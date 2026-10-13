@@ -16,4 +16,4 @@
 - [x] Add a separate browser-only saved-discussions mode with named snapshots, reopen, update, and delete, without sign-in.
 - [x] Add Matrix and Final Fantasy themes with native sprites and distinct-game protagonists.
 - [x] Verify live Matrix reply, both theme layouts, mobile overflow, and saving/reopening after refresh; 27 affected tests pass.
-- [ ] Software Developer team theme (pals at computers instead of a table)
+- [x] Software Developer team theme (pals at computers instead of a table)
