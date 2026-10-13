@@ -1304,3 +1304,44 @@ h1 {
 
 .account-chip { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--muted-foreground); }
 .account-name { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Thinking props: each pal's signature activity while composing a reply */
+.thinking-prop {
+  position: absolute;
+  left: calc(100% - 6px);
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 2px 0 var(--scene-ink));
+  z-index: 2;
+}
+.tp-dark { fill: var(--scene-ink); }
+.tp-metal { fill: var(--muted-foreground); }
+.tp-paper { fill: var(--foreground); }
+.tp-screen { fill: var(--accent); }
+.tp-glow { fill: var(--primary); }
+.tp-accent { fill: var(--agent-color, var(--primary)); }
+.thinking-prop rect { transform-box: fill-box; transform-origin: center; }
+.tp-twinkle-a { animation: tp-blink 1.2s steps(2) infinite; }
+.tp-twinkle-b { animation: tp-blink 1.2s steps(2) 0.4s infinite; }
+.tp-twinkle-c { animation: tp-blink 1.2s steps(2) 0.8s infinite; }
+.tp-line-a { animation: tp-blink 0.9s steps(2) infinite; }
+.tp-line-b { animation: tp-blink 0.9s steps(2) 0.3s infinite; }
+.tp-line-c { animation: tp-blink 0.9s steps(2) 0.6s infinite; }
+.tp-tap-a { animation: tp-blink 0.3s steps(2) infinite; }
+.tp-tap-b { animation: tp-blink 0.3s steps(2) 0.15s infinite; }
+.tp-ink { animation: tp-blink 1.4s steps(2) infinite; }
+.tp-draw-a { animation: tp-blink 1.8s steps(2) infinite; }
+.tp-draw-b { animation: tp-blink 1.8s steps(2) 0.6s infinite; }
+.tp-draw-c { animation: tp-blink 1.8s steps(2) 1.2s infinite; }
+.tp-flip { animation: tp-flip 1s steps(4) infinite; }
+.tp-note-a { animation: tp-bounce 0.8s steps(2) infinite; }
+.tp-note-b { animation: tp-bounce 0.8s steps(2) 0.4s infinite; }
+.tp-quill { animation: tp-scribble 0.6s steps(3) infinite; }
+.tp-wrench { animation: tp-scribble 0.5s steps(2) infinite; }
+.tp-spin { animation: tp-blink 0.5s steps(2) infinite; }
+@keyframes tp-blink { 50% { opacity: 0.15; } }
+@keyframes tp-bounce { 50% { transform: translateY(-1px); } }
+@keyframes tp-flip { 50% { transform: scaleX(-1) translateX(5px); } }
+@keyframes tp-scribble { 33% { transform: translate(-1px, 1px); } 66% { transform: translate(1px, 0); } }
+@media (prefers-reduced-motion: reduce) { .thinking-prop rect { animation: none !important; } }

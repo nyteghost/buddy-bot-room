@@ -55,6 +55,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
+import { ThinkingProp } from "./thinking-prop";
 import { characterModeCommand, setCharacterMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
@@ -492,6 +493,7 @@ export function Room() {
                     {bubbleText || "···"}
                   </div>
                 )}
+                {speaking === a.id && !bubbleText && <ThinkingProp id={a.id} />}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror, characterMode)}
