@@ -12,3 +12,6 @@
 - [x] Free engines: Groq/Gemini key + in-browser WebGPU option
 - [x] Rounds setting controls debate rounds (hide in one-on-one)
 - [x] Walk a full Problem solving discussion end to end
+- [x] Add a separate browser-only saved-discussions mode with named snapshots, reopen, update, and delete, without sign-in.
+- [x] Add Matrix and Final Fantasy themes with native sprites and distinct-game protagonists.
+- [ ] Verify saving/reopening and theme changes in the live room.
