@@ -21,3 +21,4 @@
 - [ ] Linux Mode: assistant pals + Terminal pal (usable terminal with error help) — awaiting plan approval
 - [ ] Gmail pal (Outlook dropped)
 - [ ] Sage adds events to Google Calendar (shows in Cozi via Google link)
+- [ ] Desktop update popup: checks GitHub for new commits, Yes pulls + rebuilds, No closes
