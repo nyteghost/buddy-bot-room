@@ -170,7 +170,7 @@ export function characterSprite(id: AgentId, mode: CharacterMode): string[] {
         [20, 12],
         [15, 13],
         [21, 6],
-      ]) {
+      ] as const) {
         dot(x, y, "r");
         dot(x + 1, y + 1, "r");
       }
