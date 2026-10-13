@@ -1301,3 +1301,6 @@ h1 {
   .header-right { gap: 8px; flex-wrap: wrap; }
   .theme-select { min-width: 140px; }
 }
+
+.account-chip { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--muted-foreground); }
+.account-name { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

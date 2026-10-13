@@ -8,6 +8,13 @@
       "when": 1791892065845,
       "tag": "0000_saved_discussions",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791915647075,
+      "tag": "0001_user_settings",
+      "breakpoints": true
     }
   ]
 }

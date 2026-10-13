@@ -10,7 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Application rules
-- Keep the current browser chat separate from named browser-only saved snapshots; no sign-in or server transcript storage is required, matching the user's storage choice.
+- Keep the current browser chat separate from named browser-only saved snapshots when signed out; optional Google sign-in syncs saved discussions and settings to the account.
 - Run one streamed model call per character turn through `/api/chat`; browser orchestration controls rounds and cancellation, keeping each server request short.
 - Keep agent identities and mode context rules in a shared browser-safe module; model prompts and gateway clients stay server-only.
 - Keep character themes mutually exclusive in one browser-persisted store and shared persona catalog, preserving legacy preferences so sprites, names, prompts and voices stay consistent.
@@ -19,3 +19,4 @@
 - Draw character forms from browser-safe native pixel grids with semantic material palettes so visual detail is independent of display size.
 - Store character mode on new replies and use one cancellable replay stream at a time; disable manual replay during discussion to prevent overlapping voices.
 - Free engines (Groq/Gemini user key, in-browser WebGPU) are chosen in a browser-persisted engine store; keys travel per request and are never stored server-side, and the local engine fetches its prompt from /api/chat (preparePrompt) so prompts stay server-authored.
+- Signed-in users (Google) sync engine choice, theme and saved discussions to owner-only tables via requireSupabaseAuth server functions; free-engine keys are AES-GCM encrypted server-side with SETTINGS_ENCRYPTION_KEY. Signed-out users keep browser-only storage, so login stays optional.
