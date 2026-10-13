@@ -224,11 +224,12 @@ export function PixelCharacter({
   const mode = useCharacterMode();
   const hell = mode === "hellraiser";
   const grid = mode === "horror" ? horrorPatterns[id] : hell ? cenobitePatterns[id] : patterns[id];
-  // 32-bit rendering: each 12x16 source pixel becomes a shaded 2x2 block on a
-  // 32x32 canvas (light top-left, dark bottom-right) for SNES-era depth.
+  // Detailed rendering: each 12x16 source pixel becomes a beveled 3x3 block on
+  // a 48x48 canvas — lit top/left edges, shadowed bottom/right, plain core —
+  // for a sculpted, high-detail sprite look.
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 48 48"
       role="img"
       aria-label={`${id} pixel character`}
       className={cn("pixel-character", `agent-${id}`, animated && "character-bounce", hell && "cenobite", mode === "horror" && "horror-icon", className)}
