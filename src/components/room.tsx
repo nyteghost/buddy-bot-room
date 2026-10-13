@@ -213,7 +213,7 @@ export function Room() {
       for (let r = 1; r <= rounds; r++)
         for (const agent of seated) turns.push({ agent, round: r, verdict: false });
       if (mode === "roundtable" && seated.length > 1)
-        turns.push({ agent: seated[0], round: rounds, verdict: true });
+        turns.push({ agent: seated[0]!, round: rounds, verdict: true });
       {
         for (const { agent, round: currentRound, verdict } of turns) {
           setRound(currentRound);
