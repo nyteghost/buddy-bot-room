@@ -239,10 +239,15 @@ export function PixelCharacter({
         [...row].map((pixel, x) =>
           pixel === "." ? null : (
             <g key={`${x}-${y}`} className={`pixel-${pixel}`}>
-              <rect className="shade-light" x={4 + x * 2} y={y * 2} width="1" height="1" />
-              <rect x={4 + x * 2 + 1} y={y * 2} width="1" height="1" />
-              <rect x={4 + x * 2} y={y * 2 + 1} width="1" height="1" />
-              <rect className="shade-dark" x={4 + x * 2 + 1} y={y * 2 + 1} width="1" height="1" />
+              <rect className="shade-light" x={6 + x * 3} y={y * 3} width="1" height="1" />
+              <rect className="shade-light" x={6 + x * 3 + 1} y={y * 3} width="1" height="1" />
+              <rect x={6 + x * 3 + 2} y={y * 3} width="1" height="1" />
+              <rect className="shade-light" x={6 + x * 3} y={y * 3 + 1} width="1" height="1" />
+              <rect x={6 + x * 3 + 1} y={y * 3 + 1} width="1" height="1" />
+              <rect className="shade-dark" x={6 + x * 3 + 2} y={y * 3 + 1} width="1" height="1" />
+              <rect x={6 + x * 3} y={y * 3 + 2} width="1" height="1" />
+              <rect className="shade-dark" x={6 + x * 3 + 1} y={y * 3 + 2} width="1" height="1" />
+              <rect className="shade-dark" x={6 + x * 3 + 2} y={y * 3 + 2} width="1" height="1" />
             </g>
           ),
         ),
