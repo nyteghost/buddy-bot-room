@@ -28,7 +28,7 @@ export function PixelCharacter({
         animated && "character-bounce",
         mode === "hellraiser" && "cenobite",
         mode === "horror" && "horror-icon",
-        (mode === "matrix" || mode === "finalfantasy" || mode === "devteam" || mode === "cyberpunk" || mode === "linux") && "cinematic-sprite",
+        (mode === "matrix" || mode === "finalfantasy" || mode === "devteam" || mode === "cyberpunk" || mode === "linux" || mode === "assistant") && "cinematic-sprite",
         className,
       )}
       shapeRendering="crispEdges"

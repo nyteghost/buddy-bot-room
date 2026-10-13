@@ -71,6 +71,6 @@ export function characterVoice(id: AgentId, mode: CharacterMode) {
   if (mode === "hellraiser") return cenobiteVoices[id];
   return {
     voice: cenobiteVoices[id].voice,
-    direction: `Read exactly the supplied text, without adding words. ${mode === "matrix" ? matrixCast[id].tone : mode === "finalfantasy" ? fantasyCast[id].tone : mode === "devteam" ? devCast[id].tone : mode === "cyberpunk" ? cyberCast[id].tone : mode === "linux" ? linuxCast[id].role + ". Friendly, clear assistant voice." : mode === "horror" ? horrorDirections[id] : normalDirections[id]} Use an original voice, not an imitation of a real actor.`,
+    direction: `Read exactly the supplied text, without adding words. ${mode === "matrix" ? matrixCast[id].tone : mode === "finalfantasy" ? fantasyCast[id].tone : mode === "devteam" ? devCast[id].tone : mode === "cyberpunk" ? cyberCast[id].tone : mode === "linux" || mode === "assistant" ? linuxCast[id].role + ". Friendly, clear assistant voice." : mode === "horror" ? horrorDirections[id] : normalDirections[id]} Use an original voice, not an imitation of a real actor.`,
   };
 }

@@ -27,3 +27,14 @@ describe("Linux Mode", () => {
     expect(findTerminalError("all good\n")).toBeNull();
   });
 });
+
+describe("assistant mode", () => {
+  it("switches on and off by command and shares Linux Mode's cast", async () => {
+    const { characterModeCommand } = await import("@/lib/hellraiser");
+    const { agentName } = await import("@/lib/agents");
+    expect(characterModeCommand("Assistant Mode")).toBe("assistant");
+    expect(characterModeCommand("assistant mode off")).toBe("normal");
+    expect(characterModeCommand("Linux Mode")).toBe("linux");
+    expect(agentName("sage", false, false, "assistant")).toBe(agentName("sage", false, false, "linux"));
+  });
+});
