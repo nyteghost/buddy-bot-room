@@ -7,7 +7,7 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 |---|---|---|
 | Nova | **Gmail pal**: inbox summary, search, draft replies (you approve before sending) | Browser + desktop |
 | Byte | **Tasks pal**: to-dos and reminders from your chats | Browser + desktop |
-| Sage | **Cozi pal**: reads your schedule and adds events you describe (see Cozi note) | Browser + desktop |
+| Sage | **Calendar pal**: tell it an event and it adds it to your Google Calendar (Cozi shows it once Google is linked in Cozi) | Browser + desktop |
 | Pip | **Notes pal**: reads/writes notes in a folder you pick | Desktop only |
 | Echo | **Files pal**: find files, tidy Downloads (approve each change) | Desktop only |
 | Rune | **System pal**: GPU, memory, disk, pending updates (read-only) | Desktop only |
@@ -24,7 +24,7 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 ## Accounts and privacy
 - Gmail needs you signed in with Google first; your account connects its own mailbox, so visitors to the public site never see your mail.
 - One-time setup: you create a Google app login in its developer console (I'll give step-by-step) and link them in the workspace connector settings.
-- Cozi has no official API. It offers a private **calendar feed link** (Cozi > Settings > Calendar > Share/Export). You paste that link once; it's saved encrypted to your account.
+- Calendar: Sage adds events to Google Calendar (confirm card first). In Cozi, link Google Calendar once so they show up there.
 
 ## Limits
 - Terminal, notes, files and system stats only work in the desktop app.
@@ -33,7 +33,7 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 
 ## Build order
 1. Linux Mode theme, sprites, personas, penguin Terminal pal + terminal panel with error help (desktop).
-2. Cozi feed + System/Notes/Files pals.
+2. Google Calendar + System/Notes/Files pals.
 3. Gmail connection (needs your Google setup).
 
 ## Technical details
@@ -41,5 +41,5 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 - Error detection: track exit code via a shell prompt hook (OSC 133) and scan output for error patterns; send last ~80 lines to the Terminal pal through the existing engine (Ollama preferred).
 - Pals get tools via AI SDK tool calling for cloud engines; for Ollama/local, a simple JSON action format parsed client-side; every mutating action rendered as an approval card.
 - Gmail via App User Connector `google_mail`, connection keys encrypted in a server-only table; server functions with `requireSupabaseAuth`.
-- Cozi: server function fetches the ICS feed, parses events; URL encrypted with existing settings crypto.
+- Google Calendar via App User Connector `google_calendar` (same Google client as Gmail), events.insert after user confirms.
 - New CharacterMode `linux` in hellraiser.ts, persona cast in theme-personas.ts, sprites in themed-sprites.ts.
