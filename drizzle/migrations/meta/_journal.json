@@ -15,6 +15,13 @@
       "when": 1791915647075,
       "tag": "0001_user_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791916393440,
+      "tag": "0002_openrouter_key",
+      "breakpoints": true
     }
   ]
 }

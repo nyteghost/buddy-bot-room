@@ -50,6 +50,7 @@ export type Database = {
           engine_kind: string
           gemini_key_ciphertext: string | null
           groq_key_ciphertext: string | null
+          openrouter_key_ciphertext: string | null
           updated_at: string
           user_id: string
         }
@@ -58,6 +59,7 @@ export type Database = {
           engine_kind?: string
           gemini_key_ciphertext?: string | null
           groq_key_ciphertext?: string | null
+          openrouter_key_ciphertext?: string | null
           updated_at?: string
           user_id: string
         }
@@ -66,6 +68,7 @@ export type Database = {
           engine_kind?: string
           gemini_key_ciphertext?: string | null
           groq_key_ciphertext?: string | null
+          openrouter_key_ciphertext?: string | null
           updated_at?: string
           user_id?: string
         }

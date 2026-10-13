@@ -10,14 +10,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { setEngine, useEngine, type EngineKind } from "@/lib/engine";
+import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
 import { hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
-  { kind: "lovable", label: "Lovable AI", note: "Each pal's own model. Uses workspace AI credits." },
-  { kind: "groq", label: "Groq (free key)", note: "GPT-OSS 120B on your free Groq key. No credits." },
-  { kind: "gemini", label: "Gemini (free key)", note: "Gemini 2.5 Flash on your free Google key. No credits." },
+  { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private, ~1 GB first download." },
 ];
 
@@ -25,7 +23,8 @@ export function EngineSettingsDialog() {
   const engine = useEngine();
   const [progress, setProgress] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const current = options.find((o) => o.kind === engine.kind)!;
+  const count = availableProviders(engine).length;
+  const label = engine.kind === "local" ? "In-browser" : `Free keys (${count})`;
   async function prepareLocal() {
     setLoading(true);
     try {
@@ -41,15 +40,14 @@ export function EngineSettingsDialog() {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" aria-label="AI engine" className="engine-trigger">
-          <Cpu /> {current.label}
+          <Cpu /> {label}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>AI engine</DialogTitle>
           <DialogDescription>
-            Choose what powers the pals. Free options keep their personalities; voices use your
-            browser's built-in speech.
+            All options are free. Voices use your browser's built-in speech.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">
@@ -68,21 +66,33 @@ export function EngineSettingsDialog() {
             </button>
           ))}
         </div>
-        {engine.kind === "groq" && (
-          <KeyField
-            value={engine.groqKey}
-            onChange={(groqKey) => setEngine({ groqKey })}
-            href="https://console.groq.com/keys"
-            placeholder="gsk_..."
-          />
-        )}
-        {engine.kind === "gemini" && (
-          <KeyField
-            value={engine.geminiKey}
-            onChange={(geminiKey) => setEngine({ geminiKey })}
-            href="https://aistudio.google.com/apikey"
-            placeholder="AIza..."
-          />
+        {engine.kind === "cloud" && (
+          <div className="grid gap-3">
+            <KeyField
+              label="Groq (GPT-OSS 120B)"
+              value={engine.groqKey}
+              onChange={(groqKey) => setEngine({ groqKey })}
+              href="https://console.groq.com/keys"
+              placeholder="gsk_..."
+            />
+            <KeyField
+              label="Gemini (2.5 Flash)"
+              value={engine.geminiKey}
+              onChange={(geminiKey) => setEngine({ geminiKey })}
+              href="https://aistudio.google.com/apikey"
+              placeholder="AIza..."
+            />
+            <KeyField
+              label="OpenRouter (Llama 3.3 70B free)"
+              value={engine.openrouterKey}
+              onChange={(openrouterKey) => setEngine({ openrouterKey })}
+              href="https://openrouter.ai/keys"
+              placeholder="sk-or-..."
+            />
+            <p className="text-sm text-muted-foreground">
+              Keys are saved only in this browser (and encrypted in your account if signed in).
+            </p>
+          </div>
         )}
         {engine.kind === "local" && (
           <div className="grid gap-2 text-sm">
@@ -104,6 +114,7 @@ export function EngineSettingsDialog() {
 }
 
 function KeyField(props: {
+  label: string;
   value: string;
   onChange: (v: string) => void;
   href: string;
@@ -111,19 +122,19 @@ function KeyField(props: {
 }) {
   return (
     <div className="grid gap-1 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">{props.label}</span>
+        <a className="text-primary underline" href={props.href} target="_blank" rel="noreferrer">
+          Get a free key
+        </a>
+      </div>
       <Input
         type="password"
-        aria-label="Your free API key"
+        aria-label={`${props.label} key`}
         placeholder={props.placeholder}
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
       />
-      <span className="text-muted-foreground">
-        Saved only in this browser.{" "}
-        <a className="text-primary underline" href={props.href} target="_blank" rel="noreferrer">
-          Get a free key
-        </a>
-      </span>
     </div>
   );
 }
