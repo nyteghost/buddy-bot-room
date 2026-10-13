@@ -1,4 +1,5 @@
 import type { AgentId } from "@/lib/agents";
+import type { CharacterMode } from "@/lib/hellraiser";
 
 type Px = [number, number, string, (string | undefined)?]; // x, y, material, animation class
 
@@ -9,7 +10,8 @@ const r = (x: number, y: number, w: number, h: number, m: string, a?: string): P
 };
 
 /** Each pal's signature "thinking" activity, drawn as a 16×16 pixel prop. */
-const props: Record<AgentId, { label: string; pixels: Px[] }> = {
+type Prop = { label: string; pixels: Px[] };
+const props: Record<AgentId, Prop> = {
   // Big-picture thinker: telescope gazing at twinkling stars.
   nova: {
     label: "stargazing through a telescope",
@@ -75,8 +77,70 @@ const props: Record<AgentId, { label: string; pixels: Px[] }> = {
   },
 };
 
-export function ThinkingProp({ id }: { id: AgentId }) {
-  const prop = props[id];
+
+// Reusable themed shapes.
+const blade = (m = "metal"): Px[] => [...r(7, 1, 2, 10, m), ...r(5, 11, 6, 1, "dark"), ...r(7, 12, 2, 3, "dark"), [8, 2, "paper", "tp-twinkle-a"], [7, 6, "paper", "tp-twinkle-b"]];
+const sparkles = (m: string): Px[] => [[3, 3, m, "tp-twinkle-a"], [12, 2, m, "tp-twinkle-b"], [8, 6, m, "tp-twinkle-c"], [2, 11, m, "tp-twinkle-b"], [13, 10, m, "tp-twinkle-a"], [7, 13, m, "tp-twinkle-c"]];
+const rain = (): Px[] => [0, 3, 6, 9, 12, 15].flatMap((x, i) => r(x, (i * 3) % 8, 1, 6, "glow", ["tp-rain-a", "tp-rain-b", "tp-rain-c"][i % 3]));
+const puzzleBox = (): Px[] => [...r(3, 3, 10, 10, "accent", "tp-spin"), ...r(5, 5, 6, 6, "dark"), ...r(7, 7, 2, 2, "accent", "tp-twinkle-a"), ...r(3, 7, 10, 1, "dark"), ...r(7, 3, 1, 10, "dark")];
+const chains = (): Px[] => [2, 7, 12].flatMap((x, i) => [...r(x, 0, 1, 9, "metal", i % 2 ? "tp-sway-b" : "tp-sway-a"), ...r(x - 1, 9, 3, 1, "metal", i % 2 ? "tp-sway-b" : "tp-sway-a"), [x - 1, 10, "metal", i % 2 ? "tp-sway-b" : "tp-sway-a"]]);
+const candle = (): Px[] => [...r(6, 7, 4, 8, "paper"), ...r(7, 3, 2, 3, "red", "tp-flicker"), [7, 2, "glow", "tp-flicker"], ...r(4, 15, 8, 1, "dark")];
+const phone = (): Px[] => [...r(5, 2, 6, 12, "dark"), ...r(6, 3, 4, 7, "screen"), ...r(7, 11, 2, 1, "metal"), [12, 2, "glow", "tp-twinkle-a"], [13, 4, "glow", "tp-twinkle-b"], [2, 3, "glow", "tp-twinkle-c"]];
+const balloon = (): Px[] => [...r(4, 1, 8, 8, "red", "tp-bob"), ...r(5, 0, 6, 1, "red", "tp-bob"), [6, 2, "paper", "tp-bob"], ...r(7, 9, 2, 1, "red", "tp-bob"), ...r(8, 10, 1, 6, "metal", "tp-sway-a")];
+const glove = (): Px[] => [...r(3, 9, 8, 5, "accent"), ...[4, 7, 9].flatMap((x) => r(x, 2, 1, 7, "metal", "tp-scribble")), [10, 3, "paper", "tp-twinkle-a"]];
+const tape = (): Px[] => [...r(1, 4, 14, 9, "dark"), ...r(3, 6, 3, 3, "metal", "tp-spin"), ...r(10, 6, 3, 3, "metal", "tp-spin"), ...r(6, 10, 4, 1, "red", "tp-twinkle-a")];
+const doll = (): Px[] => [...r(5, 2, 6, 5, "paper"), ...r(4, 1, 8, 2, "red"), [6, 4, "dark"], [9, 4, "dark"], ...r(5, 7, 6, 6, "screen"), ...blade("metal").map(([x, y, m, an]) => [x + 5, y, m, an ?? "tp-scribble"] as Px).filter(([, y]) => y < 9)];
+const pills = (): Px[] => [...r(2, 6, 5, 3, "red", "tp-bob"), ...r(9, 6, 5, 3, "screen", "tp-bob"), ...r(1, 11, 14, 2, "paper")];
+const monitors = (): Px[] => [0, 5, 10].flatMap((x, i) => [...r(x, 2, 5, 4, "dark"), ...r(x + 1, 3, 3, 2, "glow", ["tp-line-a", "tp-line-b", "tp-line-c"][i]), ...r(x, 8, 5, 4, "dark"), ...r(x + 1, 9, 3, 2, "glow", ["tp-line-c", "tp-line-a", "tp-line-b"][i])]);
+const cookies = (): Px[] => [...r(2, 12, 12, 2, "metal"), ...r(3, 9, 4, 3, "accent"), ...r(9, 9, 4, 3, "accent"), ...r(6, 4, 4, 3, "accent", "tp-bob"), ...r(5, 1, 6, 1, "metal", "tp-twinkle-a")];
+const ship = (): Px[] => [...r(2, 7, 12, 4, "metal"), ...r(5, 5, 6, 2, "dark"), ...r(0, 8, 2, 2, "glow", "tp-flicker"), ...r(14, 8, 2, 2, "glow", "tp-flicker")];
+const shades = (): Px[] => [...r(1, 6, 6, 3, "dark"), ...r(9, 6, 6, 3, "dark"), ...r(7, 6, 2, 1, "dark"), [2, 7, "glow", "tp-twinkle-a"], [10, 7, "glow", "tp-twinkle-b"]];
+const ball = (): Px[] => [...r(5, 3, 6, 6, "screen", "tp-bounce-big"), ...r(4, 4, 8, 4, "screen", "tp-bounce-big"), ...r(6, 5, 4, 1, "paper", "tp-bounce-big"), ...r(2, 14, 12, 1, "dark")];
+const fireball = (): Px[] => [...r(4, 5, 8, 7, "red", "tp-flicker"), ...r(6, 2, 4, 3, "glow", "tp-flicker"), ...r(6, 7, 4, 3, "glow")];
+const gunblade = (): Px[] => [...r(1, 6, 10, 2, "metal"), ...r(11, 5, 4, 4, "dark"), ...r(12, 9, 2, 4, "dark"), [3, 6, "paper", "tp-twinkle-a"], [7, 7, "paper", "tp-twinkle-b"]];
+const daggers = (): Px[] => [...r(2, 2, 1, 9, "metal", "tp-scribble"), ...r(1, 11, 3, 1, "accent"), ...r(13, 2, 1, 9, "metal", "tp-wrench"), ...r(12, 11, 3, 1, "accent"), [7, 6, "glow", "tp-twinkle-a"]];
+
+const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
+  horror: {
+    nova: { label: "making a spooky phone call", pixels: phone() },
+    byte: { label: "sharpening a machete", pixels: blade() },
+    sage: { label: "watching from the shadows by a candle", pixels: [...candle(), ...blade().map(([x, y, m, an]) => [x - 5, y, m, an] as Px).filter(([x]) => x >= 0)] },
+    pip: { label: "flexing a razor glove", pixels: glove() },
+    echo: { label: "floating a red balloon", pixels: balloon() },
+    rune: { label: "plotting with a toy knife", pixels: doll() },
+    claude: { label: "playing a tape recorder", pixels: tape() },
+  },
+  hellraiser: {
+    nova: { label: "turning the puzzle box", pixels: puzzleBox() },
+    byte: { label: "swinging hooked chains", pixels: chains() },
+    sage: { label: "chanting by candlelight", pixels: candle() },
+    pip: { label: "clicking teeth", pixels: [...r(2, 5, 12, 2, "paper", "tp-chatter"), ...r(2, 9, 12, 2, "paper", "tp-chatter-b"), ...r(2, 7, 12, 2, "dark")] },
+    echo: { label: "summoning glowing sigils", pixels: sparkles("accent") },
+    rune: { label: "rattling the hooks", pixels: chains() },
+    claude: { label: "designing a puzzle box", pixels: [...puzzleBox(), ...sparkles("glow")] },
+  },
+  matrix: {
+    nova: { label: "reading the code rain", pixels: rain() },
+    byte: { label: "hacking a terminal", pixels: monitors() },
+    sage: { label: "offering the red and blue pills", pixels: pills() },
+    pip: { label: "adjusting dark shades", pixels: shades() },
+    echo: { label: "baking cookies", pixels: cookies() },
+    rune: { label: "piloting a hovercraft", pixels: ship() },
+    claude: { label: "watching a wall of monitors", pixels: monitors() },
+  },
+  finalfantasy: {
+    nova: { label: "polishing a giant sword", pixels: blade() },
+    byte: { label: "spinning a gunblade", pixels: gunblade() },
+    sage: { label: "twirling twin daggers", pixels: daggers() },
+    pip: { label: "bouncing a blitzball", pixels: ball() },
+    echo: { label: "conjuring magic", pixels: sparkles("accent") },
+    rune: { label: "charging a gunblade", pixels: [...gunblade(), ...sparkles("glow")] },
+    claude: { label: "calling the Phoenix flame", pixels: fireball() },
+  },
+};
+
+export function ThinkingProp({ id, mode = "normal" }: { id: AgentId; mode?: CharacterMode }) {
+  const prop = themed[mode]?.[id] ?? props[id];
   if (!prop) return null;
   return (
     <svg

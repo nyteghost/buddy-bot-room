@@ -1345,3 +1345,19 @@ h1 {
 @keyframes tp-flip { 50% { transform: scaleX(-1) translateX(5px); } }
 @keyframes tp-scribble { 33% { transform: translate(-1px, 1px); } 66% { transform: translate(1px, 0); } }
 @media (prefers-reduced-motion: reduce) { .thinking-prop rect { animation: none !important; } }
+.tp-red { fill: var(--destructive); }
+.tp-rain-a { animation: tp-fall 0.9s steps(3) infinite; }
+.tp-rain-b { animation: tp-fall 0.9s steps(3) 0.3s infinite; }
+.tp-rain-c { animation: tp-fall 0.9s steps(3) 0.6s infinite; }
+.tp-sway-a { animation: tp-sway 1s steps(2) infinite; }
+.tp-sway-b { animation: tp-sway 1s steps(2) 0.5s infinite; }
+.tp-flicker { animation: tp-blink 0.35s steps(2) infinite; }
+.tp-bob { animation: tp-bounce 1.2s steps(2) infinite; }
+.tp-bounce-big { animation: tp-bounce-big 0.7s steps(3) infinite; }
+.tp-scribble { animation: tp-scribble 0.6s steps(3) infinite; }
+.tp-chatter { animation: tp-bounce 0.2s steps(2) infinite; }
+.tp-chatter-b { animation: tp-drop 0.2s steps(2) infinite; }
+@keyframes tp-fall { from { transform: translateY(-4px); opacity: 0.3; } to { transform: translateY(4px); } }
+@keyframes tp-sway { 50% { transform: translateX(1px); } }
+@keyframes tp-drop { 50% { transform: translateY(1px); } }
+@keyframes tp-bounce-big { 50% { transform: translateY(-4px); } }
