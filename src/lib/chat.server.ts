@@ -69,7 +69,7 @@ export async function handleChat(request: Request) {
       result = call.result;
       // The helper returns a wrapper for basic responses; metadata-aware responses
       // use the same request-scoped gateway fetch through its response method below.
-      return call.responseForMessages(messages, { agentId: agent.id, round: body.round });
+      return await call.responseForMessages(messages, { agentId: agent.id, round: body.round });
     } else {
       gateway = createLovableAiGatewayProvider(key, getLovableAiGatewayRunId(request), {
         baseURL: "https://ai.gateway.lovable.dev/v1",
@@ -83,7 +83,7 @@ export async function handleChat(request: Request) {
         onError: logStreamError,
       });
     }
-    return withLovableAiGatewayRunIdHeader(
+    return await withLovableAiGatewayRunIdHeader(
       result.toUIMessageStreamResponse({
         originalMessages: messages,
         sendReasoning: true,
