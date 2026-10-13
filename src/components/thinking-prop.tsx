@@ -128,6 +128,15 @@ const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
     rune: { label: "piloting a hovercraft", pixels: ship() },
     claude: { label: "watching a wall of monitors", pixels: monitors() },
   },
+  devteam: {
+    nova: { label: "sketching system architecture", pixels: [...r(1, 2, 14, 10, "paper"), ...r(3, 4, 3, 2, "screen"), ...r(10, 4, 3, 2, "screen"), ...r(6, 8, 4, 2, "accent", "tp-twinkle-a"), ...r(5, 5, 5, 1, "dark", "tp-line-a")] },
+    byte: { label: "writing a database query", pixels: monitors() },
+    sage: { label: "running the test suite", pixels: [...r(1, 2, 14, 11, "dark"), ...[3, 6, 9].flatMap((y, i) => [...r(2, y, 2, 2, i === 1 ? "red" : "glow", ["tp-twinkle-a", "tp-twinkle-b", "tp-twinkle-c"][i]), ...r(5, y, 8, 1, "metal", ["tp-line-a", "tp-line-b", "tp-line-c"][i])])] },
+    pip: { label: "nudging pixels in a mockup", pixels: [...r(2, 2, 12, 9, "screen"), ...r(4, 4, 4, 3, "accent", "tp-bob"), ...r(9, 4, 3, 1, "paper", "tp-line-a"), ...r(9, 6, 3, 1, "paper", "tp-line-b"), [10, 12, "paper", "tp-scribble"], [11, 13, "paper", "tp-scribble"]] },
+    echo: { label: "watching the deploy pipeline", pixels: [...[1, 6, 11].flatMap((x, i) => r(x, 6, 4, 4, "glow", ["tp-twinkle-a", "tp-twinkle-b", "tp-twinkle-c"][i])), ...r(5, 7, 1, 2, "metal"), ...r(10, 7, 1, 2, "metal"), ...r(3, 12, 10, 1, "dark")] },
+    rune: { label: "auditing for vulnerabilities", pixels: [...r(4, 7, 8, 7, "metal"), ...r(5, 3, 1, 4, "metal"), ...r(10, 3, 1, 4, "metal"), ...r(6, 2, 4, 1, "metal"), ...r(7, 9, 2, 3, "dark"), [7, 10, "red", "tp-flicker"]] },
+    claude: { label: "reviewing a pull request", pixels: [...r(1, 1, 14, 13, "paper"), ...[3, 6, 9].flatMap((y, i) => [...r(3, y, 9, 1, i === 1 ? "red" : "glow", ["tp-line-a", "tp-line-b", "tp-line-c"][i])]), [12, 11, "glow", "tp-twinkle-a"], [13, 12, "glow", "tp-twinkle-b"]] },
+  },
   finalfantasy: {
     nova: { label: "polishing a giant sword", pixels: blade() },
     byte: { label: "spinning a gunblade", pixels: gunblade() },

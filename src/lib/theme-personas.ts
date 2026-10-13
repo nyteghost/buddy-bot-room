@@ -15,4 +15,12 @@ export const fantasyCast = {
   echo: { name: "Terra Branford", game: "VI", role: "Final Fantasy VI · Terra", tone: "Gentle, reflective and resilient. Explore identity, empathy and the courage to care." },
   rune: { name: "Lightning", game: "XIII", role: "Final Fantasy XIII · Lightning", tone: "Resolute, direct and protective. Cut through distractions with tactical practical advice." },
   claude: { name: "Clive Rosfield", game: "XVI", role: "Final Fantasy XVI · Clive", tone: "Earnest, thoughtful and steadfast. Weigh duty against freedom and stand up for others." },
+};export const devCast = {
+  nova: { name: "Nova", role: "Tech Lead & Architect", tone: "Big-picture and pragmatic. Talk architecture, scalability and framework trade-offs, and keep the team pointed at a clean design." },
+  byte: { name: "Byte", role: "Senior Backend Engineer", tone: "Precise and practical. Focus on APIs, databases, query performance and concrete implementation steps." },
+  sage: { name: "Sage", role: "QA & Site Reliability", tone: "Skeptical and thorough. Hunt for edge cases, failure modes, test coverage and what breaks at 3 a.m." },
+  pip: { name: "Pip", role: "Frontend & UX Engineer", tone: "Playful and user-focused. Think about UI states, accessibility, layout and how it actually feels to use." },
+  echo: { name: "Echo", role: "DevOps & Cloud Engineer", tone: "Calm and operational. Cover CI/CD, deployments, containers, monitoring and infrastructure as code." },
+  rune: { name: "Rune", role: "Security Engineer", tone: "Sharp and adversarial. Point out attack surfaces, auth gaps, secrets handling and safe defaults." },
+  claude: { name: "Claude", role: "Principal Engineer & Code Reviewer", tone: "Thoughtful and balanced. Review everyone's ideas like a PR, weigh trade-offs and drive the team to a decision." },
 };

@@ -1,7 +1,7 @@
 import type { AgentId } from "./agents";
 
 /** Hand-drawn silhouettes rasterized directly onto a native 32×32 canvas. */
-export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy"): string[] {
+export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam"): string[] {
   const grid = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
   const dot = (x: number, y: number, c: string) => {
     if (grid[y] && x >= 0 && x < 32) grid[y][x] = c;
@@ -63,6 +63,30 @@ export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy"): stri
     line(12,3,17,3,highlight); dot(11,4,highlight); line(19,4,21,5,highlight);
   };
   legs();
+  if (mode === "devteam") {
+    const look: Record<AgentId, [string, string, string, string, string]> = {
+      // hoodie, hoodie shade, hair, hair light, skin
+      nova: ["F", "B", "H", "J", "E"],
+      byte: ["N", "B", "H", "J", "U"],
+      sage: ["A", "B", "Q", "Y", "E"],
+      pip: ["p", "r", "v", "Z", "E"],
+      echo: ["G", "B", "H", "J", "U"],
+      rune: ["I", "B", "r", "R", "E"],
+      claude: ["r", "B", "J", "H", "E"],
+    };
+    const [hood, hoodShade, hc, hl, skin] = look[id];
+    head(skin, skin === "U" ? "V" : "T"); eyes(); hair(hc, hl);
+    torso(hood, hoodShade);
+    box(15,16,3,2,"K"); line(14,18,14,22,"W"); line(18,18,18,22,"W"); // hoodie strings
+    box(13,21,7,2,hoodShade); // front pocket
+    if (id === "nova") { box(23,10,6,5,"I"); box(24,11,4,3,"C"); box(25,15,2,2,"G"); } // laptop sticker board
+    if (id === "byte" || id === "pip") { line(10,7,10,3,"I"); line(10,3,22,3,"I"); line(22,3,22,7,"I"); box(9,7,2,4,"I"); box(22,7,2,4,"I"); } // headphones
+    if (id === "sage" || id === "claude") { box(12,8,3,2,"I"); box(18,8,3,2,"I"); line(15,8,17,8,"I"); dot(13,9,"C"); dot(19,9,"C"); } // glasses
+    if (id === "echo") { box(24,19,4,5,"K"); box(28,20,1,2,"K"); box(25,18,2,1,"H"); } // coffee mug
+    if (id === "rune") { shape([[9,3],[23,3],[24,9],[22,8],[10,8],[8,9]],"I"); box(14,16,5,1,"I"); } // hood up
+    box(24,23,1,1,"C"); // lanyard badge glint
+    return grid.map(row => row.join(""));
+  }
   if (mode === "matrix") {
     head(id === "sage" || id === "rune" || id === "echo" ? "U" : "E", id === "sage" || id === "rune" || id === "echo" ? "V" : "T");
     if (id !== "sage") hair("H","J");
