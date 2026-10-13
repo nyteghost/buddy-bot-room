@@ -121,7 +121,7 @@ export async function handleChat(request: Request) {
         onFinish: () => {},
         onError: safeError,
       }),
-      gateway,
+      gateway!,
     );
   } catch (error) {
     if (request.signal.aborted || isAbortError(error))
