@@ -114,6 +114,38 @@ export function EngineSettingsDialog() {
   );
 }
 
+function WebGpuUsageBox({ active }: { active: boolean }) {
+  const [gpu, setGpu] = useState<string | null>(null);
+  const [stats, setStats] = useState<string | null>(null);
+  useEffect(() => {
+    let stop = false;
+    getGpuInfo().then((info) => !stop && setGpu(info));
+    const tick = async () => {
+      const text = await getLocalStats();
+      if (!stop) setStats(text);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => {
+      stop = true;
+      clearInterval(timer);
+    };
+  }, [active]);
+  return (
+    <div className="rounded-md border border-border p-3 text-xs" aria-label="WebGPU usage">
+      <div className="font-semibold">WebGPU usage</div>
+      <div className="text-muted-foreground">{gpu ?? "Checking your graphics card…"}</div>
+      {stats ? (
+        <pre className="mt-1 whitespace-pre-wrap font-mono text-muted-foreground">{stats}</pre>
+      ) : (
+        <div className="mt-1 text-muted-foreground">
+          Start the local model to see memory and speed here.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KeyField(props: {
   label: string;
   value: string;
