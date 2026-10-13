@@ -148,6 +148,8 @@
   --byte: oklch(0.78 0.11 225);
   --sage: oklch(0.84 0.1 155);
   --pip: oklch(0.81 0.14 75);
+  --echo: oklch(0.76 0.14 350);
+  --rune: oklch(0.8 0.12 190);
   --skin: oklch(0.85 0.075 55);
   --pixel-ink: oklch(0.24 0.018 270);
   --pixel-shoe: oklch(0.32 0.025 270);
@@ -350,22 +352,12 @@ h1 {
   border: 1px solid var(--agent-color);
   margin-top: 3px;
 }
-.scene-pal-0 {
-  left: 41%;
-  top: 42%;
-}
-.scene-pal-1 {
-  left: 60%;
-  top: 42%;
-}
-.scene-pal-2 {
-  left: 39%;
-  top: 70%;
-}
-.scene-pal-3 {
-  left: 61%;
-  top: 70%;
-}
+.scene-pal-0 { left: 32%; top: 42%; }
+.scene-pal-1 { left: 50%; top: 40%; }
+.scene-pal-2 { left: 68%; top: 42%; }
+.scene-pal-3 { left: 32%; top: 72%; }
+.scene-pal-4 { left: 50%; top: 74%; }
+.scene-pal-5 { left: 68%; top: 72%; }
 .pal-away {
   opacity: 0.2;
 }
@@ -380,6 +372,12 @@ h1 {
 }
 .agent-pip {
   --agent-color: var(--pip);
+}
+.agent-echo {
+  --agent-color: var(--echo);
+}
+.agent-rune {
+  --agent-color: var(--rune);
 }
 .pixel-character {
   width: 32px;
@@ -427,7 +425,7 @@ h1 {
 }
 .agent-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .agent-card {
@@ -936,7 +934,7 @@ h1 {
     padding: 9px;
   }
   .agent-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
   }
   .agent-card {
@@ -1035,6 +1033,8 @@ h1 {
   --byte: oklch(0.6 0.17 30);
   --sage: oklch(0.7 0.06 60);
   --pip: oklch(0.55 0.2 20);
+  --echo: oklch(0.62 0.12 350);
+  --rune: oklch(0.6 0.04 250);
 }
 .hellraiser .pixel-room-image { filter: brightness(0.9) contrast(1.05); }
 .hellraiser .room-scene { position: relative; box-shadow: 0 0 40px oklch(0.45 0.18 25 / 45%); }
@@ -1077,6 +1077,8 @@ h1 {
   --byte: oklch(0.78 0.09 140);
   --sage: oklch(0.78 0.09 240);
   --pip: oklch(0.76 0.17 25);
+  --echo: oklch(0.85 0.1 20);
+  --rune: oklch(0.72 0.15 45);
 }
 .horror .pixel-room-image { filter: saturate(0.6) brightness(0.75); }
 .voice-toggle {

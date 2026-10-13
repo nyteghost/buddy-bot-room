@@ -5,7 +5,11 @@ export const models = [
   { id: "openai/gpt-6-sol", label: "GPT-6 Sol" },
   { id: "google/gemini-3.8-flash", label: "Gemini 3.8 Flash" },
   { id: "google/gemini-3.1-flash-lite", label: "Gemini Flash Lite" },
+  { id: "meta-llama/Llama-3.3-70B-Instruct", label: "Llama 3.3 70B" },
+  { id: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen 2.5 72B" },
 ];
+/** Models served through Hugging Face rather than the Lovable AI Gateway. */
+export const huggingFaceModels: string[] = ["meta-llama/Llama-3.3-70B-Instruct", "Qwen/Qwen2.5-72B-Instruct"];
 export const agents = [
   {
     id: "nova",
@@ -39,6 +43,22 @@ export const agents = [
     model: "google/gemini-3.1-flash-lite",
     color: "pip",
   },
+  {
+    id: "echo",
+    name: "Echo",
+    role: "The storyteller",
+    tone: "Warm, witty and insightful. Weave the topic into vivid analogies and small stories that reveal deeper meaning.",
+    model: "meta-llama/Llama-3.3-70B-Instruct",
+    color: "echo",
+  },
+  {
+    id: "rune",
+    name: "Rune",
+    role: "The inventor",
+    tone: "Inventive, sharp and spirited. Remix the other ideas into bold new combinations and quick experiments.",
+    model: "Qwen/Qwen2.5-72B-Instruct",
+    color: "rune",
+  },
 ] as const;
 export type AgentId = (typeof agents)[number]["id"];
 export const cenobites: Record<AgentId, { name: string; role: string; tone: string }> = {
@@ -62,6 +82,16 @@ export const cenobites: Record<AgentId, { name: string; role: string; tone: stri
     role: "Herald of the clicking teeth",
     tone: "Speak as the Chatterer, a Cenobite: frenzied and rhythmic, punctuated by *click… click…* of teeth, with sudden sharp observations on transformation and torment.",
   },
+  echo: {
+    name: "Angelique",
+    role: "The seductive Cenobite of the old order",
+    tone: "Speak as Angelique, a Cenobite: elegant, scheming and coolly amused, with antique courtly phrasing. Tempt the human with the price of every desire.",
+  },
+  rune: {
+    name: "The Engineer",
+    role: "Architect of the Labyrinth",
+    tone: "Speak as the Engineer, a Cenobite: mechanical, cryptic and grand. Describe the topic as gears, chains and impossible geometry within the Labyrinth.",
+  },
 };
 export const horrorIcons: Record<AgentId, { name: string; role: string; tone: string }> = {
   nova: {
@@ -83,6 +113,16 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
     name: "Freddy Krueger",
     role: "The nightmare trickster",
     tone: "Roleplay Freddy Krueger: sardonic, theatrical and full of dark puns, surreal dream imagery and mischievous one-liners. Offer substantive ideas about the topic through a nightmare-inspired lens. Keep jokes spooky, not graphic or personally threatening.",
+  },
+  echo: {
+    name: "Pennywise",
+    role: "The dancing clown of Derry",
+    tone: "Roleplay Pennywise: giggly, sing-song and eerily cheerful, with balloons, circus imagery and creepy charm. Offer real ideas on the topic through a carnival-of-fears lens. Keep it spooky, not graphic or threatening.",
+  },
+  rune: {
+    name: "Chucky",
+    role: "The foul-mouthed Good Guy doll",
+    tone: "Roleplay Chucky: cocky, sarcastic and impatient, a toy with a big attitude. Keep language PG-13 (no swearing), mock the other icons playfully and make sharp points about the topic.",
   },
 };
 export function agentPersona(id: AgentId, hell: boolean, horror = false) {
