@@ -1,0 +1,36 @@
+# Maintainer: nyteghost
+pkgname=pixelpals
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Pixel Pals — AI agent chat room with pixel characters (works with local Ollama)"
+arch=('x86_64')
+url="https://github.com/nyteghost/buddy-bot-room"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+makedepends=('git' 'bun' 'rust' 'cargo')
+optdepends=('ollama-cuda: fast local AI on NVIDIA GPUs')
+source=("$pkgname::git+https://github.com/nyteghost/buddy-bot-room.git")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname"
+  bun install
+  bunx tauri icon src-tauri/icons/app-icon.png
+  bunx tauri build --bundles deb
+}
+
+package() {
+  cd "$srcdir/$pkgname/src-tauri/target/release"
+  install -Dm755 pixelpals "$pkgdir/usr/bin/pixelpals"
+  install -Dm644 "$srcdir/$pkgname/src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/pixelpals.png"
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/pixelpals.desktop" <<EOF
+[Desktop Entry]
+Name=Pixel Pals
+Comment=AI agent chat room
+Exec=pixelpals
+Icon=pixelpals
+Type=Application
+Categories=Utility;
+EOF
+}
