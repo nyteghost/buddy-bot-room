@@ -224,9 +224,11 @@ export function PixelCharacter({
   const mode = useCharacterMode();
   const hell = mode === "hellraiser";
   const grid = mode === "horror" ? horrorPatterns[id] : hell ? cenobitePatterns[id] : patterns[id];
+  // 32-bit rendering: each 12x16 source pixel becomes a shaded 2x2 block on a
+  // 32x32 canvas (light top-left, dark bottom-right) for SNES-era depth.
   return (
     <svg
-      viewBox="0 0 12 16"
+      viewBox="0 0 32 32"
       role="img"
       aria-label={`${id} pixel character`}
       className={cn("pixel-character", `agent-${id}`, animated && "character-bounce", hell && "cenobite", mode === "horror" && "horror-icon", className)}
@@ -235,7 +237,12 @@ export function PixelCharacter({
       {grid.flatMap((row, y) =>
         [...row].map((pixel, x) =>
           pixel === "." ? null : (
-            <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" className={`pixel-${pixel}`} />
+            <g key={`${x}-${y}`} className={`pixel-${pixel}`}>
+              <rect className="shade-light" x={4 + x * 2} y={y * 2} width="1" height="1" />
+              <rect x={4 + x * 2 + 1} y={y * 2} width="1" height="1" />
+              <rect x={4 + x * 2} y={y * 2 + 1} width="1" height="1" />
+              <rect className="shade-dark" x={4 + x * 2 + 1} y={y * 2 + 1} width="1" height="1" />
+            </g>
           ),
         ),
       )}
