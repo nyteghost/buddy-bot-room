@@ -1,5 +1,5 @@
 # Pixel Pals Chat
-- [ ] Improve and visually verify all Matrix and Final Fantasy native character sprites.
+- [x] Improve and visually verify all Matrix and Final Fantasy native character sprites.
 - [x] Build pixel room, character roster, topic input, and start/stop controls.
 - [x] Connect multiple AI models with roundtable and broadcast modes.
 - [x] Save the single conversation in this browser.
