@@ -69,6 +69,9 @@ import {
 import roomImage from "@/assets/pixel-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
+import { engineKey, useEngine } from "@/lib/engine";
+import { localTurn, speakFree } from "@/lib/local-llm";
+import { EngineSettingsDialog } from "./engine-settings";
 import { cn } from "@/lib/utils";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -81,6 +84,7 @@ const suggestions = [
 export function Room() {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const characterMode = useCharacterMode();
+  const engine = useEngine();
   const hell = characterMode === "hellraiser";
   const horror = characterMode === "horror";
   useEffect(() => {
@@ -169,6 +173,10 @@ export function Room() {
     setReplayId(message.id);
     setError("");
     try {
+      if (engine.kind !== "lovable") {
+        await speakFree(messageText(message), controller.signal);
+        return;
+      }
       await streamSpeech(
         {
           agentId,
@@ -227,25 +235,45 @@ export function Room() {
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
           const began = performance.now();
-          const transport = new DefaultChatTransport<RoomMessage>({
-            api: "/api/chat",
-            body: {
-              agentId: agent.id,
-              model: selectedModels[agent.id],
-              mode,
-              round: currentRound,
-              verdict,
-              hellraiser: hell,
-              horror,
-            },
-          });
-          const stream = await transport.sendMessages({
-            chatId: "pixel-pals-room",
-            messageId: undefined,
-            messages: transcript,
-            trigger: "submit-message",
-            abortSignal: controller.signal,
-          });
+          const requestBody = {
+            agentId: agent.id,
+            model: selectedModels[agent.id],
+            mode,
+            round: currentRound,
+            verdict,
+            hellraiser: hell,
+            horror,
+          };
+          let stream;
+          if (engine.kind === "local") {
+            const res = await fetch("/api/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...requestBody, messages: transcript, preparePrompt: true }),
+              signal: controller.signal,
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Prompt failed.");
+            stream = await localTurn(
+              await res.json(),
+              { agentId: agent.id, round: currentRound },
+              controller.signal,
+            );
+          } else {
+            const transport = new DefaultChatTransport<RoomMessage>({
+              api: "/api/chat",
+              body:
+                engine.kind === "lovable"
+                  ? requestBody
+                  : { ...requestBody, engine: { kind: engine.kind, apiKey: engineKey(engine) } },
+            });
+            stream = await transport.sendMessages({
+              chatId: "pixel-pals-room",
+              messageId: undefined,
+              messages: transcript,
+              trigger: "submit-message",
+              abortSignal: controller.signal,
+            });
+          }
           let answer: RoomMessage | undefined;
           const answerId = crypto.randomUUID();
           for await (const partial of readUIMessageStream<RoomMessage>({
@@ -271,10 +299,13 @@ export function Room() {
             setMessages(transcript);
             if (hell && voiceRef.current && !controller.signal.aborted) {
               try {
-                await streamSpeech(
-                  { agentId: agent.id, text: messageText(answer), characterMode },
-                  controller.signal,
-                );
+                if (engine.kind !== "lovable")
+                  await speakFree(messageText(answer), controller.signal);
+                else
+                  await streamSpeech(
+                    { agentId: agent.id, text: messageText(answer), characterMode },
+                    controller.signal,
+                  );
               } catch (err) {
                 if (controller.signal.aborted) return;
                 voiceRef.current = false;
