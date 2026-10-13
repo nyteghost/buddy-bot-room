@@ -28,3 +28,15 @@ describe("Discussion visibility", () => {
     expect(contextForMode(transcript, "broadcast").map((m) => m.id)).toEqual(["human"]);
   });
 });
+
+import { contextForPartner } from "@/lib/agents";
+describe("one-on-one", () => {
+  it("only shows the human and the chosen pal", () => {
+    const msgs = [
+      { id: "h", role: "user", parts: [] },
+      { id: "c", role: "assistant", parts: [], metadata: { agentId: "claude" } },
+      { id: "n", role: "assistant", parts: [], metadata: { agentId: "nova" } },
+    ] as never;
+    expect(contextForPartner(msgs, "claude").map((m) => m.id)).toEqual(["h", "c"]);
+  });
+});

@@ -452,7 +452,7 @@ export function Room() {
           </div>
           <div className="section-heading">
             <h2>
-              The pals <span>{enabled.length}/4</span>
+              The pals <span>{enabled.length}/{agents.length}</span>
             </h2>
             <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
               <Settings2 size={14} />
