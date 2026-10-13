@@ -24,6 +24,30 @@ export function loadLocalEngine(onProgress?: (progress: number, text: string) =>
   return enginePromise;
 }
 
+/** Live usage stats from the running local engine, or null if not started. */
+export async function getLocalStats(): Promise<string | null> {
+  if (!enginePromise) return null;
+  try {
+    const engine = await enginePromise;
+    return await engine.runtimeStatsText();
+  } catch {
+    return null;
+  }
+}
+
+/** Basic WebGPU adapter info for the usage box. */
+export async function getGpuInfo(): Promise<string | null> {
+  if (!hasWebGPU()) return null;
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    const info = (adapter as unknown as { info?: { description?: string; vendor?: string; architecture?: string } })?.info;
+    if (!info) return "WebGPU adapter available";
+    return [info.description, info.vendor, info.architecture].filter(Boolean).join(" · ") || "WebGPU adapter available";
+  } catch {
+    return null;
+  }
+}
+
 /** Runs one turn locally and returns it as a UI message stream like /api/chat does. */
 export async function localTurn(
   prompt: { system: string; messages: { role: "user" | "assistant"; content: string }[] },

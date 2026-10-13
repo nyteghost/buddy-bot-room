@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
-import { hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
+import { getGpuInfo, getLocalStats, hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
@@ -106,10 +106,43 @@ export function EngineSettingsDialog() {
               </p>
             )}
             {progress && <p className="text-muted-foreground">{progress}</p>}
+            <WebGpuUsageBox active={!loading} />
           </div>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function WebGpuUsageBox({ active }: { active: boolean }) {
+  const [gpu, setGpu] = useState<string | null>(null);
+  const [stats, setStats] = useState<string | null>(null);
+  useEffect(() => {
+    let stop = false;
+    getGpuInfo().then((info) => !stop && setGpu(info));
+    const tick = async () => {
+      const text = await getLocalStats();
+      if (!stop) setStats(text);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => {
+      stop = true;
+      clearInterval(timer);
+    };
+  }, [active]);
+  return (
+    <div className="rounded-md border border-border p-3 text-xs" aria-label="WebGPU usage">
+      <div className="font-semibold">WebGPU usage</div>
+      <div className="text-muted-foreground">{gpu ?? "Checking your graphics card…"}</div>
+      {stats ? (
+        <pre className="mt-1 whitespace-pre-wrap font-mono text-muted-foreground">{stats}</pre>
+      ) : (
+        <div className="mt-1 text-muted-foreground">
+          Start the local model to see memory and speed here.
+        </div>
+      )}
+    </div>
   );
 }
 
