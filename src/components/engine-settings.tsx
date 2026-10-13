@@ -106,6 +106,7 @@ export function EngineSettingsDialog() {
               </p>
             )}
             {progress && <p className="text-muted-foreground">{progress}</p>}
+            <WebGpuUsageBox active={!loading} />
           </div>
         )}
       </DialogContent>
