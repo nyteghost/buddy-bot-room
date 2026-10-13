@@ -20,4 +20,4 @@
 - [x] Start Ollama button (desktop) / copy launch command (browser)
 - [ ] Linux Mode: assistant pals + Terminal pal (usable terminal with error help) — awaiting plan approval
 - [ ] Gmail pal (Outlook dropped)
-- [ ] Sage adds events to Cozi from chat — blocked: Cozi has no public API; awaiting user choice
+- [ ] Sage adds events to Google Calendar (shows in Cozi via Google link)
