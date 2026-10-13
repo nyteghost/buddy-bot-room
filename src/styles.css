@@ -1389,3 +1389,22 @@ h1 {
 .cyberpunk .tp-accent { fill: var(--cast-neon-magenta); }
 .cyberpunk .tp-screen { fill: oklch(0.3 0.12 300); }
 .cyberpunk .thinking-prop { filter: drop-shadow(0 0 2px var(--cast-neon-cyan)); }
+
+/* Cyber Llama: local Ollama mascot */
+.ollama-mascot { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--cast-neon-cyan); border-radius: var(--radius); background: color-mix(in oklab, var(--card) 85%, var(--cast-neon-cyan)); }
+.ollama-sprite { width: 56px; height: 56px; flex: none; animation: llama-bob 1.6s steps(2) infinite; filter: drop-shadow(0 0 4px var(--cast-neon-cyan)); }
+.ollama-info { display: flex; flex-direction: column; font-size: 0.75rem; color: var(--muted-foreground); }
+.ollama-info b { color: var(--foreground); font-size: 0.85rem; }
+.ollama-switch { margin-left: auto; font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: var(--radius); background: var(--primary); color: var(--primary-foreground); }
+.llama-w { fill: var(--foreground); }
+.llama-d { fill: var(--muted-foreground); }
+.llama-k { fill: var(--background); }
+.llama-h { fill: var(--muted-foreground); }
+.llama-v { fill: var(--cast-neon-cyan); animation: llama-visor 2.4s ease-in-out infinite; }
+.llama-g { fill: var(--cast-neon-magenta); }
+.llama-f { fill: var(--cast-neon-yellow); animation: llama-fan 0.4s steps(2) infinite; }
+.ollama-busy .ollama-sprite { animation-duration: 0.5s; }
+.ollama-busy .llama-g { animation: llama-visor 0.5s steps(2) infinite; }
+@keyframes llama-bob { 50% { transform: translateY(-2px); } }
+@keyframes llama-visor { 50% { opacity: 0.45; } }
+@keyframes llama-fan { 50% { fill: var(--cast-neon-cyan); } }

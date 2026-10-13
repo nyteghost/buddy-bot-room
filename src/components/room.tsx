@@ -78,6 +78,7 @@ import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
 import { hasWebGPU, localTurn, ollamaTurn, speakFree } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
+import { OllamaMascot } from "./ollama-mascot";
 import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
 
@@ -470,6 +471,7 @@ export function Room() {
             </span>
           </div>
           {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
+          <OllamaMascot active={running && engine.kind === "ollama"} />
           <div className="room-scene">
             <img
               src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
