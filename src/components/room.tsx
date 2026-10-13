@@ -275,6 +275,7 @@ export function Room() {
           <div className="room-scene">
             <img
               src={roomImage}
+              className="pixel-room-image"
               width={1536}
               height={864}
               alt="Pixel-art common room with a discussion table, computer stations, and plants"
