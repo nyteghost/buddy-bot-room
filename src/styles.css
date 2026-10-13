@@ -1079,3 +1079,14 @@ h1 {
   --pip: oklch(0.76 0.17 25);
 }
 .horror .pixel-room-image { filter: saturate(0.6) brightness(0.75); }
+.voice-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  background: var(--scene-overlay);
+  font: inherit;
+}
+.voice-toggle[aria-pressed="false"] { opacity: 0.6; }

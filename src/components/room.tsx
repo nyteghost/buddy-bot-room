@@ -15,6 +15,8 @@ import {
   Square,
   Users,
   X,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -60,6 +62,7 @@ import {
 } from "@/lib/agents";
 import roomImage from "@/assets/pixel-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
+import { streamSpeech } from "@/lib/stream-speech";
 import { cn } from "@/lib/utils";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -79,6 +82,12 @@ export function Room() {
     document.documentElement.classList.toggle("horror", horror);
   }, [hell, horror]);
   const [ready, setReady] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const voiceRef = useRef(true);
+  const toggleVoice = () => {
+    voiceRef.current = !voiceRef.current;
+    setVoiceOn(voiceRef.current);
+  };
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
@@ -189,6 +198,16 @@ export function Room() {
           if (answer && messageText(answer).trim()) {
             transcript = [...transcript, answer];
             setMessages(transcript);
+            if (hell && voiceRef.current && !controller.signal.aborted) {
+              try {
+                await streamSpeech({ agentId: agent.id, text: messageText(answer) }, controller.signal);
+              } catch (err) {
+                if (controller.signal.aborted) return;
+                voiceRef.current = false;
+                setVoiceOn(false);
+                setError(`${err instanceof Error ? err.message : "Voice failed."} Voices are muted; the discussion continues.`);
+              }
+            }
           } else if (!controller.signal.aborted)
             throw new Error("This agent returned no answer. The discussion has stopped.");
         }
@@ -293,7 +312,21 @@ export function Room() {
                 <span className={cn("status-dot", running && "pulse-dot")} />
                 {running ? "CONVERSATION IN PROGRESS" : "WAITING FOR A GOOD IDEA"}
               </span>
-              <span>{enabled.length} PALS IN ROOM</span>
+              <span className="flex items-center gap-2">
+                {hell && (
+                  <button
+                    type="button"
+                    className="voice-toggle"
+                    onClick={toggleVoice}
+                    aria-pressed={voiceOn}
+                    aria-label={voiceOn ? "Mute Cenobite voices" : "Unmute Cenobite voices"}
+                  >
+                    {voiceOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                    {voiceOn ? "VOICES ON" : "VOICES OFF"}
+                  </button>
+                )}
+                {enabled.length} PALS IN ROOM
+              </span>
             </div>
             {agents.map((a, i) => (
               <div
