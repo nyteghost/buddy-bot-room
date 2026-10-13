@@ -74,7 +74,7 @@ export function Room() {
   const hell = characterMode === "hellraiser";
   const horror = characterMode === "horror";
   useEffect(() => {
-    document.documentElement.classList.toggle("hellraiser", hell, horror);
+    document.documentElement.classList.toggle("hellraiser", hell);
     document.documentElement.classList.toggle("horror", horror);
   }, [hell, horror]);
   const [ready, setReady] = useState(false);

@@ -11,9 +11,9 @@ const horrorPatterns: Record<AgentId, string[]> = {
     "..bbbbbbbb..", "...bb..bb...", "...bb..bb...", "..bbb..bbb..",
   ],
   byte: [
-    "....oooo....", "...owwww o..".replace(/ /g, ""), "..wwrwwrww..", "..wwiwwiww..",
+    "....oooo....", "...owwwwo...", "..wwrwwrww..", "..wwiwwiww..",
     "..wwwwwwww..", "..wgwggwgw..", "...wwrrww...", "....wwww....",
-    "...oooooo...", "..oooooooo..", ".w oooooo w.".replace(/ /g, "o"), ".woooooooow.",
+    "...oooooo...", "..oooooooo..", ".woooooooow.", ".woooooooow.",
     "...oooooo...", "...bb..bb...", "...bb..bb...", "..bbb..bbb..",
   ],
   sage: [
@@ -24,7 +24,7 @@ const horrorPatterns: Record<AgentId, string[]> = {
   ],
   pip: [
     "....hhhh....", "...hhhhhh...", "..hhhhhhhh..", "...ttrttt...",
-    "...ti ttit..".replace(/ /g, "t"), "...trttrt...", "....tttt....", "...rrrrrr...",
+    "...tittit...", "...trttrt...", "....tttt....", "...rrrrrr...",
     "..oooooooo..", "..rrrrrrrr..", ".toooooooot.", ".trrrrrrrtg.",
     "...oooooo.gg", "...bb..bb.gg", "...bb..bb...", "..bbb..bbb..",
   ],
