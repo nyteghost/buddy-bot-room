@@ -381,8 +381,15 @@ h1 {
 }
 .pixel-character {
   width: 32px;
-  height: 42px;
+  height: 32px;
   flex-shrink: 0;
+}
+/* 32-bit shading: light/dark sub-pixels inside each 2x2 block */
+.pixel-character .shade-light {
+  filter: brightness(1.28) saturate(1.05);
+}
+.pixel-character .shade-dark {
+  filter: brightness(0.68);
 }
 .pixel-a {
   fill: var(--agent-color);
