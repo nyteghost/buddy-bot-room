@@ -356,6 +356,7 @@ export function Room() {
           <span className="brand-icon">
             <PixelCharacter id="nova" />
           </span>
+          <EngineSettingsDialog />
           <span>
             pixel<span className="text-primary">pals</span>
             <span className="brand-chat"> / chat</span>
@@ -490,7 +491,7 @@ export function Room() {
                 <Users size={13} /> {mode === "roundtable" ? "Roundtable" : direct ? "One-on-one" : mode === "solve" ? "Problem solving" : "Broadcast"}
               </span>
               <span>
-                {running ? `Round ${round} of ${rounds}` : "Ready when you are"}
+                {running ? (direct ? "Chatting" : `Round ${round} of ${rounds}`) : "Ready when you are"}
                 <span className="scene-cursor">_</span>
               </span>
             </div>
@@ -677,6 +678,7 @@ export function Room() {
                 </select>
               </div>
             )}
+            {!direct && (
             <div>
               <span className="control-label">ROUNDS</span>
               <div className="round-stepper">
@@ -701,6 +703,7 @@ export function Room() {
                 </Button>
               </div>
             </div>
+            )}
             <Button
               className="start-button"
               onClick={running ? stop : start}
