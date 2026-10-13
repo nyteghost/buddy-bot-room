@@ -1,6 +1,6 @@
 import type { AgentId } from "@/lib/agents";
 
-type Px = [number, number, string, string?]; // x, y, material, animation class
+type Px = [number, number, string, (string | undefined)?]; // x, y, material, animation class
 
 const r = (x: number, y: number, w: number, h: number, m: string, a?: string): Px[] => {
   const out: Px[] = [];
