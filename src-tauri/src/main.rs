@@ -71,6 +71,35 @@ async fn ollama_tags(url: String) -> Result<Vec<String>, String> {
         .unwrap_or_default())
 }
 
+/// Starts `ollama serve` in the background with OLLAMA_ORIGINS=* so the app can reach it.
+#[tauri::command]
+fn ollama_start() -> Result<String, String> {
+    use std::process::{Command, Stdio};
+    match Command::new("ollama")
+        .arg("serve")
+        .env("OLLAMA_ORIGINS", "*")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(_) => Ok("started".into()),
+        Err(e) => {
+            // Fall back to a user systemd service if the binary isn't on PATH.
+            let ok = Command::new("systemctl")
+                .args(["--user", "start", "ollama"])
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if ok {
+                Ok("service".into())
+            } else {
+                Err(format!("Couldn't start Ollama ({e}). Install it with: sudo pacman -S ollama-cuda"))
+            }
+        }
+    }
+}
+
 fn main() {
     // WebKitGTK + NVIDIA: avoid blank windows from the DMA-BUF renderer.
     #[cfg(target_os = "linux")]
@@ -79,7 +108,7 @@ fn main() {
     }
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![ollama_chat, ollama_tags])
+        .invoke_handler(tauri::generate_handler![ollama_chat, ollama_tags, ollama_start])
         .run(tauri::generate_context!())
         .expect("error while running Pixel Pals");
 }

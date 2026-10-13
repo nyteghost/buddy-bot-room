@@ -74,10 +74,42 @@ function useOllamaStatus(url: string): Status {
   return status;
 }
 
+const LAUNCH_CMD = 'OLLAMA_ORIGINS="*" ollama serve';
+
+function OllamaLauncher() {
+  const [note, setNote] = useState<string | null>(null);
+  const desktop = isTauri();
+  async function start() {
+    setNote("Starting Ollama…");
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("ollama_start");
+      setNote("Starting… the llama appears in a few seconds.");
+    } catch (e) {
+      setNote(String(e));
+    }
+  }
+  async function copy() {
+    await navigator.clipboard.writeText(LAUNCH_CMD);
+    setNote("Copied — paste it into your terminal.");
+  }
+  return (
+    <div className="ollama-mascot" role="status">
+      <div className="ollama-info">
+        <b>Ollama offline</b>
+        <span>{note ?? (desktop ? "Start the local server from here." : `Run: ${LAUNCH_CMD}`)}</span>
+      </div>
+      <button type="button" className="ollama-switch" onClick={desktop ? start : copy}>
+        {desktop ? "Start Ollama" : "Copy launch command"}
+      </button>
+    </div>
+  );
+}
+
 export function OllamaMascot({ active = false }: { active?: boolean }) {
   const engine = useEngine();
   const status = useOllamaStatus(engine.ollamaUrl);
-  if (!status.online) return null;
+  if (!status.online) return engine.kind === "ollama" ? <OllamaLauncher /> : null;
   const using = engine.kind === "ollama";
   const hasModel = status.models.some((m) => m === engine.ollamaModel || m.startsWith(`${engine.ollamaModel}:`));
   return (
