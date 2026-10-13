@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import type { CharacterMode } from "./hellraiser";
 
 export const models = [
   { id: "openai/gpt-6-astra", label: "GPT-6 Astra" },
@@ -134,7 +135,12 @@ export function agentName(id: AgentId | undefined, hell: boolean, horror = false
   return agentPersona(a.id, hell, horror).name;
 }
 export type Mode = "roundtable" | "broadcast";
-export type RoomMessage = UIMessage<{ agentId?: AgentId; round?: number; elapsed?: number }>;
+export type RoomMessage = UIMessage<{
+  agentId?: AgentId;
+  round?: number;
+  elapsed?: number;
+  characterMode?: CharacterMode;
+}>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;
 }

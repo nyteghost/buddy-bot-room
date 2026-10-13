@@ -16,3 +16,5 @@
 - Keep normal, Hellraiser and horror character modes mutually exclusive in one browser-persisted store, preserving legacy Hellraiser preferences so character identities never conflict.
 - Override AI SDK stream error logging to treat AbortError as cancellation, and return 499 at server boundaries; genuine failures remain reported so Stop does not trigger the runtime crash overlay.
 - Compose chat surfaces with the installed AI Elements primitives and use semantic CSS tokens for the pixel-room visual theme.
+- Draw character forms from browser-safe native pixel grids with semantic material palettes so visual detail is independent of display size.
+- Store character mode on new replies and use one cancellable replay stream at a time; disable manual replay during discussion to prevent overlapping voices.

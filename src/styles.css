@@ -1099,3 +1099,39 @@ h1 {
   font: inherit;
 }
 .voice-toggle[aria-pressed="false"] { opacity: 0.6; }
+
+/* Native sprite material palette: dedicated colors instead of block bevels. */
+:root {
+  --sprite-leather: oklch(0.22 0.008 260);
+  --sprite-metal: oklch(0.57 0.015 240);
+  --sprite-bone: oklch(0.89 0.025 90);
+  --sprite-white: oklch(0.97 0.008 90);
+  --sprite-hair: oklch(0.30 0.04 45);
+  --sprite-red: oklch(0.48 0.17 25);
+  --sprite-denim: oklch(0.37 0.055 245);
+  --sprite-olive: oklch(0.39 0.055 140);
+  --sprite-skin-shadow: oklch(0.66 0.075 45);
+  --sprite-gold: oklch(0.78 0.13 80);
+  --sprite-glass: oklch(0.78 0.10 215);
+}
+.native-sprite { image-rendering: pixelated; }
+.sprite-a { fill: var(--agent-color); }
+.sprite-l { fill: color-mix(in oklch, var(--agent-color) 65%, var(--sprite-white)); }
+.sprite-s { fill: color-mix(in oklch, var(--agent-color) 55%, var(--pixel-ink)); }
+.sprite-e { fill: var(--skin); }
+.sprite-t { fill: var(--sprite-skin-shadow); }
+.sprite-i { fill: var(--horror-ink); }
+.sprite-d { fill: var(--pixel-shoe); }
+.sprite-b { fill: var(--sprite-leather); }
+.sprite-g { fill: var(--sprite-metal); }
+.sprite-w { fill: var(--sprite-bone); }
+.sprite-k { fill: var(--sprite-white); }
+.sprite-h { fill: var(--sprite-hair); }
+.sprite-r { fill: var(--sprite-red); }
+.sprite-n { fill: var(--sprite-denim); }
+.sprite-o { fill: var(--sprite-olive); }
+.sprite-q { fill: var(--sprite-gold); }
+.sprite-c { fill: var(--sprite-glass); }
+.message-heading { flex-wrap: wrap; }
+.message-heading .reply-voice { width: 28px; height: 28px; flex-shrink: 0; color: var(--muted-foreground); }
+.message-heading .reply-voice[aria-pressed="true"] { color: var(--primary); }

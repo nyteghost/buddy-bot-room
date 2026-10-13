@@ -1,4 +1,5 @@
 import type { AgentId } from "./agents";
+import type { CharacterMode } from "./hellraiser";
 
 /** Browser-safe voice casting for the Cenobites (Gemini prebuilt voices + delivery direction). */
 export const cenobiteVoices: Record<AgentId, { voice: string; direction: string }> = {
@@ -29,8 +30,7 @@ export const cenobiteVoices: Record<AgentId, { voice: string; direction: string 
   },
   rune: {
     voice: "Orus",
-    direction:
-      "Read this in a grand, mechanical, cryptic voice, measured like grinding gears:",
+    direction: "Read this in a grand, mechanical, cryptic voice, measured like grinding gears:",
   },
 };
 
@@ -41,5 +41,29 @@ export function speakableText(text: string): string {
     .replace(/[*_`#>~]/g, "")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 1200);
+    .slice(0, 6000);
+}
+
+const normalDirections: Record<AgentId, string> = {
+  nova: "Warm, curious and imaginative, with clear expressive phrasing.",
+  byte: "Crisp, practical and steady, with a friendly matter-of-fact delivery.",
+  sage: "Gentle, reflective and thoughtful, with relaxed natural pauses.",
+  pip: "Bright, playful and witty, with lively conversational energy.",
+  echo: "Warm storytelling, vivid and expressive, with an amused smile.",
+  rune: "Confident, inventive and spirited, with energetic clear phrasing.",
+};
+const horrorDirections: Record<AgentId, string> = {
+  nova: "A sly, theatrical masked horror storyteller; low, teasing and suspenseful.",
+  byte: "Read these actions as a low, restrained atmospheric narrator. Jason is silent; do not invent dialogue or extra words.",
+  sage: "Read these actions as a cool, detached atmospheric narrator. Michael is mute; do not invent dialogue or extra words.",
+  pip: "A raspy, sardonic nightmare trickster, theatrical and full of mischievous dark humor.",
+  echo: "An eerie sing-song clown, giggly and deceptively cheerful.",
+  rune: "A cocky, sarcastic toy-doll trickster, quick and impish.",
+};
+export function characterVoice(id: AgentId, mode: CharacterMode) {
+  if (mode === "hellraiser") return cenobiteVoices[id];
+  return {
+    voice: cenobiteVoices[id].voice,
+    direction: `Read exactly the supplied text, without adding words. ${mode === "horror" ? horrorDirections[id] : normalDirections[id]}`,
+  };
 }

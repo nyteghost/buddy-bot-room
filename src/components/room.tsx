@@ -40,7 +40,12 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import {
+  Message,
+  MessageAction,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputTextarea,
@@ -107,6 +112,8 @@ export function Room() {
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const replayRef = useRef<AbortController | null>(null);
+  const [replayId, setReplayId] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const runLock = useRef(false);
 
@@ -126,7 +133,10 @@ export function Room() {
     }
     setReady(true);
     inputRef.current?.focus();
-    return () => abortRef.current?.abort();
+    return () => {
+      abortRef.current?.abort();
+      replayRef.current?.abort();
+    };
   }, []);
   useEffect(() => {
     if (!ready) return;
@@ -139,9 +149,43 @@ export function Room() {
 
   const stop = () => {
     abortRef.current?.abort();
+    replayRef.current?.abort();
   };
+  async function replay(message: RoomMessage) {
+    const agentId = message.metadata?.agentId;
+    if (!agentId || running || !messageText(message).trim()) return;
+    replayRef.current?.abort();
+    if (replayId === message.id) {
+      setReplayId(null);
+      return;
+    }
+    const controller = new AbortController();
+    replayRef.current = controller;
+    setReplayId(message.id);
+    setError("");
+    try {
+      await streamSpeech(
+        {
+          agentId,
+          text: messageText(message),
+          characterMode: message.metadata?.characterMode ?? characterMode,
+        },
+        controller.signal,
+      );
+    } catch (err) {
+      if (!controller.signal.aborted)
+        setError(err instanceof Error ? err.message : "Voice playback failed.");
+    } finally {
+      if (replayRef.current === controller) {
+        replayRef.current = null;
+        setReplayId(null);
+      }
+    }
+  }
   async function start() {
     if (runLock.current) return;
+    replayRef.current?.abort();
+    setReplayId(null);
     const command = characterModeCommand(topic);
     if (command) {
       setCharacterMode(command);
@@ -172,7 +216,14 @@ export function Room() {
           const began = performance.now();
           const transport = new DefaultChatTransport<RoomMessage>({
             api: "/api/chat",
-            body: { agentId: agent.id, model: selectedModels[agent.id], mode, round: currentRound, hellraiser: hell, horror },
+            body: {
+              agentId: agent.id,
+              model: selectedModels[agent.id],
+              mode,
+              round: currentRound,
+              hellraiser: hell,
+              horror,
+            },
           });
           const stream = await transport.sendMessages({
             chatId: "pixel-pals-room",
@@ -182,15 +233,18 @@ export function Room() {
             abortSignal: controller.signal,
           });
           let answer: RoomMessage | undefined;
+          const answerId = crypto.randomUUID();
           for await (const partial of readUIMessageStream<RoomMessage>({
             stream,
             terminateOnError: true,
           })) {
             answer = {
               ...partial,
+              id: answerId,
               metadata: {
                 ...partial.metadata,
                 agentId: agent.id,
+                characterMode,
                 round: currentRound,
                 elapsed: (performance.now() - began) / 1000,
               },
@@ -202,12 +256,17 @@ export function Room() {
             setMessages(transcript);
             if (hell && voiceRef.current && !controller.signal.aborted) {
               try {
-                await streamSpeech({ agentId: agent.id, text: messageText(answer) }, controller.signal);
+                await streamSpeech(
+                  { agentId: agent.id, text: messageText(answer), characterMode },
+                  controller.signal,
+                );
               } catch (err) {
                 if (controller.signal.aborted) return;
                 voiceRef.current = false;
                 setVoiceOn(false);
-                setError(`${err instanceof Error ? err.message : "Voice failed."} Voices are muted; the discussion continues.`);
+                setError(
+                  `${err instanceof Error ? err.message : "Voice failed."} Voices are muted; the discussion continues.`,
+                );
               }
             }
           } else if (!controller.signal.aborted)
@@ -279,7 +338,13 @@ export function Room() {
         <section className="room-column">
           <div className="page-heading">
             <div>
-              <div className="eyebrow">{horror ? "HORROR MODE" : hell ? "THE LAMENT CONFIGURATION IS SOLVED" : "YOUR AI COMMON ROOM"}</div>
+              <div className="eyebrow">
+                {horror
+                  ? "HORROR MODE"
+                  : hell
+                    ? "THE LAMENT CONFIGURATION IS SOLVED"
+                    : "YOUR AI COMMON ROOM"}
+              </div>
               <h1>
                 {horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
@@ -290,8 +355,8 @@ export function Room() {
                 {horror
                   ? "The masks are on. The conversation begins."
                   : hell
-                  ? "The Cenobites answer your call. Type “Normal mode” to close the box."
-                  : "Different minds. One conversation. Type “Hellraiser mode” if you dare."}
+                    ? "The Cenobites answer your call. Type “Normal mode” to close the box."
+                    : "Different minds. One conversation. Type “Hellraiser mode” if you dare."}
               </p>
             </div>
             <span className="room-number">
@@ -306,7 +371,11 @@ export function Room() {
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
-              alt={hell ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box" : "Pixel-art common room with a discussion table, computer stations, and plants"}
+              alt={
+                hell
+                  ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box"
+                  : "Pixel-art common room with a discussion table, computer stations, and plants"
+              }
             />
             {hell && <div className="hell-glow" aria-hidden />}
             <div className="scene-top">
@@ -407,7 +476,10 @@ export function Room() {
                       setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
                     }
                   >
-                    <SelectTrigger aria-label={`${agentName(a.id, hell, horror)} model`} className="mt-3">
+                    <SelectTrigger
+                      aria-label={`${agentName(a.id, hell, horror)} model`}
+                      className="mt-3"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -445,7 +517,12 @@ export function Room() {
                   aria-label={running ? "Stop discussion" : "Start topic"}
                   status={running ? "streaming" : "ready"}
                   onStop={stop}
-                  disabled={!running && (!topic.trim() || (!characterModeCommand(topic) && enabled.length < 2) || !ready)}
+                  disabled={
+                    !running &&
+                    (!topic.trim() ||
+                      (!characterModeCommand(topic) && enabled.length < 2) ||
+                      !ready)
+                  }
                 />
               </PromptInputFooter>
             </PromptInput>
@@ -520,7 +597,10 @@ export function Room() {
             <Button
               className="start-button"
               onClick={running ? stop : start}
-              disabled={!running && (!topic.trim() || (!characterModeCommand(topic) && enabled.length < 2) || !ready)}
+              disabled={
+                !running &&
+                (!topic.trim() || (!characterModeCommand(topic) && enabled.length < 2) || !ready)
+              }
             >
               {running ? <Square /> : <Play fill="currentColor" />}
               {running ? "Stop discussion" : "Start discussion"}
@@ -621,16 +701,40 @@ export function Room() {
               ) : (
                 messages.map((m) => {
                   const a = agents.find((a) => a.id === m.metadata?.agentId);
+                  const messageMode = m.metadata?.characterMode ?? characterMode;
+                  const name = a
+                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror")
+                    : "You";
                   return (
                     <Message key={m.id} from={m.role} className="room-message">
                       {a && (
                         <div className={`message-avatar agent-${a.id}`}>
-                          <PixelCharacter id={a.id} />
+                          <PixelCharacter id={a.id} mode={messageMode} />
                         </div>
                       )}
                       <div className="message-main">
                         <div className="message-heading">
-                          <b className={a ? `agent-${a.id}` : "text-primary"}>{a ? agentName(a.id, hell, horror) : "You"}</b>
+                          <b className={a ? `agent-${a.id}` : "text-primary"}>{name}</b>
+                          {a && m.role === "assistant" && (
+                            <MessageAction
+                              className="reply-voice"
+                              tooltip={
+                                replayId === m.id
+                                  ? "Stop voice playback"
+                                  : `Hear ${name} read this reply`
+                              }
+                              aria-label={
+                                replayId === m.id
+                                  ? "Stop voice playback"
+                                  : `Hear ${name} read this reply`
+                              }
+                              aria-pressed={replayId === m.id}
+                              disabled={running || !messageText(m).trim()}
+                              onClick={() => void replay(m)}
+                            >
+                              {replayId === m.id ? <Square size={13} /> : <Volume2 size={14} />}
+                            </MessageAction>
+                          )}
                           <span>{a ? `ROUND ${m.metadata?.round ?? 1}` : "THE TOPIC"}</span>
                           {m.metadata?.elapsed && (
                             <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>

@@ -12,7 +12,10 @@ function decodePCM(pending: Uint8Array, incoming: Uint8Array) {
 }
 
 /** Streams 24 kHz PCM speech from /api/speech and resolves when playback ends. */
-export async function streamSpeech(body: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
+export async function streamSpeech(
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<void> {
   signal?.throwIfAborted();
   const context = new AudioContext({ sampleRate: 24000 });
   const sources = new Set<AudioBufferSourceNode>();
@@ -36,10 +39,12 @@ export async function streamSpeech(body: Record<string, unknown>, signal?: Abort
       signal: controller.signal,
     });
     if (!response.ok || !response.body) {
-      let message = "The Cenobite's voice could not be summoned.";
+      let message = "The character's voice could not be played.";
       try {
         message = (await response.json()).error ?? message;
-      } catch { /* keep default */ }
+      } catch {
+        /* keep default */
+      }
       throw new Error(message);
     }
     const parser = createParser({
@@ -51,7 +56,10 @@ export async function streamSpeech(body: Record<string, unknown>, signal?: Abort
           return;
         }
         if (payload.type !== "speech.audio.delta" || !payload.audio) return;
-        const decoded = decodePCM(pending, Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0)));
+        const decoded = decodePCM(
+          pending,
+          Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0)),
+        );
         pending = new Uint8Array(decoded.pending);
         if (!decoded.samples.length) return;
         samplesPlayed += decoded.samples.length;
