@@ -135,7 +135,12 @@ export function agentName(id: AgentId | undefined, hell: boolean, horror = false
   return agentPersona(a.id, hell, horror).name;
 }
 export type Mode = "roundtable" | "broadcast";
-export type RoomMessage = UIMessage<{ agentId?: AgentId; round?: number; elapsed?: number; characterMode?: CharacterMode }>;
+export type RoomMessage = UIMessage<{
+  agentId?: AgentId;
+  round?: number;
+  elapsed?: number;
+  characterMode?: CharacterMode;
+}>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;
 }

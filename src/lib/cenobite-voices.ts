@@ -30,8 +30,7 @@ export const cenobiteVoices: Record<AgentId, { voice: string; direction: string 
   },
   rune: {
     voice: "Orus",
-    direction:
-      "Read this in a grand, mechanical, cryptic voice, measured like grinding gears:",
+    direction: "Read this in a grand, mechanical, cryptic voice, measured like grinding gears:",
   },
 };
 

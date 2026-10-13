@@ -12,7 +12,10 @@ export async function handleSpeech(request: Request) {
     const agent = agents.find((a) => a.id === body.agentId);
     const text = typeof body.text === "string" ? speakableText(body.text) : "";
     if (!agent || !text) return Response.json({ error: "Nothing to speak." }, { status: 400 });
-    const mode = body.characterMode === "normal" || body.characterMode === "horror" ? body.characterMode : "hellraiser";
+    const mode =
+      body.characterMode === "normal" || body.characterMode === "horror"
+        ? body.characterMode
+        : "hellraiser";
     const cast = characterVoice(agent.id, mode);
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
       method: "POST",
@@ -35,7 +38,9 @@ export async function handleSpeech(request: Request) {
       try {
         const parsed = JSON.parse(detail);
         message = parsed.message ?? parsed.error?.message ?? message;
-      } catch { /* keep default */ }
+      } catch {
+        /* keep default */
+      }
       return Response.json({ error: message }, { status: upstream.status });
     }
     return new Response(upstream.body, {
