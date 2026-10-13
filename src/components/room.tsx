@@ -208,9 +208,15 @@ export function Room() {
     setTopic("");
     inputRef.current?.focus();
     try {
-      for (let currentRound = 1; currentRound <= rounds; currentRound++) {
-        setRound(currentRound);
-        for (const agent of agents.filter((a) => enabled.includes(a.id))) {
+      const seated = agents.filter((a) => enabled.includes(a.id));
+      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean }[] = [];
+      for (let r = 1; r <= rounds; r++)
+        for (const agent of seated) turns.push({ agent, round: r, verdict: false });
+      if (mode === "roundtable" && seated.length > 1)
+        turns.push({ agent: seated[0], round: rounds, verdict: true });
+      {
+        for (const { agent, round: currentRound, verdict } of turns) {
+          setRound(currentRound);
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
           const began = performance.now();
@@ -221,6 +227,7 @@ export function Room() {
               model: selectedModels[agent.id],
               mode,
               round: currentRound,
+              verdict,
               hellraiser: hell,
               horror,
             },
