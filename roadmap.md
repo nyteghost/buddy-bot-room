@@ -5,3 +5,5 @@
 - [x] Test discussion flow, restoration, and page rendering.
 - [x] Add Horror Mode commands, horror-icon sprites and personalities, preserving Hellraiser Mode.
 - [x] Verify command transitions and a real horror discussion.
+- [ ] Redraw all character modes with detailed native 32×32 sprites.
+- [ ] Add per-reply character voice playback and verify playback/cancellation.
