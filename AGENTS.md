@@ -18,3 +18,4 @@
 - Compose chat surfaces with the installed AI Elements primitives and use semantic CSS tokens for the pixel-room visual theme.
 - Draw character forms from browser-safe native pixel grids with semantic material palettes so visual detail is independent of display size.
 - Store character mode on new replies and use one cancellable replay stream at a time; disable manual replay during discussion to prevent overlapping voices.
+- Free engines (Groq/Gemini user key, in-browser WebGPU) are chosen in a browser-persisted engine store; keys travel per request and are never stored server-side, and the local engine fetches its prompt from /api/chat (preparePrompt) so prompts stay server-authored.
