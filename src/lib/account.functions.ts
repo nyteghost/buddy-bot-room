@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 
-const engineKinds = ["cloud", "local", "auto"] as const;
+const engineKinds = ["cloud", "local", "auto", "ollama"] as const;
 const themes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk"] as const;
 const modes = ["roundtable", "broadcast", "direct", "solve"] as const;
 

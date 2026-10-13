@@ -11,14 +11,23 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
-import { detectBestModel, getGpuInfo, getLocalStats, hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
+import {
+  chosenLocalModel,
+  detectBestModel,
+  getGpuInfo,
+  getLocalStats,
+  hasWebGPU,
+  isModelCached,
+  loadLocalEngine,
+} from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 import { localModelChoices } from "@/lib/gpu-tier";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
   { kind: "auto", label: "Auto (fastest)", note: "Free keys answer first (about 40× faster); the in-browser model takes over if a key hits its limit." },
-  { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private, ~1 GB first download." },
+  { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once, then loads from cache." },
+  { kind: "ollama", label: "Local server / Ollama", note: "Uses Ollama or llama.cpp on your computer for full native GPU speed." },
 ];
 
 export function EngineSettingsDialog() {
@@ -26,7 +35,14 @@ export function EngineSettingsDialog() {
   const [progress, setProgress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const count = availableProviders(engine).length;
-  const label = engine.kind === "local" ? "In-browser" : engine.kind === "auto" ? `Auto (${count} + GPU)` : `Free keys (${count})`;
+  const label =
+    engine.kind === "local"
+      ? "In-browser"
+      : engine.kind === "auto"
+        ? `Auto (${count} + GPU)`
+        : engine.kind === "ollama"
+          ? `Ollama (${engine.ollamaModel})`
+          : `Free keys (${count})`;
   async function prepareLocal() {
     setLoading(true);
     try {
@@ -68,7 +84,31 @@ export function EngineSettingsDialog() {
             </button>
           ))}
         </div>
-        {engine.kind !== "local" && (
+        {engine.kind === "ollama" && (
+          <div className="grid gap-3 text-sm">
+            <label className="grid gap-1">
+              <span className="font-medium">Server URL</span>
+              <Input
+                aria-label="Local server URL"
+                value={engine.ollamaUrl}
+                onChange={(e) => setEngine({ ollamaUrl: e.target.value })}
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="font-medium">Model name</span>
+              <Input
+                aria-label="Local server model"
+                value={engine.ollamaModel}
+                onChange={(e) => setEngine({ ollamaModel: e.target.value })}
+              />
+            </label>
+            <p className="text-muted-foreground">
+              In a terminal run <code>ollama pull {engine.ollamaModel}</code>, then start it with{" "}
+              <code>OLLAMA_ORIGINS="*" ollama serve</code> so the browser is allowed to talk to it.
+            </p>
+          </div>
+        )}
+        {(engine.kind === "cloud" || engine.kind === "auto") && (
           <div className="grid gap-3">
             <KeyField
               label="Groq (GPT-OSS 120B)"
@@ -96,7 +136,7 @@ export function EngineSettingsDialog() {
             </p>
           </div>
         )}
-        {engine.kind !== "cloud" && (
+        {(engine.kind === "local" || engine.kind === "auto") && (
           <div className="grid gap-2 text-sm">
             {hasWebGPU() ? (
               <Button onClick={prepareLocal} disabled={loading}>
@@ -179,6 +219,8 @@ export function AutoModelDownload() {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState<string | null>(null);
   const [gpu, setGpu] = useState<string | null>(null);
+  const [cached, setCached] = useState<Set<string>>(new Set());
+  const [manual, setManual] = useState<string>("auto");
   useEffect(() => {
     let stop = false;
     if (!hasWebGPU()) {
@@ -186,11 +228,36 @@ export function AutoModelDownload() {
       return;
     }
     getGpuInfo().then((info) => !stop && setGpu(info));
+    (async () => {
+      // Find models already saved in this browser so nothing re-downloads.
+      const ids = localModelChoices.flatMap((m) => [m.f16, m.f32]);
+      const found = new Set<string>();
+      for (const id of ids) if (await isModelCached(id)) found.add(id);
+      if (stop) return;
+      setCached(found);
+      const last = chosenLocalModel();
+      const pick = found.has(last) ? last : [...found][0];
+      if (!pick) return;
+      const choice = localModelChoices.find((m) => m.f16 === pick || m.f32 === pick);
+      const label = choice?.label ?? pick;
+      setStatus(`${label} already downloaded — loading onto your GPU…`);
+      setBusy(true);
+      try {
+        await loadLocalEngine(undefined, pick);
+        if (!stop) {
+          setReady(label);
+          setStatus("");
+        }
+      } catch (err) {
+        if (!stop) setStatus(err instanceof Error ? err.message : "Could not start the local model.");
+      } finally {
+        if (!stop) setBusy(false);
+      }
+    })();
     return () => {
       stop = true;
     };
   }, []);
-  const [manual, setManual] = useState<string>("auto");
   async function run() {
     setBusy(true);
     try {
@@ -199,8 +266,13 @@ export function AutoModelDownload() {
       const choice = localModelChoices.find((m) => m.tier === manual);
       const f16 = detected.id.includes("q4f16");
       const pick = choice ? { ...detected, id: f16 ? choice.f16 : choice.f32, label: choice.label, size: choice.size } : detected;
-      setStatus(`${choice ? "Your pick" : "Best fit"}: ${pick.label} (${pick.size})`);
-      await loadLocalEngine((p) => setStatus(`${pick.label}: ${Math.round(p * 100)}% downloaded`), pick.id);
+      const already = cached.has(pick.id) || (await isModelCached(pick.id));
+      setStatus(already ? `${pick.label} already downloaded — loading…` : `${choice ? "Your pick" : "Best fit"}: ${pick.label} (${pick.size})`);
+      await loadLocalEngine(
+        (p) => setStatus(`${pick.label}: ${Math.round(p * 100)}% ${already ? "loaded" : "downloaded"}`),
+        pick.id,
+      );
+      setCached((s) => new Set(s).add(pick.id));
       setReady(pick.label);
       setStatus("");
     } catch (err) {
@@ -209,6 +281,7 @@ export function AutoModelDownload() {
       setBusy(false);
     }
   }
+  const isCached = (m: (typeof localModelChoices)[number]) => cached.has(m.f16) || cached.has(m.f32);
   return (
     <div className="auto-model-download">
       <div className="flex flex-wrap items-center gap-2">
@@ -228,7 +301,7 @@ export function AutoModelDownload() {
           <option value="auto">Auto-detect</option>
           {localModelChoices.map((m) => (
             <option key={m.tier} value={m.tier}>
-              {m.label} ({m.size})
+              {m.label} ({isCached(m) ? "downloaded" : m.size})
             </option>
           ))}
         </select>
