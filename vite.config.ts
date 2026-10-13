@@ -12,4 +12,7 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Pre-bundle late-discovered browser deps so the optimizer doesn't reload mid-page,
+  // which leaves two React copies loaded and blanks the screen.
+  vite: { optimizeDeps: { include: ["@supabase/supabase-js", "eventsource-parser"] } },
 });
