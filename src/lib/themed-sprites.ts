@@ -63,6 +63,35 @@ export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "dev
     line(12,3,17,3,highlight); dot(11,4,highlight); line(19,4,21,5,highlight);
   };
   legs();
+  if (mode === "cyberpunk") {
+    // jacket, jacket shade, neon hair, neon accent, skin
+    const look: Record<AgentId, [string, string, string, string, string]> = {
+      nova: ["F", "B", "X", "M", "E"],
+      byte: ["B", "I", "M", "X", "U"],
+      sage: ["N", "B", "O", "X", "E"],
+      pip: ["p", "r", "O", "M", "E"],
+      echo: ["I", "B", "S", "X", "U"],
+      rune: ["G", "B", "r", "O", "E"],
+      claude: ["K", "S", "X", "M", "E"],
+    };
+    const [jacket, shade, neon, glow, skin] = look[id];
+    head(skin, skin === "U" ? "V" : "T"); eyes(glow);
+    // spiky neon hair
+    shape([[9,6],[10,1],[13,4],[15,0],[17,4],[20,1],[21,5],[24,3],[22,8],[19,6],[13,6],[10,10]],"I");
+    shape([[10,5],[11,2],[13,5],[15,1],[17,5],[20,2],[21,6],[19,5],[12,6]],neon);
+    torso(jacket, shade);
+    // glowing jacket trim + collar
+    line(11,16,15,22,glow); line(21,16,17,22,glow); box(14,16,5,1,"I"); box(11,23,11,1,glow);
+    // neon visor / cyber-eye per pal
+    if (id === "nova" || id === "claude") { box(11,8,11,2,"I"); box(12,8,9,1,glow); }
+    if (id === "byte") { box(18,7,4,3,"I"); dot(19,8,glow); dot(20,8,glow); line(21,10,23,14,glow); } // optic implant + cable
+    if (id === "sage") { box(11,8,4,2,glow); box(18,8,4,2,glow); line(15,8,17,8,"I"); }
+    if (id === "pip") { dot(10,11,glow); dot(22,11,glow); line(13,13,19,13,glow); } // glow face tattoo
+    if (id === "echo") { shape([[9,3],[23,3],[24,10],[22,9],[10,9],[8,10]],"I"); line(10,4,22,4,glow); box(13,12,7,3,"I"); line(14,13,18,13,glow); } // hood + mask
+    if (id === "rune") { box(23,17,4,7,"S"); box(24,18,2,5,"G"); dot(25,19,glow); dot(25,21,glow); } // chrome cyber-arm
+    box(9,22,2,1,glow); box(23,22,2,1,glow); // glowing gloves
+    return grid.map(row => row.join(""));
+  }
   if (mode === "devteam") {
     const look: Record<AgentId, [string, string, string, string, string]> = {
       // hoodie, hoodie shade, hair, hair light, skin

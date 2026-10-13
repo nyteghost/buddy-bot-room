@@ -1,6 +1,6 @@
 import type { UIMessage } from "ai";
 import type { CharacterMode } from "./hellraiser";
-import { matrixCast, fantasyCast, devCast } from "./theme-personas";
+import { matrixCast, fantasyCast, devCast, cyberCast } from "./theme-personas";
 
 export const models = [
   { id: "openai/gpt-6-astra", label: "GPT-6 Astra" },

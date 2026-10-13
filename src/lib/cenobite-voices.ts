@@ -1,6 +1,6 @@
 import type { AgentId } from "./agents";
 import type { CharacterMode } from "./hellraiser";
-import { matrixCast, fantasyCast, devCast } from "./theme-personas";
+import { matrixCast, fantasyCast, devCast, cyberCast } from "./theme-personas";
 
 /** Browser-safe voice casting for the Cenobites (Gemini prebuilt voices + delivery direction). */
 export const cenobiteVoices: Record<AgentId, { voice: string; direction: string }> = {
