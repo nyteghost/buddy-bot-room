@@ -1,7 +1,7 @@
 import type { AgentId } from "./agents";
 
 /** Hand-drawn silhouettes rasterized directly onto a native 32×32 canvas. */
-export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam"): string[] {
+export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam" | "cyberpunk"): string[] {
   const grid = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
   const dot = (x: number, y: number, c: string) => {
     if (grid[y] && x >= 0 && x < 32) grid[y][x] = c;

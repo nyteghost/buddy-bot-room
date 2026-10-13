@@ -148,6 +148,7 @@ export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: 
   if (mode === "matrix") return matrixCast[id];
   if (mode === "finalfantasy") return fantasyCast[id];
   if (mode === "devteam") return devCast[id];
+  if (mode === "cyberpunk") return cyberCast[id];
   if (horror) return horrorIcons[id];
   if (hell) return cenobites[id];
   return agents.find((agent) => agent.id === id) ?? agents[0];

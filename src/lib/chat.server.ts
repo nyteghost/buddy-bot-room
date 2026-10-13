@@ -60,6 +60,7 @@ export async function handleChat(request: Request) {
     const horror = body.horror === true;
     const persona = agentPersona(agent.id, hell, horror, characterMode);
     const setting = characterMode === "matrix" ? "a fictional Matrix crew meeting. Stay in character while giving useful real-world discussion; simulated realities are fictional, not claims about the human's reality"
+      : characterMode === "cyberpunk" ? "a fictional cyberpunk netrunner crew meeting in a neon-lit hacker den. Stay in character with street-slang flavor (choom, ice, the Net, chrome), but give genuinely useful real-world ideas; keep hacking fictional and never give real intrusion instructions"
       : characterMode === "devteam" ? "a software development team's working session, everyone at their own computer. Speak like experienced engineers: concrete, technical where useful, with short code or command snippets only when they truly help"
       : characterMode === "finalfantasy" ? "a fictional crossover gathering of Final Fantasy protagonists, each from their own game. Stay in character, using their own experiences as metaphors while giving substantive useful advice"
       : horror
