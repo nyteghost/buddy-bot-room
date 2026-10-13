@@ -12,7 +12,7 @@ import { isCharacterMode } from "./hellraiser";
 export async function handleChat(request: Request) {
   try {
     const key = process.env["LOVABLE_API_KEY"];
-    if (!key) return Response.json({ error: "AI service is not configured." }, { status: 401 });
+    void key;
     const body = await request.json();
     const agent = agents.find((item) => item.id === body.agentId);
     if (
