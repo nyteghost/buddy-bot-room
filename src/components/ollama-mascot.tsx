@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { setEngine, useEngine } from "@/lib/engine";
+import { isTauri, tauriOllamaTags } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 
 // Native 32×32 Cyber Llama. w=wool, d=wool shade, v=visor, k=dark, g=gpu core, f=fan, h=hoof
@@ -49,10 +50,16 @@ function useOllamaStatus(url: string): Status {
     async function probe() {
       const t = performance.now();
       try {
-        const res = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(2500) });
-        if (!res.ok) throw new Error();
-        const json = (await res.json()) as { models?: { name: string }[] };
-        if (!stop) setStatus({ online: true, models: (json.models ?? []).map((m) => m.name), ping: Math.round(performance.now() - t) });
+        let models: string[];
+        if (isTauri()) {
+          models = await tauriOllamaTags(url);
+        } else {
+          const res = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(2500) });
+          if (!res.ok) throw new Error();
+          const json = (await res.json()) as { models?: { name: string }[] };
+          models = (json.models ?? []).map((m) => m.name);
+        }
+        if (!stop) setStatus({ online: true, models, ping: Math.round(performance.now() - t) });
       } catch {
         if (!stop) setStatus({ online: false, models: [] });
       }

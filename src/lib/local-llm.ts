@@ -114,6 +114,31 @@ export async function isModelCached(model: string): Promise<boolean> {
   }
 }
 
+/** True inside the Tauri desktop window, where localhost calls must go through the native side. */
+export function isTauri() {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+/** Native Ollama chat via the Rust side (no mixed-content/CORS limits). Returns the full reply. */
+async function tauriOllamaChat(
+  prompt: { system: string; messages: { role: "user" | "assistant"; content: string }[] },
+  server: { url: string; model: string },
+): Promise<string> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("ollama_chat", {
+    url: server.url,
+    model: server.model,
+    system: prompt.system,
+    messages: prompt.messages,
+  });
+}
+
+/** Native /api/tags probe for the mascot when running in the desktop app. */
+export async function tauriOllamaTags(url: string): Promise<string[]> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string[]>("ollama_tags", { url });
+}
+
 /** Streams one turn from a local OpenAI-compatible server (Ollama, llama.cpp, vLLM). */
 export async function ollamaTurn(
   prompt: { system: string; messages: { role: "user" | "assistant"; content: string }[] },
@@ -121,6 +146,22 @@ export async function ollamaTurn(
   metadata: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<ReadableStream<UIMessageChunk>> {
+  if (isTauri()) {
+    // The desktop window loads the https site, so browser fetch to http://localhost is blocked.
+    // Ask the native side instead and emit the reply as one stream.
+    const text = await tauriOllamaChat(prompt, server);
+    signal.throwIfAborted();
+    return new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: "start", messageMetadata: metadata });
+        controller.enqueue({ type: "text-start", id: "t" });
+        if (text) controller.enqueue({ type: "text-delta", id: "t", delta: text });
+        controller.enqueue({ type: "text-end", id: "t" });
+        controller.enqueue({ type: "finish" });
+        controller.close();
+      },
+    });
+  }
   let res: Response;
   try {
     res = await fetch(`${server.url.replace(/\/+$/, "")}/chat/completions`, {
