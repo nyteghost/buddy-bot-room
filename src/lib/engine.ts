@@ -1,18 +1,32 @@
 import { useSyncExternalStore } from "react";
 
 /** Which brain powers the pals. All options are free: "cloud" shares every entered free key, "local" runs in the browser. */
-export type EngineKind = "cloud" | "local" | "auto";
+export type EngineKind = "cloud" | "local" | "auto" | "ollama";
 export type FreeProvider = "groq" | "gemini" | "openrouter";
-export type EngineSettings = { kind: EngineKind; groqKey: string; geminiKey: string; openrouterKey: string };
+export type EngineSettings = {
+  kind: EngineKind;
+  groqKey: string;
+  geminiKey: string;
+  openrouterKey: string;
+  ollamaUrl: string;
+  ollamaModel: string;
+};
 
 const key = "pixel-pals-engine-v1";
-const fallback: EngineSettings = { kind: "cloud", groqKey: "", geminiKey: "", openrouterKey: "" };
+const fallback: EngineSettings = {
+  kind: "cloud",
+  groqKey: "",
+  geminiKey: "",
+  openrouterKey: "",
+  ollamaUrl: "http://localhost:11434/v1",
+  ollamaModel: "qwen2.5:7b",
+};
 const listeners = new Set<() => void>();
 let cache: EngineSettings | null = null;
 
 /** Older saves used "lovable", "groq" or "gemini"; they all become the shared free cloud mode. */
 export function normalizeKind(kind: unknown): EngineKind {
-  return kind === "local" || kind === "auto" ? kind : "cloud";
+  return kind === "local" || kind === "auto" || kind === "ollama" ? kind : "cloud";
 }
 
 function read(): EngineSettings {
