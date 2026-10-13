@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
-import { getGpuInfo, getLocalStats, hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
+import { detectBestModel, getGpuInfo, getLocalStats, hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
@@ -168,6 +168,35 @@ function KeyField(props: {
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
       />
+    </div>
+  );
+}
+
+/** Main-screen one-click: detect the GPU, pick the best model, download it so Auto/local is ready. */
+export function AutoModelDownload() {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState<string | null>(null);
+  async function run() {
+    setBusy(true);
+    try {
+      const pick = await detectBestModel();
+      setStatus(`Detected ${pick.gpu} → ${pick.label} (${pick.size})`);
+      await loadLocalEngine((p) => setStatus(`${pick.label}: ${Math.round(p * 100)}% downloaded`), pick.id);
+      setReady(pick.label);
+      setStatus("");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Could not start the local model.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="auto-model-download">
+      <Button size="sm" variant="outline" onClick={run} disabled={busy || !hasWebGPU()}>
+        <Cpu /> {ready ? `Local model ready (${ready})` : busy ? "Preparing…" : "Detect GPU & download best model"}
+      </Button>
+      {status && <p className="text-xs text-muted-foreground">{status}</p>}
     </div>
   );
 }
