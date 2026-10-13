@@ -1,3 +1,5 @@
+import { isAbortError } from "./stream-errors.server";
+
 const LOVABLE_AIG_RUN_ID_HEADER = "X-Lovable-AIG-Run-ID";
 
 export function createLovableAiGatewayRunIdFetch(initialRunId?: string) {
@@ -98,7 +100,11 @@ export async function withLovableAiGatewayRunIdHeader(
   }
 
   const reader = response.body.getReader();
-  const firstChunk = reader.read();
+  // Attach rejection handling immediately while gateway response headers arrive.
+  const firstChunk = reader.read().then(
+    (chunk) => ({ chunk }),
+    (error: unknown) => ({ error }),
+  );
   const runId = await gateway.waitForRunId();
   const headers = getLovableAiGatewayResponseHeaders(undefined, response.headers);
   new Headers(init).forEach((value, name) => headers.set(name, value));
@@ -107,7 +113,9 @@ export async function withLovableAiGatewayRunIdHeader(
   const body = new ReadableStream({
     async start(controller) {
       try {
-        const first = await firstChunk;
+        const initial = await firstChunk;
+        if ("error" in initial) throw initial.error;
+        const first = initial.chunk;
         if (first.done) {
           controller.close();
           return;
@@ -120,7 +128,8 @@ export async function withLovableAiGatewayRunIdHeader(
         }
         controller.close();
       } catch (error) {
-        controller.error(error);
+        if (isAbortError(error)) controller.close();
+        else controller.error(error);
       }
     },
     cancel(reason?: unknown) {

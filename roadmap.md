@@ -3,3 +3,5 @@
 - [x] Connect multiple AI models with roundtable and broadcast modes.
 - [x] Save the single conversation in this browser.
 - [x] Test discussion flow, restoration, and page rendering.
+- [x] Add Horror Mode commands, horror-icon sprites and personalities, preserving Hellraiser Mode.
+- [x] Verify command transitions and a real horror discussion.

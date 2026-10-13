@@ -47,11 +47,11 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
-import { modeCommand, setHellraiser, useHellraiser } from "@/lib/hellraiser";
+import { characterModeCommand, setCharacterMode, useCharacterMode } from "@/lib/hellraiser";
 import {
   agents,
   agentName,
-  cenobites,
+  agentPersona,
   models,
   messageText,
   type AgentId,
@@ -70,10 +70,13 @@ const suggestions = [
 
 export function Room() {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
-  const hell = useHellraiser();
+  const characterMode = useCharacterMode();
+  const hell = characterMode === "hellraiser";
+  const horror = characterMode === "horror";
   useEffect(() => {
     document.documentElement.classList.toggle("hellraiser", hell);
-  }, [hell]);
+    document.documentElement.classList.toggle("horror", horror);
+  }, [hell, horror]);
   const [ready, setReady] = useState(false);
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("roundtable");
@@ -126,9 +129,10 @@ export function Room() {
     abortRef.current?.abort();
   };
   async function start() {
-    const command = modeCommand(topic);
+    if (runLock.current) return;
+    const command = characterModeCommand(topic);
     if (command) {
-      setHellraiser(command === "on");
+      setCharacterMode(command);
       setTopic("");
       inputRef.current?.focus();
       return;
@@ -156,7 +160,7 @@ export function Room() {
           const began = performance.now();
           const transport = new DefaultChatTransport<RoomMessage>({
             api: "/api/chat",
-            body: { agentId: agent.id, model: selectedModels[agent.id], mode, round: currentRound, hellraiser: hell },
+            body: { agentId: agent.id, model: selectedModels[agent.id], mode, round: currentRound, hellraiser: hell, horror },
           });
           const stream = await transport.sendMessages({
             chatId: "pixel-pals-room",
@@ -203,7 +207,7 @@ export function Room() {
     const text = messages
       .map(
         (m) =>
-          `### ${m.metadata?.agentId ? agentName(m.metadata?.agentId, hell) : "You"}\n\n${messageText(m)}`,
+          `### ${m.metadata?.agentId ? agentName(m.metadata?.agentId, hell, horror) : "You"}\n\n${messageText(m)}`,
       )
       .join("\n\n");
     const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
@@ -253,15 +257,17 @@ export function Room() {
         <section className="room-column">
           <div className="page-heading">
             <div>
-              <div className="eyebrow">{hell ? "THE LAMENT CONFIGURATION IS SOLVED" : "YOUR AI COMMON ROOM"}</div>
+              <div className="eyebrow">{horror ? "HORROR MODE" : hell ? "THE LAMENT CONFIGURATION IS SOLVED" : "YOUR AI COMMON ROOM"}</div>
               <h1>
-                {hell ? "We have such sights" : "A little room."}
+                {horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
-                {hell ? "to show you" : "Big ideas"}
+                {horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {hell
+                {horror
+                  ? "The masks are on. The conversation begins."
+                  : hell
                   ? "The Cenobites answer your call. Type “Normal mode” to close the box."
                   : "Different minds. One conversation. Type “Hellraiser mode” if you dare."}
               </p>
@@ -299,7 +305,7 @@ export function Room() {
               >
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
-                  {agentName(a.id, hell)}
+                  {agentName(a.id, hell, horror)}
                   {speaking === a.id && " ···"}
                 </span>
               </div>
@@ -338,7 +344,7 @@ export function Room() {
                     <PixelCharacter id={a.id} />
                   </span>
                   <Switch
-                    aria-label={`Enable ${agentName(a.id, hell)}`}
+                    aria-label={`Enable ${agentName(a.id, hell, horror)}`}
                     checked={enabled.includes(a.id)}
                     disabled={running}
                     onCheckedChange={(checked) =>
@@ -349,10 +355,10 @@ export function Room() {
                   />
                 </div>
                 <h3>
-                  {agentName(a.id, hell)}
+                  {agentName(a.id, hell, horror)}
                   <span className="agent-dot" />
                 </h3>
-                <p>{hell ? cenobites[a.id].role : a.role}</p>
+                <p>{agentPersona(a.id, hell, horror).role}</p>
                 <span className="model-label">
                   {models.find((m) => m.id === selectedModels[a.id])?.label}
                 </span>
@@ -364,7 +370,7 @@ export function Room() {
                       setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
                     }
                   >
-                    <SelectTrigger aria-label={`${agentName(a.id, hell)} model`} className="mt-3">
+                    <SelectTrigger aria-label={`${agentName(a.id, hell, horror)} model`} className="mt-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -402,7 +408,7 @@ export function Room() {
                   aria-label={running ? "Stop discussion" : "Start topic"}
                   status={running ? "streaming" : "ready"}
                   onStop={stop}
-                  disabled={!running && (!topic.trim() || enabled.length < 2 || !ready)}
+                  disabled={!running && (!topic.trim() || (!characterModeCommand(topic) && enabled.length < 2) || !ready)}
                 />
               </PromptInputFooter>
             </PromptInput>
@@ -477,7 +483,7 @@ export function Room() {
             <Button
               className="start-button"
               onClick={running ? stop : start}
-              disabled={!running && (!topic.trim() || enabled.length < 2 || !ready)}
+              disabled={!running && (!topic.trim() || (!characterModeCommand(topic) && enabled.length < 2) || !ready)}
             >
               {running ? <Square /> : <Play fill="currentColor" />}
               {running ? "Stop discussion" : "Start discussion"}
@@ -544,7 +550,7 @@ export function Room() {
           <div className="conversation-subhead">
             <span className="status-dot" />
             {running
-              ? `${activeAgent ? agentName(activeAgent.id, hell) : hell ? "The Order" : "Your pals"} is thinking…`
+              ? `${activeAgent ? agentName(activeAgent.id, hell, horror) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`
               : messages.length
                 ? "The floor is yours"
                 : "The room is open"}
@@ -587,7 +593,7 @@ export function Room() {
                       )}
                       <div className="message-main">
                         <div className="message-heading">
-                          <b className={a ? `agent-${a.id}` : "text-primary"}>{a ? agentName(a.id, hell) : "You"}</b>
+                          <b className={a ? `agent-${a.id}` : "text-primary"}>{a ? agentName(a.id, hell, horror) : "You"}</b>
                           <span>{a ? `ROUND ${m.metadata?.round ?? 1}` : "THE TOPIC"}</span>
                           {m.metadata?.elapsed && (
                             <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
@@ -613,7 +619,7 @@ export function Room() {
               {running && (
                 <div className="thinking-row">
                   {speaking && <PixelCharacter id={speaking} animated />}
-                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell) : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
+                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell, horror) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
                 </div>
               )}
             </ConversationContent>

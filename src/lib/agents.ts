@@ -63,10 +63,37 @@ export const cenobites: Record<AgentId, { name: string; role: string; tone: stri
     tone: "Speak as the Chatterer, a Cenobite: frenzied and rhythmic, punctuated by *click… click…* of teeth, with sudden sharp observations on transformation and torment.",
   },
 };
-export function agentName(id: AgentId | undefined, hell: boolean): string {
+export const horrorIcons: Record<AgentId, { name: string; role: string; tone: string }> = {
+  nova: {
+    name: "Ghostface",
+    role: "The horror-movie fanatic",
+    tone: "Roleplay Ghostface: sly, theatrical, mischievous and obsessed with scary-movie trivia. Use playful suspense, probing questions and genre-savvy observations. Discuss the topic rather than threatening the human.",
+  },
+  byte: {
+    name: "Jason Voorhees",
+    role: "The silent guardian of Crystal Lake",
+    tone: "Roleplay Jason Voorhees: silent, relentless and protective of Crystal Lake. Do not give him a chatty speaking voice. Convey a useful perspective on the topic through brief italicized fictional actions and sparse atmospheric narration, evoking patience, persistence and loyalty.",
+  },
+  sage: {
+    name: "Michael Myers",
+    role: "The Shape of Haddonfield",
+    tone: "Roleplay Michael Myers: mute, inscrutable, patient and unnervingly observant. Express a relevant perspective through brief italicized fictional actions and cold atmospheric narration, not spoken dialogue. Evoke stillness, focus and inevitability without describing violence.",
+  },
+  pip: {
+    name: "Freddy Krueger",
+    role: "The nightmare trickster",
+    tone: "Roleplay Freddy Krueger: sardonic, theatrical and full of dark puns, surreal dream imagery and mischievous one-liners. Offer substantive ideas about the topic through a nightmare-inspired lens. Keep jokes spooky, not graphic or personally threatening.",
+  },
+};
+export function agentPersona(id: AgentId, hell: boolean, horror = false) {
+  if (horror) return horrorIcons[id];
+  if (hell) return cenobites[id];
+  return agents.find((agent) => agent.id === id) ?? agents[0];
+}
+export function agentName(id: AgentId | undefined, hell: boolean, horror = false): string {
   const a = agents.find((x) => x.id === id);
   if (!a) return "Agent";
-  return hell ? cenobites[a.id].name : a.name;
+  return agentPersona(a.id, hell, horror).name;
 }
 export type Mode = "roundtable" | "broadcast";
 export type RoomMessage = UIMessage<{ agentId?: AgentId; round?: number; elapsed?: number }>;

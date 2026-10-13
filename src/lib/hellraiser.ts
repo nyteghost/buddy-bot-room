@@ -1,25 +1,48 @@
 import { useSyncExternalStore } from "react";
 
 const key = "pixel-pals-hellraiser-v1";
+const characterKey = "pixel-pals-character-mode-v1";
+export type CharacterMode = "normal" | "hellraiser" | "horror";
 const listeners = new Set<() => void>();
-let on = false;
-if (typeof window !== "undefined") on = localStorage.getItem(key) === "1";
+let currentMode: CharacterMode = "normal";
+if (typeof window !== "undefined") {
+  try {
+    const saved = localStorage.getItem(characterKey);
+    currentMode = saved === "horror" || saved === "hellraiser" || saved === "normal"
+      ? saved
+      : localStorage.getItem(key) === "1" ? "hellraiser" : "normal";
+  } catch { /* storage unavailable */ }
+}
 
 export function setHellraiser(value: boolean) {
-  on = value;
+  setCharacterMode(value ? "hellraiser" : "normal");
+}
+export function setCharacterMode(value: CharacterMode) {
+  currentMode = value;
   try {
-    localStorage.setItem(key, value ? "1" : "0");
+    localStorage.setItem(characterKey, value);
+    localStorage.setItem(key, value === "hellraiser" ? "1" : "0");
   } catch {
     /* storage unavailable */
   }
   listeners.forEach((l) => l());
 }
 export function useHellraiser() {
+  return useCharacterMode() === "hellraiser";
+}
+export function useCharacterMode() {
   return useSyncExternalStore(
     (l) => (listeners.add(l), () => listeners.delete(l)),
-    () => on,
-    () => false,
+    () => currentMode,
+    () => "normal" as CharacterMode,
   );
+}
+export function characterModeCommand(text: string): CharacterMode | null {
+  const t = text.trim().toLowerCase().replace(/[.!]+$/, "");
+  if (t === "horror mode" || t === "horror mode on") return "horror";
+  if (t === "horror mode off") return "normal";
+  const hell = modeCommand(text);
+  return hell === "on" ? "hellraiser" : hell === "off" ? "normal" : null;
 }
 /** Returns "on" / "off" when the text is a mode command, otherwise null. */
 export function modeCommand(text: string): "on" | "off" | null {
