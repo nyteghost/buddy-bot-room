@@ -24,7 +24,7 @@ export function useHellraiser() {
 /** Returns "on" / "off" when the text is a mode command, otherwise null. */
 export function modeCommand(text: string): "on" | "off" | null {
   const t = text.trim().toLowerCase().replace(/[.!]+$/, "");
-  if (t === "hellraiser mode") return "on";
-  if (t === "normal mode" || t === "close the box") return "off";
+  if (t === "hellraiser mode" || t === "hellraiser mode on") return "on";
+  if (t === "hellraiser mode off" || t === "normal mode" || t === "close the box") return "off";
   return null;
 }
