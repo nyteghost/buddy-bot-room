@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import {
   ArrowUpRight,
@@ -133,6 +133,20 @@ export function Room() {
   const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
   const direct = mode === "direct";
   const tooFew = !direct && enabled.length < 2;
+  const topicDraft = topic;
+  const directMode = direct;
+  const partnerChoice = partner;
+  const [desktopApp, setDesktopApp] = useState(false);
+  useEffect(() => setDesktopApp(isTauri()), []);
+  const startRef = useRef<(ask?: { partner: AgentId; text: string }) => Promise<void>>(async () => {});
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const detail = (e as CustomEvent<{ partner: AgentId; text: string }>).detail;
+      if (detail?.text) void startRef.current(detail);
+    };
+    window.addEventListener("pixelpals:ask", onAsk);
+    return () => window.removeEventListener("pixelpals:ask", onAsk);
+  }, []);
   const [selectedModels, setSelectedModels] = useState<Record<AgentId, string>>({
     nova: agents[0].model,
     byte: agents[1].model,
@@ -273,7 +287,6 @@ export function Room() {
           const requestBody = {
             agentId: agent.id,
             model: selectedModels[agent.id],
-            mode,
             round: currentRound,
             verdict,
             hellraiser: turnMode === "hellraiser",
@@ -377,6 +390,7 @@ export function Room() {
       inputRef.current?.focus();
     }
   }
+  startRef.current = start;
   function exportChat() {
     const text = messages
       .map(
