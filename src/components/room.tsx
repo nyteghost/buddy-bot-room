@@ -253,6 +253,7 @@ export function Room() {
                 agentId: agent.id,
                 characterMode,
                 round: currentRound,
+                ...(verdict ? { verdict: true } : {}),
                 elapsed: (performance.now() - began) / 1000,
               },
             };
