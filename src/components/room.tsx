@@ -6,6 +6,7 @@ import {
   CircleHelp,
   Download,
   MessageSquare,
+  Wrench,
   Minus,
   Play,
   Plus,
@@ -218,7 +219,7 @@ export function Room() {
       const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean }[] = [];
       for (let r = 1; r <= (direct ? 1 : rounds); r++)
         for (const agent of seated) turns.push({ agent, round: r, verdict: false });
-      if (mode === "roundtable" && seated.length > 1)
+      if ((mode === "roundtable" || mode === "solve") && seated.length > 1)
         turns.push({ agent: seated[0]!, round: rounds, verdict: true });
       {
         for (const { agent, round: currentRound, verdict } of turns) {
@@ -442,7 +443,7 @@ export function Room() {
             ))}
             <div className="scene-bottom">
               <span>
-                <Users size={13} /> {mode === "roundtable" ? "Roundtable" : direct ? "One-on-one" : "Broadcast"}
+                <Users size={13} /> {mode === "roundtable" ? "Roundtable" : direct ? "One-on-one" : mode === "solve" ? "Problem solving" : "Broadcast"}
               </span>
               <span>
                 {running ? `Round ${round} of ${rounds}` : "Ready when you are"}
@@ -602,6 +603,16 @@ export function Room() {
                   <MessageSquare />
                   One-on-one
                 </Button>
+                <Button
+                  variant="ghost"
+                  disabled={running}
+                  aria-pressed={mode === "solve"}
+                  className={cn(mode === "solve" && "mode-active")}
+                  onClick={() => setMode("solve")}
+                >
+                  <Wrench />
+                  Problem solving
+                </Button>
               </div>
             </div>
             {direct && (
@@ -723,7 +734,7 @@ export function Room() {
               : messages.length
                 ? "The floor is yours"
                 : "The room is open"}
-            <span>{mode === "roundtable" ? "ROUND TABLE" : direct ? "ONE-ON-ONE" : "BROADCAST"}</span>
+            <span>{mode === "roundtable" ? "ROUND TABLE" : direct ? "ONE-ON-ONE" : mode === "solve" ? "PROBLEM SOLVING" : "BROADCAST"}</span>
           </div>
           <Conversation className="chat-log">
             <ConversationContent

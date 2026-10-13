@@ -16,7 +16,7 @@ export async function handleChat(request: Request) {
     if (
       !agent ||
       !models.some((model) => model.id === body.model) ||
-      !["roundtable", "broadcast", "direct"].includes(body.mode) ||
+      !["roundtable", "broadcast", "direct", "solve"].includes(body.mode) ||
       !Array.isArray(body.messages)
     ) {
       return Response.json(
@@ -61,8 +61,14 @@ export async function handleChat(request: Request) {
       : hell ? "a gathering of Cenobites summoned by the Lament Configuration, in the style of Clive Barker's Hellraiser. Stay fully in character, gothic and ominous, but keep it PG-13: no graphic gore, and never encourage real self-harm" : "Pixel Pals Chat";
     const roundtableRule =
       "You can see the other participants. Talk directly to them by name: react to what the most recent speaker just said (agree, push back, or build on it), and when useful quote a short phrase from someone. Avoid repeating points already made and move the discussion forward.";
+    const solveRule =
+      "The human needs help with a problem. Collaborate with the other participants by name to find the best approach: diagnose likely causes, propose concrete steps, critique or refine others' suggestions, and converge toward one recommended fix.";
     const task =
-      body.verdict === true
+      body.verdict === true && body.mode === "solve"
+        ? `The team discussion has ended. In your own voice, give the final plan for the human's problem as short labelled lines: "Best approach:" (one sentence), "Steps:" (3–5 numbered concrete steps) and "Watch out:" (one risk or alternative). No more than 130 words, no name prefix.`
+        : body.mode === "solve" && body.verdict !== true
+          ? `${solveRule} Write just your contribution, without a name prefix, in roughly 60–110 words.`
+          : body.verdict === true
         ? `The discussion has ended. In your own voice, deliver the room's verdict on the human's latest topic as three short labelled lines: "Agreed:" (what the participants agreed on), "Disputed:" (the main disagreement, naming who disagreed), and "Verdict:" (a one-sentence final recommendation). No more than 90 words, no name prefix.`
         : body.mode === "direct"
           ? "You are in a private one-on-one chat with the human. Reply directly and conversationally to their latest message in roughly 40–120 words, without a name prefix."
@@ -100,11 +106,12 @@ export async function handleChat(request: Request) {
         onError: logStreamError,
       });
     } else {
-      gateway = createLovableAiGatewayProvider(key, getLovableAiGatewayRunId(request), {
+      const provider = createLovableAiGatewayProvider(key, getLovableAiGatewayRunId(request), {
         baseURL: "https://ai.gateway.lovable.dev/v1",
       });
+      gateway = provider;
       result = streamText({
-        model: gateway(body.model),
+        model: provider(body.model),
         system: instructions,
         messages: history,
         abortSignal: request.signal,

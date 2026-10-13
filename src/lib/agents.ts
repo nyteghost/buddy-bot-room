@@ -153,7 +153,7 @@ export function agentName(id: AgentId | undefined, hell: boolean, horror = false
   if (!a) return "Agent";
   return agentPersona(a.id, hell, horror).name;
 }
-export type Mode = "roundtable" | "broadcast" | "direct";
+export type Mode = "roundtable" | "broadcast" | "direct" | "solve";
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
