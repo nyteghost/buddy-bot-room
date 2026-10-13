@@ -1361,3 +1361,12 @@ h1 {
 @keyframes tp-sway { 50% { transform: translateX(1px); } }
 @keyframes tp-drop { 50% { transform: translateY(1px); } }
 @keyframes tp-bounce-big { 50% { transform: translateY(-4px); } }
+
+/* Dev Team theme: each pal stands at their own workstation instead of a table. */
+.devteam .scene-pal-0 { left: 26%; top: 36%; }
+.devteam .scene-pal-1 { left: 42%; top: 36%; }
+.devteam .scene-pal-2 { left: 58%; top: 36%; }
+.devteam .scene-pal-3 { left: 73%; top: 36%; }
+.devteam .scene-pal-4 { left: 27%; top: 76%; }
+.devteam .scene-pal-5 { left: 51%; top: 76%; }
+.devteam .scene-pal-6 { left: 74%; top: 76%; }

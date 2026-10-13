@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 
 const engineKinds = ["cloud", "local"] as const;
-const themes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy"] as const;
+const themes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam"] as const;
 const modes = ["roundtable", "broadcast", "direct", "solve"] as const;
 
 export const loadAccount = createServerFn({ method: "GET" })

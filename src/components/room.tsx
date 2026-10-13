@@ -71,6 +71,7 @@ import { SavedDiscussions } from "./saved-discussions";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
+import devRoomImage from "@/assets/devteam-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
@@ -105,6 +106,7 @@ export function Room() {
     document.documentElement.classList.toggle("horror", horror);
     document.documentElement.classList.toggle("matrix", characterMode === "matrix");
     document.documentElement.classList.toggle("finalfantasy", characterMode === "finalfantasy");
+    document.documentElement.classList.toggle("devteam", characterMode === "devteam");
   }, [hell, horror, characterMode]);
   const [ready, setReady] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
@@ -391,6 +393,7 @@ export function Room() {
               <SelectItem value="horror">Horror Mode</SelectItem>
               <SelectItem value="matrix">Matrix Theme</SelectItem>
               <SelectItem value="finalfantasy">Final Fantasy Theme</SelectItem>
+              <SelectItem value="devteam">Dev Team Theme</SelectItem>
             </SelectContent>
           </Select>
           <Dialog>
@@ -417,20 +420,20 @@ export function Room() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
+                {characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
                   ? "HORROR MODE"
                   : hell
                     ? "THE LAMENT CONFIGURATION IS SOLVED"
                     : "YOUR AI COMMON ROOM"}
               </div>
               <h1>
-                {characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
+                {characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
-                {characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
+                {characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
+                {characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
                   ? "The masks are on. The conversation begins."
                   : hell
                     ? "The Cenobites answer your call. Type “Normal mode” to close the box."
@@ -446,12 +449,12 @@ export function Room() {
           {engine.kind === "local" && <WebGpuUsageBox active />}
           <div className="room-scene">
             <img
-              src={characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
+              src={characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
               alt={
-                characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
+                characterMode === "devteam" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
                   ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box"
                   : "Pixel-art common room with a discussion table, computer stations, and plants"
               }
