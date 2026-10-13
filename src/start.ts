@@ -2,11 +2,13 @@ import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/r
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { isAbortError } from "./lib/ai/stream-errors.server";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     return await next();
   } catch (error) {
+    if (isAbortError(error)) return new Response(null, { status: 499 });
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }

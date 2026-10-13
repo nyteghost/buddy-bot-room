@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, type ModelMessage, type UIMessage } from "ai";
+import { logStreamError } from "./stream-errors.server";
 
 import {
   createLovableAiGatewayRunIdFetch,
@@ -28,6 +29,8 @@ export function createResponsesCall(
     messages,
     abortSignal: request.signal,
     maxRetries: 0,
+    // Override the SDK's default console.error: a canceled fetch is not a crash.
+    onError: logStreamError,
     providerOptions: {
       openai: {
         store: false,

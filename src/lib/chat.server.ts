@@ -3,6 +3,7 @@ import { agents, agentName, agentPersona, contextForMode, models, messageText, t
 import { createResponsesCall } from "./ai/responses.server";
 import { createLovableAiGatewayProvider } from "./ai/gateway-helpers.server";
 import { getLovableAiGatewayRunId, withLovableAiGatewayRunIdHeader } from "./ai/run-id.server";
+import { isAbortError, logStreamError } from "./ai/stream-errors.server";
 
 export async function handleChat(request: Request) {
   try {
@@ -79,6 +80,7 @@ export async function handleChat(request: Request) {
         messages: history,
         abortSignal: request.signal,
         maxRetries: 0,
+        onError: logStreamError,
       });
     }
     return withLovableAiGatewayRunIdHeader(
@@ -93,7 +95,7 @@ export async function handleChat(request: Request) {
       gateway,
     );
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError")
+    if (request.signal.aborted || isAbortError(error))
       return new Response(null, { status: 499 });
     return Response.json({ error: safeError(error) }, { status: 400 });
   }
