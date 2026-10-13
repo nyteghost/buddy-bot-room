@@ -20,6 +20,8 @@ export function gpuTier(p: GpuProbe): GpuTier {
   return "light";
 }
 
+export const localModelChoices = (["high", "mid", "light"] as GpuTier[]).map((tier) => ({ tier, ...models[tier] }));
+
 export function modelForProbe(p: GpuProbe) {
   const tier = gpuTier(p);
   const m = models[tier];

@@ -13,6 +13,7 @@ import {
 import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
 import { detectBestModel, getGpuInfo, getLocalStats, hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
+import { localModelChoices } from "@/lib/gpu-tier";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
@@ -189,12 +190,16 @@ export function AutoModelDownload() {
       stop = true;
     };
   }, []);
+  const [manual, setManual] = useState<string>("auto");
   async function run() {
     setBusy(true);
     try {
-      const pick = await detectBestModel();
-      setGpu(pick.gpu);
-      setStatus(`Best fit: ${pick.label} (${pick.size})`);
+      const detected = await detectBestModel();
+      setGpu(detected.gpu);
+      const choice = localModelChoices.find((m) => m.tier === manual);
+      const f16 = detected.id.includes("q4f16");
+      const pick = choice ? { ...detected, id: f16 ? choice.f16 : choice.f32, label: choice.label, size: choice.size } : detected;
+      setStatus(`${choice ? "Your pick" : "Best fit"}: ${pick.label} (${pick.size})`);
       await loadLocalEngine((p) => setStatus(`${pick.label}: ${Math.round(p * 100)}% downloaded`), pick.id);
       setReady(pick.label);
       setStatus("");
@@ -206,10 +211,32 @@ export function AutoModelDownload() {
   }
   return (
     <div className="auto-model-download">
-      <Button size="sm" variant="outline" onClick={run} disabled={busy || !hasWebGPU()}>
-        <Cpu /> {ready ? `Local model ready (${ready})` : busy ? "Preparing…" : "Detect GPU & download best model"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" onClick={run} disabled={busy || !hasWebGPU()}>
+          <Cpu /> {ready ? `Local model ready (${ready})` : busy ? "Preparing…" : manual === "auto" ? "Detect GPU & download best model" : "Download selected model"}
+        </Button>
+        <select
+          aria-label="Local model"
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+          value={manual}
+          disabled={busy}
+          onChange={(e) => {
+            setManual(e.target.value);
+            setReady(null);
+          }}
+        >
+          <option value="auto">Auto-detect</option>
+          {localModelChoices.map((m) => (
+            <option key={m.tier} value={m.tier}>
+              {m.label} ({m.size})
+            </option>
+          ))}
+        </select>
+      </div>
       <p className="text-xs text-muted-foreground">GPU found: {gpu ?? "Checking…"}</p>
+      {gpu?.includes("Unknown") && manual === "auto" && (
+        <p className="text-xs text-muted-foreground">Name hidden by your browser — pick a model above (7B for RTX 3080-class cards).</p>
+      )}
       {status && <p className="text-xs text-muted-foreground">{status}</p>}
     </div>
   );

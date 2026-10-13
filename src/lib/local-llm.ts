@@ -29,7 +29,8 @@ export async function detectBestModel() {
   const adapter = hasWebGPU() ? await navigator.gpu.requestAdapter() : null;
   if (!adapter) throw new Error("No WebGPU graphics card found in this browser.");
   const info = (adapter as unknown as { info?: { description?: string; vendor?: string; architecture?: string } }).info;
-  const description = [info?.description, info?.vendor, info?.architecture].filter(Boolean).join(" ") || "Unknown GPU";
+  const description =
+    webglRenderer() || [info?.description, info?.vendor, info?.architecture].filter(Boolean).join(" ") || "Unknown GPU";
   const probe = {
     description,
     maxBufferSize: Number(adapter.limits.maxBufferSize),
@@ -76,12 +77,26 @@ export async function getLocalStats(): Promise<string | null> {
   }
 }
 
+/** WebGL's unmasked renderer often names the GPU when WebGPU blanks it. */
+export function webglRenderer(): string | null {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl");
+    const ext = gl?.getExtension("WEBGL_debug_renderer_info");
+    const name = gl && ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
+    return name.replace(/^ANGLE \((.*)\)$/, "$1") || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Basic WebGPU adapter info for the usage box. */
 export async function getGpuInfo(): Promise<string | null> {
   if (!hasWebGPU()) return null;
   try {
     const adapter = await navigator.gpu.requestAdapter();
     const info = (adapter as unknown as { info?: { description?: string; vendor?: string; architecture?: string } })?.info;
+    const gl = webglRenderer();
+    if (gl) return gl;
     if (!info) return "WebGPU adapter available";
     return [info.description, info.vendor, info.architecture].filter(Boolean).join(" · ") || "WebGPU adapter available";
   } catch {
