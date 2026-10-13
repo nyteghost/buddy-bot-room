@@ -55,7 +55,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
-import { characterModeCommand, setCharacterMode, useCharacterMode } from "@/lib/hellraiser";
+import { characterModeCommand, setCharacterMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
   agentName,
@@ -334,6 +334,19 @@ export function Room() {
           <span className="lab-badge">
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
+          <Select
+            value={characterMode}
+            onValueChange={(value) => setCharacterMode(value as CharacterMode)}
+          >
+            <SelectTrigger aria-label="Theme" className="theme-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="normal">Normal Mode</SelectItem>
+              <SelectItem value="hellraiser">Hellraiser Mode</SelectItem>
+              <SelectItem value="horror">Horror Mode</SelectItem>
+            </SelectContent>
+          </Select>
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="About this room">
