@@ -1,31 +1,34 @@
 # Pixel Pals desktop (CachyOS / Arch)
 
-## Install as a system package (`pacman`)
+## Clone
+GitHub doesn't accept account passwords in the terminal. Log in once first:
 ```bash
-git clone https://github.com/nyteghost/buddy-bot-room.git
-cd buddy-bot-room/packaging/arch
-makepkg -si          # builds and installs with pacman
-```
-Afterwards: `pixelpals` from Ghostty, or "Pixel Pals" in your app launcher.
-Remove with `sudo pacman -R pixelpals`.
-
-## Build an AppImage
-```bash
-bun install
-bun run tauri:icons
-bun run tauri:build     # output: src-tauri/target/release/bundle/appimage/
+sudo pacman -S github-cli
+gh auth login
+gh repo clone nyteghost/buddy-bot-room
+cd buddy-bot-room
 ```
 
-## Develop locally (window shows your local dev server)
+## One-step install (any shell, including fish)
 ```bash
-bun run tauri:dev
+bash packaging/install.sh
 ```
+Installs missing tools, sets up Rust, fixes icons, builds, and adds Pixel Pals
+to your app menu and desktop. Then right-click it in the menu → Add to Favorites.
+
+## Or as a pacman package
+```bash
+cd packaging/arch
+makepkg -si
+```
+Builds from your local copy (no GitHub login). Remove with `sudo pacman -R pixelpals`.
+
+## AppImage
+After building: `src-tauri/target/release/bundle/appimage/`
 
 ## Ollama
 ```bash
 ollama pull qwen2.5:7b
 OLLAMA_ORIGINS="*" ollama serve
 ```
-Then pick "Local Server / Ollama" in the AI engine settings.
-
-Note: the release window loads the published app; the Ollama connection still runs on your own GPU.
+Run these separately, then pick "Local Server / Ollama" in the AI engine settings.
