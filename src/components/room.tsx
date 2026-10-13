@@ -76,7 +76,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
-import { hasWebGPU, localTurn, speakFree } from "@/lib/local-llm";
+import { hasWebGPU, localTurn, ollamaTurn, speakFree } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
@@ -269,7 +269,7 @@ export function Room() {
             horror: turnMode === "horror",
             characterMode: turnMode,
           };
-          const runLocal = async () => {
+          const fetchPrompt = async () => {
             const res = await fetch("/api/chat", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -277,8 +277,10 @@ export function Room() {
               signal: controller.signal,
             });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Prompt failed.");
-            return localTurn(await res.json(), { agentId: agent.id, round: currentRound }, controller.signal);
+            return res.json();
           };
+          const runLocal = async () =>
+            localTurn(await fetchPrompt(), { agentId: agent.id, round: currentRound }, controller.signal);
           const runCloud = (provider: NonNullable<ReturnType<typeof providerForTurn>>) =>
             new DefaultChatTransport<RoomMessage>({ api: "/api/chat", body: { ...requestBody, engine: provider } }).sendMessages({
               chatId: "pixel-pals-room",
@@ -307,7 +309,16 @@ export function Room() {
             }
           };
           const provider = providerForTurn(engine, turnIndex);
-          if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
+          if (engine.kind === "ollama") {
+            await consume(
+              await ollamaTurn(
+                await fetchPrompt(),
+                { url: engine.ollamaUrl, model: engine.ollamaModel },
+                { agentId: agent.id, round: currentRound },
+                controller.signal,
+              ),
+            );
+          } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
             await consume(await runLocal());
           } else if (!provider) {
             throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
@@ -458,7 +469,7 @@ export function Room() {
               <b>001</b>
             </span>
           </div>
-          {engine.kind !== "cloud" && <><AutoModelDownload /><WebGpuUsageBox active /></>}
+          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <div className="room-scene">
             <img
               src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
