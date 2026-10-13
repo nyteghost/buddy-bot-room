@@ -66,6 +66,9 @@ import {
   type Mode,
   type RoomMessage,
 } from "@/lib/agents";
+import { SavedDiscussions } from "./saved-discussions";
+import matrixRoomImage from "@/assets/matrix-room.jpg";
+import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
@@ -84,13 +87,23 @@ const suggestions = [
 export function Room() {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const characterMode = useCharacterMode();
+  const [cloud, setCloud] = useState(false);
+  const browserMessages = useRef<RoomMessage[]>([]);
+  function changeStorage(value: boolean) {
+    if (value === cloud) return;
+    if (value) browserMessages.current = messages;
+    else setMessages(browserMessages.current);
+    setCloud(value);
+  }
   const engine = useEngine();
   const hell = characterMode === "hellraiser";
   const horror = characterMode === "horror";
   useEffect(() => {
     document.documentElement.classList.toggle("hellraiser", hell);
     document.documentElement.classList.toggle("horror", horror);
-  }, [hell, horror]);
+    document.documentElement.classList.toggle("matrix", characterMode === "matrix");
+    document.documentElement.classList.toggle("finalfantasy", characterMode === "finalfantasy");
+  }, [hell, horror, characterMode]);
   const [ready, setReady] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const voiceRef = useRef(true);
@@ -148,13 +161,13 @@ export function Room() {
     };
   }, []);
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || cloud) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(messages));
     } catch {
       setSaveError("Browser storage is full. This conversation could not be saved.");
     }
-  }, [messages, ready]);
+  }, [messages, ready, cloud]);
 
   const stop = () => {
     abortRef.current?.abort();
@@ -227,8 +240,9 @@ export function Room() {
       const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean }[] = [];
       for (let r = 1; r <= (direct ? 1 : rounds); r++)
         for (const agent of seated) turns.push({ agent, round: r, verdict: false });
-      if ((mode === "roundtable" || mode === "solve") && seated.length > 1)
-        turns.push({ agent: seated[0]!, round: rounds, verdict: true });
+      const lead = seated[0];
+      if ((mode === "roundtable" || mode === "solve") && seated.length > 1 && lead)
+        turns.push({ agent: lead, round: rounds, verdict: true });
       {
         for (const { agent, round: currentRound, verdict } of turns) {
           setRound(currentRound);
@@ -243,6 +257,7 @@ export function Room() {
             verdict,
             hellraiser: hell,
             horror,
+            characterMode,
           };
           let stream;
           if (engine.kind === "local") {
@@ -334,7 +349,7 @@ export function Room() {
     const text = messages
       .map(
         (m) =>
-          `### ${m.metadata?.agentId ? agentName(m.metadata?.agentId, hell, horror) : "You"}\n\n${messageText(m)}`,
+          `### ${m.metadata?.agentId ? agentName(m.metadata?.agentId, m.metadata?.characterMode === "hellraiser", m.metadata?.characterMode === "horror", m.metadata?.characterMode ?? characterMode) : "You"}\n\n${messageText(m)}`,
       )
       .join("\n\n");
     const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
@@ -368,6 +383,7 @@ export function Room() {
           <EngineSettingsDialog />
           <Select
             value={characterMode}
+            disabled={running}
             onValueChange={(value) => setCharacterMode(value as CharacterMode)}
           >
             <SelectTrigger aria-label="Theme" className="theme-select">
@@ -377,6 +393,8 @@ export function Room() {
               <SelectItem value="normal">Normal Mode</SelectItem>
               <SelectItem value="hellraiser">Hellraiser Mode</SelectItem>
               <SelectItem value="horror">Horror Mode</SelectItem>
+              <SelectItem value="matrix">Matrix Theme</SelectItem>
+              <SelectItem value="finalfantasy">Final Fantasy Theme</SelectItem>
             </SelectContent>
           </Select>
           <Dialog>
@@ -391,7 +409,7 @@ export function Room() {
                 <DialogDescription>
                   Roundtable lets the pals respond to each other. Broadcast gives independent
                   answers. Choose at least two pals, set your topic, and start. Your conversation is
-                  saved only in this browser. AI replies use workspace AI credits unless you pick a free engine.
+                  saved only in this browser. Choose Saved discussions to keep and reopen multiple conversations. AI replies use workspace AI credits unless you pick a free engine.
                 </DialogDescription>
               </DialogHeader>
             </DialogContent>
@@ -403,20 +421,20 @@ export function Room() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {horror
+                {characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
                   ? "HORROR MODE"
                   : hell
                     ? "THE LAMENT CONFIGURATION IS SOLVED"
                     : "YOUR AI COMMON ROOM"}
               </div>
               <h1>
-                {horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
+                {characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
-                {horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
+                {characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {horror
+                {characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
                   ? "The masks are on. The conversation begins."
                   : hell
                     ? "The Cenobites answer your call. Type “Normal mode” to close the box."
@@ -431,12 +449,12 @@ export function Room() {
           </div>
           <div className="room-scene">
             <img
-              src={hell ? hellRoomImage : roomImage}
+              src={characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
               alt={
-                hell
+                characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
                   ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box"
                   : "Pixel-art common room with a discussion table, computer stations, and plants"
               }
@@ -481,7 +499,7 @@ export function Room() {
                 )}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
-                  {agentName(a.id, hell, horror)}
+                  {agentName(a.id, hell, horror, characterMode)}
                   {speaking === a.id && " ···"}
                 </span>
               </div>
@@ -520,7 +538,7 @@ export function Room() {
                     <PixelCharacter id={a.id} />
                   </span>
                   <Switch
-                    aria-label={`Enable ${agentName(a.id, hell, horror)}`}
+                    aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
                     checked={enabled.includes(a.id)}
                     disabled={running}
                     onCheckedChange={(checked) =>
@@ -531,10 +549,10 @@ export function Room() {
                   />
                 </div>
                 <h3>
-                  {agentName(a.id, hell, horror)}
+                  {agentName(a.id, hell, horror, characterMode)}
                   <span className="agent-dot" />
                 </h3>
-                <p>{agentPersona(a.id, hell, horror).role}</p>
+                <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
                 <span className="model-label">
                   {models.find((m) => m.id === selectedModels[a.id])?.label}
                 </span>
@@ -547,7 +565,7 @@ export function Room() {
                     }
                   >
                     <SelectTrigger
-                      aria-label={`${agentName(a.id, hell, horror)} model`}
+                      aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
                       className="mt-3"
                     >
                       <SelectValue />
@@ -672,7 +690,7 @@ export function Room() {
                 >
                   {agents.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {agentName(a.id, hell, horror)}
+                      {agentName(a.id, hell, horror, characterMode)}
                     </option>
                   ))}
                 </select>
@@ -756,7 +774,7 @@ export function Room() {
                   <DialogHeader>
                     <DialogTitle>Clear this conversation?</DialogTitle>
                     <DialogDescription>
-                      This removes the chat from this browser. Download a copy first if you want to
+                      This clears the current chat. Previously saved discussions stay until you delete them. Download a copy first if you want to
                       keep it.
                     </DialogDescription>
                   </DialogHeader>
@@ -774,10 +792,11 @@ export function Room() {
               </Dialog>
             </div>
           </div>
+          <SavedDiscussions key={cloud ? "cloud" : "browser"} messages={messages} mode={mode} theme={characterMode} running={running} cloud={cloud} onCloud={changeStorage} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
           <div className="conversation-subhead">
             <span className="status-dot" />
             {running
-              ? `${activeAgent ? agentName(activeAgent.id, hell, horror) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`
+              ? `${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`
               : messages.length
                 ? "The floor is yours"
                 : "The room is open"}
@@ -813,7 +832,7 @@ export function Room() {
                   const a = agents.find((a) => a.id === m.metadata?.agentId);
                   const messageMode = m.metadata?.characterMode ?? characterMode;
                   const name = a
-                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror")
+                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror", messageMode)
                     : "You";
                   return (
                     <Message
@@ -880,7 +899,7 @@ export function Room() {
               {running && (
                 <div className="thinking-row">
                   {speaking && <PixelCharacter id={speaking} animated />}
-                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell, horror) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
+                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
                 </div>
               )}
             </ConversationContent>
@@ -912,7 +931,7 @@ export function Room() {
                   : "READY TO START"}
             </span>
             <span>
-              <Check size={12} /> SAVED IN THIS BROWSER
+              <Check size={12} /> {cloud ? "SAVED DISCUSSIONS · PRESS SAVE TO KEEP CHANGES" : "SAVED IN THIS BROWSER"}
             </span>
           </footer>
         </section>

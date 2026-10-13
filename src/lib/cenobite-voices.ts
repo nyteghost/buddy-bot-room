@@ -1,5 +1,6 @@
 import type { AgentId } from "./agents";
 import type { CharacterMode } from "./hellraiser";
+import { matrixCast, fantasyCast } from "./theme-personas";
 
 /** Browser-safe voice casting for the Cenobites (Gemini prebuilt voices + delivery direction). */
 export const cenobiteVoices: Record<AgentId, { voice: string; direction: string }> = {
@@ -70,6 +71,6 @@ export function characterVoice(id: AgentId, mode: CharacterMode) {
   if (mode === "hellraiser") return cenobiteVoices[id];
   return {
     voice: cenobiteVoices[id].voice,
-    direction: `Read exactly the supplied text, without adding words. ${mode === "horror" ? horrorDirections[id] : normalDirections[id]}`,
+    direction: `Read exactly the supplied text, without adding words. ${mode === "matrix" ? matrixCast[id].tone : mode === "finalfantasy" ? fantasyCast[id].tone : mode === "horror" ? horrorDirections[id] : normalDirections[id]} Use an original voice, not an imitation of a real actor.`,
   };
 }

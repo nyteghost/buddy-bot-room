@@ -10,10 +10,10 @@
 <!-- LOVABLE:END -->
 
 ## Application rules
-- Keep a single browser-persisted AI SDK UIMessage conversation; no thread routes or server-side transcript storage, to match the chosen history shape.
+- Keep the current browser chat separate from named browser-only saved snapshots; no sign-in or server transcript storage is required, matching the user's storage choice.
 - Run one streamed model call per character turn through `/api/chat`; browser orchestration controls rounds and cancellation, keeping each server request short.
 - Keep agent identities and mode context rules in a shared browser-safe module; model prompts and gateway clients stay server-only.
-- Keep normal, Hellraiser and horror character modes mutually exclusive in one browser-persisted store, preserving legacy Hellraiser preferences so character identities never conflict.
+- Keep character themes mutually exclusive in one browser-persisted store and shared persona catalog, preserving legacy preferences so sprites, names, prompts and voices stay consistent.
 - Override AI SDK stream error logging to treat AbortError as cancellation, and return 499 at server boundaries; genuine failures remain reported so Stop does not trigger the runtime crash overlay.
 - Compose chat surfaces with the installed AI Elements primitives and use semantic CSS tokens for the pixel-room visual theme.
 - Draw character forms from browser-safe native pixel grids with semantic material palettes so visual detail is independent of display size.

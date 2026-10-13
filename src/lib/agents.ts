@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 import type { CharacterMode } from "./hellraiser";
+import { matrixCast, fantasyCast } from "./theme-personas";
 
 export const models = [
   { id: "openai/gpt-6-astra", label: "GPT-6 Astra" },
@@ -143,15 +144,17 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
     tone: "Roleplay Jigsaw (John Kramer): calm, cold, philosophical and moralizing. Open lines like \"I want to play a game\" sparingly, frame the topic as a test of choices and appreciating life, and speak in grim puzzle metaphors. Keep it PG-13: no gore or real threats.",
   },
 };
-export function agentPersona(id: AgentId, hell: boolean, horror = false) {
+export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode) {
+  if (mode === "matrix") return matrixCast[id];
+  if (mode === "finalfantasy") return fantasyCast[id];
   if (horror) return horrorIcons[id];
   if (hell) return cenobites[id];
   return agents.find((agent) => agent.id === id) ?? agents[0];
 }
-export function agentName(id: AgentId | undefined, hell: boolean, horror = false): string {
+export function agentName(id: AgentId | undefined, hell: boolean, horror = false, mode?: CharacterMode): string {
   const a = agents.find((x) => x.id === id);
   if (!a) return "Agent";
-  return agentPersona(a.id, hell, horror).name;
+  return agentPersona(a.id, hell, horror, mode).name;
 }
 export type Mode = "roundtable" | "broadcast" | "direct" | "solve";
 export type RoomMessage = UIMessage<{

@@ -7,6 +7,7 @@ import { createResponsesCall } from "./ai/responses.server";
 import { createLovableAiGatewayProvider } from "./ai/gateway-helpers.server";
 import { getLovableAiGatewayRunId, withLovableAiGatewayRunIdHeader } from "./ai/run-id.server";
 import { isAbortError, logStreamError } from "./ai/stream-errors.server";
+import { isCharacterMode } from "./hellraiser";
 
 export async function handleChat(request: Request) {
   try {
@@ -26,6 +27,7 @@ export async function handleChat(request: Request) {
       );
     }
     const messages = await validateUIMessages<RoomMessage>({ messages: body.messages });
+    const characterMode = isCharacterMode(body.characterMode) ? body.characterMode : body.horror === true ? "horror" : body.hellraiser === true ? "hellraiser" : "normal";
     const visible =
       body.mode === "direct" ? contextForPartner(messages, agent.id) : contextForMode(messages, body.mode);
     // Preserve the entire visible transcript as named contributions without replaying
@@ -35,7 +37,7 @@ export async function handleChat(request: Request) {
       parts: [
         {
           type: "text" as const,
-          text: `${message.metadata?.agentId ? agentName(message.metadata.agentId, body.hellraiser === true, body.horror === true) : "Human"}: ${messageText(message)}`,
+          text: `${message.metadata?.agentId ? agentName(message.metadata.agentId, message.metadata.characterMode === "hellraiser", message.metadata.characterMode === "horror", message.metadata.characterMode ?? characterMode) : "Human"}: ${messageText(message)}`,
         },
       ],
     }));
@@ -56,8 +58,10 @@ export async function handleChat(request: Request) {
     const history: ModelMessage[] = await convertToModelMessages(merged);
     const hell = body.hellraiser === true;
     const horror = body.horror === true;
-    const persona = agentPersona(agent.id, hell, horror);
-    const setting = horror
+    const persona = agentPersona(agent.id, hell, horror, characterMode);
+    const setting = characterMode === "matrix" ? "a fictional Matrix crew meeting. Stay in character while giving useful real-world discussion; simulated realities are fictional, not claims about the human's reality"
+      : characterMode === "finalfantasy" ? "a fictional crossover gathering of Final Fantasy protagonists, each from their own game. Stay in character, using their own experiences as metaphors while giving substantive useful advice"
+      : horror
       ? "a fictional gathering of horror icons. Stay in character, with spooky PG-13 suspense: no graphic gore, real-world threats, encouragement of violence or self-harm. Jason and Michael are mute; convey their contributions through fictional actions and atmospheric narration, never spoken dialogue"
       : hell ? "a gathering of Cenobites summoned by the Lament Configuration, in the style of Clive Barker's Hellraiser. Stay fully in character, gothic and ominous, but keep it PG-13: no graphic gore, and never encourage real self-harm" : "Pixel Pals Chat";
     const roundtableRule =
@@ -170,7 +174,7 @@ export async function handleChat(request: Request) {
         onFinish: () => {},
         onError: safeError,
       }),
-      gateway!,
+      gateway,
     );
   } catch (error) {
     if (request.signal.aborted || isAbortError(error))

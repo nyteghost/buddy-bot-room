@@ -12,7 +12,25 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  // Pre-bundle late-discovered browser deps so the optimizer doesn't reload mid-page,
-  // which leaves two React copies loaded and blanks the screen.
-  vite: { optimizeDeps: { include: ["@supabase/supabase-js", "eventsource-parser"] } },
+  // Use a stable, explicit browser dependency set. Late optimizer discoveries can
+  // change React's module URL while an open preview still uses the old renderer.
+  // Reject old optimizer hashes instead of serving new code under stale URLs.
+  vite: {
+    optimizeDeps: {
+      noDiscovery: true,
+      ignoreOutdatedRequests: false,
+      include: [
+        "@supabase/supabase-js", "eventsource-parser", "@mlc-ai/web-llm",
+        "@ai-sdk/anthropic", "@ai-sdk/openai", "@ai-sdk/openai-compatible", "ai",
+        "@tanstack/react-query", "@tanstack/react-router > @tanstack/react-store",
+        "@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu",
+        "@radix-ui/react-hover-card", "@radix-ui/react-select",
+        "@radix-ui/react-separator", "@radix-ui/react-slot",
+        "@radix-ui/react-switch", "@radix-ui/react-tooltip",
+        "@streamdown/cjk", "@streamdown/code", "@streamdown/math", "@streamdown/mermaid",
+        "streamdown", "use-stick-to-bottom", "motion/react", "lucide-react",
+        "class-variance-authority", "clsx", "cmdk", "nanoid", "tailwind-merge",
+      ],
+    },
+  },
 });

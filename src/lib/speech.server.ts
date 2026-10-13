@@ -1,6 +1,7 @@
 import { agents } from "./agents";
 import { characterVoice, speakableText } from "./cenobite-voices";
 import { isAbortError } from "./ai/stream-errors.server";
+import { isCharacterMode } from "./hellraiser";
 
 const MODEL = "google/gemini-3.1-flash-tts-preview";
 
@@ -14,7 +15,7 @@ export async function handleSpeech(request: Request) {
     const text = typeof body.text === "string" ? speakableText(body.text) : "";
     if (!agent || !text) return Response.json({ error: "Nothing to speak." }, { status: 400 });
     const mode =
-      body.characterMode === "normal" || body.characterMode === "horror"
+      isCharacterMode(body.characterMode)
         ? body.characterMode
         : "hellraiser";
     const cast = characterVoice(agent.id, mode);

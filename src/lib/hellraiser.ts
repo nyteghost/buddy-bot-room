@@ -2,13 +2,17 @@ import { useSyncExternalStore } from "react";
 
 const key = "pixel-pals-hellraiser-v1";
 const characterKey = "pixel-pals-character-mode-v1";
-export type CharacterMode = "normal" | "hellraiser" | "horror";
+export const characterModes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy"] as const;
+export type CharacterMode = (typeof characterModes)[number];
+export function isCharacterMode(value: unknown): value is CharacterMode {
+  return characterModes.some(mode => mode === value);
+}
 const listeners = new Set<() => void>();
 let currentMode: CharacterMode = "normal";
 if (typeof window !== "undefined") {
   try {
     const saved = localStorage.getItem(characterKey);
-    currentMode = saved === "horror" || saved === "hellraiser" || saved === "normal"
+    currentMode = isCharacterMode(saved)
       ? saved
       : localStorage.getItem(key) === "1" ? "hellraiser" : "normal";
   } catch { /* storage unavailable */ }
@@ -39,6 +43,9 @@ export function useCharacterMode() {
 }
 export function characterModeCommand(text: string): CharacterMode | null {
   const t = text.trim().toLowerCase().replace(/[.!]+$/, "");
+  if (t === "matrix mode" || t === "matrix theme") return "matrix";
+  if (t === "final fantasy mode" || t === "final fantasy theme") return "finalfantasy";
+  if (t === "matrix mode off" || t === "final fantasy mode off") return "normal";
   if (t === "horror mode" || t === "horror mode on") return "horror";
   if (t === "horror mode off") return "normal";
   const hell = modeCommand(text);
