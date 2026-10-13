@@ -72,7 +72,7 @@ import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
-import { engineKey, useEngine } from "@/lib/engine";
+import { providerForTurn, useEngine } from "@/lib/engine";
 import { localTurn, speakFree } from "@/lib/local-llm";
 import { EngineSettingsDialog } from "./engine-settings";
 import { AccountButton } from "./account-button";
@@ -187,7 +187,7 @@ export function Room() {
     setReplayId(message.id);
     setError("");
     try {
-      if (engine.kind !== "lovable") {
+      {
         await speakFree(messageText(message), controller.signal);
         return;
       }
@@ -245,7 +245,7 @@ export function Room() {
       if ((mode === "roundtable" || mode === "solve") && seated.length > 1 && lead)
         turns.push({ agent: lead, round: rounds, verdict: true });
       {
-        for (const { agent, round: currentRound, verdict } of turns) {
+        for (const [turnIndex, { agent, round: currentRound, verdict }] of turns.entries()) {
           setRound(currentRound);
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
@@ -275,12 +275,11 @@ export function Room() {
               controller.signal,
             );
           } else {
+            const provider = providerForTurn(engine, turnIndex);
+            if (!provider) throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
             const transport = new DefaultChatTransport<RoomMessage>({
               api: "/api/chat",
-              body:
-                engine.kind === "lovable"
-                  ? requestBody
-                  : { ...requestBody, engine: { kind: engine.kind, apiKey: engineKey(engine) } },
+              body: { ...requestBody, engine: provider },
             });
             stream = await transport.sendMessages({
               chatId: "pixel-pals-room",
@@ -315,13 +314,7 @@ export function Room() {
             setMessages(transcript);
             if (hell && voiceRef.current && !controller.signal.aborted) {
               try {
-                if (engine.kind !== "lovable")
-                  await speakFree(messageText(answer), controller.signal);
-                else
-                  await streamSpeech(
-                    { agentId: agent.id, text: messageText(answer), characterMode },
-                    controller.signal,
-                  );
+                await speakFree(messageText(answer), controller.signal);
               } catch (err) {
                 if (controller.signal.aborted) return;
                 voiceRef.current = false;
@@ -411,7 +404,7 @@ export function Room() {
                 <DialogDescription>
                   Roundtable lets the pals respond to each other. Broadcast gives independent
                   answers. Choose at least two pals, set your topic, and start. Your conversation is
-                  saved only in this browser. Choose Saved discussions to keep and reopen multiple conversations. AI replies use workspace AI credits unless you pick a free engine.
+                  saved only in this browser. Choose Saved discussions to keep and reopen multiple conversations. AI replies use your free keys or the in-browser model — no credits.
                 </DialogDescription>
               </DialogHeader>
             </DialogContent>

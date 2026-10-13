@@ -94,7 +94,9 @@ export async function handleChat(request: Request) {
     }
     // Free cloud engines with the user's own key (never stored on the server).
     const engine = body.engine;
-    if (engine && (engine.kind === "groq" || engine.kind === "gemini")) {
+    if (!engine || !["groq", "gemini", "openrouter"].includes(engine.kind))
+      return Response.json({ error: "Add a free key in AI engine settings, or choose In-browser." }, { status: 400 });
+    {
       if (typeof engine.apiKey !== "string" || !engine.apiKey.trim())
         return Response.json({ error: "Add your free API key in Engine settings." }, { status: 400 });
       const provider = createOpenAICompatible({
@@ -103,10 +105,12 @@ export async function handleChat(request: Request) {
         baseURL:
           engine.kind === "groq"
             ? "https://api.groq.com/openai/v1"
-            : "https://generativelanguage.googleapis.com/v1beta/openai",
+            : engine.kind === "openrouter"
+              ? "https://openrouter.ai/api/v1"
+              : "https://generativelanguage.googleapis.com/v1beta/openai",
       });
       const free = streamText({
-        model: provider(engine.kind === "groq" ? "openai/gpt-oss-120b" : "gemini-2.5-flash"),
+        model: provider(engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
         abortSignal: request.signal,
