@@ -17,3 +17,7 @@
 - [x] Add Matrix and Final Fantasy themes with native sprites and distinct-game protagonists.
 - [x] Verify live Matrix reply, both theme layouts, mobile overflow, and saving/reopening after refresh; 27 affected tests pass.
 - [x] Software Developer team theme (pals at computers instead of a table)
+- [x] Start Ollama button (desktop) / copy launch command (browser)
+- [ ] Linux Mode: assistant pals + Terminal pal (usable terminal with error help) — awaiting plan approval
+- [ ] Gmail pal (Outlook dropped)
+- [ ] Sage adds events to Cozi from chat — blocked: Cozi has no public API; awaiting user choice

@@ -6,8 +6,8 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 | Pal | Linux Mode role | Works in |
 |---|---|---|
 | Nova | **Gmail pal**: inbox summary, search, draft replies (you approve before sending) | Browser + desktop |
-| Byte | **Outlook pal**: same for Outlook mail | Browser + desktop |
-| Sage | **Cozi pal**: today's and this week's schedule | Browser + desktop |
+| Byte | **Tasks pal**: to-dos and reminders from your chats | Browser + desktop |
+| Sage | **Cozi pal**: reads your schedule and adds events you describe (see Cozi note) | Browser + desktop |
 | Pip | **Notes pal**: reads/writes notes in a folder you pick | Desktop only |
 | Echo | **Files pal**: find files, tidy Downloads (approve each change) | Desktop only |
 | Rune | **System pal**: GPU, memory, disk, pending updates (read-only) | Desktop only |
@@ -22,8 +22,8 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 - You can also ask it anything in a side chat ("why is my wifi dropping?") and it can read recent terminal output to answer.
 
 ## Accounts and privacy
-- Gmail and Outlook need you signed in with Google first; each account connects its own mailbox, so visitors to the public site never see your mail.
-- One-time setup: you create a Google and a Microsoft app login in their developer consoles (I'll give step-by-step) and link them in the workspace connector settings.
+- Gmail needs you signed in with Google first; your account connects its own mailbox, so visitors to the public site never see your mail.
+- One-time setup: you create a Google app login in its developer console (I'll give step-by-step) and link them in the workspace connector settings.
 - Cozi has no official API. It offers a private **calendar feed link** (Cozi > Settings > Calendar > Share/Export). You paste that link once; it's saved encrypted to your account.
 
 ## Limits
@@ -34,12 +34,12 @@ A new **Linux Mode** theme (dropdown + chat command "Linux Mode" / "Linux Mode O
 ## Build order
 1. Linux Mode theme, sprites, personas, penguin Terminal pal + terminal panel with error help (desktop).
 2. Cozi feed + System/Notes/Files pals.
-3. Gmail + Outlook connections (needs your OAuth setup).
+3. Gmail connection (needs your Google setup).
 
 ## Technical details
 - Tauri: add `portable-pty` for a PTY session (`pty_spawn`, `pty_write`, `pty_resize`, events for output/exit), plus `run_command` for approved one-shot commands, `read_dir`/`read_file`/`write_file` scoped to a chosen folder, `system_stats` (nvidia-smi, free, df, checkupdates). Frontend: `@xterm/xterm` + fit addon, loaded client-only.
 - Error detection: track exit code via a shell prompt hook (OSC 133) and scan output for error patterns; send last ~80 lines to the Terminal pal through the existing engine (Ollama preferred).
 - Pals get tools via AI SDK tool calling for cloud engines; for Ollama/local, a simple JSON action format parsed client-side; every mutating action rendered as an approval card.
-- Gmail/Outlook via App User Connectors (`google_mail`, `microsoft_outlook`), connection keys encrypted in a server-only table; server functions with `requireSupabaseAuth`.
+- Gmail via App User Connector `google_mail`, connection keys encrypted in a server-only table; server functions with `requireSupabaseAuth`.
 - Cozi: server function fetches the ICS feed, parses events; URL encrypted with existing settings crypto.
 - New CharacterMode `linux` in hellraiser.ts, persona cast in theme-personas.ts, sprites in themed-sprites.ts.
