@@ -6,7 +6,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { loadAccount, saveSettings } from "@/lib/account.functions";
-import { setEngine, useEngine, type EngineKind } from "@/lib/engine";
+import { normalizeKind, setEngine, useEngine } from "@/lib/engine";
 import { isCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 
 /** Google sign-in that syncs engine, keys (encrypted on the server) and theme to the account. */

@@ -11,8 +11,6 @@ import { isCharacterMode } from "./hellraiser";
 
 export async function handleChat(request: Request) {
   try {
-    const key = process.env["LOVABLE_API_KEY"];
-    void key;
     const body = await request.json();
     const agent = agents.find((item) => item.id === body.agentId);
     if (
@@ -124,62 +122,6 @@ export async function handleChat(request: Request) {
         onError: safeError,
       });
     }
-    let result;
-    let gateway: { getRunId: () => string | undefined; waitForRunId: () => Promise<string | undefined> } | undefined;
-    if (body.model.startsWith("openai/")) {
-      const call = createResponsesCall(
-        request,
-        { baseURL: "https://ai.gateway.lovable.dev/v1", apiKey: key, model: body.model },
-        history,
-        instructions,
-      );
-      result = call.result;
-      // The helper returns a wrapper for basic responses; metadata-aware responses
-      // use the same request-scoped gateway fetch through its response method below.
-      return await call.responseForMessages(messages, { agentId: agent.id, round: body.round });
-    } else if (body.model.startsWith("anthropic/")) {
-      const runIdFetch = createLovableAiGatewayRunIdFetch(getLovableAiGatewayRunId(request));
-      const anthropic = createAnthropic({
-        baseURL: "https://ai.gateway.lovable.dev/v1",
-        apiKey: key,
-        headers: { "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-        fetch: runIdFetch.fetch,
-      });
-      gateway = runIdFetch;
-      result = streamText({
-        model: anthropic(body.model),
-        system: instructions,
-        messages: history,
-        maxOutputTokens: 2000,
-        abortSignal: request.signal,
-        maxRetries: 0,
-        onError: logStreamError,
-      });
-    } else {
-      const provider = createLovableAiGatewayProvider(key, getLovableAiGatewayRunId(request), {
-        baseURL: "https://ai.gateway.lovable.dev/v1",
-      });
-      gateway = provider;
-      result = streamText({
-        model: provider(body.model),
-        system: instructions,
-        messages: history,
-        abortSignal: request.signal,
-        maxRetries: 0,
-        onError: logStreamError,
-      });
-    }
-    return await withLovableAiGatewayRunIdHeader(
-      result.toUIMessageStreamResponse({
-        originalMessages: messages,
-        sendReasoning: true,
-        messageMetadata: ({ part }) =>
-          part.type === "start" ? { agentId: agent.id, round: body.round } : undefined,
-        onFinish: () => {},
-        onError: safeError,
-      }),
-      gateway,
-    );
   } catch (error) {
     if (request.signal.aborted || isAbortError(error))
       return new Response(null, { status: 499 });
