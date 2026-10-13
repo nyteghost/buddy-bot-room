@@ -34,12 +34,13 @@ export async function handleChat(request: Request) {
         },
       ],
     }));
-    // Some providers (e.g. Gemini) reject consecutive same-role messages, so
-    // merge adjacent turns into one message per speaker run.
+    // Some providers (e.g. Gemini) reject consecutive same-role messages and
+    // any request that ends with a model turn, so merge adjacent turns and
+    // fold trailing agent replies into the final user message.
     const merged: typeof namedMessages = [];
     for (const message of namedMessages) {
       const last = merged[merged.length - 1];
-      if (last && last.role === message.role) {
+      if (last && (last.role === message.role || message.role === "assistant")) {
         last.parts = [
           { type: "text" as const, text: `${messageText(last)}\n\n${messageText(message)}` },
         ];
