@@ -22,6 +22,16 @@ export const cenobiteVoices: Record<AgentId, { voice: string; direction: string 
     direction:
       "Read this in a frantic, rhythmic, jittery staccato. Pronounce every 'click' as a sharp, crisp teeth-clicking sound with a tiny pause after it:",
   },
+  echo: {
+    voice: "Despina",
+    direction:
+      "Read this in an elegant, seductive, coolly amused voice with antique courtly poise:",
+  },
+  rune: {
+    voice: "Orus",
+    direction:
+      "Read this in a grand, mechanical, cryptic voice, measured like grinding gears:",
+  },
 };
 
 /** Strip markdown and stage directions so only spoken words remain (keeps the Chatterer's clicks). */

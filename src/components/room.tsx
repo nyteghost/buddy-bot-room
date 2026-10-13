@@ -97,6 +97,8 @@ export function Room() {
     byte: agents[1].model,
     sage: agents[2].model,
     pip: agents[3].model,
+    echo: agents[4].model,
+    rune: agents[5].model,
   });
   const [running, setRunning] = useState(false);
   const [speaking, setSpeaking] = useState<AgentId | null>(null);

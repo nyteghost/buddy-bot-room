@@ -28,6 +28,18 @@ const horrorPatterns: Record<AgentId, string[]> = {
     "..oooooooo..", "..rrrrrrrr..", ".toooooooot.", ".trrrrrrrtg.",
     "...oooooo.gg", "...bb..bb.gg", "...bb..bb...", "..bbb..bbb..",
   ],
+  echo: [
+    "..rr....rr..", ".rrr.ww.rrr.", "..rwwwwwwr..", "..wiwwwwiw..",
+    "..wwwrrwww..", "..wrwwwwrw..", "...wrrrrw...", "....wwww....",
+    "...wwkkww...", "..wwkkkkww..", ".wwwwkkwwww.", ".kwwwwwwwwk.",
+    "...wwwwww...", "...ww..ww...", "...ww..ww...", "..rrr..rrr..",
+  ],
+  rune: [
+    "...rrrrrr...", "..rrrrrrrr..", "..rttttttr..", "..ttittitt..",
+    "..trttttrt..", "..tttrrttt..", "...tttttt...", "....tttt....",
+    "...nnwwnn...", "..nnnwwnnn..", ".tnnoonnnnt.", ".tnnoonnnnt.",
+    "...nnnnnn...", "...nn..nn...", "...nn..nn...", "..rrr..rrr..",
+  ],
 };
 
 // w = pale flesh, g = pins/grid, b = black leather, r = blood, i = eyes, k = teeth
@@ -104,6 +116,18 @@ const cenobitePatterns: Record<AgentId, string[]> = {
     "...bb..bb...",
     "..bbb..bbb..",
   ],
+  echo: [
+    "...bbbbbb...", "..bbwwwwbb..", "..bwwwwwwb..", "..bwiwwiwb..",
+    "..bwwwwwwb..", "...wwrrww...", "....wwww....", "...gbbbbg...",
+    "..bbbrrbbb..", ".bbbrrrrbbb.", ".wbbbbbbbbw.", "..bbbbbbbb..",
+    ".bbbbbbbbbb.", "..bb....bb..", "..bb....bb..", ".bbb....bbb.",
+  ],
+  rune: [
+    "..gggggggg..", "..gwwwwwwg..", "..gwiwwiwg..", "..gwwwwwwg..",
+    "..ggkkkkgg..", "...gwwwwg...", "....gggg....", "..gbbbbbbg..",
+    ".gbbgbbgbbg.", ".bbbbbbbbbb.", "gbbbgggbbbbg", ".bbbbbbbbbb.",
+    "..bbbbbbbb..", "..gb....bg..", "..bb....bb..", ".bbb....bbb.",
+  ],
 };
 
 const patterns: Record<AgentId, string[]> = {
@@ -174,6 +198,18 @@ const patterns: Record<AgentId, string[]> = {
     "...dd..dd...",
     "...dd..dd...",
     "..ddd..ddd..",
+  ],
+  echo: [
+    "..aa....aa..", "..aaaaaaaa..", "..aaeeeeaa..", "..aeeeeeea..",
+    "..aeieeiea..", "...eeeeee...", "....eeee....", "...aaaaaa...",
+    "..aaaaaaaa..", ".eeaaaaaaee.", ".eeaaaaaaee.", "...aaaaaa...",
+    "...dd..dd...", "...dd..dd...", "..ddd..ddd..",
+  ],
+  rune: [
+    ".....a......", "....aaa.....", "...aaaaaa...", "..aaaaaaaa..",
+    "..aeeeeeea..", "..eiieeiie..", "...eeeeee...", "....eeee....",
+    "...aaaaaa...", "..adaaaada..", ".eeaaaaaaee.", "...aaaaaa...",
+    "...dd..dd...", "...dd..dd...", "..ddd..ddd..",
   ],
 };
 export function PixelCharacter({
