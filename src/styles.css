@@ -1183,6 +1183,57 @@ h1 {
   --sprite-glass: oklch(0.78 0.10 215);
 }
 .native-sprite { image-rendering: pixelated; }
+/* Fixed material ramps keep themed clothes and faces independent of agent UI colors. */
+:root {
+  --cast-ink: oklch(0.13 0.008 260);
+  --cast-leather: oklch(0.25 0.012 260);
+  --cast-steel: oklch(0.58 0.025 250);
+  --cast-silver: oklch(0.82 0.012 250);
+  --cast-ivory: oklch(0.88 0.022 85);
+  --cast-light: oklch(0.98 0.008 85);
+  --cast-skin: oklch(0.83 0.073 55);
+  --cast-skin-shade: oklch(0.64 0.082 45);
+  --cast-dark-skin: oklch(0.59 0.08 48);
+  --cast-dark-skin-shade: oklch(0.41 0.065 40);
+  --cast-hair: oklch(0.27 0.038 48);
+  --cast-hair-light: oklch(0.42 0.055 55);
+  --cast-blond: oklch(0.78 0.13 86);
+  --cast-blond-light: oklch(0.92 0.1 95);
+  --cast-water: oklch(0.76 0.12 220);
+  --cast-violet: oklch(0.37 0.06 295);
+  --cast-blue: oklch(0.5 0.095 245);
+  --cast-crimson: oklch(0.5 0.18 25);
+  --cast-crimson-light: oklch(0.66 0.16 25);
+  --cast-apron: oklch(0.62 0.06 135);
+  --cast-mint: oklch(0.65 0.12 160);
+  --cast-mint-light: oklch(0.84 0.095 155);
+  --cast-rose: oklch(0.67 0.1 15);
+  --cast-rose-light: oklch(0.85 0.07 15);
+}
+.cinematic-sprite .sprite-I { fill: var(--cast-ink); }
+.cinematic-sprite .sprite-B { fill: var(--cast-leather); }
+.cinematic-sprite .sprite-G { fill: var(--cast-steel); }
+.cinematic-sprite .sprite-S { fill: var(--cast-silver); }
+.cinematic-sprite .sprite-W { fill: var(--cast-ivory); }
+.cinematic-sprite .sprite-K { fill: var(--cast-light); }
+.cinematic-sprite .sprite-E { fill: var(--cast-skin); }
+.cinematic-sprite .sprite-T { fill: var(--cast-skin-shade); }
+.cinematic-sprite .sprite-U { fill: var(--cast-dark-skin); }
+.cinematic-sprite .sprite-V { fill: var(--cast-dark-skin-shade); }
+.cinematic-sprite .sprite-H { fill: var(--cast-hair); }
+.cinematic-sprite .sprite-J { fill: var(--cast-hair-light); }
+.cinematic-sprite .sprite-Q { fill: var(--cast-blond); }
+.cinematic-sprite .sprite-Y { fill: var(--cast-blond-light); }
+.cinematic-sprite .sprite-C { fill: var(--cast-water); }
+.cinematic-sprite .sprite-F { fill: var(--cast-violet); }
+.cinematic-sprite .sprite-N { fill: var(--cast-blue); }
+.cinematic-sprite .sprite-r { fill: var(--cast-crimson); }
+.cinematic-sprite .sprite-R { fill: var(--cast-crimson-light); }
+.cinematic-sprite .sprite-A { fill: var(--cast-apron); }
+.cinematic-sprite .sprite-v { fill: var(--cast-mint); }
+.cinematic-sprite .sprite-Z { fill: var(--cast-mint-light); }
+.cinematic-sprite .sprite-p { fill: var(--cast-rose); }
+.cinematic-sprite .sprite-L { fill: var(--cast-rose-light); }
 .sprite-a { fill: var(--agent-color); }
 .sprite-l { fill: color-mix(in oklch, var(--agent-color) 65%, var(--sprite-white)); }
 .sprite-s { fill: color-mix(in oklch, var(--agent-color) 55%, var(--pixel-ink)); }
