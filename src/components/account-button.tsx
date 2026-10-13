@@ -18,7 +18,7 @@ export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onThem
   const [synced, setSynced] = useState(false);
   const [note, setNote] = useState("");
   const userId = session?.user.id;
-  const loadedFor = useRef<string>();
+  const loadedFor = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!userId) { setSynced(false); loadedFor.current = undefined; return; }
@@ -55,7 +55,7 @@ export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onThem
     );
   return (
     <span className="account-chip" title={note || "Settings and saved discussions sync to your account"}>
-      <span className="account-name">{session.user.user_metadata?.name ?? session.user.email}</span>
+      <span className="account-name">{session.user.user_metadata?.["name"] ?? session.user.email}</span>
       <Button variant="ghost" size="sm" aria-label="Sign out" onClick={async () => {
         await supabase.auth.signOut();
         setEngine({ groqKey: "", geminiKey: "" });

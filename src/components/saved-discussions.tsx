@@ -33,7 +33,7 @@ export function SavedDiscussions({ messages, mode, theme, running, cloud: archiv
   }
   async function list(): Promise<SavedDiscussion[]> {
     if (!signedIn) return readDiscussions();
-    return (await load()).discussions as SavedDiscussion[];
+    return (await load()).discussions.map((d) => ({ ...d, messages: JSON.parse(d.messages) })) as SavedDiscussion[];
   }
   return <div className="saved-toolbar">
     <Select value={archive ? "archive" : "browser"} disabled={running} onValueChange={(v) => { onArchive(v === "archive"); setId(undefined); setStatus(""); }}>

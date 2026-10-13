@@ -23,7 +23,7 @@ export const loadAccount = createServerFn({ method: "GET" })
         ? { engineKind: s.engine_kind, characterMode: s.character_mode, groqKey: await safe(s.groq_key_ciphertext), geminiKey: await safe(s.gemini_key_ciphertext) }
         : null,
       discussions: (rows ?? []).map((r) => ({
-        id: r.id, title: r.title, messages: r.messages as unknown, theme: r.character_mode, mode: r.discussion_mode, updatedAt: r.updated_at,
+        id: r.id, title: r.title, messages: JSON.stringify(r.messages), theme: r.character_mode, mode: r.discussion_mode, updatedAt: r.updated_at,
       })),
     };
   });
