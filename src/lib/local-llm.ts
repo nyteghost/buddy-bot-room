@@ -8,19 +8,60 @@ export function hasWebGPU() {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
-/** Downloads (first time) and starts the in-browser model. */
-export function loadLocalEngine(onProgress?: (progress: number, text: string) => void) {
+const modelKey = "pixel-pals-local-model-v1";
+let loadedModel: string | null = null;
+
+export function chosenLocalModel(): string {
+  try {
+    return localStorage.getItem(modelKey) || freeModels.local;
+  } catch {
+    return freeModels.local;
+  }
+}
+
+export function loadedLocalModel() {
+  return loadedModel;
+}
+
+/** Probes the GPU and returns the best-fitting Hugging Face model. */
+export async function detectBestModel() {
+  const { modelForProbe } = await import("./gpu-tier");
+  const adapter = hasWebGPU() ? await navigator.gpu.requestAdapter() : null;
+  if (!adapter) throw new Error("No WebGPU graphics card found in this browser.");
+  const info = (adapter as unknown as { info?: { description?: string; vendor?: string; architecture?: string } }).info;
+  const description = [info?.description, info?.vendor, info?.architecture].filter(Boolean).join(" ") || "Unknown GPU";
+  const probe = {
+    description,
+    maxBufferSize: Number(adapter.limits.maxBufferSize),
+    deviceMemoryGB: (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 4,
+    f16: adapter.features.has("shader-f16"),
+  };
+  return { gpu: description, ...modelForProbe(probe) };
+}
+
+/** Downloads (first time) and starts the in-browser model. Passing a model switches to it. */
+export function loadLocalEngine(onProgress?: (progress: number, text: string) => void, model?: string) {
   if (!hasWebGPU()) return Promise.reject(new Error("This browser does not support WebGPU."));
-  enginePromise ??= import("@mlc-ai/web-llm")
-    .then(({ CreateMLCEngine }) =>
-      CreateMLCEngine(freeModels.local, {
-        initProgressCallback: (p) => onProgress?.(p.progress, p.text),
-      }),
-    )
-    .catch((err) => {
-      enginePromise = null;
-      throw err;
-    });
+  const target = model ?? chosenLocalModel();
+  if (model) {
+    try {
+      localStorage.setItem(modelKey, model);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (enginePromise && loadedModel === target) return enginePromise;
+  const previous = enginePromise;
+  loadedModel = target;
+  enginePromise = (async () => {
+    if (previous) await previous.then((e) => e.unload()).catch(() => {});
+    const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
+    return CreateMLCEngine(target, { initProgressCallback: (p) => onProgress?.(p.progress, p.text) });
+  })().catch((err) => {
+    enginePromise = null;
+    loadedModel = null;
+    throw err;
+  });
   return enginePromise;
 }
 
