@@ -307,6 +307,10 @@ export function Room() {
     URL.revokeObjectURL(url);
   }
   const activeAgent = agents.find((a) => a.id === speaking);
+  const lastMessage = messages[messages.length - 1];
+  const liveText =
+    running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
+  const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
   return (
     <div className="app-shell">
       <header className="app-header">
