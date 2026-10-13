@@ -55,7 +55,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
-import { characterModeCommand, setCharacterMode, useCharacterMode } from "@/lib/hellraiser";
+import { characterModeCommand, setCharacterMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
   agentName,
