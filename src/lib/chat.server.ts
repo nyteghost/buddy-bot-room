@@ -134,7 +134,7 @@ export function safeError(error: unknown): string {
     try {
       const body = JSON.parse(error.responseBody);
       return (
-        body.message ?? body.error?.message ?? "The AI service could not complete this request."
+        body.message ?? body.error?.message ?? (typeof body.error === "string" ? body.error : undefined) ?? "The AI service could not complete this request."
       );
     } catch {
       /* use message below */
