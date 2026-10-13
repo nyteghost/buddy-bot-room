@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import {
   ArrowUpRight,
@@ -79,6 +79,11 @@ import { providerForTurn, useEngine } from "@/lib/engine";
 import { hasWebGPU, localTurn, ollamaTurn, speakFree } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
+import { LinuxActions } from "./linux-actions";
+import { UpdatePopup } from "./update-popup";
+import { linuxContext } from "@/lib/linux";
+import { isTauri } from "@/lib/local-llm";
+const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
 
@@ -110,6 +115,7 @@ export function Room() {
     document.documentElement.classList.toggle("finalfantasy", characterMode === "finalfantasy");
     document.documentElement.classList.toggle("devteam", characterMode === "devteam");
     document.documentElement.classList.toggle("cyberpunk", characterMode === "cyberpunk");
+    document.documentElement.classList.toggle("linux", characterMode === "linux");
   }, [hell, horror, characterMode]);
   const modeRef = useRef(characterMode);
   modeRef.current = characterMode;
@@ -127,6 +133,20 @@ export function Room() {
   const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
   const direct = mode === "direct";
   const tooFew = !direct && enabled.length < 2;
+  const topicDraft = topic;
+  const directMode = direct;
+  const partnerChoice = partner;
+  const [desktopApp, setDesktopApp] = useState(false);
+  useEffect(() => setDesktopApp(isTauri()), []);
+  const startRef = useRef<(ask?: { partner: AgentId; text: string }) => Promise<void>>(async () => {});
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const detail = (e as CustomEvent<{ partner: AgentId; text: string }>).detail;
+      if (detail?.text) void startRef.current(detail);
+    };
+    window.addEventListener("pixelpals:ask", onAsk);
+    return () => window.removeEventListener("pixelpals:ask", onAsk);
+  }, []);
   const [selectedModels, setSelectedModels] = useState<Record<AgentId, string>>({
     nova: agents[0].model,
     byte: agents[1].model,
@@ -217,11 +237,15 @@ export function Room() {
       }
     }
   }
-  async function start() {
+  async function start(ask?: { partner: AgentId; text: string }) {
     if (runLock.current) return;
     replayRef.current?.abort();
     setReplayId(null);
-    const command = characterModeCommand(topic);
+    const topic = ask?.text ?? topicDraft;
+    const direct = ask ? true : directMode;
+    const partner = ask?.partner ?? partnerChoice;
+    const tooFew = !direct && enabled.length < 2;
+    const command = ask ? null : characterModeCommand(topic);
     if (command) {
       setCharacterMode(command);
       setTopic("");
@@ -263,12 +287,13 @@ export function Room() {
           const requestBody = {
             agentId: agent.id,
             model: selectedModels[agent.id],
-            mode,
             round: currentRound,
             verdict,
             hellraiser: turnMode === "hellraiser",
             horror: turnMode === "horror",
             characterMode: turnMode,
+            mode: direct ? ("direct" as Mode) : mode,
+            linuxContext: turnMode === "linux" ? await linuxContext(agent.id) : undefined,
           };
           const fetchPrompt = async () => {
             const res = await fetch("/api/chat", {
@@ -365,6 +390,7 @@ export function Room() {
       inputRef.current?.focus();
     }
   }
+  startRef.current = start;
   function exportChat() {
     const text = messages
       .map(
@@ -418,6 +444,7 @@ export function Room() {
               <SelectItem value="finalfantasy">Final Fantasy Theme</SelectItem>
               <SelectItem value="devteam">Dev Team Theme</SelectItem>
               <SelectItem value="cyberpunk">Cyberpunk Theme</SelectItem>
+              <SelectItem value="linux">Linux Mode</SelectItem>
             </SelectContent>
           </Select>
           <Dialog>
@@ -444,20 +471,20 @@ export function Room() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {characterMode === "cyberpunk" ? "NEON NETRUNNERS" : characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
+                {characterMode === "linux" ? "LINUX MODE" : characterMode === "cyberpunk" ? "NEON NETRUNNERS" : characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
                   ? "HORROR MODE"
                   : hell
                     ? "THE LAMENT CONFIGURATION IS SOLVED"
                     : "YOUR AI COMMON ROOM"}
               </div>
               <h1>
-                {characterMode === "cyberpunk" ? "Seven netrunners." : characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
+                {characterMode === "linux" ? "Seven assistants." : characterMode === "cyberpunk" ? "Seven netrunners." : characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
-                {characterMode === "cyberpunk" ? "One neon grid" : characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
+                {characterMode === "linux" ? "One penguin" : characterMode === "cyberpunk" ? "One neon grid" : characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
+                {characterMode === "linux" ? "Mail, tasks, calendar, notes, files, system — and Tux in your terminal." : characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
                   ? "The masks are on. The conversation begins."
                   : hell
                     ? "The Cenobites answer your call. Type “Normal mode” to close the box."
@@ -472,14 +499,20 @@ export function Room() {
           </div>
           {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && engine.kind === "ollama"} />
+          <UpdatePopup />
+          {characterMode === "linux" && (desktopApp ? (
+            <Suspense fallback={<div className="linux-terminal">Opening terminal…</div>}><LinuxTerminal /></Suspense>
+          ) : (
+            <p className="linux-note">Tux's terminal, notes, files and system stats work in the Pixel Pals desktop app. Here, pals can still help and give you commands to copy.</p>
+          ))}
           <div className="room-scene">
             <img
-              src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
+              src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" || characterMode === "linux" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
               alt={
-                characterMode === "cyberpunk" ? "Neon-lit cyberpunk hacker den with holographic terminals" : characterMode === "devteam" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
+                characterMode === "cyberpunk" ? "Neon-lit cyberpunk hacker den with holographic terminals" : characterMode === "devteam" || characterMode === "linux" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
                   ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box"
                   : "Pixel-art common room with a discussion table, computer stations, and plants"
               }
@@ -750,7 +783,7 @@ export function Room() {
             )}
             <Button
               className="start-button"
-              onClick={running ? stop : start}
+              onClick={running ? stop : () => void start()}
               disabled={
                 !running &&
                 (!topic.trim() || (!characterModeCommand(topic) && tooFew) || !ready)
@@ -908,7 +941,10 @@ export function Room() {
                         <MessageContent className={cn(m.role === "user" && "user-message-content")}>
                           {m.parts.map((part, i) =>
                             part.type === "text" ? (
-                              <MessageResponse key={i}>{part.text}</MessageResponse>
+                              <div key={i}>
+                                <MessageResponse>{part.text}</MessageResponse>
+                                {m.role === "assistant" && m.metadata?.characterMode === "linux" && !running && <LinuxActions text={part.text} />}
+                              </div>
                             ) : part.type === "reasoning" ? (
                               <details className="reasoning" key={i}>
                                 <summary>Thinking</summary>

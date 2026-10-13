@@ -1,7 +1,7 @@
 import type { AgentId } from "./agents";
 
 /** Hand-drawn silhouettes rasterized directly onto a native 32×32 canvas. */
-export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam" | "cyberpunk"): string[] {
+export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam" | "cyberpunk" | "linux"): string[] {
   const grid = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
   const dot = (x: number, y: number, c: string) => {
     if (grid[y] && x >= 0 && x < 32) grid[y][x] = c;
@@ -62,6 +62,17 @@ export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "dev
     shape([[11,3],[19,3],[22,5],[21,7],[19,5],[16,5],[13,6],[10,6]],color);
     line(12,3,17,3,highlight); dot(11,4,highlight); line(19,4,21,5,highlight);
   };
+  if (mode === "linux" && id === "claude") {
+    // Tux the penguin: dark body, white belly, orange beak and feet
+    shape([[16,2],[21,4],[23,9],[24,16],[26,22],[24,28],[8,28],[6,22],[8,16],[9,9],[11,4]],"I");
+    shape([[16,9],[20,11],[22,17],[22,24],[19,27],[13,27],[10,24],[10,17],[12,11]],"W");
+    box(12,6,3,3,"W"); box(18,6,3,3,"W"); dot(13,7,"I"); dot(19,7,"I");
+    shape([[13,10],[19,10],[16,13]],"O");
+    shape([[6,17],[8,16],[9,24],[5,23]],"I"); shape([[26,17],[24,16],[23,24],[27,23]],"I");
+    box(9,28,6,2,"O"); box(17,28,6,2,"O");
+    return grid.map(row => row.join(""));
+  }
+  if (mode === "linux") mode = "devteam";
   legs();
   if (mode === "cyberpunk") {
     // jacket, jacket shade, neon hair, neon accent, skin

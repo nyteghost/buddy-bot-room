@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 const key = "pixel-pals-hellraiser-v1";
 const characterKey = "pixel-pals-character-mode-v1";
-export const characterModes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk"] as const;
+export const characterModes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "linux"] as const;
 export type CharacterMode = (typeof characterModes)[number];
 export function isCharacterMode(value: unknown): value is CharacterMode {
   return characterModes.some(mode => mode === value);
@@ -47,7 +47,8 @@ export function characterModeCommand(text: string): CharacterMode | null {
   if (t === "final fantasy mode" || t === "final fantasy theme") return "finalfantasy";
   if (t === "dev team mode" || t === "developer mode" || t === "dev team theme") return "devteam";
   if (t === "cyberpunk mode" || t === "cyberpunk theme") return "cyberpunk";
-  if (t === "cyberpunk mode off" || t === "matrix mode off" || t === "final fantasy mode off" || t === "dev team mode off") return "normal";
+  if (t === "linux mode" || t === "linux theme" || t === "assistant mode") return "linux";
+  if (t === "linux mode off" || t === "cyberpunk mode off" || t === "matrix mode off" || t === "final fantasy mode off" || t === "dev team mode off") return "normal";
   if (t === "horror mode" || t === "horror mode on") return "horror";
   if (t === "horror mode off") return "normal";
   const hell = modeCommand(text);

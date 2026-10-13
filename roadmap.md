@@ -18,6 +18,7 @@
 - [x] Verify live Matrix reply, both theme layouts, mobile overflow, and saving/reopening after refresh; 27 affected tests pass.
 - [x] Software Developer team theme (pals at computers instead of a table)
 - [x] Start Ollama button (desktop) / copy launch command (browser)
-- [ ] Linux Mode: assistant pals + Terminal pal (usable terminal with error help) — awaiting plan approval
-- [ ] Gmail pal (Outlook dropped)
-- [ ] Sage adds events to Google Calendar (shows in Cozi via Google link)
+- [x] Linux Mode: assistant pals + Terminal pal (usable terminal with error help), notes/files/system context, approve-to-run cards
+- [ ] Gmail pal live inbox access — blocked: needs user's Google OAuth client (connect card)
+- [ ] Sage adds events to Google Calendar — blocked: same Google OAuth client
+- [x] Desktop update popup: checks GitHub for new commits, Yes pulls + rebuilds, No closes

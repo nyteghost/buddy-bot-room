@@ -146,6 +146,15 @@ const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
     rune: { label: "soldering a chrome implant", pixels: [...r(3, 8, 8, 4, "metal"), ...r(4, 9, 2, 2, "dark"), ...r(8, 9, 2, 2, "dark"), ...r(12, 2, 1, 7, "metal"), [12, 9, "glow", "tp-flicker"], [11, 10, "accent", "tp-twinkle-a"], [13, 11, "accent", "tp-twinkle-b"]] },
     claude: { label: "simulating every outcome", pixels: [...r(6, 6, 4, 4, "accent", "tp-flicker"), ...r(1, 7, 4, 1, "glow", "tp-line-a"), ...r(11, 7, 4, 1, "glow", "tp-line-b"), ...r(7, 1, 1, 4, "glow", "tp-line-c"), ...r(8, 11, 1, 4, "glow", "tp-line-a"), [2, 2, "screen", "tp-twinkle-a"], [13, 13, "screen", "tp-twinkle-b"], [13, 2, "screen", "tp-twinkle-c"]] },
   },
+  linux: {
+    nova: { label: "sorting the inbox", pixels: [...r(1, 3, 14, 10, "paper"), ...r(1, 3, 14, 1, "accent"), ...r(3, 6, 10, 1, "dark", "tp-line-a"), ...r(3, 9, 8, 1, "dark", "tp-line-b"), [13, 11, "red", "tp-flicker"]] },
+    byte: { label: "checking off tasks", pixels: [...r(2, 1, 12, 14, "paper"), ...[3, 7, 11].flatMap((y, i) => [...r(4, y, 2, 2, "glow", ["tp-twinkle-a", "tp-twinkle-b", "tp-twinkle-c"][i]), ...r(7, y, 6, 1, "dark", ["tp-line-a", "tp-line-b", "tp-line-c"][i])])] },
+    sage: { label: "planning the calendar", pixels: [...r(1, 2, 14, 12, "paper"), ...r(1, 2, 14, 3, "red"), ...[6, 9, 12].flatMap((y) => [3, 7, 11].map((x) => [x, y, "dark"] as [number, number, string])), [7, 9, "accent", "tp-flicker"]] },
+    pip: { label: "jotting a note", pixels: [...r(2, 2, 10, 12, "paper"), ...r(4, 5, 6, 1, "dark", "tp-line-a"), ...r(4, 8, 5, 1, "dark", "tp-line-b"), [12, 10, "accent", "tp-scribble"], [13, 11, "accent", "tp-scribble"]] },
+    echo: { label: "searching folders", pixels: [...r(1, 4, 9, 8, "accent"), ...r(1, 3, 4, 1, "accent"), ...r(9, 8, 4, 4, "metal", "tp-bob"), [13, 13, "metal"]] },
+    rune: { label: "reading GPU stats", pixels: [...r(1, 3, 14, 10, "dark"), ...r(3, 9, 2, 3, "glow", "tp-twinkle-a"), ...r(6, 6, 2, 6, "glow", "tp-twinkle-b"), ...r(9, 4, 2, 8, "glow", "tp-twinkle-c"), ...r(12, 7, 2, 5, "glow", "tp-twinkle-a")] },
+    claude: { label: "reading the terminal", pixels: [...r(1, 2, 14, 12, "dark"), ...r(3, 5, 2, 1, "glow"), [4, 6, "glow"], ...r(3, 7, 2, 1, "glow"), ...r(6, 7, 4, 1, "glow", "tp-flicker")] },
+  },
   finalfantasy: {
     nova: { label: "polishing a giant sword", pixels: blade() },
     byte: { label: "spinning a gunblade", pixels: gunblade() },
