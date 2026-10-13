@@ -107,7 +107,10 @@ export function Room() {
     document.documentElement.classList.toggle("matrix", characterMode === "matrix");
     document.documentElement.classList.toggle("finalfantasy", characterMode === "finalfantasy");
     document.documentElement.classList.toggle("devteam", characterMode === "devteam");
+    document.documentElement.classList.toggle("cyberpunk", characterMode === "cyberpunk");
   }, [hell, horror, characterMode]);
+  const modeRef = useRef(characterMode);
+  modeRef.current = characterMode;
   const [ready, setReady] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const voiceRef = useRef(true);
@@ -253,18 +256,19 @@ export function Room() {
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
           const began = performance.now();
+          // Read the theme live so switching themes mid-discussion applies to the very next speaker.
+          const turnMode = modeRef.current;
           const requestBody = {
             agentId: agent.id,
             model: selectedModels[agent.id],
             mode,
             round: currentRound,
             verdict,
-            hellraiser: hell,
-            horror,
-            characterMode,
+            hellraiser: turnMode === "hellraiser",
+            horror: turnMode === "horror",
+            characterMode: turnMode,
           };
-          let stream;
-          if (engine.kind === "local") {
+          const runLocal = async () => {
             const res = await fetch("/api/chat", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -272,25 +276,32 @@ export function Room() {
               signal: controller.signal,
             });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Prompt failed.");
-            stream = await localTurn(
-              await res.json(),
-              { agentId: agent.id, round: currentRound },
-              controller.signal,
-            );
-          } else {
-            const provider = providerForTurn(engine, turnIndex);
-            if (!provider) throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
-            const transport = new DefaultChatTransport<RoomMessage>({
-              api: "/api/chat",
-              body: { ...requestBody, engine: provider },
-            });
-            stream = await transport.sendMessages({
+            return localTurn(await res.json(), { agentId: agent.id, round: currentRound }, controller.signal);
+          };
+          const runCloud = (provider: NonNullable<ReturnType<typeof providerForTurn>>) =>
+            new DefaultChatTransport<RoomMessage>({ api: "/api/chat", body: { ...requestBody, engine: provider } }).sendMessages({
               chatId: "pixel-pals-room",
               messageId: undefined,
               messages: transcript,
               trigger: "submit-message",
               abortSignal: controller.signal,
             });
+          let stream;
+          const provider = providerForTurn(engine, turnIndex);
+          if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
+            stream = await runLocal();
+          } else if (!provider) {
+            throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
+          } else if (engine.kind === "auto") {
+            // Auto: free keys are far faster; the in-browser model takes over when a key hits its limit.
+            try {
+              stream = await runCloud(provider);
+            } catch (err) {
+              if (controller.signal.aborted || !hasWebGPU()) throw err;
+              stream = await runLocal();
+            }
+          } else {
+            stream = await runCloud(provider);
           }
           let answer: RoomMessage | undefined;
           const answerId = crypto.randomUUID();
@@ -304,7 +315,7 @@ export function Room() {
               metadata: {
                 ...partial.metadata,
                 agentId: agent.id,
-                characterMode,
+                characterMode: turnMode,
                 round: currentRound,
                 ...(verdict ? { verdict: true } : {}),
                 elapsed: (performance.now() - began) / 1000,
