@@ -783,7 +783,7 @@ export function Room() {
             )}
             <Button
               className="start-button"
-              onClick={running ? stop : start}
+              onClick={running ? stop : () => void start()}
               disabled={
                 !running &&
                 (!topic.trim() || (!characterModeCommand(topic) && tooFew) || !ready)
