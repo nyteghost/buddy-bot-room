@@ -224,11 +224,12 @@ export function PixelCharacter({
   const mode = useCharacterMode();
   const hell = mode === "hellraiser";
   const grid = mode === "horror" ? horrorPatterns[id] : hell ? cenobitePatterns[id] : patterns[id];
-  // 32-bit rendering: each 12x16 source pixel becomes a shaded 2x2 block on a
-  // 32x32 canvas (light top-left, dark bottom-right) for SNES-era depth.
+  // Detailed rendering: each 12x16 source pixel becomes a beveled 3x3 block on
+  // a 48x48 canvas — lit top/left edges, shadowed bottom/right, plain core —
+  // for a sculpted, high-detail sprite look.
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 48 48"
       role="img"
       aria-label={`${id} pixel character`}
       className={cn("pixel-character", `agent-${id}`, animated && "character-bounce", hell && "cenobite", mode === "horror" && "horror-icon", className)}
@@ -238,10 +239,15 @@ export function PixelCharacter({
         [...row].map((pixel, x) =>
           pixel === "." ? null : (
             <g key={`${x}-${y}`} className={`pixel-${pixel}`}>
-              <rect className="shade-light" x={4 + x * 2} y={y * 2} width="1" height="1" />
-              <rect x={4 + x * 2 + 1} y={y * 2} width="1" height="1" />
-              <rect x={4 + x * 2} y={y * 2 + 1} width="1" height="1" />
-              <rect className="shade-dark" x={4 + x * 2 + 1} y={y * 2 + 1} width="1" height="1" />
+              <rect className="shade-light" x={6 + x * 3} y={y * 3} width="1" height="1" />
+              <rect className="shade-light" x={6 + x * 3 + 1} y={y * 3} width="1" height="1" />
+              <rect x={6 + x * 3 + 2} y={y * 3} width="1" height="1" />
+              <rect className="shade-light" x={6 + x * 3} y={y * 3 + 1} width="1" height="1" />
+              <rect x={6 + x * 3 + 1} y={y * 3 + 1} width="1" height="1" />
+              <rect className="shade-dark" x={6 + x * 3 + 2} y={y * 3 + 1} width="1" height="1" />
+              <rect x={6 + x * 3} y={y * 3 + 2} width="1" height="1" />
+              <rect className="shade-dark" x={6 + x * 3 + 1} y={y * 3 + 2} width="1" height="1" />
+              <rect className="shade-dark" x={6 + x * 3 + 2} y={y * 3 + 2} width="1" height="1" />
             </g>
           ),
         ),
