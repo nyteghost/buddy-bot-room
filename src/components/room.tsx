@@ -253,13 +253,18 @@ export function Room() {
         <section className="room-column">
           <div className="page-heading">
             <div>
-              <div className="eyebrow">YOUR AI COMMON ROOM</div>
+              <div className="eyebrow">{hell ? "THE LAMENT CONFIGURATION IS SOLVED" : "YOUR AI COMMON ROOM"}</div>
               <h1>
-                A little room.
+                {hell ? "We have such sights" : "A little room."}
                 <br />
-                Big ideas<span className="text-primary">.</span>
+                {hell ? "to show you" : "Big ideas"}
+                <span className="text-primary">.</span>
               </h1>
-              <p>Different minds. One conversation. See where it goes.</p>
+              <p>
+                {hell
+                  ? "The Cenobites answer your call. Type “Normal mode” to close the box."
+                  : "Different minds. One conversation. Type “Hellraiser mode” if you dare."}
+              </p>
             </div>
             <span className="room-number">
               ROOM
