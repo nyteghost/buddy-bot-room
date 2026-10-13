@@ -6,6 +6,7 @@ const MODEL = "google/gemini-3.1-flash-tts-preview";
 
 export async function handleSpeech(request: Request) {
   try {
+    if (request.signal.aborted) return new Response(null, { status: 499 });
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) return Response.json({ error: "Voice service is not configured." }, { status: 401 });
     const body = await request.json();
@@ -43,7 +44,32 @@ export async function handleSpeech(request: Request) {
       }
       return Response.json({ error: message }, { status: upstream.status });
     }
-    return new Response(upstream.body, {
+    // The response body is consumed after this handler returns, outside its
+    // try/catch. Handle cancelled reads here rather than leaking a stream error.
+    const reader = upstream.body.getReader();
+    const audio = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          const next = await reader.read();
+          if (next.done) controller.close();
+          else controller.enqueue(next.value);
+        } catch (error) {
+          if (request.signal.aborted || isAbortError(error)) controller.close();
+          else {
+            console.error(error);
+            controller.error(error);
+          }
+        }
+      },
+      async cancel(reason) {
+        try {
+          await reader.cancel(reason);
+        } catch (error) {
+          if (!request.signal.aborted && !isAbortError(error)) console.error(error);
+        }
+      },
+    });
+    return new Response(audio, {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
     });
   } catch (error) {
