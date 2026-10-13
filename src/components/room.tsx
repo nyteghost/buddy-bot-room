@@ -233,12 +233,14 @@ export function Room() {
             abortSignal: controller.signal,
           });
           let answer: RoomMessage | undefined;
+          const answerId = crypto.randomUUID();
           for await (const partial of readUIMessageStream<RoomMessage>({
             stream,
             terminateOnError: true,
           })) {
             answer = {
               ...partial,
+              id: answerId,
               metadata: {
                 ...partial.metadata,
                 agentId: agent.id,
