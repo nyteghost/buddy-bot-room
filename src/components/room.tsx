@@ -59,6 +59,7 @@ import {
   type RoomMessage,
 } from "@/lib/agents";
 import roomImage from "@/assets/pixel-room.jpg";
+import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { cn } from "@/lib/utils";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -280,12 +281,13 @@ export function Room() {
           </div>
           <div className="room-scene">
             <img
-              src={roomImage}
-              className="pixel-room-image"
+              src={hell ? hellRoomImage : roomImage}
+              className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
-              alt="Pixel-art common room with a discussion table, computer stations, and plants"
+              alt={hell ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box" : "Pixel-art common room with a discussion table, computer stations, and plants"}
             />
+            {hell && <div className="hell-glow" aria-hidden />}
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />

@@ -1036,7 +1036,23 @@ h1 {
   --sage: oklch(0.7 0.06 60);
   --pip: oklch(0.55 0.2 20);
 }
-.hellraiser .pixel-room-image { filter: sepia(0.6) hue-rotate(-30deg) saturate(1.6) brightness(0.55); }
+.hellraiser .pixel-room-image { filter: brightness(0.9) contrast(1.05); }
+.hellraiser .room-scene { position: relative; box-shadow: 0 0 40px oklch(0.45 0.18 25 / 45%); }
+.hell-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 48%, oklch(0.8 0.15 80 / 22%), transparent 30%),
+    radial-gradient(ellipse at center, transparent 55%, oklch(0.08 0.02 25 / 70%));
+  animation: hell-flicker 3.2s steps(6) infinite;
+}
+@keyframes hell-flicker {
+  0%, 100% { opacity: 1; }
+  40% { opacity: 0.8; }
+  55% { opacity: 0.95; }
+  70% { opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) { .hell-glow { animation: none; } }
 
 /* Horror icon palette: moonlit masks, workwear and nightmare stripes. */
 :root {
