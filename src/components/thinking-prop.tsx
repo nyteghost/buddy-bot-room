@@ -167,7 +167,7 @@ const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
 };
 
 export function ThinkingProp({ id, mode = "normal" }: { id: AgentId; mode?: CharacterMode }) {
-  const prop = themed[mode]?.[id] ?? props[id];
+  const prop = themed[mode === "assistant" ? "linux" : mode]?.[id] ?? props[id];
   if (!prop) return null;
   return (
     <svg

@@ -5,23 +5,23 @@ import { isTauri } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 
 /** Approval cards under a Linux Mode reply: nothing runs or saves without a click. */
-export function LinuxActions({ text }: { text: string }) {
+export function LinuxActions({ text, canRun = true }: { text: string; canRun?: boolean }) {
   const commands = extractCommands(text);
   const notes = extractNotes(text);
   if (!commands.length && !notes.length) return null;
   return (
     <div className="linux-actions">
-      {commands.map((cmd, i) => <CommandCard key={`c${i}`} cmd={cmd} />)}
+      {commands.map((cmd, i) => <CommandCard key={`c${i}`} cmd={cmd} canRun={canRun} />)}
       {notes.map((n, i) => <NoteCard key={`n${i}`} {...n} />)}
     </div>
   );
 }
 
-function CommandCard({ cmd }: { cmd: string }) {
+function CommandCard({ cmd, canRun }: { cmd: string; canRun: boolean }) {
   const [done, setDone] = useState(false);
   const [hidden, setHidden] = useState(false);
   const risky = isRiskyCommand(cmd);
-  const desktopApp = isTauri();
+  const desktopApp = canRun && isTauri();
   if (hidden) return null;
   function run() {
     if (risky && !window.confirm(`This command can change your system or delete data:\n\n${cmd}\n\nRun it?`)) return;
