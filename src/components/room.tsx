@@ -75,7 +75,7 @@ import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
 import { localTurn, speakFree } from "@/lib/local-llm";
-import { EngineSettingsDialog } from "./engine-settings";
+import { EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
 
@@ -443,6 +443,7 @@ export function Room() {
               <b>001</b>
             </span>
           </div>
+          {engine.kind === "local" && <WebGpuUsageBox active />}
           <div className="room-scene">
             <img
               src={characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
