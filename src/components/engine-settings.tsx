@@ -106,7 +106,6 @@ export function EngineSettingsDialog() {
               </p>
             )}
             {progress && <p className="text-muted-foreground">{progress}</p>}
-            <WebGpuUsageBox active={!loading} />
           </div>
         )}
       </DialogContent>
@@ -114,7 +113,7 @@ export function EngineSettingsDialog() {
   );
 }
 
-function WebGpuUsageBox({ active }: { active: boolean }) {
+export function WebGpuUsageBox({ active }: { active: boolean }) {
   const [gpu, setGpu] = useState<string | null>(null);
   const [stats, setStats] = useState<string | null>(null);
   useEffect(() => {
