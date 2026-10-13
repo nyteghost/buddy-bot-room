@@ -5,11 +5,9 @@ export const models = [
   { id: "openai/gpt-6-sol", label: "GPT-6 Sol" },
   { id: "google/gemini-3.8-flash", label: "Gemini 3.8 Flash" },
   { id: "google/gemini-3.1-flash-lite", label: "Gemini Flash Lite" },
-  { id: "meta-llama/Llama-3.3-70B-Instruct", label: "Llama 3.3 70B" },
-  { id: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen 2.5 72B" },
+  { id: "openai/gpt-5.6-terra", label: "GPT-5.6 Terra" },
+  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
 ];
-/** Models served through Hugging Face rather than the Lovable AI Gateway. */
-export const huggingFaceModels: string[] = ["meta-llama/Llama-3.3-70B-Instruct", "Qwen/Qwen2.5-72B-Instruct"];
 export const agents = [
   {
     id: "nova",
@@ -48,7 +46,7 @@ export const agents = [
     name: "Echo",
     role: "The storyteller",
     tone: "Warm, witty and insightful. Weave the topic into vivid analogies and small stories that reveal deeper meaning.",
-    model: "meta-llama/Llama-3.3-70B-Instruct",
+    model: "openai/gpt-5.6-terra",
     color: "echo",
   },
   {
@@ -56,7 +54,7 @@ export const agents = [
     name: "Rune",
     role: "The inventor",
     tone: "Inventive, sharp and spirited. Remix the other ideas into bold new combinations and quick experiments.",
-    model: "Qwen/Qwen2.5-72B-Instruct",
+    model: "google/gemini-3-flash-preview",
     color: "rune",
   },
 ] as const;
