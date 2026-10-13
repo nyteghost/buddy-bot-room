@@ -177,11 +177,24 @@ export function AutoModelDownload() {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState<string | null>(null);
+  const [gpu, setGpu] = useState<string | null>(null);
+  useEffect(() => {
+    let stop = false;
+    if (!hasWebGPU()) {
+      setGpu("No WebGPU graphics card found");
+      return;
+    }
+    getGpuInfo().then((info) => !stop && setGpu(info));
+    return () => {
+      stop = true;
+    };
+  }, []);
   async function run() {
     setBusy(true);
     try {
       const pick = await detectBestModel();
-      setStatus(`Detected ${pick.gpu} → ${pick.label} (${pick.size})`);
+      setGpu(pick.gpu);
+      setStatus(`Best fit: ${pick.label} (${pick.size})`);
       await loadLocalEngine((p) => setStatus(`${pick.label}: ${Math.round(p * 100)}% downloaded`), pick.id);
       setReady(pick.label);
       setStatus("");
@@ -196,6 +209,7 @@ export function AutoModelDownload() {
       <Button size="sm" variant="outline" onClick={run} disabled={busy || !hasWebGPU()}>
         <Cpu /> {ready ? `Local model ready (${ready})` : busy ? "Preparing…" : "Detect GPU & download best model"}
       </Button>
+      <p className="text-xs text-muted-foreground">GPU found: {gpu ?? "Checking…"}</p>
       {status && <p className="text-xs text-muted-foreground">{status}</p>}
     </div>
   );
