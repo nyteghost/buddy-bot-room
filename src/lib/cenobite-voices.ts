@@ -32,6 +32,10 @@ export const cenobiteVoices: Record<AgentId, { voice: string; direction: string 
     voice: "Orus",
     direction: "Read this in a grand, mechanical, cryptic voice, measured like grinding gears:",
   },
+  claude: {
+    voice: "Iapetus",
+    direction: "Read this in a precise, eloquent, quietly sinister voice, savoring every intricate detail:",
+  },
 };
 
 /** Strip markdown and stage directions so only spoken words remain (keeps the Chatterer's clicks). */
@@ -51,6 +55,7 @@ const normalDirections: Record<AgentId, string> = {
   pip: "Bright, playful and witty, with lively conversational energy.",
   echo: "Warm storytelling, vivid and expressive, with an amused smile.",
   rune: "Confident, inventive and spirited, with energetic clear phrasing.",
+  claude: "Warm, measured and thoughtful, with a calm articulate cadence.",
 };
 const horrorDirections: Record<AgentId, string> = {
   nova: "A sly, theatrical masked horror storyteller; low, teasing and suspenseful.",
@@ -59,6 +64,7 @@ const horrorDirections: Record<AgentId, string> = {
   pip: "A raspy, sardonic nightmare trickster, theatrical and full of mischievous dark humor.",
   echo: "An eerie sing-song clown, giggly and deceptively cheerful.",
   rune: "A cocky, sarcastic toy-doll trickster, quick and impish.",
+  claude: "A low, gravelly, slow and deliberate voice; calm, cold and menacing, like Jigsaw on a cassette tape.",
 };
 export function characterVoice(id: AgentId, mode: CharacterMode) {
   if (mode === "hellraiser") return cenobiteVoices[id];

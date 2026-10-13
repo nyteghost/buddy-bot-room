@@ -150,6 +150,7 @@
   --pip: oklch(0.81 0.14 75);
   --echo: oklch(0.76 0.14 350);
   --rune: oklch(0.8 0.12 190);
+  --claude: oklch(0.7 0.13 40);
   --skin: oklch(0.85 0.075 55);
   --pixel-ink: oklch(0.24 0.018 270);
   --pixel-shoe: oklch(0.32 0.025 270);
@@ -426,6 +427,9 @@ h1 {
 }
 .agent-rune {
   --agent-color: var(--rune);
+}
+.agent-claude {
+  --agent-color: var(--claude);
 }
 .pixel-character {
   width: 32px;
@@ -1090,6 +1094,7 @@ h1 {
   --pip: oklch(0.55 0.2 20);
   --echo: oklch(0.62 0.12 350);
   --rune: oklch(0.6 0.04 250);
+  --claude: oklch(0.55 0.1 60);
 }
 .hellraiser .pixel-room-image { filter: brightness(0.9) contrast(1.05); }
 .hellraiser .room-scene { position: relative; box-shadow: 0 0 40px oklch(0.45 0.18 25 / 45%); }
@@ -1134,6 +1139,7 @@ h1 {
   --pip: oklch(0.76 0.17 25);
   --echo: oklch(0.85 0.1 20);
   --rune: oklch(0.72 0.15 45);
+  --claude: oklch(0.6 0.2 25);
 }
 .horror .pixel-room-image { filter: saturate(0.6) brightness(0.75); }
 .voice-toggle {

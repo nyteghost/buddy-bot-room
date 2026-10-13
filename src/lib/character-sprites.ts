@@ -203,7 +203,7 @@ export function characterSprite(id: AgentId, mode: CharacterMode): string[] {
       dot(27, 3, "l");
       box(10, 29, 6, 2, "r");
       box(17, 29, 6, 2, "r");
-    } else {
+    } else if (id === "rune") {
       oval(8, 1, 17, 14, "r");
       oval(10, 4, 13, 12, "e");
       eyes(8, "c");
@@ -324,7 +324,64 @@ export function characterSprite(id: AgentId, mode: CharacterMode): string[] {
         box(x, 15, 2, 12, "t");
         box(x, 25, 3, 2, "g");
       }
+    } else {
+      // The Artificer: obsidian hood, geometric cuts and a brass puzzle box.
+      oval(7, 0, 19, 17, "b");
+      oval(10, 3, 13, 13, "w");
+      eyes(8);
+      for (let i = 0; i < 6; i++) {
+        dot(11 + i, 4 + i, "g");
+        dot(21 - i, 4 + i, "g");
+      }
+      box(16, 3, 1, 12, "g");
+      box(13, 13, 7, 1, "r");
+      box(9, 17, 15, 8, "b");
+      box(15, 17, 3, 8, "g");
+      box(23, 21, 5, 5, "q");
+      box(24, 22, 3, 3, "k");
+      dot(25, 23, "q");
     }
+  }
+  if (id === "claude" && mode === "normal") {
+    // Claude: warm scholar with a starburst crest, monocle and quill.
+    box(9, 15, 15, 9, "a");
+    box(15, 15, 3, 9, "l");
+    box(12, 7, 4, 4, "q");
+    box(13, 8, 2, 2, "c");
+    for (const [x, y] of [[16, 0], [16, 1], [14, 1], [18, 1], [16, 2], [15, 1], [17, 1]] as const) dot(x, y, "q");
+    box(24, 14, 1, 9, "w");
+    dot(25, 13, "w");
+    dot(23, 15, "w");
+  }
+  if (id === "claude" && mode === "horror") {
+    // Jigsaw's Billy puppet: chalk-white face, red spiral cheeks, black tux and red bow tie.
+    oval(8, 0, 17, 9, "i");
+    oval(10, 2, 13, 14, "w");
+    box(11, 7, 4, 3, "i");
+    box(18, 7, 4, 3, "i");
+    dot(12, 8, "r");
+    dot(19, 8, "r");
+    for (const cx of [11, 20]) {
+      box(cx, 11, 3, 1, "r");
+      dot(cx, 12, "r");
+      dot(cx + 2, 12, "r");
+      box(cx, 13, 3, 1, "r");
+      dot(cx + 1, 12, "w");
+    }
+    box(14, 13, 5, 1, "r");
+    box(14, 14, 5, 1, "i");
+    box(15, 15, 1, 2, "g");
+    box(17, 15, 1, 2, "g");
+    box(9, 17, 15, 8, "i");
+    box(8, 17, 3, 7, "i");
+    box(23, 17, 3, 7, "i");
+    box(15, 17, 3, 7, "w");
+    box(13, 17, 7, 2, "r");
+    box(16, 17, 1, 2, "k");
+    box(8, 23, 3, 3, "w");
+    box(23, 23, 3, 3, "w");
+    box(11, 20, 5, 10, "i");
+    box(17, 20, 5, 10, "i");
   }
   return grid.map((row) => row.join(""));
 }

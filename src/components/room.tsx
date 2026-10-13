@@ -104,6 +104,7 @@ export function Room() {
     pip: agents[3].model,
     echo: agents[4].model,
     rune: agents[5].model,
+    claude: agents[6].model,
   });
   const [running, setRunning] = useState(false);
   const [speaking, setSpeaking] = useState<AgentId | null>(null);
