@@ -346,7 +346,7 @@ export function Room() {
                   {agentName(a.id, hell)}
                   <span className="agent-dot" />
                 </h3>
-                <p>{a.role}</p>
+                <p>{hell ? cenobites[a.id].role : a.role}</p>
                 <span className="model-label">
                   {models.find((m) => m.id === selectedModels[a.id])?.label}
                 </span>
