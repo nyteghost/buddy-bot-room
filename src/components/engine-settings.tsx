@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
-import { hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
+import { getGpuInfo, getLocalStats, hasWebGPU, loadLocalEngine } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
