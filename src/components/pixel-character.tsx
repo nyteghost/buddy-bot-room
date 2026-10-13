@@ -28,6 +28,7 @@ export function PixelCharacter({
         animated && "character-bounce",
         mode === "hellraiser" && "cenobite",
         mode === "horror" && "horror-icon",
+        (mode === "matrix" || mode === "finalfantasy") && "cinematic-sprite",
         className,
       )}
       shapeRendering="crispEdges"
