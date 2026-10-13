@@ -356,7 +356,6 @@ export function Room() {
           <span className="brand-icon">
             <PixelCharacter id="nova" />
           </span>
-          <EngineSettingsDialog />
           <span>
             pixel<span className="text-primary">pals</span>
             <span className="brand-chat"> / chat</span>
@@ -366,6 +365,7 @@ export function Room() {
           <span className="lab-badge">
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
+          <EngineSettingsDialog />
           <Select
             value={characterMode}
             onValueChange={(value) => setCharacterMode(value as CharacterMode)}
@@ -391,7 +391,7 @@ export function Room() {
                 <DialogDescription>
                   Roundtable lets the pals respond to each other. Broadcast gives independent
                   answers. Choose at least two pals, set your topic, and start. Your conversation is
-                  saved only in this browser. AI replies use workspace AI credits.
+                  saved only in this browser. AI replies use workspace AI credits unless you pick a free engine.
                 </DialogDescription>
               </DialogHeader>
             </DialogContent>
