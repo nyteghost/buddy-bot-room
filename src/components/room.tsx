@@ -415,8 +415,14 @@ export function Room() {
                   `scene-pal-${i}`,
                   !enabled.includes(a.id) && "pal-away",
                   speaking === a.id && "is-speaking",
+                  running && speaking && speaking !== a.id && enabled.includes(a.id) && "is-listening",
                 )}
               >
+                {speaking === a.id && (
+                  <div className={`speech-bubble agent-${a.id}`} aria-hidden="true">
+                    {bubbleText || "···"}
+                  </div>
+                )}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror)}
@@ -714,7 +720,11 @@ export function Room() {
                     ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror")
                     : "You";
                   return (
-                    <Message key={m.id} from={m.role} className="room-message">
+                    <Message
+                      key={m.id}
+                      from={m.role}
+                      className={cn("room-message", m.metadata?.verdict && "verdict-message")}
+                    >
                       {a && (
                         <div className={`message-avatar agent-${a.id}`}>
                           <PixelCharacter id={a.id} mode={messageMode} />
@@ -743,7 +753,13 @@ export function Room() {
                               {replayId === m.id ? <Square size={13} /> : <Volume2 size={14} />}
                             </MessageAction>
                           )}
-                          <span>{a ? `ROUND ${m.metadata?.round ?? 1}` : "THE TOPIC"}</span>
+                          <span>
+                            {!a
+                              ? "THE TOPIC"
+                              : m.metadata?.verdict
+                                ? "THE VERDICT"
+                                : `ROUND ${m.metadata?.round ?? 1}`}
+                          </span>
                           {m.metadata?.elapsed && (
                             <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
                           )}
