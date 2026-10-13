@@ -77,6 +77,12 @@ export async function handleChat(request: Request) {
         maxRetries: 0,
         onError: logStreamError,
       });
+      return result.toUIMessageStreamResponse({
+        originalMessages: messages,
+        messageMetadata: ({ part }) =>
+          part.type === "start" ? { agentId: agent.id, round: body.round } : undefined,
+        onError: safeError,
+      });
     } else if (body.model.startsWith("openai/")) {
       const call = createResponsesCall(
         request,
