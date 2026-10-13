@@ -306,7 +306,7 @@ export function characterSprite(id: AgentId, mode: CharacterMode): string[] {
       box(14, 17, 5, 4, "w");
       box(13, 21, 7, 2, "r");
       box(16, 23, 1, 2, "r");
-    } else {
+    } else if (id === "rune") {
       oval(6, 1, 22, 17, "t");
       box(9, 3, 15, 4, "g");
       box(11, 4, 11, 2, "i");
