@@ -75,6 +75,7 @@ import { streamSpeech } from "@/lib/stream-speech";
 import { engineKey, useEngine } from "@/lib/engine";
 import { localTurn, speakFree } from "@/lib/local-llm";
 import { EngineSettingsDialog } from "./engine-settings";
+import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -381,6 +382,7 @@ export function Room() {
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
           <EngineSettingsDialog />
+          <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
             value={characterMode}
             disabled={running}
