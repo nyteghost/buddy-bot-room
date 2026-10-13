@@ -153,7 +153,7 @@ export function agentName(id: AgentId | undefined, hell: boolean, horror = false
   if (!a) return "Agent";
   return agentPersona(a.id, hell, horror).name;
 }
-export type Mode = "roundtable" | "broadcast";
+export type Mode = "roundtable" | "broadcast" | "direct";
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
@@ -163,6 +163,10 @@ export type RoomMessage = UIMessage<{
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;
+}
+/** One-on-one: only the human and the chosen pal's own replies. */
+export function contextForPartner(messages: RoomMessage[], partner: AgentId): RoomMessage[] {
+  return messages.filter((m) => m.role === "user" || m.metadata?.agentId === partner);
 }
 export function messageText(message: UIMessage): string {
   return message.parts
