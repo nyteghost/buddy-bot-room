@@ -1,6 +1,34 @@
 import { cn } from "@/lib/utils";
 import type { AgentId } from "@/lib/agents";
-import { useHellraiser } from "@/lib/hellraiser";
+import { useCharacterMode } from "@/lib/hellraiser";
+
+// Pale masks, dark robes, hockey-mask markings and Freddy's striped sweater.
+const horrorPatterns: Record<AgentId, string[]> = {
+  nova: [
+    "...bbbbbb...", "..bbwwwwbb..", "..bwwwwwwb..", "..bwiwwiwb..",
+    "..bwiwwiwb..", "..bwwwwwwb..", "...bwiwb....", "...bwiwb....",
+    "..bbbbbbbb..", ".bbbbbbbbbb.", ".bbbbbbbbbb.", ".bbbbbbbbbb.",
+    "..bbbbbbbb..", "...bb..bb...", "...bb..bb...", "..bbb..bbb..",
+  ],
+  byte: [
+    "....oooo....", "...owwww o..".replace(/ /g, ""), "..wwrwwrww..", "..wwiwwiww..",
+    "..wwwwwwww..", "..wgwggwgw..", "...wwrrww...", "....wwww....",
+    "...oooooo...", "..oooooooo..", ".w oooooo w.".replace(/ /g, "o"), ".woooooooow.",
+    "...oooooo...", "...bb..bb...", "...bb..bb...", "..bbb..bbb..",
+  ],
+  sage: [
+    "....hhhh....", "...hhhhhh...", "..hhwwwwhh..", "..hwwwwwwh..",
+    "..wwiwwiww..", "..wwwwwwww..", "...wwggww...", "....wwww....",
+    "...nnnnnn...", "..nnnnnnnn..", ".wnnnnnnnnw.", ".wnnnnnnnnw.",
+    "...nnnnnn...", "...nn..nn...", "...nn..nn...", "..bbb..bbb..",
+  ],
+  pip: [
+    "....hhhh....", "...hhhhhh...", "..hhhhhhhh..", "...ttrttt...",
+    "...ti ttit..".replace(/ /g, "t"), "...trttrt...", "....tttt....", "...rrrrrr...",
+    "..oooooooo..", "..rrrrrrrr..", ".toooooooot.", ".trrrrrrrtg.",
+    "...oooooo.gg", "...bb..bb.gg", "...bb..bb...", "..bbb..bbb..",
+  ],
+};
 
 // w = pale flesh, g = pins/grid, b = black leather, r = blood, i = eyes, k = teeth
 const cenobitePatterns: Record<AgentId, string[]> = {
@@ -157,14 +185,15 @@ export function PixelCharacter({
   className?: string;
   animated?: boolean;
 }) {
-  const hell = useHellraiser();
-  const grid = hell ? cenobitePatterns[id] : patterns[id];
+  const mode = useCharacterMode();
+  const hell = mode === "hellraiser";
+  const grid = mode === "horror" ? horrorPatterns[id] : hell ? cenobitePatterns[id] : patterns[id];
   return (
     <svg
       viewBox="0 0 12 16"
       role="img"
       aria-label={`${id} pixel character`}
-      className={cn("pixel-character", `agent-${id}`, animated && "character-bounce", hell && "cenobite", className)}
+      className={cn("pixel-character", `agent-${id}`, animated && "character-bounce", hell && "cenobite", mode === "horror" && "horror-icon", className)}
       shapeRendering="crispEdges"
     >
       {grid.flatMap((row, y) =>
