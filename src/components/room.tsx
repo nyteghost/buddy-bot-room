@@ -493,7 +493,7 @@ export function Room() {
                     {bubbleText || "···"}
                   </div>
                 )}
-                {speaking === a.id && !bubbleText && <ThinkingProp id={a.id} />}
+                {speaking === a.id && !bubbleText && <ThinkingProp id={a.id} mode={characterMode} />}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror, characterMode)}
