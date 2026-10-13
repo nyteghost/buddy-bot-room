@@ -36,7 +36,7 @@ export async function streamSpeech(body: Record<string, unknown>, signal?: Abort
       signal: controller.signal,
     });
     if (!response.ok || !response.body) {
-      let message = "The Cenobite's voice could not be summoned.";
+      let message = "The character's voice could not be played.";
       try {
         message = (await response.json()).error ?? message;
       } catch { /* keep default */ }
