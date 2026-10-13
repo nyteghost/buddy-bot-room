@@ -358,6 +358,54 @@ h1 {
 .scene-pal-3 { left: 32%; top: 72%; }
 .scene-pal-4 { left: 50%; top: 74%; }
 .scene-pal-5 { left: 68%; top: 72%; }
+.scene-pal.is-speaking { z-index: 5; }
+.speech-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 170px;
+  padding: 5px 7px;
+  background: var(--scene-ink);
+  color: var(--foreground);
+  border: 2px solid var(--agent-color);
+  box-shadow: 3px 3px 0 var(--agent-color);
+  font-family: "Silkscreen", monospace;
+  font-size: 8px;
+  line-height: 1.35;
+  text-align: left;
+  animation: bubble-pop 0.18s steps(3) both;
+}
+.speech-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--agent-color);
+}
+.scene-pal.is-listening .pixel-character {
+  animation: pal-listen 1.6s steps(2) infinite;
+}
+@keyframes bubble-pop {
+  from { transform: translateX(-50%) scale(0.6); opacity: 0; }
+  to { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+@keyframes pal-listen {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .speech-bubble, .scene-pal.is-listening .pixel-character { animation: none; }
+}
+.verdict-message .message-main {
+  border: 2px solid var(--primary);
+  padding: 10px 12px;
+  box-shadow: 4px 4px 0 var(--primary);
+}
+.verdict-message .message-heading > span:not(.ml-auto) { color: var(--primary); }
 .pal-away {
   opacity: 0.2;
 }
