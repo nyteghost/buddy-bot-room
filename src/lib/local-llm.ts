@@ -104,6 +104,88 @@ export async function getGpuInfo(): Promise<string | null> {
   }
 }
 
+/** True when the model's weights are already in this browser's cache (no re-download needed). */
+export async function isModelCached(model: string): Promise<boolean> {
+  try {
+    const { hasModelInCache } = await import("@mlc-ai/web-llm");
+    return await hasModelInCache(model);
+  } catch {
+    return false;
+  }
+}
+
+/** Streams one turn from a local OpenAI-compatible server (Ollama, llama.cpp, vLLM). */
+export async function ollamaTurn(
+  prompt: { system: string; messages: { role: "user" | "assistant"; content: string }[] },
+  server: { url: string; model: string },
+  metadata: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<ReadableStream<UIMessageChunk>> {
+  let res: Response;
+  try {
+    res = await fetch(`${server.url.replace(/\/+$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+      body: JSON.stringify({
+        model: server.model,
+        stream: true,
+        max_tokens: 400,
+        messages: [{ role: "system", content: prompt.system }, ...prompt.messages],
+      }),
+    });
+  } catch (err) {
+    if (signal.aborted) throw err;
+    throw new Error(
+      `Can't reach your local server at ${server.url}. Start it with: OLLAMA_ORIGINS="*" ollama serve`,
+    );
+  }
+  if (!res.ok || !res.body) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      res.status === 404
+        ? `Model "${server.model}" not found. Run: ollama pull ${server.model}`
+        : `Local server error ${res.status}: ${detail.slice(0, 200)}`,
+    );
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  return new ReadableStream<UIMessageChunk>({
+    async start(controller) {
+      controller.enqueue({ type: "start", messageMetadata: metadata });
+      controller.enqueue({ type: "text-start", id: "t" });
+      let buffer = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += value;
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const data = line.replace(/^data:\s*/, "").trim();
+            if (!data || data === "[DONE]" || !line.startsWith("data:")) continue;
+            try {
+              const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+              if (delta) controller.enqueue({ type: "text-delta", id: "t", delta });
+            } catch {
+              /* partial line */
+            }
+          }
+        }
+        controller.enqueue({ type: "text-end", id: "t" });
+        controller.enqueue({ type: "finish" });
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+    cancel() {
+      reader.cancel().catch(() => {});
+    },
+  });
+}
+
+
 /** Runs one turn locally and returns it as a UI message stream like /api/chat does. */
 export async function localTurn(
   prompt: { system: string; messages: { role: "user" | "assistant"; content: string }[] },
