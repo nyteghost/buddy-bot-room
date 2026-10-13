@@ -1019,3 +1019,21 @@ h1 {
     scroll-behavior: auto !important;
   }
 }
+
+/* Hellraiser mode */
+.pixel-w { fill: oklch(0.88 0.02 80); }
+.pixel-g { fill: oklch(0.55 0.02 260); }
+.pixel-b { fill: oklch(0.16 0.01 30); }
+.pixel-r { fill: oklch(0.45 0.18 25); }
+.pixel-k { fill: oklch(0.95 0.02 90); }
+.cenobite .pixel-i { fill: oklch(0.1 0 0); }
+.hellraiser {
+  --background: oklch(0.12 0.015 25);
+  --card: oklch(0.16 0.02 25);
+  --primary: oklch(0.72 0.13 80);
+  --nova: oklch(0.72 0.13 80);
+  --byte: oklch(0.6 0.17 30);
+  --sage: oklch(0.7 0.06 60);
+  --pip: oklch(0.55 0.2 20);
+}
+.hellraiser .pixel-room-image { filter: sepia(0.6) hue-rotate(-30deg) saturate(1.6) brightness(0.55); }
