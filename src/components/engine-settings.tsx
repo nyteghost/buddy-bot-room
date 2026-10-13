@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
+  { kind: "auto", label: "Auto (fastest)", note: "Free keys answer first (about 40× faster); the in-browser model takes over if a key hits its limit." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private, ~1 GB first download." },
 ];
 
@@ -24,7 +25,7 @@ export function EngineSettingsDialog() {
   const [progress, setProgress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const count = availableProviders(engine).length;
-  const label = engine.kind === "local" ? "In-browser" : `Free keys (${count})`;
+  const label = engine.kind === "local" ? "In-browser" : engine.kind === "auto" ? `Auto (${count} + GPU)` : `Free keys (${count})`;
   async function prepareLocal() {
     setLoading(true);
     try {
@@ -66,7 +67,7 @@ export function EngineSettingsDialog() {
             </button>
           ))}
         </div>
-        {engine.kind === "cloud" && (
+        {engine.kind !== "local" && (
           <div className="grid gap-3">
             <KeyField
               label="Groq (GPT-OSS 120B)"
@@ -94,7 +95,7 @@ export function EngineSettingsDialog() {
             </p>
           </div>
         )}
-        {engine.kind === "local" && (
+        {engine.kind !== "cloud" && (
           <div className="grid gap-2 text-sm">
             {hasWebGPU() ? (
               <Button onClick={prepareLocal} disabled={loading}>

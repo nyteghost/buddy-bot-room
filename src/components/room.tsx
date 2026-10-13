@@ -72,10 +72,11 @@ import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
 import devRoomImage from "@/assets/devteam-room.jpg";
+import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
-import { localTurn, speakFree } from "@/lib/local-llm";
+import { hasWebGPU, localTurn, speakFree } from "@/lib/local-llm";
 import { EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
@@ -107,7 +108,10 @@ export function Room() {
     document.documentElement.classList.toggle("matrix", characterMode === "matrix");
     document.documentElement.classList.toggle("finalfantasy", characterMode === "finalfantasy");
     document.documentElement.classList.toggle("devteam", characterMode === "devteam");
+    document.documentElement.classList.toggle("cyberpunk", characterMode === "cyberpunk");
   }, [hell, horror, characterMode]);
+  const modeRef = useRef(characterMode);
+  modeRef.current = characterMode;
   const [ready, setReady] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const voiceRef = useRef(true);
@@ -253,18 +257,19 @@ export function Room() {
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
           const began = performance.now();
+          // Read the theme live so switching themes mid-discussion applies to the very next speaker.
+          const turnMode = modeRef.current;
           const requestBody = {
             agentId: agent.id,
             model: selectedModels[agent.id],
             mode,
             round: currentRound,
             verdict,
-            hellraiser: hell,
-            horror,
-            characterMode,
+            hellraiser: turnMode === "hellraiser",
+            horror: turnMode === "horror",
+            characterMode: turnMode,
           };
-          let stream;
-          if (engine.kind === "local") {
+          const runLocal = async () => {
             const res = await fetch("/api/chat", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -272,50 +277,56 @@ export function Room() {
               signal: controller.signal,
             });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Prompt failed.");
-            stream = await localTurn(
-              await res.json(),
-              { agentId: agent.id, round: currentRound },
-              controller.signal,
-            );
-          } else {
-            const provider = providerForTurn(engine, turnIndex);
-            if (!provider) throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
-            const transport = new DefaultChatTransport<RoomMessage>({
-              api: "/api/chat",
-              body: { ...requestBody, engine: provider },
-            });
-            stream = await transport.sendMessages({
+            return localTurn(await res.json(), { agentId: agent.id, round: currentRound }, controller.signal);
+          };
+          const runCloud = (provider: NonNullable<ReturnType<typeof providerForTurn>>) =>
+            new DefaultChatTransport<RoomMessage>({ api: "/api/chat", body: { ...requestBody, engine: provider } }).sendMessages({
               chatId: "pixel-pals-room",
               messageId: undefined,
               messages: transcript,
               trigger: "submit-message",
               abortSignal: controller.signal,
             });
-          }
           let answer: RoomMessage | undefined;
           const answerId = crypto.randomUUID();
-          for await (const partial of readUIMessageStream<RoomMessage>({
-            stream,
-            terminateOnError: true,
-          })) {
-            answer = {
-              ...partial,
-              id: answerId,
-              metadata: {
-                ...partial.metadata,
-                agentId: agent.id,
-                characterMode,
-                round: currentRound,
-                ...(verdict ? { verdict: true } : {}),
-                elapsed: (performance.now() - began) / 1000,
-              },
-            };
-            setMessages([...transcript, answer]);
+          const consume = async (stream: Awaited<ReturnType<typeof runLocal>>) => {
+            for await (const partial of readUIMessageStream<RoomMessage>({ stream, terminateOnError: true })) {
+              answer = {
+                ...partial,
+                id: answerId,
+                metadata: {
+                  ...partial.metadata,
+                  agentId: agent.id,
+                  characterMode: turnMode,
+                  round: currentRound,
+                  ...(verdict ? { verdict: true } : {}),
+                  elapsed: (performance.now() - began) / 1000,
+                },
+              };
+              setMessages([...transcript, answer]);
+            }
+          };
+          const provider = providerForTurn(engine, turnIndex);
+          if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
+            await consume(await runLocal());
+          } else if (!provider) {
+            throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
+          } else if (engine.kind === "auto") {
+            // Auto: free keys are far faster; the in-browser model takes over when a key hits its limit.
+            try {
+              await consume(await runCloud(provider));
+            } catch (err) {
+              if (controller.signal.aborted || !hasWebGPU() || (answer && messageText(answer).trim())) throw err;
+              answer = undefined;
+              await consume(await runLocal());
+            }
+          } else {
+            await consume(await runCloud(provider));
           }
           if (answer && messageText(answer).trim()) {
             transcript = [...transcript, answer];
             setMessages(transcript);
-            if (hell && voiceRef.current && !controller.signal.aborted) {
+            if (turnMode === "hellraiser" && voiceRef.current && !controller.signal.aborted) {
               try {
                 await speakFree(messageText(answer), controller.signal);
               } catch (err) {
@@ -394,6 +405,7 @@ export function Room() {
               <SelectItem value="matrix">Matrix Theme</SelectItem>
               <SelectItem value="finalfantasy">Final Fantasy Theme</SelectItem>
               <SelectItem value="devteam">Dev Team Theme</SelectItem>
+              <SelectItem value="cyberpunk">Cyberpunk Theme</SelectItem>
             </SelectContent>
           </Select>
           <Dialog>
@@ -420,20 +432,20 @@ export function Room() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
+                {characterMode === "cyberpunk" ? "NEON NETRUNNERS" : characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
                   ? "HORROR MODE"
                   : hell
                     ? "THE LAMENT CONFIGURATION IS SOLVED"
                     : "YOUR AI COMMON ROOM"}
               </div>
               <h1>
-                {characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
+                {characterMode === "cyberpunk" ? "Seven netrunners." : characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
-                {characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
+                {characterMode === "cyberpunk" ? "One neon grid" : characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
+                {characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
                   ? "The masks are on. The conversation begins."
                   : hell
                     ? "The Cenobites answer your call. Type “Normal mode” to close the box."
@@ -446,15 +458,15 @@ export function Room() {
               <b>001</b>
             </span>
           </div>
-          {engine.kind === "local" && <WebGpuUsageBox active />}
+          {engine.kind !== "cloud" && <WebGpuUsageBox active />}
           <div className="room-scene">
             <img
-              src={characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
+              src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
               alt={
-                characterMode === "devteam" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
+                characterMode === "cyberpunk" ? "Neon-lit cyberpunk hacker den with holographic terminals" : characterMode === "devteam" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
                   ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box"
                   : "Pixel-art common room with a discussion table, computer stations, and plants"
               }

@@ -137,6 +137,15 @@ const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
     rune: { label: "auditing for vulnerabilities", pixels: [...r(4, 7, 8, 7, "metal"), ...r(5, 3, 1, 4, "metal"), ...r(10, 3, 1, 4, "metal"), ...r(6, 2, 4, 1, "metal"), ...r(7, 9, 2, 3, "dark"), [7, 10, "red", "tp-flicker"]] },
     claude: { label: "reviewing a pull request", pixels: [...r(1, 1, 14, 13, "paper"), ...[3, 6, 9].flatMap((y, i) => [...r(3, y, 9, 1, i === 1 ? "red" : "glow", ["tp-line-a", "tp-line-b", "tp-line-c"][i])]), [12, 11, "glow", "tp-twinkle-a"], [13, 12, "glow", "tp-twinkle-b"]] },
   },
+  cyberpunk: {
+    nova: { label: "jacking into the Net", pixels: [...r(2, 2, 12, 8, "dark"), ...r(3, 3, 10, 6, "screen"), ...[4, 6, 8].flatMap((y, i) => r(4, y, 8 - i * 2, 1, "glow", ["tp-line-a", "tp-line-b", "tp-line-c"][i])), ...r(7, 10, 2, 4, "accent", "tp-flicker"), ...r(5, 13, 6, 1, "accent")] },
+    byte: { label: "cracking code on a cyberdeck", pixels: [...r(1, 6, 14, 6, "dark"), ...r(2, 7, 12, 2, "screen"), ...r(3, 7, 6, 1, "glow", "tp-line-a"), ...r(3, 10, 2, 1, "accent", "tp-tap-a"), ...r(7, 10, 2, 1, "accent", "tp-tap-b"), ...r(11, 10, 2, 1, "accent", "tp-tap-a")] },
+    sage: { label: "breaking through ICE", pixels: [...r(3, 2, 10, 12, "screen"), ...r(5, 4, 6, 8, "dark"), [7, 6, "red", "tp-flicker"], [8, 7, "red", "tp-flicker"], [7, 8, "glow", "tp-twinkle-a"], [9, 9, "glow", "tp-twinkle-b"], [6, 10, "glow", "tp-twinkle-c"]] },
+    pip: { label: "spraying neon holo-graffiti", pixels: [...r(2, 9, 3, 6, "metal"), ...r(2, 8, 3, 1, "accent"), [6, 6, "accent", "tp-twinkle-a"], [8, 4, "glow", "tp-twinkle-b"], [10, 7, "accent", "tp-twinkle-c"], [12, 3, "glow", "tp-twinkle-a"], [13, 6, "accent", "tp-twinkle-b"], [11, 10, "glow", "tp-twinkle-c"]] },
+    echo: { label: "tracing a signal on the scanner", pixels: [...r(2, 2, 12, 12, "dark"), ...r(7, 2, 1, 12, "screen"), ...r(2, 7, 12, 1, "screen"), ...r(7, 4, 4, 1, "glow", "tp-line-a"), [10, 5, "accent", "tp-flicker"], [4, 10, "glow", "tp-twinkle-b"]] },
+    rune: { label: "soldering a chrome implant", pixels: [...r(3, 8, 8, 4, "metal"), ...r(4, 9, 2, 2, "dark"), ...r(8, 9, 2, 2, "dark"), ...r(12, 2, 1, 7, "metal"), [12, 9, "glow", "tp-flicker"], [11, 10, "accent", "tp-twinkle-a"], [13, 11, "accent", "tp-twinkle-b"]] },
+    claude: { label: "simulating every outcome", pixels: [...r(6, 6, 4, 4, "accent", "tp-flicker"), ...r(1, 7, 4, 1, "glow", "tp-line-a"), ...r(11, 7, 4, 1, "glow", "tp-line-b"), ...r(7, 1, 1, 4, "glow", "tp-line-c"), ...r(8, 11, 1, 4, "glow", "tp-line-a"), [2, 2, "screen", "tp-twinkle-a"], [13, 13, "screen", "tp-twinkle-b"], [13, 2, "screen", "tp-twinkle-c"]] },
+  },
   finalfantasy: {
     nova: { label: "polishing a giant sword", pixels: blade() },
     byte: { label: "spinning a gunblade", pixels: gunblade() },

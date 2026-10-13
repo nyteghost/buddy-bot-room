@@ -1370,3 +1370,22 @@ h1 {
 .devteam .scene-pal-4 { left: 27%; top: 76%; }
 .devteam .scene-pal-5 { left: 51%; top: 76%; }
 .devteam .scene-pal-6 { left: 74%; top: 76%; }
+
+/* Cyberpunk theme: neon materials, glowing outlines and neon thinking props. */
+:root {
+  --cast-neon-cyan: oklch(0.85 0.16 200);
+  --cast-neon-magenta: oklch(0.68 0.27 340);
+  --cast-neon-yellow: oklch(0.9 0.18 105);
+}
+.cinematic-sprite .sprite-X { fill: var(--cast-neon-cyan); }
+.cinematic-sprite .sprite-M { fill: var(--cast-neon-magenta); }
+.cinematic-sprite .sprite-O { fill: var(--cast-neon-yellow); }
+.cyberpunk .cinematic-sprite {
+  filter: drop-shadow(0 0 2px var(--cast-neon-magenta)) drop-shadow(0 0 4px var(--cast-neon-cyan));
+  animation: neon-buzz 3.2s steps(1) infinite;
+}
+@keyframes neon-buzz { 0%, 92%, 100% { opacity: 1; } 94% { opacity: .75; } 96% { opacity: .95; } }
+.cyberpunk .tp-glow { fill: var(--cast-neon-cyan); }
+.cyberpunk .tp-accent { fill: var(--cast-neon-magenta); }
+.cyberpunk .tp-screen { fill: oklch(0.3 0.12 300); }
+.cyberpunk .thinking-prop { filter: drop-shadow(0 0 2px var(--cast-neon-cyan)); }
