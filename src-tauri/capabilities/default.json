@@ -4,5 +4,5 @@
   "description": "Main window permissions",
   "windows": ["main"],
   "remote": { "urls": ["https://buddy-bot-room.lovable.app/*", "http://localhost:8080/*"] },
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:event:default"]
 }
