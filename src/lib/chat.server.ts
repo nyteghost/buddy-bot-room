@@ -106,7 +106,7 @@ export async function handleChat(request: Request) {
             : "https://generativelanguage.googleapis.com/v1beta/openai",
       });
       const free = streamText({
-        model: provider(engine.kind === "groq" ? "llama-3.3-70b-versatile" : "gemini-2.5-flash"),
+        model: provider(engine.kind === "groq" ? "openai/gpt-oss-120b" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
         abortSignal: request.signal,
