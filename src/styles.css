@@ -359,6 +359,7 @@ h1 {
 .scene-pal-3 { left: 32%; top: 72%; }
 .scene-pal-4 { left: 50%; top: 74%; }
 .scene-pal-5 { left: 68%; top: 72%; }
+.scene-pal-6 { left: 84%; top: 57%; }
 .scene-pal.is-speaking { z-index: 5; }
 .speech-bubble {
   position: absolute;
