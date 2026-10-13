@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          character_mode: string
+          engine_kind: string
+          gemini_key_ciphertext: string | null
+          groq_key_ciphertext: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          character_mode?: string
+          engine_kind?: string
+          gemini_key_ciphertext?: string | null
+          groq_key_ciphertext?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          character_mode?: string
+          engine_kind?: string
+          gemini_key_ciphertext?: string | null
+          groq_key_ciphertext?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
