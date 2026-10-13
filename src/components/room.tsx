@@ -287,42 +287,41 @@ export function Room() {
               trigger: "submit-message",
               abortSignal: controller.signal,
             });
-          let stream;
+          let answer: RoomMessage | undefined;
+          const answerId = crypto.randomUUID();
+          const consume = async (stream: Awaited<ReturnType<typeof runLocal>>) => {
+            for await (const partial of readUIMessageStream<RoomMessage>({ stream, terminateOnError: true })) {
+              answer = {
+                ...partial,
+                id: answerId,
+                metadata: {
+                  ...partial.metadata,
+                  agentId: agent.id,
+                  characterMode: turnMode,
+                  round: currentRound,
+                  ...(verdict ? { verdict: true } : {}),
+                  elapsed: (performance.now() - began) / 1000,
+                },
+              };
+              setMessages([...transcript, answer]);
+            }
+          };
           const provider = providerForTurn(engine, turnIndex);
           if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
-            stream = await runLocal();
+            await consume(await runLocal());
           } else if (!provider) {
             throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
           } else if (engine.kind === "auto") {
             // Auto: free keys are far faster; the in-browser model takes over when a key hits its limit.
             try {
-              stream = await runCloud(provider);
+              await consume(await runCloud(provider));
             } catch (err) {
-              if (controller.signal.aborted || !hasWebGPU()) throw err;
-              stream = await runLocal();
+              if (controller.signal.aborted || !hasWebGPU() || (answer && messageText(answer).trim())) throw err;
+              answer = undefined;
+              await consume(await runLocal());
             }
           } else {
-            stream = await runCloud(provider);
-          }
-          let answer: RoomMessage | undefined;
-          const answerId = crypto.randomUUID();
-          for await (const partial of readUIMessageStream<RoomMessage>({
-            stream,
-            terminateOnError: true,
-          })) {
-            answer = {
-              ...partial,
-              id: answerId,
-              metadata: {
-                ...partial.metadata,
-                agentId: agent.id,
-                characterMode: turnMode,
-                round: currentRound,
-                ...(verdict ? { verdict: true } : {}),
-                elapsed: (performance.now() - began) / 1000,
-              },
-            };
-            setMessages([...transcript, answer]);
+            await consume(await runCloud(provider));
           }
           if (answer && messageText(answer).trim()) {
             transcript = [...transcript, answer];
