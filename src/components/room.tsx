@@ -77,7 +77,7 @@ import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
 import { hasWebGPU, localTurn, speakFree } from "@/lib/local-llm";
-import { EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
+import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { AccountButton } from "./account-button";
 import { cn } from "@/lib/utils";
 
@@ -458,7 +458,7 @@ export function Room() {
               <b>001</b>
             </span>
           </div>
-          {engine.kind !== "cloud" && <WebGpuUsageBox active />}
+          {engine.kind !== "cloud" && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <div className="room-scene">
             <img
               src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
