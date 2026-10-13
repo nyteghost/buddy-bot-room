@@ -15,6 +15,8 @@ import {
   Square,
   Users,
   X,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -310,7 +312,21 @@ export function Room() {
                 <span className={cn("status-dot", running && "pulse-dot")} />
                 {running ? "CONVERSATION IN PROGRESS" : "WAITING FOR A GOOD IDEA"}
               </span>
-              <span>{enabled.length} PALS IN ROOM</span>
+              <span className="flex items-center gap-2">
+                {hell && (
+                  <button
+                    type="button"
+                    className="voice-toggle"
+                    onClick={toggleVoice}
+                    aria-pressed={voiceOn}
+                    aria-label={voiceOn ? "Mute Cenobite voices" : "Unmute Cenobite voices"}
+                  >
+                    {voiceOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                    {voiceOn ? "VOICES ON" : "VOICES OFF"}
+                  </button>
+                )}
+                {enabled.length} PALS IN ROOM
+              </span>
             </div>
             {agents.map((a, i) => (
               <div
