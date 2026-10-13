@@ -208,9 +208,15 @@ export function Room() {
     setTopic("");
     inputRef.current?.focus();
     try {
-      for (let currentRound = 1; currentRound <= rounds; currentRound++) {
-        setRound(currentRound);
-        for (const agent of agents.filter((a) => enabled.includes(a.id))) {
+      const seated = agents.filter((a) => enabled.includes(a.id));
+      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean }[] = [];
+      for (let r = 1; r <= rounds; r++)
+        for (const agent of seated) turns.push({ agent, round: r, verdict: false });
+      if (mode === "roundtable" && seated.length > 1)
+        turns.push({ agent: seated[0]!, round: rounds, verdict: true });
+      {
+        for (const { agent, round: currentRound, verdict } of turns) {
+          setRound(currentRound);
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
           const began = performance.now();
@@ -221,6 +227,7 @@ export function Room() {
               model: selectedModels[agent.id],
               mode,
               round: currentRound,
+              verdict,
               hellraiser: hell,
               horror,
             },
@@ -246,6 +253,7 @@ export function Room() {
                 agentId: agent.id,
                 characterMode,
                 round: currentRound,
+                ...(verdict ? { verdict: true } : {}),
                 elapsed: (performance.now() - began) / 1000,
               },
             };
@@ -299,6 +307,10 @@ export function Room() {
     URL.revokeObjectURL(url);
   }
   const activeAgent = agents.find((a) => a.id === speaking);
+  const lastMessage = messages[messages.length - 1];
+  const liveText =
+    running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
+  const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -407,8 +419,14 @@ export function Room() {
                   `scene-pal-${i}`,
                   !enabled.includes(a.id) && "pal-away",
                   speaking === a.id && "is-speaking",
+                  running && speaking && speaking !== a.id && enabled.includes(a.id) && "is-listening",
                 )}
               >
+                {speaking === a.id && (
+                  <div className={`speech-bubble agent-${a.id}`} aria-hidden="true">
+                    {bubbleText || "···"}
+                  </div>
+                )}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror)}
@@ -706,7 +724,11 @@ export function Room() {
                     ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror")
                     : "You";
                   return (
-                    <Message key={m.id} from={m.role} className="room-message">
+                    <Message
+                      key={m.id}
+                      from={m.role}
+                      className={cn("room-message", m.metadata?.verdict && "verdict-message")}
+                    >
                       {a && (
                         <div className={`message-avatar agent-${a.id}`}>
                           <PixelCharacter id={a.id} mode={messageMode} />
@@ -735,7 +757,13 @@ export function Room() {
                               {replayId === m.id ? <Square size={13} /> : <Volume2 size={14} />}
                             </MessageAction>
                           )}
-                          <span>{a ? `ROUND ${m.metadata?.round ?? 1}` : "THE TOPIC"}</span>
+                          <span>
+                            {!a
+                              ? "THE TOPIC"
+                              : m.metadata?.verdict
+                                ? "THE VERDICT"
+                                : `ROUND ${m.metadata?.round ?? 1}`}
+                          </span>
                           {m.metadata?.elapsed && (
                             <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
                           )}

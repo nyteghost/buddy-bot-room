@@ -138,6 +138,7 @@ export type Mode = "roundtable" | "broadcast";
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
+  verdict?: boolean;
   elapsed?: number;
   characterMode?: CharacterMode;
 }>;
