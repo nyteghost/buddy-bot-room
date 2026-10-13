@@ -9,6 +9,6 @@
 - [x] Add per-reply character voice playback and verify playback/cancellation.- [x] Claude pal (Jigsaw in Horror)
 - [x] One-on-one chat with a selected pal
 - [x] Problem-solving discussion mode
-- [ ] Free engines: Groq/Gemini key + in-browser WebGPU option
-- [ ] Rounds setting controls debate rounds (hide in one-on-one)
-- [ ] Walk a full Problem solving discussion end to end
+- [x] Free engines: Groq/Gemini key + in-browser WebGPU option
+- [x] Rounds setting controls debate rounds (hide in one-on-one)
+- [x] Walk a full Problem solving discussion end to end
