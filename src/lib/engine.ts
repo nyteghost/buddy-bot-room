@@ -44,7 +44,7 @@ export function engineKey(s: EngineSettings) {
 }
 
 export const freeModels = {
-  groq: "llama-3.3-70b-versatile",
+  groq: "openai/gpt-oss-120b",
   gemini: "gemini-2.5-flash",
   local: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
 } as const;

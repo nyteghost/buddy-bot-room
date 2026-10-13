@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "lovable", label: "Lovable AI", note: "Each pal's own model. Uses workspace AI credits." },
-  { kind: "groq", label: "Groq (free key)", note: "Llama 3.3 70B on your free Groq key. No credits." },
+  { kind: "groq", label: "Groq (free key)", note: "GPT-OSS 120B on your free Groq key. No credits." },
   { kind: "gemini", label: "Gemini (free key)", note: "Gemini 2.5 Flash on your free Google key. No credits." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private, ~1 GB first download." },
 ];
