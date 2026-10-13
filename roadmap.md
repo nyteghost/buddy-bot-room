@@ -6,4 +6,6 @@
 - [x] Add Horror Mode commands, horror-icon sprites and personalities, preserving Hellraiser Mode.
 - [x] Verify command transitions and a real horror discussion.
 - [x] Redraw all character modes with detailed native 32×32 sprites.
-- [x] Add per-reply character voice playback and verify playback/cancellation.
+- [x] Add per-reply character voice playback and verify playback/cancellation.- [x] Claude pal (Jigsaw in Horror)
+- [x] One-on-one chat with a selected pal
+- [x] Problem-solving discussion mode

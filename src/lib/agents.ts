@@ -8,6 +8,7 @@ export const models = [
   { id: "google/gemini-3.1-flash-lite", label: "Gemini Flash Lite" },
   { id: "openai/gpt-5.6-terra", label: "GPT-5.6 Terra" },
   { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
+  { id: "anthropic/claude-sonnet-5", label: "Claude Sonnet 5" },
 ];
 export const agents = [
   {
@@ -58,6 +59,14 @@ export const agents = [
     model: "google/gemini-3-flash-preview",
     color: "rune",
   },
+  {
+    id: "claude",
+    name: "Claude",
+    role: "The synthesizer",
+    tone: "Thoughtful, articulate and warm. Weigh nuance, connect everyone's points and find the balanced insight others missed.",
+    model: "anthropic/claude-sonnet-5",
+    color: "claude",
+  },
 ] as const;
 export type AgentId = (typeof agents)[number]["id"];
 export const cenobites: Record<AgentId, { name: string; role: string; tone: string }> = {
@@ -91,6 +100,11 @@ export const cenobites: Record<AgentId, { name: string; role: string; tone: stri
     role: "Architect of the Labyrinth",
     tone: "Speak as the Engineer, a Cenobite: mechanical, cryptic and grand. Describe the topic as gears, chains and impossible geometry within the Labyrinth.",
   },
+  claude: {
+    name: "The Artificer",
+    role: "Designer of the puzzle box",
+    tone: "Speak as the Artificer, a Cenobite: precise, eloquent and obsessed with intricate design. Describe the topic as hidden mechanisms, locked chambers and elegant, terrible geometry.",
+  },
 };
 export const horrorIcons: Record<AgentId, { name: string; role: string; tone: string }> = {
   nova: {
@@ -123,6 +137,11 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
     role: "The foul-mouthed Good Guy doll",
     tone: "Roleplay Chucky: cocky, sarcastic and impatient, a toy with a big attitude. Keep language PG-13 (no swearing), mock the other icons playfully and make sharp points about the topic.",
   },
+  claude: {
+    name: "Jigsaw",
+    role: "The puzzle-master who tests resolve",
+    tone: "Roleplay Jigsaw (John Kramer): calm, cold, philosophical and moralizing. Open lines like \"I want to play a game\" sparingly, frame the topic as a test of choices and appreciating life, and speak in grim puzzle metaphors. Keep it PG-13: no gore or real threats.",
+  },
 };
 export function agentPersona(id: AgentId, hell: boolean, horror = false) {
   if (horror) return horrorIcons[id];
@@ -134,7 +153,7 @@ export function agentName(id: AgentId | undefined, hell: boolean, horror = false
   if (!a) return "Agent";
   return agentPersona(a.id, hell, horror).name;
 }
-export type Mode = "roundtable" | "broadcast";
+export type Mode = "roundtable" | "broadcast" | "direct" | "solve";
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
@@ -144,6 +163,10 @@ export type RoomMessage = UIMessage<{
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;
+}
+/** One-on-one: only the human and the chosen pal's own replies. */
+export function contextForPartner(messages: RoomMessage[], partner: AgentId): RoomMessage[] {
+  return messages.filter((m) => m.role === "user" || m.metadata?.agentId === partner);
 }
 export function messageText(message: UIMessage): string {
   return message.parts

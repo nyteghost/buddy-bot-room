@@ -6,6 +6,7 @@ import {
   CircleHelp,
   Download,
   MessageSquare,
+  Wrench,
   Minus,
   Play,
   Plus,
@@ -96,7 +97,10 @@ export function Room() {
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
+  const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
+  const direct = mode === "direct";
+  const tooFew = !direct && enabled.length < 2;
   const [selectedModels, setSelectedModels] = useState<Record<AgentId, string>>({
     nova: agents[0].model,
     byte: agents[1].model,
@@ -104,6 +108,7 @@ export function Room() {
     pip: agents[3].model,
     echo: agents[4].model,
     rune: agents[5].model,
+    claude: agents[6].model,
   });
   const [running, setRunning] = useState(false);
   const [speaking, setSpeaking] = useState<AgentId | null>(null);
@@ -193,7 +198,7 @@ export function Room() {
       inputRef.current?.focus();
       return;
     }
-    if (runLock.current || !topic.trim() || enabled.length < 2 || !ready) return;
+    if (runLock.current || !topic.trim() || tooFew || !ready) return;
     runLock.current = true;
     setRunning(true);
     setError("");
@@ -208,11 +213,13 @@ export function Room() {
     setTopic("");
     inputRef.current?.focus();
     try {
-      const seated = agents.filter((a) => enabled.includes(a.id));
+      const seated = direct
+        ? agents.filter((a) => a.id === partner)
+        : agents.filter((a) => enabled.includes(a.id));
       const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean }[] = [];
-      for (let r = 1; r <= rounds; r++)
+      for (let r = 1; r <= (direct ? 1 : rounds); r++)
         for (const agent of seated) turns.push({ agent, round: r, verdict: false });
-      if (mode === "roundtable" && seated.length > 1)
+      if ((mode === "roundtable" || mode === "solve") && seated.length > 1)
         turns.push({ agent: seated[0]!, round: rounds, verdict: true });
       {
         for (const { agent, round: currentRound, verdict } of turns) {
@@ -436,7 +443,7 @@ export function Room() {
             ))}
             <div className="scene-bottom">
               <span>
-                <Users size={13} /> {mode === "roundtable" ? "Roundtable" : "Broadcast"}
+                <Users size={13} /> {mode === "roundtable" ? "Roundtable" : direct ? "One-on-one" : mode === "solve" ? "Problem solving" : "Broadcast"}
               </span>
               <span>
                 {running ? `Round ${round} of ${rounds}` : "Ready when you are"}
@@ -446,7 +453,7 @@ export function Room() {
           </div>
           <div className="section-heading">
             <h2>
-              The pals <span>{enabled.length}/4</span>
+              The pals <span>{enabled.length}/{agents.length}</span>
             </h2>
             <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
               <Settings2 size={14} />
@@ -538,7 +545,7 @@ export function Room() {
                   disabled={
                     !running &&
                     (!topic.trim() ||
-                      (!characterModeCommand(topic) && enabled.length < 2) ||
+                      (!characterModeCommand(topic) && tooFew) ||
                       !ready)
                   }
                 />
@@ -586,8 +593,46 @@ export function Room() {
                   <Radio />
                   Broadcast
                 </Button>
+                <Button
+                  variant="ghost"
+                  disabled={running}
+                  aria-pressed={direct}
+                  className={cn(direct && "mode-active")}
+                  onClick={() => setMode("direct")}
+                >
+                  <MessageSquare />
+                  One-on-one
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={running}
+                  aria-pressed={mode === "solve"}
+                  className={cn(mode === "solve" && "mode-active")}
+                  onClick={() => setMode("solve")}
+                >
+                  <Wrench />
+                  Problem solving
+                </Button>
               </div>
             </div>
+            {direct && (
+              <div>
+                <span className="control-label">TALK WITH</span>
+                <select
+                  className="partner-select"
+                  aria-label="Pal to talk with"
+                  value={partner}
+                  disabled={running}
+                  onChange={(e) => setPartner(e.target.value as AgentId)}
+                >
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {agentName(a.id, hell, horror)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <span className="control-label">ROUNDS</span>
               <div className="round-stepper">
@@ -617,14 +662,14 @@ export function Room() {
               onClick={running ? stop : start}
               disabled={
                 !running &&
-                (!topic.trim() || (!characterModeCommand(topic) && enabled.length < 2) || !ready)
+                (!topic.trim() || (!characterModeCommand(topic) && tooFew) || !ready)
               }
             >
               {running ? <Square /> : <Play fill="currentColor" />}
-              {running ? "Stop discussion" : "Start discussion"}
+              {running ? "Stop" : direct ? "Send" : "Start discussion"}
             </Button>
           </div>
-          {enabled.length < 2 && (
+          {tooFew && (
             <p className="validation-note">Invite at least two pals to start a discussion.</p>
           )}
         </section>
@@ -689,7 +734,7 @@ export function Room() {
               : messages.length
                 ? "The floor is yours"
                 : "The room is open"}
-            <span>{mode === "roundtable" ? "ROUND TABLE" : "BROADCAST"}</span>
+            <span>{mode === "roundtable" ? "ROUND TABLE" : direct ? "ONE-ON-ONE" : mode === "solve" ? "PROBLEM SOLVING" : "BROADCAST"}</span>
           </div>
           <Conversation className="chat-log">
             <ConversationContent
