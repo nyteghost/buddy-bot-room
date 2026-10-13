@@ -97,9 +97,9 @@ export function Room() {
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
   const [partner, setPartner] = useState<AgentId>("claude");
+  const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
   const direct = mode === "direct";
   const tooFew = !direct && enabled.length < 2;
-  const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
   const [selectedModels, setSelectedModels] = useState<Record<AgentId, string>>({
     nova: agents[0].model,
     byte: agents[1].model,

@@ -89,6 +89,7 @@ export async function handleChat(request: Request) {
         headers: { "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
         fetch: runIdFetch.fetch,
       });
+      gateway = runIdFetch as unknown as typeof gateway;
       result = streamText({
         model: anthropic(body.model),
         system: instructions,
