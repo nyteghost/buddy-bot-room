@@ -485,7 +485,7 @@ export function Room() {
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {characterMode === "assistant" ? "Mail, tasks, calendar, notes, files and system — all in one chat." : characterMode === "linux" ? "Mail, tasks, calendar, notes, files, system — and Tux in your terminal." : characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
+                {characterMode === "assistant" ? "Mail, tasks, calendar, notes, Q&A and system — all in one chat." : characterMode === "linux" ? "Mail, tasks, calendar, notes, Q&A, system — and Tux in your terminal." : characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
                   ? "The masks are on. The conversation begins."
                   : hell
                     ? "The Cenobites answer your call. Type “Normal mode” to close the box."
