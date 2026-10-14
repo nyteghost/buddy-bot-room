@@ -52,7 +52,8 @@ export async function handleTranscribe(request: Request) {
           for (const line of lines) {
             if (!line.startsWith("data:")) continue;
             const data = line.slice(5).trim();
-            if (!data || data === "[DONE]") continue;
+            if (data === "[DONE]") { reader.cancel().catch(() => {}); return controller.close(); }
+            if (!data) continue;
             try {
               const delta = JSON.parse(data).choices?.[0]?.delta?.content;
               if (delta) controller.enqueue(enc.encode(delta));
