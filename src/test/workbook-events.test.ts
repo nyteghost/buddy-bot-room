@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { Blob as NodeBlob, File as NodeFile } from "node:buffer";
 import ExcelJS from "exceljs";
 import { eventsWorkbook } from "@/lib/work-files";
 import { BALLROOM_ROWS, summarizeEvents, type EventCode, type EventEntry } from "@/lib/work-tools";
+
+Object.defineProperty(globalThis, "Blob", { value: NodeBlob, configurable: true });
+Object.defineProperty(globalThis, "File", { value: NodeFile, configurable: true });
 
 const event = (space: string, code: EventCode = "S", title = "Shared show", date = "2026-10-12"): EventEntry => ({ date, space, code, start: 480, end: 1020, title });
 async function build(entries: EventEntry[], existing?: File) {
@@ -20,6 +24,22 @@ async function build(entries: EventEntry[], existing?: File) {
 }
 
 describe("Excel shared event rules", () => {
+  it.each([
+    { name: "show plus move out is orange", codes: ["S", "MO"], color: "FFF4B084" },
+    { name: "move in plus show is teal", codes: ["MI", "S"], color: "FF4DB6AC" },
+    { name: "exhibitor move in plus show is teal", codes: ["Exmi", "S"], color: "FF4DB6AC" },
+    { name: "all three activities are blue", codes: ["MI", "S", "MO"], color: "FF5B9BD5" },
+    { name: "exhibitor move in with show and move out is blue", codes: ["Exmi", "S", "MO"], color: "FF5B9BD5" },
+  ] as { name: string; codes: EventCode[]; color: string }[])("$name", async ({ codes, color }) => {
+    const entries = codes.flatMap((code) => [event("BallRoom A", code), event("BallRoom B", code)]);
+    const original = await build(entries);
+    const buffer = await original.wb.xlsx.writeBuffer();
+    const template = await build(entries, new File([buffer], "schedule.xlsx"));
+    for (const result of [original, template]) {
+      expect(result.room("BallRoom A").fill).toEqual({ type: "pattern", pattern: "solid", fgColor: { argb: color } });
+      expect(result.room("BallRoom B").master.address).toBe(result.room("BallRoom A").address);
+    }
+  });
   it("merges Ballroom A and B into one event without including E", async () => {
     const { room } = await build([event("BallRoom A"), event("BallRoom B")]);
     expect(room("BallRoom B").master.address).toBe(room("BallRoom A").address);
