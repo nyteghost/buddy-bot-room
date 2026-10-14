@@ -134,6 +134,13 @@ export function EngineSettingsDialog() {
               href="https://openrouter.ai/keys"
               placeholder="sk-or-..."
             />
+            <KeyField
+              label="NVIDIA NIM (Llama 3.1 70B)"
+              value={engine.nvidiaKey}
+              onChange={(nvidiaKey) => setEngine({ nvidiaKey })}
+              href="https://build.nvidia.com/settings/api-keys"
+              placeholder="nvapi-..."
+            />
             <p className="text-sm text-muted-foreground">
               Keys are saved only in this browser (and encrypted in your account if signed in).
             </p>
