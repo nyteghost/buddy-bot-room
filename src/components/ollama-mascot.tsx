@@ -109,8 +109,8 @@ function OllamaLauncher() {
 export function OllamaMascot({ active = false }: { active?: boolean }) {
   const engine = useEngine();
   const status = useOllamaStatus(engine.ollamaUrl);
-  if (!status.online) return engine.kind === "ollama" ? <OllamaLauncher /> : null;
-  const using = engine.kind === "ollama";
+  if (!status.online) return engine.kind === "ollama" || engine.kind === "auto-ollama" ? <OllamaLauncher /> : null;
+  const using = engine.kind === "ollama" || engine.kind === "auto-ollama";
   const hasModel = status.models.some((m) => m === engine.ollamaModel || m.startsWith(`${engine.ollamaModel}:`));
   return (
     <div className={cn("ollama-mascot", active && "ollama-busy")} role="status">

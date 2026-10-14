@@ -314,7 +314,28 @@ export function Room() {
             }
           };
           const provider = providerForTurn(engine, turnIndex);
-          if (engine.kind === "ollama") {
+          const runOllama = async () =>
+            consume(
+              await ollamaTurn(
+                await fetchPrompt(),
+                { url: engine.ollamaUrl, model: engine.ollamaModel },
+                { agentId: agent.id, round: currentRound },
+                controller.signal,
+              ),
+            );
+          if (engine.kind === "auto-ollama") {
+            // Free keys first; local Ollama takes over when no key is set or a key fails before any text.
+            if (!provider) await runOllama();
+            else {
+              try {
+                await consume(await runCloud(provider));
+              } catch (err) {
+                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
+                answer = undefined;
+                await runOllama();
+              }
+            }
+          } else if (engine.kind === "ollama") {
             await consume(
               await ollamaTurn(
                 await fetchPrompt(),
@@ -470,7 +491,7 @@ export function Room() {
             </span>
           </div>
           {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
-          <OllamaMascot active={running && engine.kind === "ollama"} />
+          <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
           <p className="build-version" title={`Commit ${__APP_COMMIT__} · built ${__APP_BUILD_DATE__}`}>
             {desktopApp ? "Desktop" : "Web"} v{__APP_VERSION__} · {__APP_COMMIT__}

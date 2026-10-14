@@ -28,6 +28,7 @@ const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "auto", label: "Auto (fastest)", note: "Free keys answer first (about 40× faster); the in-browser model takes over if a key hits its limit." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once, then loads from cache." },
   { kind: "ollama", label: "Local server / Ollama", note: "Uses Ollama or llama.cpp on your computer for full native GPU speed." },
+  { kind: "auto-ollama", label: "Auto (keys + Ollama)", note: "Free keys answer first; your local Ollama server takes over if a key hits its limit or none are set." },
 ];
 
 export function EngineSettingsDialog() {
@@ -40,7 +41,9 @@ export function EngineSettingsDialog() {
       ? "In-browser"
       : engine.kind === "auto"
         ? `Auto (${count} + GPU)`
-        : engine.kind === "ollama"
+        : engine.kind === "auto-ollama"
+          ? `Auto (${count} + Ollama)`
+          : engine.kind === "ollama"
           ? `Ollama (${engine.ollamaModel})`
           : `Free keys (${count})`;
   async function prepareLocal() {
@@ -84,7 +87,7 @@ export function EngineSettingsDialog() {
             </button>
           ))}
         </div>
-        {engine.kind === "ollama" && (
+        {(engine.kind === "ollama" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3 text-sm">
             <label className="grid gap-1">
               <span className="font-medium">Server URL</span>
@@ -108,7 +111,7 @@ export function EngineSettingsDialog() {
             </p>
           </div>
         )}
-        {(engine.kind === "cloud" || engine.kind === "auto") && (
+        {(engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3">
             <KeyField
               label="Groq (GPT-OSS 120B)"
