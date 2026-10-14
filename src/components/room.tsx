@@ -339,7 +339,6 @@ export function Room() {
           if (answer && messageText(answer).trim()) {
             transcript = [...transcript, answer];
             setMessages(transcript);
-            }
           } else if (!controller.signal.aborted)
             throw new Error("This agent returned no answer. The discussion has stopped.");
         }
