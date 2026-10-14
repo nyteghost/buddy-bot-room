@@ -132,17 +132,23 @@ function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s:
   const push = useServerFn(pushShiftsToCalendar);
   const status = useServerFn(calendarStatus);
   const [busy, setBusy] = useState(false);
+  // null = unknown yet; false = must open the Google popup on the next click.
+  const [ready, setReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!session) return;
+    status().then((r) => setReady(r.connected)).catch(() => setReady(false));
+  }, [session, status]);
   if (!session) return null;
 
-  async function connect(): Promise<boolean> {
-    const popup = window.open("", "lovable-oauth", "width=600,height=720");
-    if (!popup) { onStatus("Popup blocked — allow popups and try again."); return false; }
+  // The popup must open synchronously inside the click, before any await, or browsers block it.
+  async function connect(popup: Window): Promise<boolean> {
     try {
       const { authorizationUrl } = await start();
       const completion = waitForOAuthCompletion(popup);
       popup.location.href = authorizationUrl;
       const code = await completion;
       if (code) await complete({ data: { code } });
+      setReady(true);
       return true;
     } catch (e) {
       popup.close();
@@ -152,15 +158,16 @@ function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s:
   }
 
   async function run() {
+    const popup = ready ? null : window.open("", "lovable-oauth", "width=600,height=720");
+    if (!ready && !popup) { onStatus("Popup blocked — allow popups for this site and try again."); return; }
     setBusy(true);
-    onStatus("");
+    onStatus(popup ? "Approve Google Calendar access in the popup…" : "");
     try {
-      let { connected } = await status();
-      if (!connected) connected = await connect();
-      if (!connected) return;
+      if (popup && !(await connect(popup))) return;
       const r = await push({ data: { shifts } });
       if (!r.connected) {
-        onStatus(r.reconnectRequired ? "Your Google Calendar access needs to be renewed — click again to reconnect." : "Google Calendar is not connected yet — click again to connect.");
+        setReady(false);
+        onStatus(r.reconnectRequired ? "Your Google Calendar access needs to be renewed — click the button again to reconnect." : "Google Calendar is not connected yet — click the button again to connect.");
         return;
       }
       onStatus(`Added ${r.added} shift${r.added === 1 ? "" : "s"} to your Google Calendar${r.skipped ? ` (${r.skipped} skipped)` : ""}.`);
