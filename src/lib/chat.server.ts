@@ -58,8 +58,10 @@ export async function handleChat(request: Request) {
     const history: ModelMessage[] = await convertToModelMessages(merged);
     const hell = body.hellraiser === true;
     const horror = body.horror === true;
-    const persona = agentPersona(agent.id, hell, horror, characterMode);
-    const setting = characterMode === "linux" || characterMode === "assistant" ? "Linux Mode, where each participant is a practical personal assistant for the human's Arch/CachyOS computer. Be concrete and helpful; only suggest shell commands inside ```bash blocks, and never claim you ran anything yourself"
+    const assistant = body.assistant === true || (body.assistant === undefined && (characterMode === "linux" || characterMode === "assistant"));
+    const persona = agentPersona(agent.id, hell, horror, characterMode, assistant);
+    const themeSetting = characterMode === "dcc" ? "a fictional Dungeon Crawler Carl safe room on the dungeon floor, with the System AI broadcasting to the galaxy. Stay in character with crawler banter, loot boxes, achievements and sponsors, but give genuinely useful real-world ideas; keep violence cartoonish and PG-13"
+      : characterMode === "linux" ? "Linux Mode, where each participant is a practical personal assistant for the human's Arch/CachyOS computer. Be concrete and helpful; only suggest shell commands inside ```bash blocks, and never claim you ran anything yourself"
       : characterMode === "matrix" ? "a fictional Matrix crew meeting. Stay in character while giving useful real-world discussion; simulated realities are fictional, not claims about the human's reality"
       : characterMode === "cyberpunk" ? "a fictional cyberpunk netrunner crew meeting in a neon-lit hacker den. Stay in character with street-slang flavor (choom, ice, the Net, chrome), but give genuinely useful real-world ideas; keep hacking fictional and never give real intrusion instructions"
       : characterMode === "devteam" ? "a software development team's working session, everyone at their own computer. Speak like experienced engineers: concrete, technical where useful, with short code or command snippets only when they truly help"
@@ -67,6 +69,9 @@ export async function handleChat(request: Request) {
       : horror
       ? "a fictional gathering of horror icons. Stay in character, with spooky PG-13 suspense: no graphic gore, real-world threats, encouragement of violence or self-harm. Jason and Michael are mute; convey their contributions through fictional actions and atmospheric narration, never spoken dialogue"
       : hell ? "a gathering of Cenobites summoned by the Lament Configuration, in the style of Clive Barker's Hellraiser. Stay fully in character, gothic and ominous, but keep it PG-13: no graphic gore, and never encourage real self-harm" : "Pixel Pals Chat";
+    const setting = assistant
+      ? `Assistant Mode, where each participant is a practical personal assistant for the human's Arch/CachyOS computer, styled after ${themeSetting}. Be concrete and helpful; only suggest shell commands inside \`\`\`bash blocks, and never claim you ran anything yourself`
+      : themeSetting;
     const roundtableRule =
       "You can see the other participants. Talk directly to them by name: react to what the most recent speaker just said (agree, push back, or build on it), and when useful quote a short phrase from someone. Avoid repeating points already made and move the discussion forward.";
     const solveRule =
