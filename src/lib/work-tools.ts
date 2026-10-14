@@ -61,7 +61,7 @@ export function classifyEvent(row: EventRow): EventCode | null {
   return null;
 }
 
-/** Merges rows into one entry per date + space + code (earliest start, latest end). */
+/** Merges rows per date + space + show + code (earliest start, latest end). */
 export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   const map = new Map<string, EventEntry>();
   for (const row of rows) {
@@ -69,7 +69,7 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
     if (!code) continue;
     const start = parseReportTime(row.start), end = parseReportTime(row.end);
     for (const space of expandSpace(row.space || "Unassigned")) {
-      const key = `${row.date}|${space}|${code}`;
+      const key = JSON.stringify([row.date, space, row.event || row.description, code]);
       const prev = map.get(key);
       if (prev) { prev.start = Math.min(prev.start, start); prev.end = Math.max(prev.end, end); }
       else map.set(key, { date: row.date, space, code, start, end, title: row.event || row.description });
@@ -245,7 +245,7 @@ const addDays = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:0
 
 export type WeekLayout = {
   monday: string; dates: string[]; cgc: string[]; escalator: string[]; serviceDesk: string[];
-  rows: Record<string, { text: string; codes: EventCode[] }[]>; other: string[];
+  rows: Record<string, { text: string; codes: EventCode[]; signature: string }[]>; other: string[];
 };
 
 /** Groups entries into Monday–Sunday weeks shaped like the CGC engineering schedule. */
@@ -261,9 +261,11 @@ export function weekLayouts(entries: EventEntry[]): WeekLayout[] {
     for (const label of [...HALL_ROWS, ...BALLROOM_ROWS, ...other]) {
       rows[label] = dates.map((d) => {
         const list = week.filter((e) => e.date === d && e.space === label).sort((a, b) => a.start - b.start);
-        if (!list.length) return { text: "", codes: [] };
-        const title = list.find((e) => e.code === "S")?.title ?? list[0]!.title;
-        return { text: [title, ...list.map(entryLabel)].filter(Boolean).join("\n"), codes: [...new Set(list.map((e) => e.code))] };
+        if (!list.length) return { text: "", codes: [], signature: "" };
+        const titles = [...new Set(list.map((e) => e.title))];
+        const text = titles.flatMap((title) => [title, ...list.filter((e) => e.title === title).map(entryLabel)]).filter(Boolean).join("\n");
+        const signature = JSON.stringify(list.map((e) => [e.title, e.code, e.start, e.end]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+        return { text, codes: [...new Set(list.map((e) => e.code))], signature };
       });
     }
     const cgc = dates.map((d) => {
