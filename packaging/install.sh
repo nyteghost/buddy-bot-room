@@ -51,5 +51,8 @@ install -Dm755 packaging/pixelpals.desktop "$desk/pixelpals.desktop"
 gio set "$desk/pixelpals.desktop" metadata::trusted true 2>/dev/null || true
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
-echo "==> Done. Launch 'Pixel Pals' from your app menu or desktop, or run: pixelpals"
+ver="1.0.$(git rev-list --count HEAD 2>/dev/null || echo 0)"
+commit="$(git rev-parse --short HEAD 2>/dev/null || echo local)"
+echo "==> Done. Installed Pixel Pals v${ver} (${commit})."
+echo "    Launch 'Pixel Pals' from your app menu or desktop, or run: pixelpals"
 echo "    To pin it: open your app menu, right-click Pixel Pals, Add to Favorites."
