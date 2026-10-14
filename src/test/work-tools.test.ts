@@ -56,3 +56,21 @@ describe("For Scheduling rules", () => {
     expect(escalatorLabel(h)).toBe("7:30a-8p");
   });
 });
+
+describe("weekly engineering layout", () => {
+  it("splits entries into Monday–Sunday weeks with escalator and service desk", async () => {
+    const { weekLayouts, mondayOf } = await import("@/lib/work-tools");
+    expect(mondayOf("2026-10-11")).toBe("2026-10-05");
+    const w = weekLayouts([
+      { date: "2026-10-09", space: "Hall A", code: "MI", start: 360, end: 1020, title: "Cobb Trade Show" },
+      { date: "2026-10-11", space: "Hall A", code: "S", start: 480, end: 1140, title: "Cobb Trade Show" },
+      { date: "2026-10-10", space: "Hall B", code: "Exmi", start: 540, end: 1260, title: "Cobb Trade Show" },
+      { date: "2026-10-12", space: "Hall A", code: "MO", start: 480, end: 900, title: "Cobb Trade Show" },
+    ]);
+    expect(w.map((x) => x.monday)).toEqual(["2026-10-05", "2026-10-12"]);
+    expect(w[0]!.escalator[6]).toBe("7a-8p");
+    expect(w[0]!.serviceDesk[5]).toBe("9a-9p");
+    expect(w[0]!.rows["Hall A"]![4]!.text).toBe("Cobb Trade Show\nMI 6a-5p");
+    expect(w[0]!.cgc[0]).toBe("DARK");
+  });
+});
