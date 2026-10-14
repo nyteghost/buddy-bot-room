@@ -34,4 +34,4 @@
 - [x] Slide-out chat history side panel
 - [x] Work tools: Ungerboeck PDF → S/Exmi/MI/MO Excel, my shifts → Google Calendar/.ics, @deck staging, @price vendor search
 
-- [ ] Google Calendar auto-upload: per-user App User Connector (google_calendar), "Add all to Google Calendar" button in ShiftsTab
+- [x] Google Calendar auto-upload: per-user App User Connector (google_calendar), "Add all to Google Calendar" button in ShiftsTab
