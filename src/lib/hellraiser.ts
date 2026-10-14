@@ -2,26 +2,38 @@ import { useSyncExternalStore } from "react";
 
 const key = "pixel-pals-hellraiser-v1";
 const characterKey = "pixel-pals-character-mode-v1";
-export const characterModes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "linux", "assistant"] as const;
+const assistantKey = "pixel-pals-assistant-mode-v1";
+// "assistant" is kept only so old saved discussions/settings still load; it maps to Linux theme + Assistant on.
+export const characterModes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux", "assistant"] as const;
 export type CharacterMode = (typeof characterModes)[number];
 export function isCharacterMode(value: unknown): value is CharacterMode {
   return characterModes.some(mode => mode === value);
 }
 const listeners = new Set<() => void>();
 let currentMode: CharacterMode = "normal";
+let assistantOn = false;
 if (typeof window !== "undefined") {
   try {
     const saved = localStorage.getItem(characterKey);
     currentMode = isCharacterMode(saved)
       ? saved
       : localStorage.getItem(key) === "1" ? "hellraiser" : "normal";
+    const savedAssistant = localStorage.getItem(assistantKey);
+    // Legacy: Linux/Assistant used to be the only assistant themes.
+    assistantOn = savedAssistant === null ? isAssistantFamily(currentMode) : savedAssistant === "1";
+    if (currentMode === "assistant") currentMode = "linux";
   } catch { /* storage unavailable */ }
 }
+const emit = () => listeners.forEach((l) => l());
 
 export function setHellraiser(value: boolean) {
   setCharacterMode(value ? "hellraiser" : "normal");
 }
 export function setCharacterMode(value: CharacterMode) {
+  if (value === "assistant") {
+    value = "linux";
+    setAssistantMode(true);
+  }
   currentMode = value;
   try {
     localStorage.setItem(characterKey, value);
@@ -29,7 +41,23 @@ export function setCharacterMode(value: CharacterMode) {
   } catch {
     /* storage unavailable */
   }
-  listeners.forEach((l) => l());
+  emit();
+}
+export function setAssistantMode(value: boolean) {
+  assistantOn = value;
+  try {
+    localStorage.setItem(assistantKey, value ? "1" : "0");
+  } catch {
+    /* storage unavailable */
+  }
+  emit();
+}
+export function useAssistantMode() {
+  return useSyncExternalStore(
+    (l) => (listeners.add(l), () => listeners.delete(l)),
+    () => assistantOn,
+    () => false,
+  );
 }
 export function useHellraiser() {
   return useCharacterMode() === "hellraiser";
@@ -41,15 +69,22 @@ export function useCharacterMode() {
     () => "normal" as CharacterMode,
   );
 }
+/** "assistant mode" / "assistant mode off" toggle the assistant switch; returns true when handled. */
+export function assistantCommand(text: string): boolean | null {
+  const t = text.trim().toLowerCase().replace(/[.!]+$/, "");
+  if (t === "assistant mode" || t === "assistant mode on") return true;
+  if (t === "assistant mode off") return false;
+  return null;
+}
 export function characterModeCommand(text: string): CharacterMode | null {
   const t = text.trim().toLowerCase().replace(/[.!]+$/, "");
   if (t === "matrix mode" || t === "matrix theme") return "matrix";
   if (t === "final fantasy mode" || t === "final fantasy theme") return "finalfantasy";
   if (t === "dev team mode" || t === "developer mode" || t === "dev team theme") return "devteam";
   if (t === "cyberpunk mode" || t === "cyberpunk theme") return "cyberpunk";
+  if (t === "dungeon crawler carl" || t === "dungeon crawler carl mode" || t === "dcc mode" || t === "dungeon mode") return "dcc";
   if (t === "linux mode" || t === "linux theme" ) return "linux";
-  if (t === "assistant mode" || t === "assistant theme") return "assistant";
-  if (t === "linux mode off" || t === "assistant mode off" || t === "cyberpunk mode off" || t === "matrix mode off" || t === "final fantasy mode off" || t === "dev team mode off") return "normal";
+  if (t === "linux mode off" || t === "cyberpunk mode off" || t === "matrix mode off" || t === "final fantasy mode off" || t === "dev team mode off" || t === "dcc mode off") return "normal";
   if (t === "horror mode" || t === "horror mode on") return "horror";
   if (t === "horror mode off") return "normal";
   const hell = modeCommand(text);
@@ -62,7 +97,7 @@ export function modeCommand(text: string): "on" | "off" | null {
   if (t === "hellraiser mode off" || t === "normal mode" || t === "close the box") return "off";
   return null;
 }
-/** Linux Mode and Assistant Mode share one cast, prompt and look; only Linux Mode has the terminal. */
+/** Legacy theme ids that always meant assistant behaviour. */
 export function isAssistantFamily(mode: unknown): mode is "linux" | "assistant" {
   return mode === "linux" || mode === "assistant";
 }
