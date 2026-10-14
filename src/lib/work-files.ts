@@ -128,15 +128,70 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
 
 type XWorkbook = import("exceljs").Workbook;
 type XSheet = import("exceljs").Worksheet;
-const FILL: Record<string, string> = { MI: "FF92D050", Exmi: "FF92D050", S: "FFFFFF00", MO: "FFF4B084" };
+const FILL: Record<string, string> = { MI: "FF92D050", Exmi: "FF92D050", S: "FFFFFF00", MO: "FFF4B084", moveInShow: "FF4DB6AC", allThree: "FF5B9BD5" };
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
 function paint(cell: import("exceljs").Cell, codes: string[]) {
-  const code = codes.includes("S") ? "S" : codes[0];
-  cell.fill = code ? { type: "pattern", pattern: "solid", fgColor: { argb: FILL[code]! } } : { type: "pattern", pattern: "none" };
+  const show = codes.includes("S"), moveIn = codes.includes("MI") || codes.includes("Exmi"), moveOut = codes.includes("MO");
+  const code = show && moveIn && moveOut ? "allThree" : show && moveOut ? "MO" : show && moveIn ? "moveInShow" : show ? "S" : codes[0];
+  const color = code ? FILL[code] : undefined;
+  cell.fill = color ? { type: "pattern", pattern: "solid", fgColor: { argb: color } } : { type: "pattern", pattern: "none" };
   cell.font = { name: "Aptos Narrow", size: 20, bold: codes.includes("S") };
+}
+
+/** Merge only adjacent space rows with identical shows, activities and times. */
+function mergeEventSpaces(ws: XSheet, w: WeekLayout, byLabel: Map<string, number>, cols: Map<string, number>) {
+  for (const labels of [HALL_ROWS, BALLROOM_ROWS]) {
+    const positions = labels.flatMap((label) => {
+      const row = byLabel.get(label.toLowerCase());
+      return row ? [{ label, row }] : [];
+    }).sort((a, b) => a.row - b.row);
+    w.dates.forEach((date, i) => {
+      const col = cols.get(date);
+      if (!col) return;
+      let start = 0;
+      while (start < positions.length) {
+        const first = positions[start];
+        if (!first) break;
+        const data = w.rows[first.label]?.[i];
+        let end = start;
+        if (data?.signature) {
+          while (end + 1 < positions.length) {
+            const next = positions[end + 1], prev = positions[end];
+            if (!next || !prev || next.row !== prev.row + 1 || w.rows[next.label]?.[i]?.signature !== data.signature) break;
+            end++;
+          }
+        }
+        const last = positions[end];
+        if (last && end > start) {
+          ws.mergeCells(first.row, col, last.row, col);
+          ws.getCell(first.row, col).alignment = { wrapText: true, vertical: "middle", horizontal: "center" };
+        }
+        start = end + 1;
+      }
+    });
+  }
+}
+
+/** Release old vertical space merges before updating, preserving untouched entries. */
+function unmergeEventSpaces(ws: XSheet, w: WeekLayout, byLabel: Map<string, number>, cols: Map<string, number>) {
+  const roomRows = new Set([...HALL_ROWS, ...BALLROOM_ROWS].map((label) => byLabel.get(label.toLowerCase())).filter((r): r is number => r !== undefined));
+  for (const range of [...(ws.model.merges ?? [])]) {
+    const [from, to] = range.split(":");
+    if (!from || !to) continue;
+    const first = ws.getCell(from), last = ws.getCell(to);
+    const top = Number(first.row), bottom = Number(last.row), col = Number(first.col);
+    if (col !== Number(last.col) || top === bottom) continue;
+    const rows = Array.from({ length: bottom - top + 1 }, (_, i) => top + i);
+    if (!rows.every((r) => roomRows.has(r))) continue;
+    const touched = w.dates.some((date, i) => cols.get(date) === col && Object.entries(w.rows).some(([label, cells]) => cells[i]?.text && rows.includes(byLabel.get(label.toLowerCase()) ?? -1)));
+    if (!touched) continue;
+    const value = first.value, style = structuredClone(first.style);
+    ws.unMergeCells(range);
+    for (const row of rows) { const cell = ws.getCell(row, col); cell.value = value; cell.style = structuredClone(style); }
+  }
 }
 
 function writeWeekSheet(ws: XSheet, w: WeekLayout) {
@@ -167,10 +222,12 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout) {
   put(r++, ["CCC Escalator and SD", ...DAYS]);
   put(r++, ["Escalator", ...w.escalator], false);
   put(r++, ["Service Desk", ...w.serviceDesk], false);
+  const byLabel = new Map<string, number>();
   const section = (title: string, labels: string[]) => {
     put(r++, [title, ...DAYS]);
     for (const label of labels) {
       put(r, [label]);
+      byLabel.set(label.toLowerCase(), r);
       (w.rows[label] ?? []).forEach((c, i) => { const cell = ws.getRow(r).getCell(i + 2); cell.value = c.text || null; cell.alignment = wrap; paint(cell, c.codes); });
       r++;
     }
@@ -180,6 +237,7 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout) {
   section("BALLROOM", BALLROOM_ROWS);
   section("LOCATION", ["CEPAC", "Theatre", "Ballroom", ...w.other.filter((o) => !/^(cepac|theatre|ballroom)$/i.test(o)), "OTHER"]);
   for (let i = 3; i < r; i++) ws.getRow(i).height = 54;
+  mergeEventSpaces(ws, w, byLabel, new Map(w.dates.map((d, i) => [d, i + 2])));
 }
 
 function cellDate(v: unknown): string | null {
@@ -199,8 +257,10 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout): boolean {
   if (!w.dates.some((d) => cols.has(d))) return false;
   const byLabel = new Map<string, number>();
   ws.eachRow((row, n) => { const l = String(row.getCell(1).value ?? "").trim().toLowerCase(); if (l && !byLabel.has(l)) byLabel.set(l, n); });
+  unmergeEventSpaces(ws, w, byLabel, cols);
   const write = (label: string, i: number, text: string, codes?: string[]) => {
-    const r = byLabel.get(label.toLowerCase()); const c = cols.get(w.dates[i]!);
+    const date = w.dates[i];
+    const r = byLabel.get(label.toLowerCase()); const c = date ? cols.get(date) : undefined;
     if (!r || !c || !text) return;
     const cell = ws.getRow(r).getCell(c); cell.value = text; cell.alignment = { wrapText: true, vertical: "middle", horizontal: "center" };
     if (codes) paint(cell, codes);
@@ -209,12 +269,14 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout): boolean {
     if (w.cgc[i] !== "DARK") write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!);
     for (const [label, cells] of Object.entries(w.rows)) write(label, i, cells[i]!.text, cells[i]!.codes);
   });
+  mergeEventSpaces(ws, w, byLabel, cols);
   return true;
 }
 
 /** Builds the weekly engineering workbook (Week #1, #2 …) or, given an existing schedule, fills its event rows. */
 export async function eventsWorkbook(entries: EventEntry[], existing?: File): Promise<Blob> {
-  const ExcelJS = (await import("exceljs")).default;
+  const module = await import("exceljs");
+  const ExcelJS = module.default ?? module;
   const wb: XWorkbook = new ExcelJS.Workbook();
   const weeks = weekLayouts(entries);
   if (existing) await wb.xlsx.load(await existing.arrayBuffer());
