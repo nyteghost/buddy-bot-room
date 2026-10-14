@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyEvent, parsePastedShifts, parseShift, summarizeEvents, entryLabel, type EventRow } from "@/lib/work-tools";
+import { classifyEvent, escalatorHours, escalatorLabel, expandSpace, parsePastedShifts, parseShift, summarizeEvents, entryLabel, type EventRow } from "@/lib/work-tools";
 import { deckReply, planStage, stairsFor } from "@/lib/deck-solver";
 
 const row = (p: Partial<EventRow>): EventRow => ({ level: 2, usage: "Event (EVT)", start: "08:30 AM", end: "07:00 PM", description: "The COBB Tradeshow", space: "Exhibit Hall AB (EXAB)", date: "2026-10-11", ...p });
@@ -36,7 +36,7 @@ describe("Ungerboeck event rules", () => {
   it("move out is MO", () => expect(classifyEvent(row({ usage: "Move Out (OUT)", description: "Move Out" }))).toBe("MO"));
   it("merges move-outs into one span", () => {
     const list = summarizeEvents([row({ usage: "Move Out (OUT)", start: "05:00 PM", end: "09:00 PM" }), row({ usage: "Move Out (OUT)", start: "05:00 PM", end: "11:59 PM" })]);
-    expect(list.map(entryLabel)).toEqual(["MO 5p-11:59p"]);
+    expect(list.filter((e) => e.space === "Hall A").map(entryLabel)).toEqual(["MO 5p-11:59p"]);
   });
 });
 
@@ -45,4 +45,14 @@ describe("@deck staging", () => {
   it("rejects sizes not a multiple of 4", () => expect(planStage(10, 8).ok).toBe(false));
   it("stairs by height", () => { expect(stairsFor(32)).toBe("5-step"); expect(stairsFor(36)).toBe("6-step"); expect(stairsFor(42)).toBe("7-step"); });
   it("answers @deck 24x24x32", () => expect(deckReply("@deck, 24x24x32")).toContain("18 of 72"));
+});
+
+describe("For Scheduling rules", () => {
+  it("exhibitor service desk is Exmi", () => expect(classifyEvent(row({ usage: "Move In (IN)", description: "Exhibitor Service Desk" }))).toBe("Exmi"));
+  it("splits Exhibit Hall AB into Hall A and Hall B", () => expect(expandSpace("Exhibit Hall AB (EXAB)")).toEqual(["Hall A", "Hall B"]));
+  it("Chattahoochee Ballroom covers Ballrooms A–G", () => expect(expandSpace("Chattahoochee Ballroom (BRFULL)")).toHaveLength(7));
+  it("escalators run 1 hour before and after the show", () => {
+    const h = escalatorHours(summarizeEvents([row({})])).get("2026-10-11")!;
+    expect(escalatorLabel(h)).toBe("7:30a-8p");
+  });
 });
