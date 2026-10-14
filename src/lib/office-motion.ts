@@ -6,8 +6,8 @@ type Station = { home: Point; visit: Point; label: string; activity: string };
 /** Shared floor routes for Linux and Assistant modes; percentages of the room. */
 export const officeStations: Record<AgentId, Station> = {
   nova: { home: [26, 39], visit: [12, 46], label: "Gmail", activity: "Drafting mail" },
-  byte: { home: [42, 39], visit: [44, 27], label: "Tasks", activity: "Reviewing tasks" },
-  sage: { home: [58, 39], visit: [61, 27], label: "Calendar", activity: "Planning an event" },
+  byte: { home: [42, 39], visit: [34, 47], label: "Tasks", activity: "Reviewing tasks" },
+  sage: { home: [58, 39], visit: [66, 47], label: "Calendar", activity: "Planning an event" },
   pip: { home: [73, 39], visit: [78, 51], label: "Notes", activity: "Writing notes" },
   echo: { home: [26, 72], visit: [12, 86], label: "Q&A", activity: "Researching an answer" },
   rune: { home: [50, 72], visit: [62, 86], label: "System", activity: "Reviewing stats" },
