@@ -1373,8 +1373,8 @@ h1 {
 .linux .office-pal.office-assigned { transition: left 1s ease, top 1s ease; z-index: 6; }
 .office-character { position: relative; width: 44px; height: 58px; }
 /* Seated at the desk: tuck the legs behind the chair back and face the monitor. */
-.office-seated .office-character > svg:first-child { transform: translateY(4%); clip-path: inset(0 0 40% 0); filter: none; }
-.office-chair { position: absolute; left: 2%; width: 96%; bottom: 0; height: auto; }
+.office-seated .office-character > svg:first-child { transform: translateY(-16%); clip-path: inset(0 0 30% 0); filter: none; }
+.office-chair { position: absolute; left: 2%; width: 96%; bottom: -4%; height: auto; }
 .chair-back { fill: var(--scene-ink); stroke: none; }
 .chair-shine { fill: var(--muted-foreground); opacity: .35; }
 .office-working.office-seated .office-character > svg:first-child { animation: office-type .6s steps(2) infinite; }
