@@ -817,7 +817,7 @@ export function Room() {
               </Dialog>
             </div>
           </div>
-          <SavedDiscussions key={cloud ? "cloud" : "browser"} messages={messages} mode={mode} theme={characterMode} running={running} cloud={cloud} onCloud={changeStorage} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
+          <SavedDiscussions messages={messages} mode={mode} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
           <div className="conversation-subhead">
             <span className="status-dot" />
             {running
@@ -939,7 +939,7 @@ export function Room() {
                   : "READY TO START"}
             </span>
             <span>
-              <Check size={12} /> {cloud ? "SAVED DISCUSSIONS · PRESS SAVE TO KEEP CHANGES" : "SAVED IN THIS BROWSER"}
+              <Check size={12} /> AUTO-SAVED
             </span>
           </footer>
         </section>

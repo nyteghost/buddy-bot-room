@@ -15,4 +15,9 @@ export function readDiscussions(): SavedDiscussion[] {
 export function writeDiscussions(rows: SavedDiscussion[]) {
   try { localStorage.setItem(savedDiscussionsKey, JSON.stringify(rows)); }
   catch { throw new Error("Browser storage is full or unavailable. Download a copy before clearing anything."); }
+}import { messageText } from "./agents";
+/** Title for an auto-saved chat: the first thing the user typed. */
+export function chatTitle(messages: RoomMessage[]): string {
+  const first = messages.find((m) => m.role === "user") ?? messages[0];
+  return (first ? messageText(first).trim().slice(0, 120) : "") || "Untitled chat";
 }

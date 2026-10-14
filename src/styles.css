@@ -1555,3 +1555,6 @@ h1 {
   color: var(--muted-foreground);
   cursor: pointer;
 }
+.saved-row-active { background: var(--accent); border-radius: 6px; }
+.history-panel { display: flex; flex-direction: column; gap: 12px; }
+.history-panel .saved-list { max-height: none; flex: 1; }
