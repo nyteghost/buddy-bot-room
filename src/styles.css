@@ -1387,6 +1387,12 @@ h1 {
 .office-working.agent-echo .office-character > svg { animation: office-sort 1s steps(3) infinite; }
 .office-working.agent-rune .office-character > svg { animation: office-inspect 1.2s steps(3) infinite; }
 .office-working.agent-sage .office-character > svg { animation: office-write 1s steps(3) infinite; }
+/* Hand-drawn art renders as <img>, so it needs the same working animations. */
+.office-working .office-character > img { animation: office-type .6s steps(2) infinite; }
+.office-working.agent-pip .office-character > img { animation: office-write .8s steps(3) infinite; }
+.office-working.agent-echo .office-character > img { animation: office-sort 1s steps(3) infinite; }
+.office-working.agent-rune .office-character > img { animation: office-inspect 1.2s steps(3) infinite; }
+.office-working.agent-sage .office-character > img { animation: office-write 1s steps(3) infinite; }
 .office-task-cue {
   position: absolute;
   bottom: calc(100% + 5px);
@@ -1432,7 +1438,7 @@ h1 {
 }
 @media (prefers-reduced-motion: reduce) {
   .linux .office-pal { transition: none; }
-  .office-character > svg, .office-character g, .office-working::after, .office-task-cue { animation: none !important; }
+  .office-character > svg, .office-character > img, .office-character g, .office-working::after, .office-task-cue { animation: none !important; }
 }
 .devteam .scene-pal-0 { left: 26%; top: 36%; }
 .devteam .scene-pal-1 { left: 42%; top: 36%; }
