@@ -8,17 +8,21 @@ export function PixelCharacter({
   className,
   animated = false,
   walking = false,
+  back = false,
   mode: explicitMode,
 }: {
   id: AgentId;
   className?: string;
   animated?: boolean;
   walking?: boolean;
+  /** Seen from behind (seated facing a monitor): face pixels become hair. */
+  back?: boolean;
   mode?: CharacterMode;
 }) {
   const currentMode = useCharacterMode();
   const mode = explicitMode ?? currentMode;
-  const grid = characterSprite(id, mode);
+  const front = characterSprite(id, mode);
+  const grid = back ? backView(front) : front;
   return (
     <svg
       viewBox="0 0 32 32"
@@ -51,4 +55,12 @@ export function PixelCharacter({
       )}</g>)}
     </svg>
   );
+}
+
+/** Turn a front sprite into a back view: the head becomes a solid hair silhouette. */
+export function backView(grid: string[]): string[] {
+  const counts = new Map<string, number>();
+  for (const row of grid.slice(0, 5)) for (const p of row) if (p !== ".") counts.set(p, (counts.get(p) ?? 0) + 1);
+  const hair = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "h";
+  return grid.map((row, y) => (y < 17 ? row.replace(/[^.]/g, hair) : row));
 }
