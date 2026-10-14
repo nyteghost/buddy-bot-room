@@ -28,3 +28,4 @@
 
 - [ ] Assistant Mode switch for every theme + Dungeon Crawler Carl theme
 - [ ] Remove pal voices (wasted power, not working)
+- [ ] Carl wears pink Crocs
