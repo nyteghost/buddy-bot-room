@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, sheetRowFor, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, parsePastedShifts, sheetRowFor, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
 import { deckReply } from "@/lib/deck-solver";
 import { MessageResponse } from "@/components/ai-elements/message";
 
