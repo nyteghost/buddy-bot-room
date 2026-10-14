@@ -251,7 +251,7 @@ fn run_update() -> Result<(), String> {
     use std::process::Command;
     let dir = env!("PIXELPALS_SRC_DIR");
     let script = format!(
-        "cd '{dir}' && git pull && bash packaging/install.sh; echo; echo 'Restart Pixel Pals to use the new version.'; read -p 'Press Enter to close' _"
+        "cd '{dir}' && bash packaging/install.sh; echo; echo 'Restart Pixel Pals to use the new version.'; read -p 'Press Enter to close' _"
     );
     let terminals: [(&str, &[&str]); 6] = [
         ("ghostty", &["-e", "bash", "-c"]),
@@ -266,7 +266,7 @@ fn run_update() -> Result<(), String> {
             return Ok(());
         }
     }
-    Err(format!("No terminal found. Run this yourself: cd {dir} && git pull && bash packaging/install.sh"))
+    Err(format!("No terminal found. Run this yourself: cd {dir} && bash packaging/install.sh"))
 }
 
 fn main() {
