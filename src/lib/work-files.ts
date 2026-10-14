@@ -9,13 +9,14 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
   pdfjs.GlobalWorkerOptions.workerSrc = worker;
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const rows: EventRow[] = [];
-  let cols: Record<string, number> | null = null;
+  type Cols = { usage: number; start: number; end: number; desc: number; reader: number; space: number; notes: number };
+  let cols: Cols | null = null;
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
     const items: Item[] = [];
     for (const it of content.items as { str?: string; transform?: number[] }[])
-      if (it.str?.trim() && it.transform) items.push({ str: it.str, x: it.transform[4], y: Math.round(it.transform[5]) });
+      if (it.str?.trim() && it.transform) items.push({ str: it.str, x: it.transform[4] ?? 0, y: Math.round(it.transform[5] ?? 0) });
     const lines = new Map<number, Item[]>();
     for (const it of items) {
       const key = [...lines.keys()].find((k) => Math.abs(k - it.y) <= 2) ?? it.y;
@@ -32,7 +33,7 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
       if (!cols) continue;
       const date = text.match(/\b\d{2}\/\d{2}\/\d{2}\b/)?.[0];
       const level = Number(line[0]?.str.trim());
-      if (!date || !Number.isFinite(level) || line[0].x > cols.usage) continue;
+      if (!date || !Number.isFinite(level) || (line[0]?.x ?? 0) > cols.usage) continue;
       const c = cols;
       const between = (lo: number, hi: number) => line.filter((i) => i.x >= lo - 2 && i.x < hi - 2).map((i) => i.str.trim()).join(" ").trim();
       const times = text.match(/\d{2}:\d{2}\s*[AP]M/gi) ?? [];
@@ -66,12 +67,13 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
     if (dayRow < 0) continue;
     const dates = grid[dayRow + 1] ?? [];
     for (let r = dayRow + 2; r < grid.length; r++) {
-      const label = String(grid[r][0] ?? "").trim();
+      const cells = grid[r] ?? [];
+      const label = String(cells[0] ?? "").trim();
       const next = String(grid[r + 1]?.[0] ?? "").trim();
       if (label && /^\d{3}$/.test(next)) people.add(label);
       if (label.toLowerCase() !== target) continue;
       for (let c = 1; c <= 7; c++) {
-        const raw = String(grid[r][c] ?? "").trim();
+        const raw = String(cells[c] ?? "").trim();
         const time = parseShift(raw);
         const d = dates[c];
         if (!time || typeof d !== "number") continue;
