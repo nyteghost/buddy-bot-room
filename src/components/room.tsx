@@ -73,6 +73,7 @@ import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
 import devRoomImage from "@/assets/devteam-room.jpg";
+import officeRoomImage from "@/assets/office-room.jpg";
 import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import { streamSpeech } from "@/lib/stream-speech";
@@ -511,7 +512,7 @@ export function Room() {
           ))}
           <div className="room-scene">
             <img
-              src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "devteam" || characterMode === "linux" || characterMode === "assistant" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
+              src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" || characterMode === "assistant" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
@@ -522,6 +523,9 @@ export function Room() {
               }
             />
             {hell && <div className="hell-glow" aria-hidden />}
+            {(characterMode === "linux" || characterMode === "assistant") && (
+              <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
+            )}
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />

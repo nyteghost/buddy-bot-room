@@ -1373,11 +1373,11 @@ h1 {
 .linux .office-pal.office-assigned { transition: left 1s ease, top 1s ease; z-index: 6; }
 .office-character { position: relative; width: 44px; height: 58px; }
 /* Seated at the desk: tuck the legs behind the chair back and face the monitor. */
-.office-seated .office-character > svg:first-child { transform: translateY(-8%); clip-path: inset(0 0 30% 0); filter: drop-shadow(0 0 1px var(--agent-color)); }
+.office-seated-away .office-character > svg:first-child { transform: translateY(-8%); clip-path: inset(0 0 30% 0); filter: drop-shadow(0 0 1px var(--agent-color)); }
 .office-chair { position: absolute; left: 6%; width: 88%; bottom: -2%; height: auto; }
 .chair-back { fill: var(--scene-ink); stroke: none; }
 .chair-shine { fill: var(--muted-foreground); opacity: .35; }
-.office-working.office-seated .office-character > svg:first-child { animation: office-type .6s steps(2) infinite; }
+.office-working.office-seated-away .office-character > svg:first-child { animation: office-type .6s steps(2) infinite; }
 .office-facing-left .office-character { transform: scaleX(-1); }
 .office-walking .office-character > svg { animation: office-stride .4s steps(2) infinite; }
 .sprite-walk-left-leg { animation: office-leg .4s steps(2) infinite; }
@@ -1506,3 +1506,8 @@ h1 {
 .command-buttons { display: flex; gap: .4rem; flex-wrap: wrap; }
 
 .build-version { font-size: 0.7rem; opacity: 0.6; color: var(--muted-foreground); text-align: right; margin: 0.25rem 0; font-family: monospace; }
+
+/* Front desk row of the office picture redrawn above the pals so they can sit and walk behind it. */
+.office-foreground { position: absolute; inset: 0; z-index: 7; pointer-events: none; clip-path: inset(62% 0 0 0); }
+.office-front > span { order: -1; }
+.office-seated-toward .office-character > svg:first-child { transform: none; }
