@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyEvent, parseShift, summarizeEvents, entryLabel, type EventRow } from "@/lib/work-tools";
+import { classifyEvent, parsePastedShifts, parseShift, summarizeEvents, entryLabel, type EventRow } from "@/lib/work-tools";
 import { deckReply, planStage, stairsFor } from "@/lib/deck-solver";
 
 const row = (p: Partial<EventRow>): EventRow => ({ level: 2, usage: "Event (EVT)", start: "08:30 AM", end: "07:00 PM", description: "The COBB Tradeshow", space: "Exhibit Hall AB (EXAB)", date: "2026-10-11", ...p });
@@ -9,6 +9,12 @@ describe("schedule shift times", () => {
   it("reads 8:30am-4:30 as ending in the afternoon", () => expect(parseShift("8:30am-4:30")).toEqual({ start: 510, end: 990 }));
   it("ends overnight shifts the next day", () => expect(parseShift("8p-4a")).toEqual({ start: 1200, end: 1680 }));
   it("blank and OFF are days off", () => { expect(parseShift("")).toBeNull(); expect(parseShift("OFF")).toBeNull(); });
+  it("reads a pasted Excel block for Mark Brown", () => {
+    const text = "Mark Brown\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t\t\n603\t9\t9\t9\t9\t9\tOFF\tOFF\nShow Srvc Manager";
+    const shifts = parsePastedShifts(text, "2026-10-12");
+    expect(shifts.map((s) => s.date)).toEqual(["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"]);
+    expect(shifts[0]).toMatchObject({ start: 540, end: 1080 });
+  });
 });
 
 describe("Ungerboeck event rules", () => {
