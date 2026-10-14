@@ -4,7 +4,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import type { RoomMessage, Mode } from "@/lib/agents";
-import { messageText } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { readDiscussions, writeDiscussions, chatTitle, type SavedDiscussion } from "@/lib/saved-discussions";
 import { useSession } from "@/hooks/use-session";
