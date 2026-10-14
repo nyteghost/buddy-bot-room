@@ -10,9 +10,9 @@ export const officeStations: Record<AgentId, Station> = {
   byte: { home: [42.6, 31], visit: [34, 46], label: "Tasks", activity: "Reviewing tasks", facing: "away" },
   sage: { home: [59.2, 31], visit: [67, 46], label: "Calendar", activity: "Planning an event", facing: "away" },
   pip: { home: [75.2, 31], visit: [86, 44], label: "Notes", activity: "Writing notes", facing: "away" },
-  echo: { home: [19, 59], visit: [28, 50], label: "Q&A", activity: "Researching an answer", facing: "toward" },
-  rune: { home: [49, 59], visit: [58, 52], label: "System", activity: "Reviewing stats", facing: "toward" },
-  claude: { home: [80, 59], visit: [88, 50], label: "Tux", activity: "Thinking through a fix", facing: "toward" },
+  echo: { home: [19, 54], visit: [28, 50], label: "Q&A", activity: "Researching an answer", facing: "toward" },
+  rune: { home: [49, 54], visit: [58, 52], label: "System", activity: "Reviewing stats", facing: "toward" },
+  claude: { home: [80, 54], visit: [88, 50], label: "Tux", activity: "Thinking through a fix", facing: "toward" },
 };
 
 export function officePose(id: AgentId, index: number, elapsed: number) {

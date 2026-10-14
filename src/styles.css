@@ -1510,4 +1510,4 @@ h1 {
 /* Front desk row of the office picture redrawn above the pals so they can sit and walk behind it. */
 .office-foreground { position: absolute; inset: 0; z-index: 7; pointer-events: none; clip-path: inset(62% 0 0 0); }
 .office-front > span { order: -1; }
-.office-seated-toward .office-character > svg:first-child { transform: translateY(6%); }
+.office-seated-toward .office-character > svg:first-child { transform: none; }
