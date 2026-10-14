@@ -30,5 +30,5 @@
 - [x] Remove pal voices (wasted power, not working)
 - [x] Carl wears pink Crocs
 - [x] Samantha redrawn (blond pigtails, mascara tears, fangs)
-- [ ] Auto-save chats as you talk
-- [ ] Slide-out chat history side panel
+- [x] Auto-save chats as you talk
+- [x] Slide-out chat history side panel
