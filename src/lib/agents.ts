@@ -201,6 +201,7 @@ export type RoomMessage = UIMessage<{
   verdict?: boolean;
   elapsed?: number;
   characterMode?: CharacterMode;
+  assistant?: boolean;
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;
