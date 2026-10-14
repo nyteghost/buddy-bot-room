@@ -15,6 +15,17 @@ describe("schedule shift times", () => {
     expect(shifts.map((s) => s.date)).toEqual(["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"]);
     expect(shifts[0]).toMatchObject({ start: 540, end: 1080 });
   });
+  it("uses the pasted date row when present", () => {
+    const text = [
+      "FROM:\t10/19/26\tTO:\t10/25/26",
+      "DAY\tMON\tTUE\tWED\tTHU\tFRI\tSAT\tSUN\tTOTAL",
+      "\t10/19/26\t10/20/26\t10/21/26\t10/22/26\t10/23/26\t10/24/26\t10/25/26",
+      "Mark Brown\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t\t",
+      "603\t9\t9\t9\t9\t9\tOFF\tOFF\t45.0",
+    ].join("\n");
+    const shifts = parsePastedShifts(text, "2026-01-05");
+    expect(shifts.map((s) => s.date)).toEqual(["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"]);
+  });
 });
 
 describe("Ungerboeck event rules", () => {
