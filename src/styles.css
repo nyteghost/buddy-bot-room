@@ -492,6 +492,29 @@ h1 {
   color: var(--muted-foreground);
   padding: 0;
 }
+.pals-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.pals-toggle:hover h2 {
+  color: var(--foreground);
+}
+.pals-chevron {
+  color: var(--muted-foreground);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.pals-chevron-closed {
+  transform: rotate(-90deg);
+}
 .muted-label {
   color: var(--muted-foreground);
   font-size: 8px;

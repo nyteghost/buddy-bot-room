@@ -3,6 +3,7 @@ import { DefaultChatTransport, readUIMessageStream } from "ai";
 import {
   ArrowUpRight,
   Check,
+  ChevronDown,
   CircleHelp,
   Download,
   MessageSquare,
@@ -164,6 +165,7 @@ export function Room() {
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
+  const [palsOpen, setPalsOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
