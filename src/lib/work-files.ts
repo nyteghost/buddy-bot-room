@@ -275,7 +275,8 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout): boolean {
 
 /** Builds the weekly engineering workbook (Week #1, #2 …) or, given an existing schedule, fills its event rows. */
 export async function eventsWorkbook(entries: EventEntry[], existing?: File): Promise<Blob> {
-  const ExcelJS = (await import("exceljs")).default;
+  const module = await import("exceljs");
+  const ExcelJS = module.default ?? module;
   const wb: XWorkbook = new ExcelJS.Workbook();
   const weeks = weekLayouts(entries);
   if (existing) await wb.xlsx.load(await existing.arrayBuffer());
