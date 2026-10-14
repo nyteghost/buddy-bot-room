@@ -24,3 +24,4 @@
 - [ ] Gmail pal live inbox access — blocked: needs user's Google OAuth client (connect card)
 - [ ] Sage adds events to Google Calendar — blocked: same Google OAuth client
 - [x] Desktop update popup: checks GitHub for new commits, Yes pulls + rebuilds, No closes
+- [x] Enlarged sprites everywhere (room 60x80, office 60x80, mobile scaled up), office name tags moved above heads with two walkway lanes so rows never stack; middle back-row pal raised off the table; verified desktop/mobile rendering and 55 tests pass.
