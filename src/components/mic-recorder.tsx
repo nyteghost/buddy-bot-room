@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Mic, Square, X } from "lucide-react";
+import { Copy, Download, FileText, Mic, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Clip = { id: string; url: string; blob: Blob; at: Date; seconds: number };
+type Clip = { id: string; url: string; blob: Blob; at: Date; seconds: number; transcript?: string; busy?: boolean; error?: string };
 
 /** Echo's recorder: records from the microphone only after the user presses Record. Clips stay in this browser tab. */
 export function MicRecorder({ onClose }: { onClose: () => void }) {
@@ -40,8 +40,24 @@ export function MicRecorder({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const ext = (b: Blob) => (b.type.includes("mp4") ? "m4a" : b.type.includes("ogg") ? "ogg" : "webm");
+  const ext = (b: Blob) => (b.type.includes("mp4") ? "m4a" : b.type.includes("ogg") ? "ogg" : b.type.includes("wav") ? "wav" : "webm");
   const save = (c: Clip) => { const a = document.createElement("a"); a.href = c.url; a.download = `recording-${c.at.toISOString().slice(0, 19).replace(/[:T]/g, "-")}.${ext(c.blob)}`; a.click(); };
+
+  const patch = (id: string, p: Partial<Clip>) => setClips((cs) => cs.map((c) => (c.id === id ? { ...c, ...p } : c)));
+  async function transcribe(c: Clip) {
+    patch(c.id, { busy: true, error: "", transcript: "" });
+    try {
+      const bytes = new Uint8Array(await c.blob.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio: btoa(bin), format: ext(c.blob) }) });
+      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => null))?.error ?? "The recording could not be transcribed.");
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let text = "";
+      for (;;) { const { done, value } = await reader.read(); if (done) break; text += value; patch(c.id, { transcript: text }); }
+      patch(c.id, { busy: false, transcript: text.trim() || "(no speech heard)" });
+    } catch (e) { patch(c.id, { busy: false, error: (e as Error).message }); }
+  }
 
   return (
     <div className="space-y-3 rounded-md border border-border bg-card p-3 text-card-foreground">
@@ -53,14 +69,25 @@ export function MicRecorder({ onClose }: { onClose: () => void }) {
         {recording
           ? <Button size="sm" variant="destructive" onClick={() => rec.current?.stop()}><Square className="size-4" /> Stop</Button>
           : <Button size="sm" onClick={start}><Mic className="size-4" /> Record</Button>}
-        <span className="text-sm text-muted-foreground">{recording ? `Recording… ${elapsed}s` : "Recordings stay on this device."}</span>
+        <span className="text-sm text-muted-foreground">{recording ? `Recording… ${elapsed}s` : "Press the page icon on a clip to transcribe it."}</span>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {clips.map((c) => (
-        <div key={c.id} className="flex items-center gap-2">
+        <div key={c.id} className="space-y-1">
+          <div className="flex items-center gap-2">
           <audio controls src={c.url} className="h-8 flex-1" />
           <span className="text-xs text-muted-foreground">{c.seconds}s</span>
+          <Button size="icon" variant="ghost" aria-label="Transcribe recording" disabled={c.busy} onClick={() => transcribe(c)}><FileText className="size-4" /></Button>
           <Button size="icon" variant="ghost" aria-label="Download recording" onClick={() => save(c)}><Download className="size-4" /></Button>
+          </div>
+          {c.busy && !c.transcript && <p className="text-xs text-muted-foreground">Transcribing…</p>}
+          {c.error && <p className="text-sm text-destructive">{c.error}</p>}
+          {c.transcript && (
+            <div className="relative rounded-md bg-muted p-2 pr-9 text-sm whitespace-pre-wrap">
+              {c.transcript}
+              <Button size="icon" variant="ghost" className="absolute top-1 right-1 size-7" aria-label="Copy transcript" onClick={() => navigator.clipboard.writeText(c.transcript ?? "")}><Copy className="size-3.5" /></Button>
+            </div>
+          )}
         </div>
       ))}
     </div>

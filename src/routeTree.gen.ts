@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
+import { Route as ApiTranscribeRouteImport } from './routes/api.transcribe'
 import { Route as ApiOauthGoogleReturnRouteImport } from './routes/api/oauth/google/return'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const ApiSpeechRoute = ApiSpeechRouteImport.update({
   path: '/api/speech',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOauthGoogleReturnRoute = ApiOauthGoogleReturnRouteImport.update({
   id: '/api/oauth/google/return',
   path: '/api/oauth/google/return',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRoutesById {
@@ -52,21 +60,38 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat' | '/api/speech' | '/api/oauth/google/return'
+  fullPaths:
+    | '/'
+    | '/api/chat'
+    | '/api/speech'
+    | '/api/transcribe'
+    | '/api/oauth/google/return'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat' | '/api/speech' | '/api/oauth/google/return'
+  to:
+    | '/'
+    | '/api/chat'
+    | '/api/speech'
+    | '/api/transcribe'
+    | '/api/oauth/google/return'
   id:
-    '__root__' | '/' | '/api/chat' | '/api/speech' | '/api/oauth/google/return'
+    | '__root__'
+    | '/'
+    | '/api/chat'
+    | '/api/speech'
+    | '/api/transcribe'
+    | '/api/oauth/google/return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiOauthGoogleReturnRoute: typeof ApiOauthGoogleReturnRoute
 }
 
@@ -93,6 +118,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSpeechRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/oauth/google/return': {
       id: '/api/oauth/google/return'
       path: '/api/oauth/google/return'
@@ -107,6 +139,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSpeechRoute: ApiSpeechRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
   ApiOauthGoogleReturnRoute: ApiOauthGoogleReturnRoute,
 }
 export const routeTree = rootRouteImport
