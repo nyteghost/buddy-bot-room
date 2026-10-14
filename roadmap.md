@@ -32,3 +32,4 @@
 - [x] Samantha redrawn (blond pigtails, mascara tears, fangs)
 - [x] Auto-save chats as you talk
 - [x] Slide-out chat history side panel
+- [x] Work tools: Ungerboeck PDF → S/Exmi/MI/MO Excel, my shifts → Google Calendar/.ics, @deck staging, @price vendor search
