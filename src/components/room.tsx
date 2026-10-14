@@ -135,7 +135,8 @@ export function Room() {
   const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
   const direct = mode === "direct";
-  const tooFew = !direct && enabled.length < 2;
+  const mentionTarget = resolveMention(topic, characterMode);
+  const tooFew = !direct && !mentionTarget && enabled.length < 2;
   const topicDraft = topic;
   const directMode = direct;
   const partnerChoice = partner;
