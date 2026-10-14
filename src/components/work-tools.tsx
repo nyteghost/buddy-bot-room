@@ -232,7 +232,10 @@ function ShiftsTab() {
       {status && <p className="text-sm">{status}</p>}
       {shifts.length > 0 && (
         <>
-          <Button size="sm" onClick={ics}><Download className="size-4" /> Download all (.ics)</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={ics}><Download className="size-4" /> Download all (.ics)</Button>
+            <AddAllToCalendar shifts={shifts} onStatus={setStatus} />
+          </div>
           <ul className="max-h-72 space-y-1 overflow-y-auto text-sm">
             {shifts.map((s) => (
               <li key={s.date} className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1">
