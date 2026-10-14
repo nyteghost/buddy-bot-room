@@ -159,6 +159,29 @@ export function agentName(id: AgentId | undefined, hell: boolean, horror = false
   if (!a) return "Agent";
   return agentPersona(a.id, hell, horror, mode).name;
 }
+const mentionAliases: Record<AgentId, string[]> = {
+  nova: ["gmail", "email", "mail", "nova"],
+  byte: ["tasks", "task", "todo", "reminders", "reminder", "byte"],
+  sage: ["calendar", "cal", "schedule", "events", "sage"],
+  pip: ["notes", "note", "pip"],
+  echo: ["qa", "q&a", "ask", "questions", "question", "echo"],
+  rune: ["system", "sys", "stats", "monitor", "rune"],
+  claude: ["terminal", "term", "tux", "bash", "shell", "claude"],
+};
+/** "@calendar add lunch" → "sage". Matches role aliases, ids and the current theme's names. */
+export function resolveMention(text: string, mode?: CharacterMode): AgentId | null {
+  const match = text.trim().match(/^@([\w&-]+)/i) ?? text.match(/(?:^|\s)@([\w&-]+)/i);
+  if (!match?.[1]) return null;
+  const handle = match[1].toLowerCase();
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9&]/g, "");
+  for (const a of agents) {
+    if (mentionAliases[a.id].includes(handle)) return a.id;
+    const name = agentPersona(a.id, mode === "hellraiser", mode === "horror", mode).name;
+    const words = name.toLowerCase().split(/\s+/).map(slug);
+    if (slug(name) === handle || words.includes(handle)) return a.id;
+  }
+  return null;
+}
 export type Mode = "roundtable" | "broadcast" | "direct" | "solve";
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;

@@ -62,6 +62,7 @@ import {
   agents,
   agentName,
   agentPersona,
+  resolveMention,
   models,
   messageText,
   type AgentId,
@@ -244,8 +245,9 @@ export function Room() {
     replayRef.current?.abort();
     setReplayId(null);
     const topic = ask?.text ?? topicDraft;
-    const direct = ask ? true : directMode;
-    const partner = ask?.partner ?? partnerChoice;
+    const mentioned = ask ? null : resolveMention(topic, modeRef.current);
+    const direct = ask || mentioned ? true : directMode;
+    const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
     const command = ask ? null : characterModeCommand(topic);
     if (command) {
