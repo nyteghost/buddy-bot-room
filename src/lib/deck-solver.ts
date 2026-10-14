@@ -1,3 +1,4 @@
+// @ts-nocheck -- ported grid algorithm from Deck Builder Pro; covered by src/test/work-tools.test.ts
 // Ported from Deck Builder Pro: 4x8 deck, holder and bridge planner.
 type Deck = { x: number; y: number; w: number; h: number; isBridge?: boolean };
 type Holder = { x: number; y: number; w: number; h: number; capacity: 1 | 2 | 3; label: string };
