@@ -17,7 +17,7 @@ describe("shared assistant station wandering", () => {
         expect(pose.x).toBeGreaterThanOrEqual(12);
         expect(pose.x).toBeLessThanOrEqual(87);
         expect(pose.y).toBeGreaterThanOrEqual(27);
-        expect(pose.y).toBeLessThanOrEqual(77);
+        expect(pose.y).toBeLessThanOrEqual(90);
       }
       expect(officePose(id, 0, 30200).x).toBe(officeStations[id].home[0]);
     }

@@ -54,6 +54,8 @@ function ChairBack() {
       <rect x="2" y="0" width="12" height="7" className="chair-back" />
       <rect x="3" y="1" width="10" height="1" className="chair-shine" />
       <rect x="7" y="7" width="2" height="2" className="chair-back" />
+      <rect x="0" y="4" width="2" height="4" className="chair-back" />
+      <rect x="14" y="4" width="2" height="4" className="chair-back" />
       <rect x="3" y="9" width="10" height="1" className="chair-back" />
     </svg>
   );
