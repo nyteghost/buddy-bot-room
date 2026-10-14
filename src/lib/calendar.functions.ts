@@ -86,7 +86,7 @@ export const pushShiftsToCalendar = createServerFn({ method: "POST" })
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            summary: "Work shift — Show Services",
+            summary: "Mark Work",
             description: `Schedule: ${s.raw}`,
             start: { dateTime: localStamp(s.date, s.start), timeZone: "America/New_York" },
             end: { dateTime: localStamp(s.date, s.end), timeZone: "America/New_York" },
