@@ -245,6 +245,36 @@ fn app_info() -> Value {
     json!({ "sha": env!("PIXELPALS_GIT_SHA"), "dir": env!("PIXELPALS_SRC_DIR") })
 }
 
+/// Asks GitHub for the newest commit on main, natively, so the webview's slow
+/// network stack doesn't make "Check for updates" hang.
+#[tauri::command]
+async fn check_update(repo: String) -> Result<Value, String> {
+    let res = reqwest::Client::new()
+        .get(format!("https://api.github.com/repos/{repo}/commits/main"))
+        .header("Accept", "application/vnd.github+json")
+        .header("User-Agent", "pixelpals-updater")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("Couldn't reach GitHub: {e}"))?;
+    if !res.status().is_success() {
+        return Err(format!("GitHub answered with error {}", res.status()));
+    }
+    let json: Value = res.json().await.map_err(|e| e.to_string())?;
+    let sha = json["sha"].as_str().unwrap_or("").to_string();
+    let message = json["commit"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .lines()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    if sha.is_empty() {
+        return Err("GitHub reply had no commit id".into());
+    }
+    Ok(json!({ "sha": sha, "message": message }))
+}
+
 /// Opens a terminal that pulls the latest code from GitHub and reinstalls Pixel Pals.
 #[tauri::command]
 fn run_update() -> Result<(), String> {
@@ -290,6 +320,7 @@ fn main() {
             read_text,
             write_note,
             app_info,
+            check_update,
             run_update
         ])
         .run(tauri::generate_context!())

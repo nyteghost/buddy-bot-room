@@ -82,6 +82,7 @@ export const desktop = {
   readText: (path: string) => invoke<string>("read_text", { path }),
   writeNote: (dir: string, name: string, content: string) => invoke<string>("write_note", { dir, name, content }),
   appInfo: () => invoke<{ sha: string; dir: string }>("app_info"),
+  checkUpdate: (repo: string) => invoke<{ sha: string; message: string }>("check_update", { repo }),
   runUpdate: () => invoke<void>("run_update"),
 };
 export async function onPty(event: "pty-output" | "pty-exit", cb: (data: string) => void) {
