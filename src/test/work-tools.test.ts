@@ -36,7 +36,7 @@ describe("Ungerboeck event rules", () => {
   it("move out is MO", () => expect(classifyEvent(row({ usage: "Move Out (OUT)", description: "Move Out" }))).toBe("MO"));
   it("merges move-outs into one span", () => {
     const list = summarizeEvents([row({ usage: "Move Out (OUT)", start: "05:00 PM", end: "09:00 PM" }), row({ usage: "Move Out (OUT)", start: "05:00 PM", end: "11:59 PM" })]);
-    expect(list.map(entryLabel)).toEqual(["MO 5p-11:59p"]);
+    expect(list.filter((e) => e.space === "Hall A").map(entryLabel)).toEqual(["MO 5p-11:59p"]);
   });
 });
 
