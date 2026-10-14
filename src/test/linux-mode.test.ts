@@ -29,12 +29,23 @@ describe("Linux Mode", () => {
 });
 
 describe("assistant mode", () => {
-  it("switches on and off by command and shares Linux Mode's cast", async () => {
-    const { characterModeCommand } = await import("@/lib/hellraiser");
-    const { agentName } = await import("@/lib/agents");
-    expect(characterModeCommand("Assistant Mode")).toBe("assistant");
-    expect(characterModeCommand("assistant mode off")).toBe("normal");
+  it("is a switch typed on/off, separate from the theme", async () => {
+    const { assistantCommand, characterModeCommand } = await import("@/lib/hellraiser");
+    expect(assistantCommand("Assistant Mode")).toBe(true);
+    expect(assistantCommand("assistant mode off")).toBe(false);
     expect(characterModeCommand("Linux Mode")).toBe("linux");
-    expect(agentName("sage", false, false, "assistant")).toBe(agentName("sage", false, false, "linux"));
+  });
+  it("keeps the theme's character but gives them the assistant job", async () => {
+    const { agentPersona } = await import("@/lib/agents");
+    const sage = agentPersona("sage", false, false, "matrix", true);
+    expect(sage.name).toBe("Morpheus");
+    expect(sage.role).toBe("Calendar Assistant");
+    expect(agentPersona("sage", false, false, "matrix", false).role).toBe("The mentor");
+  });
+  it("Dungeon Crawler Carl theme casts Katia in Echo's seat", async () => {
+    const { agentName, resolveMention } = await import("@/lib/agents");
+    expect(agentName("echo", false, false, "dcc")).toBe("Katia");
+    expect(agentName("nova", false, false, "dcc")).toBe("Carl");
+    expect(resolveMention("@donut hi", "dcc")).toBe("byte");
   });
 });

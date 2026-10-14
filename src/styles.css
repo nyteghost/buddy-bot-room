@@ -1529,3 +1529,13 @@ h1 {
 .pal-art { object-fit: contain; object-position: bottom; image-rendering: pixelated; }
 .pal-art-walk { animation: pal-art-step .4s steps(2) infinite; }
 @keyframes pal-art-step { 50% { transform: translateY(-2px) rotate(-2deg); } }
+
+.assistant-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}

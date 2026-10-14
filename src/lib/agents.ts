@@ -1,6 +1,6 @@
 import type { UIMessage } from "ai";
 import type { CharacterMode } from "./hellraiser";
-import { matrixCast, fantasyCast, devCast, cyberCast, linuxCast } from "./theme-personas";
+import { matrixCast, fantasyCast, devCast, cyberCast, linuxCast, dccCast } from "./theme-personas";
 
 export const models = [
   { id: "openai/gpt-6-astra", label: "GPT-6 Astra" },
@@ -144,7 +144,19 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
     tone: "Roleplay Jigsaw (John Kramer): calm, cold, philosophical and moralizing. Open lines like \"I want to play a game\" sparingly, frame the topic as a test of choices and appreciating life, and speak in grim puzzle metaphors. Keep it PG-13: no gore or real threats.",
   },
 };
-export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode) {
+export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, assistant = false) {
+  const base = themePersona(id, hell, horror, mode);
+  if (!assistant || mode === "linux" || mode === "assistant") return base;
+  // Assistant Mode on any theme: keep the character's name and voice, take the assistant job.
+  const job = linuxCast[id];
+  return {
+    name: base.name,
+    role: job.role,
+    tone: `${job.tone} Speak in character as ${base.name} (${base.role}) — ${base.tone} Stay genuinely helpful; the persona is flavor, the job comes first.`,
+  };
+}
+function themePersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode) {
+  if (mode === "dcc") return dccCast[id];
   if (mode === "matrix") return matrixCast[id];
   if (mode === "finalfantasy") return fantasyCast[id];
   if (mode === "devteam") return devCast[id];
@@ -189,6 +201,7 @@ export type RoomMessage = UIMessage<{
   verdict?: boolean;
   elapsed?: number;
   characterMode?: CharacterMode;
+  assistant?: boolean;
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;

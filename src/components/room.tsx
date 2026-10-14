@@ -16,8 +16,6 @@ import {
   Square,
   Users,
   X,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -57,7 +55,7 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
 import { OfficePal } from "./office-pal";
-import { characterModeCommand, setCharacterMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
+import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
   agentName,
@@ -77,9 +75,9 @@ import devRoomImage from "@/assets/devteam-room.jpg";
 import officeRoomImage from "@/assets/office-room.jpg";
 import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
-import { streamSpeech } from "@/lib/stream-speech";
+import dccRoomImage from "@/assets/dcc-room.jpg";
 import { providerForTurn, useEngine } from "@/lib/engine";
-import { hasWebGPU, localTurn, ollamaTurn, speakFree } from "@/lib/local-llm";
+import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
 import { LinuxActions } from "./linux-actions";
@@ -100,6 +98,9 @@ const suggestions = [
 export function Room() {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const characterMode = useCharacterMode();
+  const assistantOn = useAssistantMode();
+  const assistantRef = useRef(assistantOn);
+  assistantRef.current = assistantOn;
   const [cloud, setCloud] = useState(false);
   const browserMessages = useRef<RoomMessage[]>([]);
   function changeStorage(value: boolean) {
@@ -118,17 +119,13 @@ export function Room() {
     document.documentElement.classList.toggle("finalfantasy", characterMode === "finalfantasy");
     document.documentElement.classList.toggle("devteam", characterMode === "devteam");
     document.documentElement.classList.toggle("cyberpunk", characterMode === "cyberpunk");
-    document.documentElement.classList.toggle("linux", characterMode === "linux" || characterMode === "assistant");
-  }, [hell, horror, characterMode]);
+    document.documentElement.classList.toggle("linux", assistantOn);
+    document.documentElement.classList.toggle("dcc", characterMode === "dcc");
+  }, [hell, horror, characterMode, assistantOn]);
   const modeRef = useRef(characterMode);
   modeRef.current = characterMode;
   const [ready, setReady] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(true);
-  const voiceRef = useRef(true);
-  const toggleVoice = () => {
-    voiceRef.current = !voiceRef.current;
-    setVoiceOn(voiceRef.current);
-  };
+
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
@@ -206,41 +203,7 @@ export function Room() {
     abortRef.current?.abort();
     replayRef.current?.abort();
   };
-  async function replay(message: RoomMessage) {
-    const agentId = message.metadata?.agentId;
-    if (!agentId || running || !messageText(message).trim()) return;
-    replayRef.current?.abort();
-    if (replayId === message.id) {
-      setReplayId(null);
-      return;
-    }
-    const controller = new AbortController();
-    replayRef.current = controller;
-    setReplayId(message.id);
-    setError("");
-    try {
-      {
-        await speakFree(messageText(message), controller.signal);
-        return;
-      }
-      await streamSpeech(
-        {
-          agentId,
-          text: messageText(message),
-          characterMode: message.metadata?.characterMode ?? characterMode,
-        },
-        controller.signal,
-      );
-    } catch (err) {
-      if (!controller.signal.aborted)
-        setError(err instanceof Error ? err.message : "Voice playback failed.");
-    } finally {
-      if (replayRef.current === controller) {
-        replayRef.current = null;
-        setReplayId(null);
-      }
-    }
-  }
+
   async function start(ask?: { partner: AgentId; text: string }) {
     if (runLock.current) return;
     replayRef.current?.abort();
@@ -250,6 +213,12 @@ export function Room() {
     const direct = ask || mentioned ? true : directMode;
     const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
+    const assistantToggle = ask ? null : assistantCommand(topic);
+    if (assistantToggle !== null) {
+      setAssistantMode(assistantToggle);
+      setTopic("");
+      return;
+    }
     const command = ask ? null : characterModeCommand(topic);
     if (command) {
       setCharacterMode(command);
@@ -298,7 +267,8 @@ export function Room() {
             horror: turnMode === "horror",
             characterMode: turnMode,
             mode: direct ? ("direct" as Mode) : mode,
-            linuxContext: (turnMode === "linux" || turnMode === "assistant") ? await linuxContext(agent.id) : undefined,
+            assistant: assistantRef.current,
+            linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
           };
           const fetchPrompt = async () => {
             const res = await fetch("/api/chat", {
@@ -331,6 +301,7 @@ export function Room() {
                   ...partial.metadata,
                   agentId: agent.id,
                   characterMode: turnMode,
+                  assistant: assistantRef.current,
                   round: currentRound,
                   ...(verdict ? { verdict: true } : {}),
                   elapsed: (performance.now() - began) / 1000,
@@ -368,18 +339,6 @@ export function Room() {
           if (answer && messageText(answer).trim()) {
             transcript = [...transcript, answer];
             setMessages(transcript);
-            if (turnMode === "hellraiser" && voiceRef.current && !controller.signal.aborted) {
-              try {
-                await speakFree(messageText(answer), controller.signal);
-              } catch (err) {
-                if (controller.signal.aborted) return;
-                voiceRef.current = false;
-                setVoiceOn(false);
-                setError(
-                  `${err instanceof Error ? err.message : "Voice failed."} Voices are muted; the discussion continues.`,
-                );
-              }
-            }
           } else if (!controller.signal.aborted)
             throw new Error("This agent returned no answer. The discussion has stopped.");
         }
@@ -449,9 +408,14 @@ export function Room() {
               <SelectItem value="finalfantasy">Final Fantasy Theme</SelectItem>
               <SelectItem value="devteam">Dev Team Theme</SelectItem>
               <SelectItem value="cyberpunk">Cyberpunk Theme</SelectItem>
-              <SelectItem value="linux">Linux Mode</SelectItem>              <SelectItem value="assistant">Assistant Mode</SelectItem>
+              <SelectItem value="dcc">Dungeon Crawler Carl</SelectItem>
+              <SelectItem value="linux">Linux Theme</SelectItem>
             </SelectContent>
           </Select>
+          <label className="assistant-toggle" title="Pals act as your assistants for mail, tasks, calendar, notes, Q&A and system">
+            <Switch checked={assistantOn} disabled={running} onCheckedChange={setAssistantMode} aria-label="Assistant Mode" />
+            <span>Assistant</span>
+          </label>
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="About this room">
@@ -476,20 +440,20 @@ export function Room() {
           <div className="page-heading">
             <div>
               <div className="eyebrow">
-                {characterMode === "assistant" ? "ASSISTANT MODE" : characterMode === "linux" ? "LINUX MODE" : characterMode === "cyberpunk" ? "NEON NETRUNNERS" : characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
+                {assistantOn ? "ASSISTANT MODE" : characterMode === "dcc" ? "DUNGEON CRAWLER CARL" : characterMode === "linux" ? "LINUX MODE" : characterMode === "cyberpunk" ? "NEON NETRUNNERS" : characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
                   ? "HORROR MODE"
                   : hell
                     ? "THE LAMENT CONFIGURATION IS SOLVED"
                     : "YOUR AI COMMON ROOM"}
               </div>
               <h1>
-                {characterMode === "linux" || characterMode === "assistant" ? "Seven assistants." : characterMode === "cyberpunk" ? "Seven netrunners." : characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
+                {assistantOn ? "Seven assistants." : characterMode === "dcc" ? "Seven crawlers." : characterMode === "linux" ? "Seven assistants." : characterMode === "cyberpunk" ? "Seven netrunners." : characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
                 <br />
-                {characterMode === "assistant" ? "One helpful crew" : characterMode === "linux" ? "One penguin" : characterMode === "cyberpunk" ? "One neon grid" : characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
+                {assistantOn ? "One helpful crew" : characterMode === "dcc" ? "One safe room" : characterMode === "linux" ? "One penguin" : characterMode === "cyberpunk" ? "One neon grid" : characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
                 <span className="text-primary">.</span>
               </h1>
               <p>
-                {characterMode === "assistant" ? "Mail, tasks, calendar, notes, Q&A and system — all in one chat." : characterMode === "linux" ? "Mail, tasks, calendar, notes, Q&A, system — and Tux in your terminal." : characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
+                {assistantOn ? "Mail, tasks, calendar, notes, Q&A, system — and a terminal helper." : characterMode === "dcc" ? "The galaxy is watching. Loot, banter and a plan to survive." : characterMode === "linux" ? "Mail, tasks, calendar, notes, Q&A, system — and Tux in your terminal." : characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
                   ? "The masks are on. The conversation begins."
                   : hell
                     ? "The Cenobites answer your call. Type “Normal mode” to close the box."
@@ -508,25 +472,25 @@ export function Room() {
           <p className="build-version" title={`Commit ${__APP_COMMIT__} · built ${__APP_BUILD_DATE__}`}>
             {desktopApp ? "Desktop" : "Web"} v{__APP_VERSION__} · {__APP_COMMIT__}
           </p>
-          {characterMode === "linux" && (desktopApp ? (
+          {assistantOn && (desktopApp ? (
             <Suspense fallback={<div className="linux-terminal">Opening terminal…</div>}><LinuxTerminal /></Suspense>
           ) : (
             <p className="linux-note">Tux's terminal, notes, files and system stats work in the Pixel Pals desktop app. Here, pals can still help and give you commands to copy.</p>
           ))}
           <div className="room-scene">
             <img
-              src={characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" || characterMode === "assistant" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
+              src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
               alt={
-                characterMode === "cyberpunk" ? "Neon-lit cyberpunk hacker den with holographic terminals" : characterMode === "devteam" || characterMode === "linux" || characterMode === "assistant" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
+                characterMode === "dcc" && !assistantOn ? "Dungeon safe room with loot chests, a round table and a glowing stairwell" : characterMode === "cyberpunk" ? "Neon-lit cyberpunk hacker den with holographic terminals" : characterMode === "devteam" || characterMode === "linux" || characterMode === "assistant" ? "Pixel-art software office with seven computer desks" : characterMode === "matrix" ? "Matrix hacker room with green code terminals and a discussion table" : characterMode === "finalfantasy" ? "Final Fantasy airship room with a glowing crystal and round table" : hell
                   ? "Pixel-art Cenobite chamber with chains, candles and a glowing puzzle box"
                   : "Pixel-art common room with a discussion table, computer stations, and plants"
               }
             />
             {hell && <div className="hell-glow" aria-hidden />}
-            {(characterMode === "linux" || characterMode === "assistant") && (
+            {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}
             <div className="scene-top">
@@ -535,22 +499,10 @@ export function Room() {
                 {running ? "CONVERSATION IN PROGRESS" : "WAITING FOR A GOOD IDEA"}
               </span>
               <span className="flex items-center gap-2">
-                {hell && (
-                  <button
-                    type="button"
-                    className="voice-toggle"
-                    onClick={toggleVoice}
-                    aria-pressed={voiceOn}
-                    aria-label={voiceOn ? "Mute Cenobite voices" : "Unmute Cenobite voices"}
-                  >
-                    {voiceOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
-                    {voiceOn ? "VOICES ON" : "VOICES OFF"}
-                  </button>
-                )}
                 {enabled.length} PALS IN ROOM
               </span>
             </div>
-            {agents.map((a, i) => characterMode === "linux" || characterMode === "assistant" ? (
+            {agents.map((a, i) => assistantOn ? (
               <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={running && speaking === a.id} enabled={enabled.includes(a.id)} />
             ) : (
               <div
@@ -920,26 +872,6 @@ export function Room() {
                       <div className="message-main">
                         <div className="message-heading">
                           <b className={a ? `agent-${a.id}` : "text-primary"}>{name}</b>
-                          {a && m.role === "assistant" && (
-                            <MessageAction
-                              className="reply-voice"
-                              tooltip={
-                                replayId === m.id
-                                  ? "Stop voice playback"
-                                  : `Hear ${name} read this reply`
-                              }
-                              aria-label={
-                                replayId === m.id
-                                  ? "Stop voice playback"
-                                  : `Hear ${name} read this reply`
-                              }
-                              aria-pressed={replayId === m.id}
-                              disabled={running || !messageText(m).trim()}
-                              onClick={() => void replay(m)}
-                            >
-                              {replayId === m.id ? <Square size={13} /> : <Volume2 size={14} />}
-                            </MessageAction>
-                          )}
                           <span>
                             {!a
                               ? "THE TOPIC"
@@ -956,7 +888,7 @@ export function Room() {
                             part.type === "text" ? (
                               <div key={i}>
                                 <MessageResponse>{part.text}</MessageResponse>
-                                {m.role === "assistant" && (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant") && !running && <LinuxActions text={part.text} canRun={m.metadata?.characterMode === "linux"} />}
+                                {m.role === "assistant" && (m.metadata?.assistant ?? (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant")) && !running && <LinuxActions text={part.text} canRun={desktopApp} />}
                               </div>
                             ) : part.type === "reasoning" ? (
                               <details className="reasoning" key={i}>
