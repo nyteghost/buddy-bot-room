@@ -111,12 +111,12 @@ function stamp(date: string, min: number) {
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00`;
 }
 
-export function googleCalendarLink(s: Shift, title = "Work shift") {
+export function googleCalendarLink(s: Shift, title = "Mark Work") {
   const q = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${stamp(s.date, s.start)}/${stamp(s.date, s.end)}`, ctz: TIME_ZONE, details: `Schedule: ${s.raw}` });
   return `https://calendar.google.com/calendar/render?${q}`;
 }
 
-export function buildIcs(shifts: Shift[], title = "Work shift"): string {
+export function buildIcs(shifts: Shift[], title = "Mark Work"): string {
   const now = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
   const events = shifts.map((s) => [
     "BEGIN:VEVENT",
