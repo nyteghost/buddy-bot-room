@@ -3,6 +3,7 @@ import type { AgentId } from "@/lib/agents";
 import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
 import { spriteRuns, to128 } from "@/lib/sprite-upscale";
+import { palArt } from "@/lib/pal-art";
 
 export function PixelCharacter({
   id,
@@ -22,6 +23,19 @@ export function PixelCharacter({
 }) {
   const currentMode = useCharacterMode();
   const mode = explicitMode ?? currentMode;
+  const art = back ? undefined : palArt(id, mode);
+  if (art) {
+    return (
+      <img
+        src={art}
+        width={128}
+        height={128}
+        alt={`${id} pixel character`}
+        draggable={false}
+        className={cn("pixel-character native-sprite pal-art", `agent-${id}`, animated && "character-bounce", walking && "pal-art-walk", className)}
+      />
+    );
+  }
   const front = characterSprite(id, mode);
   const grid = to128(back ? backView(front) : front);
   const runs = spriteRuns(grid, (x, y) => (y < 96 ? "body" : x < 64 ? "left-leg" : "right-leg"));
