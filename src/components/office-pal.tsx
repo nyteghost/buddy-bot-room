@@ -28,6 +28,8 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   const pose = officePose(id, index, elapsed);
   const working = active && arrived;
   const walking = enabled && (active ? !arrived : pose.walking);
+  // Seated whenever the pal is parked at its own desk chair.
+  const seated = active ? arrived : !pose.walking && pose.x === station.home[0] && pose.y === station.home[1];
   const position = {
     "--office-x": `${active ? station.home[0] : pose.x}%`,
     "--office-y": `${active ? station.home[1] : pose.y}%`,
@@ -35,13 +37,24 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   return (
     <div
       style={position}
-      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", walking && "office-walking", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
+      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", walking && "office-walking", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
       aria-label={`${station.label}: ${working ? station.activity : walking ? "walking to a station" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} /></div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} />{seated && <ChairBack />}</div>
       <span>{station.label}</span>
     </div>
+  );
+}
+/** Pixel chair back drawn in front of a seated pal so it reads as sitting at the desk. */
+function ChairBack() {
+  return (
+    <svg className="office-chair" viewBox="0 0 16 10" shapeRendering="crispEdges" aria-hidden>
+      <rect x="2" y="0" width="12" height="7" className="chair-back" />
+      <rect x="3" y="1" width="10" height="1" className="chair-shine" />
+      <rect x="7" y="7" width="2" height="2" className="chair-back" />
+      <rect x="3" y="9" width="10" height="1" className="chair-back" />
+    </svg>
   );
 }

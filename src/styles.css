@@ -1371,7 +1371,13 @@ h1 {
   z-index: 3;
 }
 .linux .office-pal.office-assigned { transition: left 1s ease, top 1s ease; z-index: 6; }
-.office-character { width: 44px; height: 58px; }
+.office-character { position: relative; width: 44px; height: 58px; }
+/* Seated at the desk: tuck the legs behind the chair back and face the monitor. */
+.office-seated .office-character > svg:first-child { transform: translateY(-6%); clip-path: inset(0 0 30% 0); }
+.office-chair { position: absolute; left: 6%; right: 6%; bottom: 4%; width: 88%; height: auto; }
+.chair-back { fill: var(--scene-ink); stroke: none; }
+.chair-shine { fill: var(--muted-foreground); opacity: .35; }
+.office-working.office-seated .office-character > svg:first-child { animation: office-type .6s steps(2) infinite; }
 .office-facing-left .office-character { transform: scaleX(-1); }
 .office-walking .office-character > svg { animation: office-stride .4s steps(2) infinite; }
 .sprite-walk-left-leg { animation: office-leg .4s steps(2) infinite; }
