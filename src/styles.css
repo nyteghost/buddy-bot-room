@@ -623,12 +623,23 @@ h1 {
   white-space: normal;
   text-align: left;
 }
+.mode-row {
+  display: flex;
+  flex-direction: column;
+  margin-top: 22px;
+}
+.mode-row .mode-switch {
+  align-self: flex-start;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
 .launch-controls {
   display: flex;
   gap: 16px;
   align-items: flex-end;
   margin-top: 24px;
 }
+
 .control-label {
   display: block;
   color: var(--muted-foreground);
