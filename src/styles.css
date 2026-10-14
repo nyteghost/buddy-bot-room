@@ -1515,8 +1515,16 @@ h1 {
 
 /* Front desk row of the office picture redrawn above the pals so they can sit and walk behind it. */
 .office-foreground { position: absolute; inset: 0; z-index: 7; pointer-events: none; clip-path: inset(62% 0 0 0); }
+/* Office name tags float above each pal's head, so the back and front rows never collide. */
+.linux .office-pal > span {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.office-task-cue { bottom: calc(100% + 26px); }
 .office-front > span { order: -1; }
-.office-seated-toward .office-character > svg:first-child { transform: none; }
 .pal-art { object-fit: contain; object-position: bottom; image-rendering: pixelated; }
 .pal-art-walk { animation: pal-art-step .4s steps(2) infinite; }
 @keyframes pal-art-step { 50% { transform: translateY(-2px) rotate(-2deg); } }
