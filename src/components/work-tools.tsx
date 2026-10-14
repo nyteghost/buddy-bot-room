@@ -130,7 +130,7 @@ function ShiftsTab() {
             onChange={(e) => setPasted(e.target.value)}
             rows={3}
             aria-label="Pasted schedule rows"
-            placeholder={"Mark Brown\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t\t\n603\t9\t9\t9\t9\t9\tOFF\tOFF"}
+            placeholder={"Paste the week block from Excel — include the date row (10/19/26 … 10/25/26) and your name row."}
             className="w-full rounded-md border border-input bg-background p-2 font-mono text-xs"
           />
           <div className="flex items-center gap-2">
