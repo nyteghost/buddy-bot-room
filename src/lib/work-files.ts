@@ -206,7 +206,7 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout): boolean {
     if (codes) paint(cell, codes);
   };
   w.dates.forEach((_, i) => {
-    write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!);
+    if (w.cgc[i] !== "DARK") write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!);
     for (const [label, cells] of Object.entries(w.rows)) write(label, i, cells[i]!.text, cells[i]!.codes);
   });
   return true;
