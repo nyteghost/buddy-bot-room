@@ -15,9 +15,9 @@ describe("shared assistant station wandering", () => {
       for (let elapsed = 0; elapsed < 31000; elapsed += 250) {
         const pose = officePose(id, 0, elapsed);
         expect(pose.x).toBeGreaterThanOrEqual(12);
-        expect(pose.x).toBeLessThanOrEqual(87);
-        expect(pose.y).toBeGreaterThanOrEqual(36);
-        expect(pose.y).toBeLessThanOrEqual(90);
+        expect(pose.x).toBeLessThanOrEqual(90);
+        expect(pose.y).toBeGreaterThanOrEqual(28);
+        expect(pose.y).toBeLessThanOrEqual(62);
       }
       expect(officePose(id, 0, 30200).x).toBe(officeStations[id].home[0]);
     }

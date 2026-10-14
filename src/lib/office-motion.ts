@@ -1,22 +1,23 @@
 import type { AgentId } from "./agents";
 
 type Point = readonly [number, number];
-type Station = { home: Point; visit: Point; label: string; activity: string };
+/** "away" = back row, seated facing the wall monitors; "toward" = front row, behind a desk facing the viewer. */
+type Station = { home: Point; visit: Point; label: string; activity: string; facing: "away" | "toward" };
 
 /** Shared floor routes for Linux and Assistant modes; percentages of the room. */
 export const officeStations: Record<AgentId, Station> = {
-  nova: { home: [26, 39], visit: [12, 46], label: "Gmail", activity: "Drafting mail" },
-  byte: { home: [42, 39], visit: [34, 47], label: "Tasks", activity: "Reviewing tasks" },
-  sage: { home: [58, 39], visit: [66, 47], label: "Calendar", activity: "Planning an event" },
-  pip: { home: [73, 39], visit: [78, 51], label: "Notes", activity: "Writing notes" },
-  echo: { home: [26, 72], visit: [12, 86], label: "Q&A", activity: "Researching an answer" },
-  rune: { home: [50, 72], visit: [62, 86], label: "System", activity: "Reviewing stats" },
-  claude: { home: [75, 72], visit: [87, 86], label: "Tux", activity: "Thinking through a fix" },
+  nova: { home: [26, 31], visit: [14, 44], label: "Gmail", activity: "Drafting mail", facing: "away" },
+  byte: { home: [42.6, 31], visit: [34, 46], label: "Tasks", activity: "Reviewing tasks", facing: "away" },
+  sage: { home: [59.2, 31], visit: [67, 46], label: "Calendar", activity: "Planning an event", facing: "away" },
+  pip: { home: [75.2, 31], visit: [86, 44], label: "Notes", activity: "Writing notes", facing: "away" },
+  echo: { home: [19, 59], visit: [28, 50], label: "Q&A", activity: "Researching an answer", facing: "toward" },
+  rune: { home: [49, 59], visit: [58, 52], label: "System", activity: "Reviewing stats", facing: "toward" },
+  claude: { home: [80, 59], visit: [88, 50], label: "Tux", activity: "Thinking through a fix", facing: "toward" },
 };
 
 export function officePose(id: AgentId, index: number, elapsed: number) {
   const { home, visit } = officeStations[id];
-  const aisle: Point = [home[0], home[1] < 50 ? 50 : 86];
+  const aisle: Point = [home[0], 46]; // walkway between the two desk rows
   const corner: Point = [visit[0], aisle[1]];
   const points = [home, home, aisle, corner, visit, visit, corner, aisle, home, home];
   const durations = [6500, 2400, 3200, 2000, 4500, 2000, 3200, 2400, 5000];

@@ -37,12 +37,12 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   return (
     <div
       style={position}
-      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", walking && "office-walking", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
+      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
       aria-label={`${station.label}: ${working ? station.activity : walking ? "walking to a station" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} back={seated} />{seated && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} back={seated && station.facing === "away"} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{station.label}</span>
     </div>
   );
