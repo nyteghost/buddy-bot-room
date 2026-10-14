@@ -55,8 +55,9 @@ export async function handleTranscribe(request: Request) {
             if (data === "[DONE]") { reader.cancel().catch(() => {}); return controller.close(); }
             if (!data) continue;
             try {
-              const delta = JSON.parse(data).choices?.[0]?.delta?.content;
-              if (delta) controller.enqueue(enc.encode(delta));
+              const choice = JSON.parse(data).choices?.[0];
+              if (choice?.delta?.content) controller.enqueue(enc.encode(choice.delta.content));
+              if (choice?.finish_reason) { reader.cancel().catch(() => {}); return controller.close(); }
             } catch { /* partial */ }
           }
         } catch (error) {
