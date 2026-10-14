@@ -36,5 +36,5 @@
 
 - [x] Google Calendar auto-upload: per-user App User Connector (google_calendar), "Add all to Google Calendar" button in ShiftsTab
 
-- [ ] Schedule Excel matches uploaded CGC/CEPAC weekly layout (new + update existing)
-- [ ] Mic recording pal: @record starts/stops browser mic recording, download clip
+- [x] Schedule Excel matches uploaded CGC/CEPAC weekly layout (new + update existing)
+- [x] Mic recording pal: @record starts/stops browser mic recording, download clip
