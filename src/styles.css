@@ -1363,6 +1363,71 @@ h1 {
 @keyframes tp-bounce-big { 50% { transform: translateY(-4px); } }
 
 /* Dev Team theme: each pal stands at their own workstation instead of a table. */
+.linux .office-pal {
+  left: var(--office-x);
+  top: var(--office-y);
+  width: 62px;
+  transition: left .18s linear, top .18s linear, opacity .2s;
+  z-index: 3;
+}
+.linux .office-pal.office-assigned { transition: left 1s ease, top 1s ease; z-index: 6; }
+.office-character { width: 44px; height: 58px; }
+.office-facing-left .office-character { transform: scaleX(-1); }
+.office-walking .office-character > svg { animation: office-stride .4s steps(2) infinite; }
+.sprite-walk-left-leg { animation: office-leg .4s steps(2) infinite; }
+.sprite-walk-right-leg { animation: office-leg .4s steps(2) -.2s infinite; }
+.office-working .office-character > svg { animation: office-type .6s steps(2) infinite; }
+.office-working.agent-pip .office-character > svg { animation: office-write .8s steps(3) infinite; }
+.office-working.agent-echo .office-character > svg { animation: office-sort 1s steps(3) infinite; }
+.office-working.agent-rune .office-character > svg { animation: office-inspect 1.2s steps(3) infinite; }
+.office-working.agent-sage .office-character > svg { animation: office-write 1s steps(3) infinite; }
+.office-task-cue {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: max-content;
+  max-width: 130px;
+  min-height: 34px;
+  padding: 4px 6px;
+  background: var(--scene-ink);
+  color: var(--foreground);
+  border: 1px solid var(--agent-color);
+  font-family: "Silkscreen", monospace;
+  font-size: 8px;
+  line-height: 1.4;
+  animation: office-cue .2s steps(3) both;
+}
+.office-task-cue .thinking-prop { position: static; flex: 0 0 26px; width: 26px; height: 26px; }
+.office-task-cue span { max-width: 84px; }
+.office-working::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  width: 30px;
+  height: 2px;
+  background: var(--agent-color);
+  animation: tp-blink 1.2s steps(2) infinite;
+}
+@keyframes office-stride { 50% { transform: translateY(-2px) rotate(2deg); } }
+@keyframes office-leg { 50% { transform: translateY(-1px) translateX(1px); } }
+@keyframes office-type { 50% { transform: translateY(1px) rotate(-2deg); } }
+@keyframes office-write { 33% { transform: rotate(-3deg); } 66% { transform: translateX(1px) rotate(2deg); } }
+@keyframes office-sort { 33% { transform: translateX(-2px); } 66% { transform: translateX(2px); } }
+@keyframes office-inspect { 50% { transform: rotate(4deg) translateY(-1px); } }
+@keyframes office-cue { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 640px) {
+  .linux .office-pal { width: 38px; }
+  .linux .office-pal .pixel-character, .office-character { width: 26px; height: 32px; }
+  .linux .office-pal > span { font-size: 6px; padding: 2px 3px; }
+  .office-task-cue { max-width: 100px; font-size: 6px; gap: 3px; }
+  .office-task-cue .thinking-prop { flex-basis: 22px; width: 22px; height: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .linux .office-pal { transition: none; }
+  .office-character > svg, .office-character g, .office-working::after, .office-task-cue { animation: none !important; }
+}
 .devteam .scene-pal-0 { left: 26%; top: 36%; }
 .devteam .scene-pal-1 { left: 42%; top: 36%; }
 .devteam .scene-pal-2 { left: 58%; top: 36%; }
