@@ -15,11 +15,12 @@ export async function handleTranscribe(request: Request) {
   try {
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) return Response.json({ error: "Transcription is not configured." }, { status: 401 });
-    const body = (await request.json()) as { audio?: unknown; format?: unknown };
+    const body = (await request.json()) as { audio?: unknown; format?: unknown; previous?: unknown };
+    const previous = typeof body.previous === "string" ? body.previous.slice(-3000) : "";
     const audio = typeof body.audio === "string" ? body.audio : "";
     const format = FORMATS.find((f) => f === body.format);
     if (!audio || !format) return Response.json({ error: "Send a recording to transcribe." }, { status: 400 });
-    if (audio.length > MAX_BASE64) return Response.json({ error: "That recording is too long — keep clips under about 15 minutes." }, { status: 413 });
+    if (audio.length > MAX_BASE64) return Response.json({ error: "That recording is too long — each part must be under 15 minutes." }, { status: 413 });
 
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -28,7 +29,7 @@ export async function handleTranscribe(request: Request) {
       body: JSON.stringify({
         model: MODEL,
         stream: true,
-        messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "input_audio", input_audio: { data: audio, format } }] }],
+        messages: [{ role: "user", content: [{ type: "text", text: previous ? `${PROMPT}\n\nThis is the next part of a longer recording. The previous part ended with the transcript below — reuse the same labels for the same voices and continue numbering new voices:\n${previous}` : PROMPT }, { type: "input_audio", input_audio: { data: audio, format } }] }],
       }),
     });
     if (!upstream.ok || !upstream.body) {
@@ -44,6 +45,7 @@ export async function handleTranscribe(request: Request) {
     const out = new ReadableStream<Uint8Array>({
       async pull(controller) {
         try {
+          for (let emitted = false; !emitted; ) {
           const next = await reader.read();
           if (next.done) return controller.close();
           buffer += next.value;
@@ -56,9 +58,10 @@ export async function handleTranscribe(request: Request) {
             if (!data) continue;
             try {
               const choice = JSON.parse(data).choices?.[0];
-              if (choice?.delta?.content) controller.enqueue(enc.encode(choice.delta.content));
+              if (choice?.delta?.content) { controller.enqueue(enc.encode(choice.delta.content)); emitted = true; }
               if (choice?.finish_reason) { reader.cancel().catch(() => {}); return controller.close(); }
             } catch { /* partial */ }
+          }
           }
         } catch (error) {
           if (request.signal.aborted || isAbortError(error)) controller.close();
