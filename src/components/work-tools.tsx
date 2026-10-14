@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, parsePastedShifts, sheetRowFor, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, parsePastedShifts, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
 import { deckReply } from "@/lib/deck-solver";
 import { MessageResponse } from "@/components/ai-elements/message";
 
@@ -41,11 +41,11 @@ export function WorkTools() {
   );
 }
 
-function FilePick({ accept, label, onFile }: { accept: string; label: string; onFile: (f: File) => void }) {
+function FilePick({ accept, label, onFile, onFiles }: { accept: string; label: string; onFile?: (f: File) => void; onFiles?: (f: File[]) => void }) {
   return (
     <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground hover:bg-muted">
       <FileUp className="size-4" /> {label}
-      <input type="file" accept={accept} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      <input type="file" accept={accept} multiple={!!onFiles} className="sr-only" onChange={(e) => { const list = [...(e.target.files ?? [])]; if (onFiles && list.length) onFiles(list); else if (list[0]) onFile?.(list[0]); e.target.value = ""; }} />
     </label>
   );
 }
@@ -54,22 +54,23 @@ function EventsTab() {
   const [entries, setEntries] = useState<EventEntry[]>([]);
   const [status, setStatus] = useState("");
   const [blob, setBlob] = useState<Blob | null>(null);
-  async function load(file: File) {
+  async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
     try {
       const { readEventPdf, eventsWorkbook } = await import("@/lib/work-files");
-      const rows = await readEventPdf(file);
+      const rows = (await Promise.all(files.map(readEventPdf))).flat();
       const list = summarizeEvents(rows);
       setEntries(list);
       setBlob(list.length ? await eventsWorkbook(list) : null);
-      setStatus(list.length ? `${rows.length} lines read, ${list.length} schedule entries (date headers skipped).` : "No show, move-in or move-out lines found.");
+      const dates = new Set(list.map((e) => e.date)).size;
+      setStatus(list.length ? `${files.length} PDF${files.length > 1 ? "s" : ""} · ${rows.length} lines read · ${list.length} entries across ${dates} days. Escalator row added at the bottom.` : "No show, move-in or move-out lines found.");
     } catch (e) { setStatus(`Could not read that PDF: ${(e as Error).message}`); }
   }
   const { deliver } = useDeliver();
   return (
     <div className="space-y-3 pt-2">
-      <FilePick accept="application/pdf" label="Drop an Ungerboeck “Event Functions” PDF" onFile={load} />
-      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in · MI = move in · MO = move out. Orange date rows are ignored.</p>
+      <FilePick accept="application/pdf" label="Drop one or more Ungerboeck PDFs (Event Functions or For Scheduling)" onFiles={load} />
+      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className="text-sm">{status}</p>}
       {entries.length > 0 && (
         <>
@@ -77,7 +78,7 @@ function EventsTab() {
             <table className="w-full text-sm">
               <thead className="bg-muted text-left"><tr><th className="p-2">Day</th><th className="p-2">Space</th><th className="p-2">Entry</th></tr></thead>
               <tbody>{entries.map((e, i) => (
-                <tr key={i} className="border-t border-border"><td className="p-2">{dayLabel(e.date)}</td><td className="p-2">{sheetRowFor(e.space)}</td><td className="p-2 font-mono">{entryLabel(e)} <span className="text-muted-foreground">{e.title}</span></td></tr>
+                <tr key={i} className="border-t border-border"><td className="p-2">{dayLabel(e.date)}</td><td className="p-2">{e.space}</td><td className="p-2 font-mono">{entryLabel(e)} <span className="text-muted-foreground">{e.title}</span></td></tr>
               ))}</tbody>
             </table>
           </div>

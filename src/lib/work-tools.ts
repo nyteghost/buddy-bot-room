@@ -40,7 +40,7 @@ export function parseReportTime(t: string): number {
 }
 
 // ---------- Ungerboeck event functions ----------
-export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string };
+export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string };
 export type EventCode = "S" | "Exmi" | "MI" | "MO";
 export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string };
 
@@ -50,7 +50,8 @@ export function classifyEvent(row: EventRow): EventCode | null {
   const usage = row.usage.toLowerCase(), desc = row.description.toLowerCase();
   if (usage.includes("move out")) return "MO";
   if (usage.includes("move in")) {
-    if (/service desk|early access|freight|registration/.test(desc)) return null;
+    if (/service desk/.test(desc)) return "Exmi";
+    if (/early access|freight|registration/.test(desc)) return null;
     return /exhibitor/.test(desc) ? "Exmi" : "MI";
   }
   if (usage.startsWith("event (evt)") || usage.startsWith("event")) {
@@ -66,12 +67,13 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   for (const row of rows) {
     const code = classifyEvent(row);
     if (!code) continue;
-    const space = row.space || "Unassigned";
-    const key = `${row.date}|${space}|${code}`;
     const start = parseReportTime(row.start), end = parseReportTime(row.end);
-    const prev = map.get(key);
-    if (prev) { prev.start = Math.min(prev.start, start); prev.end = Math.max(prev.end, end); }
-    else map.set(key, { date: row.date, space, code, start, end, title: row.description });
+    for (const space of expandSpace(row.space || "Unassigned")) {
+      const key = `${row.date}|${space}|${code}`;
+      const prev = map.get(key);
+      if (prev) { prev.start = Math.min(prev.start, start); prev.end = Math.max(prev.end, end); }
+      else map.set(key, { date: row.date, space, code, start, end, title: row.event || row.description });
+    }
   }
   const order: EventCode[] = ["MI", "Exmi", "S", "MO"];
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
@@ -100,6 +102,38 @@ export function sheetRowFor(space: string): string {
   if (conc) return `Concourse ${(conc[1] ?? "").toUpperCase()}`;
   return space;
 }
+
+/** Splits combined spaces into individual sheet rows: "Exhibit Hall AB" → Hall A, Hall B; Chattahoochee/BRFULL → BallRoom A–G. */
+export function expandSpace(space: string): string[] {
+  const s = space.toLowerCase();
+  if (/chattahoochee|brfull/.test(s)) return [..."ABCDEFG"].map((l) => `BallRoom ${l}`);
+  const hall = s.match(/exhibit hall ([a-d]+)\b/);
+  if (hall) return [...(hall[1] ?? "").toUpperCase()].map((l) => `Hall ${l}`);
+  const ball = s.match(/ballroom ([a-g]+)\b/);
+  if (ball) return [...(ball[1] ?? "").toUpperCase()].map((l) => `BallRoom ${l}`);
+  return [sheetRowFor(space)];
+}
+
+/** Fixed sheet order: halls, ballrooms, then anything else. */
+export function sheetRowOrder(rows: string[]): string[] {
+  const fixed = [..."ABCD"].map((l) => `Hall ${l}`).concat([..."ABCDEFG"].map((l) => `BallRoom ${l}`));
+  const used = new Set(rows);
+  return [...fixed.filter((r) => used.has(r)), ...[...used].filter((r) => !fixed.includes(r)).sort()];
+}
+
+/** Escalators run 1 hour before the first show (S) of the day to 1 hour after the last one ends. */
+export function escalatorHours(entries: EventEntry[]): Map<string, { start: number; end: number }> {
+  const out = new Map<string, { start: number; end: number }>();
+  for (const e of entries) {
+    if (e.code !== "S") continue;
+    const prev = out.get(e.date);
+    const start = Math.max(0, e.start - 60), end = e.end + 60;
+    out.set(e.date, prev ? { start: Math.min(prev.start, start), end: Math.max(prev.end, end) } : { start, end });
+  }
+  return out;
+}
+
+export const escalatorLabel = (h: { start: number; end: number }) => `${formatMinutes(h.start)}-${h.end >= 1440 ? "12a" : formatMinutes(h.end)}`;
 
 // ---------- my shifts ----------
 export type Shift = { date: string; start: number; end: number; raw: string };
