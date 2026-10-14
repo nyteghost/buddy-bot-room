@@ -88,6 +88,9 @@ import { linuxContext } from "@/lib/linux";
 import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
+import { WorkTools } from "./work-tools";
+import { deckReply } from "@/lib/deck-solver";
+import { priceReply } from "@/lib/work-tools";
 import { cn } from "@/lib/utils";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -227,6 +230,17 @@ export function Room() {
       setCharacterMode(command);
       setTopic("");
       inputRef.current?.focus();
+      return;
+    }
+    const toolReply = ask ? null : deckReply(topic) ?? priceReply(topic);
+    if (toolReply) {
+      const toolAgent: AgentId = /^@(deck|stage|staging)\b/i.test(topic.trim()) ? "rune" : "byte";
+      setMessages([
+        ...messages,
+        { id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: topic.trim() }] },
+        { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: toolAgent, characterMode: modeRef.current }, parts: [{ type: "text", text: toolReply }] },
+      ]);
+      setTopic("");
       return;
     }
     if (runLock.current || !topic.trim() || tooFew || !ready) return;
@@ -415,6 +429,7 @@ export function Room() {
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
           <EngineSettingsDialog />
+          <WorkTools />
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
             value={characterMode}
