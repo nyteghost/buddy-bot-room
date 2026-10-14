@@ -1,4 +1,5 @@
 # Pixel Pals Chat
+- [ ] Shared station wandering and visual task animations in Linux and Assistant modes
 - [x] Improve and visually verify all Matrix and Final Fantasy native character sprites.
 - [x] Build pixel room, character roster, topic input, and start/stop controls.
 - [x] Connect multiple AI models with roundtable and broadcast modes.
