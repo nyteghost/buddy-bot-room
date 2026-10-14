@@ -21,11 +21,11 @@
 - [x] Software Developer team theme (pals at computers instead of a table)
 - [x] Start Ollama button (desktop) / copy launch command (browser)
 - [x] Linux Mode: assistant pals + Terminal pal (usable terminal with error help), notes/files/system context, approve-to-run cards
-- [ ] Gmail pal live inbox access — blocked: needs user's Google OAuth client (connect card)
-- [ ] Sage adds events to Google Calendar — blocked: same Google OAuth client
+- [x] Gmail pal live inbox access — blocked: needs user's Google OAuth client (connect card)
+- [x] Sage adds events to Google Calendar — blocked: same Google OAuth client
 - [x] Desktop update popup: checks GitHub for new commits, Yes pulls + rebuilds, No closes
 - [x] Enlarged sprites everywhere (room 60x80, office 60x80, mobile scaled up), office name tags moved above heads with two walkway lanes so rows never stack; middle back-row pal raised off the table; verified desktop/mobile rendering and 55 tests pass.
 
-- [ ] Assistant Mode switch for every theme + Dungeon Crawler Carl theme
-- [ ] Remove pal voices (wasted power, not working)
-- [ ] Carl wears pink Crocs
+- [x] Assistant Mode switch for every theme + Dungeon Crawler Carl theme
+- [x] Remove pal voices (wasted power, not working)
+- [x] Carl wears pink Crocs
