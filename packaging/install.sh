@@ -4,6 +4,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Grab the newest code from GitHub first, so this script is the only command
+# needed to update. Set SKIP_PULL=1 to build exactly what is on disk.
+if [ "${SKIP_PULL:-0}" != "1" ]; then
+  bash "$(dirname "$0")/pull.sh"
+fi
+
 need() { command -v "$1" >/dev/null 2>&1; }
 missing=()
 need bun || missing+=(bun)
