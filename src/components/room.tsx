@@ -239,7 +239,7 @@ export function Room() {
       setMessages([
         ...messages,
         { id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: topic.trim() }] },
-        { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: "echo", characterMode: modeRef.current }, parts: [{ type: "text", text: "Recorder's open below — press Record when you're ready and Stop when you're done. Nothing records until you press it, and clips stay on this device." }] },
+        { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: "echo", characterMode: modeRef.current }, parts: [{ type: "text", text: "Recorder is open below — press Record, then Stop. Tap the page icon on a clip and I will transcribe it, labelling each voice Man 1, Woman 1 and so on." }] },
       ]);
       setTopic("");
       return;
