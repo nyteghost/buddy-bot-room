@@ -39,3 +39,7 @@
 
 - [x] Schedule Excel matches uploaded CGC/CEPAC weekly layout (new + update existing)
 - [x] Mic recording pal: @record starts/stops browser mic recording, download clip
+- [x] Transcribe clips with Man 1 / Woman 1 speaker labels; auto-split recordings into 14-minute parts
+- [x] Record button in the top bar next to Work tools
+- [x] Move CONVERSATION MODE switch above "What's on your mind?"
+
