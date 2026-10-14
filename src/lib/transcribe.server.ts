@@ -20,7 +20,7 @@ export async function handleTranscribe(request: Request) {
     const audio = typeof body.audio === "string" ? body.audio : "";
     const format = FORMATS.find((f) => f === body.format);
     if (!audio || !format) return Response.json({ error: "Send a recording to transcribe." }, { status: 400 });
-    if (audio.length > MAX_BASE64) return Response.json({ error: "That recording is too long — keep clips under about 15 minutes." }, { status: 413 });
+    if (audio.length > MAX_BASE64) return Response.json({ error: "That recording is too long — each part must be under 15 minutes." }, { status: 413 });
 
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
