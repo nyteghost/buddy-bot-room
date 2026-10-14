@@ -7,6 +7,7 @@ import {
   CircleHelp,
   Download,
   MessageSquare,
+  Mic,
   Wrench,
   Minus,
   Play,
@@ -134,6 +135,10 @@ export function Room() {
 
   const [topic, setTopic] = useState("");
   const [recorderOpen, setRecorderOpen] = useState(false);
+  useEffect(() => {
+    if (!recorderOpen) return;
+    document.getElementById("recorder-anchor")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [recorderOpen]);
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
   const [partner, setPartner] = useState<AgentId>("claude");
@@ -441,6 +446,15 @@ export function Room() {
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
           <EngineSettingsDialog />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="engine-trigger"
+            aria-pressed={recorderOpen}
+            onClick={() => setRecorderOpen((open) => !open)}
+          >
+            <Mic className="size-4" /> Record
+          </Button>
           <WorkTools />
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
@@ -594,7 +608,9 @@ export function Room() {
               <h2>What's on your mind?</h2>
               <span className="muted-label">YOU SET THE TOPIC</span>
             </div>
-            {recorderOpen && <MicRecorder onClose={() => setRecorderOpen(false)} />}
+            <div id="recorder-anchor">
+              {recorderOpen && <MicRecorder onClose={() => setRecorderOpen(false)} />}
+            </div>
             <PromptInput onSubmit={() => start()} className="topic-composer">
               <PromptInputTextarea
                 ref={inputRef}
