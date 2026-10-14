@@ -131,6 +131,26 @@ export function buildIcs(shifts: Shift[], title = "Work shift"): string {
   return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Pixel Pals//Shifts//EN", ...events, "END:VCALENDAR"].join("\r\n");
 }
 
+/** Parses a pasted 3-row schedule block (name row with 7 shift cells, badge/hours row, title row) starting from the week's Monday. */
+export function parsePastedShifts(text: string, weekStartIso: string, name = DEFAULT_SCHEDULE_NAME): Shift[] {
+  const target = name.trim().toLowerCase();
+  const line = text.split(/\r?\n/).find((l) => l.trim().toLowerCase().startsWith(target));
+  if (!line) return [];
+  const cells = line.split(/\t| {2,}/).map((c) => c.trim()).slice(1);
+  const monday = new Date(`${weekStartIso}T12:00:00Z`);
+  if (Number.isNaN(monday.getTime())) return [];
+  const shifts: Shift[] = [];
+  for (let i = 0; i < Math.min(cells.length, 7); i++) {
+    const raw = cells[i] ?? "";
+    const time = parseShift(raw);
+    if (!time) continue;
+    const d = new Date(monday);
+    d.setUTCDate(d.getUTCDate() + i);
+    shifts.push({ date: d.toISOString().slice(0, 10), ...time, raw });
+  }
+  return shifts;
+}
+
 // ---------- vendors ----------
 export const vendors = [
   { name: "Grainger", url: (q: string) => `https://www.grainger.com/search?searchQuery=${encodeURIComponent(q)}`, taxNote: "Tax-exempt certificate on account; gov PO accepted" },
