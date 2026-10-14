@@ -3,6 +3,7 @@ import { DefaultChatTransport, readUIMessageStream } from "ai";
 import {
   ArrowUpRight,
   Check,
+  ChevronDown,
   CircleHelp,
   Download,
   MessageSquare,
@@ -164,6 +165,7 @@ export function Room() {
   const [error, setError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
+  const [palsOpen, setPalsOpen] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
@@ -539,74 +541,6 @@ export function Room() {
               </span>
             </div>
           </div>
-          <div className="section-heading">
-            <h2>
-              The pals <span>{enabled.length}/{agents.length}</span>
-            </h2>
-            <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
-              <Settings2 size={14} />
-              {settings ? "Hide settings" : "Model settings"}
-            </Button>
-          </div>
-          <div className="agent-grid">
-            {agents.map((a) => (
-              <div
-                key={a.id}
-                className={cn(
-                  "agent-card",
-                  `agent-${a.id}`,
-                  !enabled.includes(a.id) && "agent-disabled",
-                )}
-              >
-                <div className="agent-card-top">
-                  <span className="avatar-tile">
-                    <PixelCharacter id={a.id} />
-                  </span>
-                  <Switch
-                    aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
-                    checked={enabled.includes(a.id)}
-                    disabled={running}
-                    onCheckedChange={(checked) =>
-                      setEnabled((prev) =>
-                        checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
-                      )
-                    }
-                  />
-                </div>
-                <h3>
-                  {agentName(a.id, hell, horror, characterMode)}
-                  <span className="agent-dot" />
-                </h3>
-                <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
-                <span className="model-label">
-                  {models.find((m) => m.id === selectedModels[a.id])?.label}
-                </span>
-                {settings && (
-                  <Select
-                    value={selectedModels[a.id]}
-                    disabled={running}
-                    onValueChange={(value) =>
-                      setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
-                      className="mt-3"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            ))}
-          </div>
           <div className="topic-section">
             <div className="section-heading">
               <h2>What's on your mind?</h2>
@@ -657,6 +591,88 @@ export function Room() {
               ))}
             </div>
           </div>
+          <div className="section-heading">
+            <button
+              type="button"
+              className="pals-toggle"
+              aria-expanded={palsOpen}
+              title={palsOpen ? "Hide pals" : "Show pals"}
+              onClick={() => setPalsOpen((v) => !v)}
+            >
+              <h2>
+                The pals <span>{enabled.length}/{agents.length}</span>
+              </h2>
+              <ChevronDown
+                size={16}
+                className={cn("pals-chevron", !palsOpen && "pals-chevron-closed")}
+              />
+            </button>
+            <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
+              <Settings2 size={14} />
+              {settings ? "Hide settings" : "Model settings"}
+            </Button>
+          </div>
+          {palsOpen && (
+            <div className="agent-grid">
+              {agents.map((a) => (
+                <div
+                  key={a.id}
+                  className={cn(
+                    "agent-card",
+                    `agent-${a.id}`,
+                    !enabled.includes(a.id) && "agent-disabled",
+                  )}
+                >
+                  <div className="agent-card-top">
+                    <span className="avatar-tile">
+                      <PixelCharacter id={a.id} />
+                    </span>
+                    <Switch
+                      aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
+                      checked={enabled.includes(a.id)}
+                      disabled={running}
+                      onCheckedChange={(checked) =>
+                        setEnabled((prev) =>
+                          checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
+                        )
+                      }
+                    />
+                  </div>
+                  <h3>
+                    {agentName(a.id, hell, horror, characterMode)}
+                    <span className="agent-dot" />
+                  </h3>
+                  <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
+                  <span className="model-label">
+                    {models.find((m) => m.id === selectedModels[a.id])?.label}
+                  </span>
+                  {settings && (
+                    <Select
+                      value={selectedModels[a.id]}
+                      disabled={running}
+                      onValueChange={(value) =>
+                        setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
+                        className="mt-3"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {models.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="launch-controls">
             <div>
               <span className="control-label">CONVERSATION MODE</span>
