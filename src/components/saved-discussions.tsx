@@ -101,4 +101,3 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen }: {
   </div>;
 }
 
-export { messageText };
