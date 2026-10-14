@@ -314,7 +314,28 @@ export function Room() {
             }
           };
           const provider = providerForTurn(engine, turnIndex);
-          if (engine.kind === "ollama") {
+          const runOllama = async () =>
+            consume(
+              await ollamaTurn(
+                await fetchPrompt(),
+                { url: engine.ollamaUrl, model: engine.ollamaModel },
+                { agentId: agent.id, round: currentRound },
+                controller.signal,
+              ),
+            );
+          if (engine.kind === "auto-ollama") {
+            // Free keys first; local Ollama takes over when no key is set or a key fails before any text.
+            if (!provider) await runOllama();
+            else {
+              try {
+                await consume(await runCloud(provider));
+              } catch (err) {
+                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
+                answer = undefined;
+                await runOllama();
+              }
+            }
+          } else if (engine.kind === "ollama") {
             await consume(
               await ollamaTurn(
                 await fetchPrompt(),
