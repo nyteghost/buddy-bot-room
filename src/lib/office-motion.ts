@@ -16,8 +16,9 @@ export const officeStations: Record<AgentId, Station> = {
 };
 
 export function officePose(id: AgentId, index: number, elapsed: number) {
-  const { home, visit } = officeStations[id];
-  const aisle: Point = [home[0], 46]; // walkway between the two desk rows
+  const { home, visit, facing } = officeStations[id];
+  // Two lanes in the walkway, so the name tags above opposite rows never stack on one line.
+  const aisle: Point = [home[0], facing === "away" ? 43 : 50.5];
   const corner: Point = [visit[0], aisle[1]];
   const points = [home, home, aisle, corner, visit, visit, corner, aisle, home, home];
   const durations = [6500, 2400, 3200, 2000, 4500, 2000, 3200, 2400, 5000];
