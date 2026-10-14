@@ -62,7 +62,7 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
   const target = name.trim().toLowerCase();
   for (const sheetName of wb.SheetNames) {
     if (!/week/i.test(sheetName)) continue;
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], { header: 1, raw: true, defval: "" });
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName]!, { header: 1, raw: true, defval: "" });
     const dayRow = grid.findIndex((r) => String(r[1]).trim().toUpperCase() === "MON");
     if (dayRow < 0) continue;
     const dates = grid[dayRow + 1] ?? [];

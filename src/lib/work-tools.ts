@@ -17,7 +17,7 @@ function parseClock(raw: string): { min: number; mer: "a" | "p" | null } | null 
 export function parseShift(cell: string): { start: number; end: number } | null {
   const m = cell.replace(/\s+/g, "").match(/^(\d{1,2}(?::\d{2})?(?:am|pm|a|p)?)[-–](\d{1,2}(?::\d{2})?(?:am|pm|a|p)?)$/i);
   if (!m) return null;
-  const a = parseClock(m[1]), b = parseClock(m[2]);
+  const a = parseClock(m[1] ?? ""), b = parseClock(m[2] ?? "");
   if (!a || !b) return null;
   let start = a.min + (a.mer === "p" ? 720 : 0);
   if (a.mer === null && a.min < 6 * 60) start += 720; // "2-10:30p" → 2pm
@@ -36,7 +36,7 @@ export function formatMinutes(min: number): string {
 export function parseReportTime(t: string): number {
   const m = t.trim().match(/^(\d{1,2}):(\d{2})\s*([AP])M$/i);
   if (!m) return 0;
-  return (Number(m[1]) % 12) * 60 + Number(m[2]) + (m[3].toUpperCase() === "P" ? 720 : 0);
+  return (Number(m[1]) % 12) * 60 + Number(m[2]) + ((m[3] ?? "").toUpperCase() === "P" ? 720 : 0);
 }
 
 // ---------- Ungerboeck event functions ----------
@@ -85,19 +85,19 @@ export function entryLabel(e: EventEntry) {
 export function reportDateToIso(d: string): string {
   const m = d.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   if (!m) return d;
-  const y = m[3].length === 2 ? `20${m[3]}` : m[3];
-  return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  const y = (m[3] ?? "").length === 2 ? `20${m[3]}` : m[3];
+  return `${y}-${(m[1] ?? "").padStart(2, "0")}-${(m[2] ?? "").padStart(2, "0")}`;
 }
 
 /** Maps Ungerboeck spaces to the weekly sheet rows. */
 export function sheetRowFor(space: string): string {
   const s = space.toLowerCase();
   const hall = s.match(/exhibit hall ([a-d]+)/);
-  if (hall) return `Hall ${hall[1].toUpperCase()}`;
+  if (hall) return `Hall ${(hall[1] ?? "").toUpperCase()}`;
   const ball = s.match(/ballroom ([a-g]+)/);
-  if (ball) return `BallRoom ${ball[1].toUpperCase()}`;
+  if (ball) return `BallRoom ${(ball[1] ?? "").toUpperCase()}`;
   const conc = s.match(/concourse ([a-d]+)/);
-  if (conc) return `Concourse ${conc[1].toUpperCase()}`;
+  if (conc) return `Concourse ${(conc[1] ?? "").toUpperCase()}`;
   return space;
 }
 
@@ -142,7 +142,7 @@ export const vendors = [
 export function priceReply(text: string): string | null {
   const m = text.trim().match(/^@(?:price|prices|scout|vendor|vendors|gear)\b[\s,]*(.*)$/i);
   if (!m) return null;
-  const q = m[1].trim();
+  const q = (m[1] ?? "").trim();
   if (!q) return "Tell me what to look for, like `@price gaffer tape 2in black`.";
   return [
     `**Vendor search: ${q}** (compare pre-tax — you're tax-exempt)`,
