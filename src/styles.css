@@ -1498,3 +1498,5 @@ h1 {
 .command-risky { border-color: var(--destructive); }
 .command-warning { color: var(--destructive); }
 .command-buttons { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+.build-version { font-size: 0.7rem; opacity: 0.6; color: var(--muted-foreground); text-align: right; margin: 0.25rem 0; font-family: monospace; }
