@@ -1,4 +1,5 @@
 # Pixel Pals Chat
+- [ ] Merge and center shared events across schedule spaces; verify mixed-activity colors in new and uploaded workbooks.
 - [x] One-command desktop update: `bash packaging/install.sh` now pulls from GitHub first (packaging/pull.sh clears installer-generated icon/lockfile dirt, FORCE=1 overrides); tested with a stand-in git checkout
 - [x] Shared station wandering and visual task animations in Linux and Assistant modes; tested task transition with controlled Ollama response and desktop/mobile rendering
 - [x] Improve and visually verify all Matrix and Final Fantasy native character sprites.
