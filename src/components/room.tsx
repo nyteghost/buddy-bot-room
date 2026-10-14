@@ -739,52 +739,8 @@ export function Room() {
             </div>
           )}
           <div className="launch-controls">
-            <div>
-              <span className="control-label">CONVERSATION MODE</span>
-              <div className="mode-switch">
-                <Button
-                  variant="ghost"
-                  disabled={running}
-                  aria-pressed={mode === "roundtable"}
-                  className={cn(mode === "roundtable" && "mode-active")}
-                  onClick={() => setMode("roundtable")}
-                >
-                  <Users />
-                  Roundtable
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={running}
-                  aria-pressed={mode === "broadcast"}
-                  className={cn(mode === "broadcast" && "mode-active")}
-                  onClick={() => setMode("broadcast")}
-                >
-                  <Radio />
-                  Broadcast
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={running}
-                  aria-pressed={direct}
-                  className={cn(direct && "mode-active")}
-                  onClick={() => setMode("direct")}
-                >
-                  <MessageSquare />
-                  One-on-one
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={running}
-                  aria-pressed={mode === "solve"}
-                  className={cn(mode === "solve" && "mode-active")}
-                  onClick={() => setMode("solve")}
-                >
-                  <Wrench />
-                  Problem solving
-                </Button>
-              </div>
-            </div>
             {direct && (
+
               <div>
                 <span className="control-label">TALK WITH</span>
                 <select
