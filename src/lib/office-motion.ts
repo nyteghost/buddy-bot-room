@@ -10,7 +10,7 @@ export const officeStations: Record<AgentId, Station> = {
   sage: { home: [58, 39], visit: [61, 27], label: "Calendar", activity: "Planning an event" },
   pip: { home: [73, 39], visit: [78, 51], label: "Notes", activity: "Writing notes" },
   echo: { home: [27, 77], visit: [12, 65], label: "Files", activity: "Reviewing files" },
-  rune: { home: [51, 77], visit: [85, 45], label: "System", activity: "Reviewing stats" },
+  rune: { home: [51, 77], visit: [51, 60], label: "System", activity: "Reviewing stats" },
   claude: { home: [74, 77], visit: [87, 68], label: "Tux", activity: "Thinking through a fix" },
 };
 

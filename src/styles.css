@@ -1418,8 +1418,8 @@ h1 {
 @keyframes office-inspect { 50% { transform: rotate(4deg) translateY(-1px); } }
 @keyframes office-cue { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 640px) {
-  .linux .office-pal { width: 42px; }
-  .office-character { width: 32px; height: 42px; }
+  .linux .office-pal { width: 38px; }
+  .linux .office-pal .pixel-character, .office-character { width: 26px; height: 32px; }
   .linux .office-pal > span { font-size: 6px; padding: 2px 3px; }
   .office-task-cue { max-width: 100px; font-size: 6px; gap: 3px; }
   .office-task-cue .thinking-prop { flex-basis: 22px; width: 22px; height: 22px; }
