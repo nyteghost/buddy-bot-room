@@ -50,13 +50,11 @@ export function OfficePal({ id, index, mode, active, enabled }: {
 /** Pixel chair back drawn in front of a seated pal so it reads as sitting at the desk. */
 function ChairBack() {
   return (
-    <svg className="office-chair" viewBox="0 0 16 14" shapeRendering="crispEdges" aria-hidden>
-      <rect x="1" y="1" width="14" height="10" className="chair-back" />
-      <rect x="2" y="0" width="12" height="1" className="chair-back" />
-      <rect x="3" y="2" width="10" height="1" className="chair-shine" />
-      <rect x="2" y="3" width="1" height="7" className="chair-shine" />
-      <rect x="7" y="11" width="2" height="2" className="chair-back" />
-      <rect x="3" y="13" width="10" height="1" className="chair-back" />
+    <svg className="office-chair" viewBox="0 0 16 9" shapeRendering="crispEdges" aria-hidden>
+      <rect x="2" y="0" width="12" height="6" className="chair-back" />
+      <rect x="3" y="1" width="10" height="1" className="chair-shine" />
+      <rect x="7" y="6" width="2" height="2" className="chair-back" />
+      <rect x="3" y="8" width="10" height="1" className="chair-back" />
     </svg>
   );
 }
