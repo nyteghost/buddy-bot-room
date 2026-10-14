@@ -2,12 +2,13 @@ import { useSyncExternalStore } from "react";
 
 /** Which brain powers the pals. All options are free: "cloud" shares every entered free key, "local" runs in the browser. */
 export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama";
-export type FreeProvider = "groq" | "gemini" | "openrouter";
+export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 export type EngineSettings = {
   kind: EngineKind;
   groqKey: string;
   geminiKey: string;
   openrouterKey: string;
+  nvidiaKey: string;
   ollamaUrl: string;
   ollamaModel: string;
 };
@@ -18,6 +19,7 @@ const fallback: EngineSettings = {
   groqKey: "",
   geminiKey: "",
   openrouterKey: "",
+  nvidiaKey: "",
   ollamaUrl: "http://localhost:11434/v1",
   ollamaModel: "qwen2.5:7b",
 };
@@ -64,6 +66,7 @@ export function availableProviders(s: EngineSettings): { kind: FreeProvider; api
     { kind: "groq", apiKey: s.groqKey.trim() },
     { kind: "gemini", apiKey: s.geminiKey.trim() },
     { kind: "openrouter", apiKey: s.openrouterKey.trim() },
+    { kind: "nvidia", apiKey: s.nvidiaKey.trim() },
   ];
   return all.filter((p) => p.apiKey);
 }
@@ -78,5 +81,6 @@ export const freeModels = {
   groq: "openai/gpt-oss-120b",
   gemini: "gemini-2.5-flash",
   openrouter: "meta-llama/llama-3.3-70b-instruct:free",
+  nvidia: "meta/llama-3.1-70b-instruct",
   local: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
 } as const;

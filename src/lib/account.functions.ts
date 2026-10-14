@@ -20,7 +20,7 @@ export const loadAccount = createServerFn({ method: "GET" })
     const safe = async (v: string | null) => { try { return v ? await decryptText(v) : ""; } catch { return ""; } };
     return {
       settings: s
-        ? { engineKind: s.engine_kind, characterMode: s.character_mode, groqKey: await safe(s.groq_key_ciphertext), geminiKey: await safe(s.gemini_key_ciphertext), openrouterKey: await safe(s.openrouter_key_ciphertext) }
+        ? { engineKind: s.engine_kind, characterMode: s.character_mode, groqKey: await safe(s.groq_key_ciphertext), geminiKey: await safe(s.gemini_key_ciphertext), openrouterKey: await safe(s.openrouter_key_ciphertext), nvidiaKey: await safe(s.nvidia_key_ciphertext) }
         : null,
       discussions: (rows ?? []).map((r) => ({
         id: r.id, title: r.title, messages: JSON.stringify(r.messages), theme: r.character_mode, mode: r.discussion_mode, updatedAt: r.updated_at,
@@ -32,7 +32,7 @@ export const saveSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
     engineKind: z.enum(engineKinds), characterMode: z.enum(themes),
-    groqKey: z.string().max(500), geminiKey: z.string().max(500), openrouterKey: z.string().max(500),
+    groqKey: z.string().max(500), geminiKey: z.string().max(500), openrouterKey: z.string().max(500), nvidiaKey: z.string().max(500),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { encryptText } = await import("./settings-crypto.server");
@@ -43,6 +43,7 @@ export const saveSettings = createServerFn({ method: "POST" })
       groq_key_ciphertext: data.groqKey.trim() ? await encryptText(data.groqKey.trim()) : null,
       gemini_key_ciphertext: data.geminiKey.trim() ? await encryptText(data.geminiKey.trim()) : null,
       openrouter_key_ciphertext: data.openrouterKey.trim() ? await encryptText(data.openrouterKey.trim()) : null,
+      nvidia_key_ciphertext: data.nvidiaKey.trim() ? await encryptText(data.nvidiaKey.trim()) : null,
       updated_at: new Date().toISOString(),
     });
     if (error) throw new Error("Could not save your settings.");
