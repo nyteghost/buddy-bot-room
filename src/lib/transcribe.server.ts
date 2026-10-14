@@ -1,6 +1,6 @@
 import { isAbortError } from "./ai/stream-errors.server";
 
-const MODEL = "google/gemini-3.5-flash";
+const MODEL = "google/gemini-4-argon";
 const FORMATS = ["wav", "mp3", "webm", "m4a", "ogg", "aac", "flac"] as const;
 const MAX_BASE64 = 20 * 1024 * 1024;
 
