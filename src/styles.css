@@ -1417,7 +1417,7 @@ h1 {
   animation: tp-blink 1.2s steps(2) infinite;
 }
 @keyframes office-stride { 50% { transform: translateY(-2px) rotate(2deg); } }
-@keyframes office-leg { 50% { transform: translateY(-1px) translateX(1px); } }
+@keyframes office-leg { 50% { transform: translateY(-4px) translateX(4px); } }
 @keyframes office-type { 50% { transform: translateY(1px) rotate(-2deg); } }
 @keyframes office-write { 33% { transform: rotate(-3deg); } 66% { transform: translateX(1px) rotate(2deg); } }
 @keyframes office-sort { 33% { transform: translateX(-2px); } 66% { transform: translateX(2px); } }

@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import type { AgentId } from "@/lib/agents";
 import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
+import { spriteRuns, to128 } from "@/lib/sprite-upscale";
 
 export function PixelCharacter({
   id,
@@ -22,10 +23,11 @@ export function PixelCharacter({
   const currentMode = useCharacterMode();
   const mode = explicitMode ?? currentMode;
   const front = characterSprite(id, mode);
-  const grid = back ? backView(front) : front;
+  const grid = to128(back ? backView(front) : front);
+  const runs = spriteRuns(grid, (x, y) => (y < 96 ? "body" : x < 64 ? "left-leg" : "right-leg"));
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 128 128"
       role="img"
       aria-label={`${id} pixel character`}
       className={cn(
@@ -39,20 +41,9 @@ export function PixelCharacter({
       )}
       shapeRendering="crispEdges"
     >
-      {["body", "left-leg", "right-leg"].map((part) => <g key={part} className={walking ? `sprite-walk-${part}` : undefined}>{grid.flatMap((row, y) =>
-        [...row].map((pixel, x) =>
-          pixel === "." || (y < 24 ? "body" : x < 16 ? "left-leg" : "right-leg") !== part ? null : (
-            <rect
-              key={`${x}-${y}`}
-              className={`sprite-${pixel}`}
-              x={x}
-              y={y}
-              width="1"
-              height="1"
-            />
-          ),
-        ),
-      )}</g>)}
+      {["body", "left-leg", "right-leg"].map((part) => <g key={part} className={walking ? `sprite-walk-${part}` : undefined}>{runs
+        .filter((r) => r.part === part)
+        .map((r) => <rect key={`${r.x}-${r.y}`} className={`sprite-${r.c}`} x={r.x} y={r.y} width={r.w} height="1" />)}</g>)}
     </svg>
   );
 }
