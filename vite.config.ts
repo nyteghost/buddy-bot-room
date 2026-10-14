@@ -32,7 +32,7 @@ export default defineConfig({
       noDiscovery: true,
       ignoreOutdatedRequests: false,
       include: [
-        "@supabase/supabase-js", "eventsource-parser", "@mlc-ai/web-llm",
+        "@supabase/supabase-js", "eventsource-parser", "@mlc-ai/web-llm", "exceljs", "xlsx",
         "@ai-sdk/anthropic", "@ai-sdk/openai", "@ai-sdk/openai-compatible", "ai",
         "@tanstack/react-query", "@tanstack/react-router > @tanstack/react-store",
         "@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu",
