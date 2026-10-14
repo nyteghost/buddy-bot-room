@@ -197,14 +197,14 @@ button {
 }
 .brand-icon {
   display: flex;
-  width: 32px;
-  height: 35px;
+  width: 40px;
+  height: 44px;
   align-items: center;
   justify-content: center;
 }
 .brand-icon .pixel-character {
-  width: 28px;
-  height: 35px;
+  width: 34px;
+  height: 42px;
 }
 .brand-chat {
   color: var(--muted-foreground);
@@ -519,16 +519,16 @@ h1 {
 }
 .avatar-tile {
   background: var(--muted);
-  height: 48px;
-  width: 40px;
+  height: 58px;
+  width: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
 }
 .avatar-tile .pixel-character {
-  width: 26px;
-  height: 35px;
+  width: 34px;
+  height: 46px;
 }
 .agent-card [role="switch"] {
   width: 25px;
@@ -749,12 +749,12 @@ h1 {
   margin-bottom: 26px;
 }
 .empty-pals .pixel-character {
-  width: 36px;
-  height: 48px;
+  width: 46px;
+  height: 62px;
 }
 .empty-pals .pixel-character:nth-child(2) {
-  width: 48px;
-  height: 64px;
+  width: 60px;
+  height: 80px;
 }
 .pixel-speech {
   position: absolute;
@@ -794,12 +794,12 @@ h1 {
   gap: 11px;
 }
 .message-avatar {
-  width: 28px;
+  width: 38px;
   padding-top: 3px;
 }
 .message-avatar .pixel-character {
-  width: 25px;
-  height: 33px;
+  width: 34px;
+  height: 45px;
 }
 .message-main {
   flex: 1;
@@ -848,8 +848,8 @@ h1 {
   color: var(--muted-foreground);
 }
 .thinking-row .pixel-character {
-  width: 24px;
-  height: 32px;
+  width: 32px;
+  height: 42px;
 }
 .conversation-footer {
   display: flex;
