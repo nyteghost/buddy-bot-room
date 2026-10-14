@@ -470,7 +470,7 @@ export function Room() {
             </span>
           </div>
           {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
-          <OllamaMascot active={running && engine.kind === "ollama"} />
+          <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
           <p className="build-version" title={`Commit ${__APP_COMMIT__} · built ${__APP_BUILD_DATE__}`}>
             {desktopApp ? "Desktop" : "Web"} v{__APP_VERSION__} · {__APP_COMMIT__}

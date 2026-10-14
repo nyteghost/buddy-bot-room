@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /** Which brain powers the pals. All options are free: "cloud" shares every entered free key, "local" runs in the browser. */
-export type EngineKind = "cloud" | "local" | "auto" | "ollama";
+export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama";
 export type FreeProvider = "groq" | "gemini" | "openrouter";
 export type EngineSettings = {
   kind: EngineKind;
@@ -26,7 +26,7 @@ let cache: EngineSettings | null = null;
 
 /** Older saves used "lovable", "groq" or "gemini"; they all become the shared free cloud mode. */
 export function normalizeKind(kind: unknown): EngineKind {
-  return kind === "local" || kind === "auto" || kind === "ollama" ? kind : "cloud";
+  return kind === "local" || kind === "auto" || kind === "ollama" || kind === "auto-ollama" ? kind : "cloud";
 }
 
 function read(): EngineSettings {
