@@ -8,3 +8,10 @@ describe("128x128 sprites", () => {
     expect(g.every((r) => r.length === 128)).toBe(true);
   });
 });
+import { palArt } from "@/lib/pal-art";
+import { characterModes } from "@/lib/hellraiser";
+describe("hand-drawn pal art", () => {
+  it("every pal has art in every theme", () => {
+    for (const m of characterModes) for (const id of ["nova","byte","sage","pip","echo","rune","claude"] as const) expect(palArt(id, m)).toBeTruthy();
+  });
+});

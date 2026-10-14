@@ -1511,3 +1511,6 @@ h1 {
 .office-foreground { position: absolute; inset: 0; z-index: 7; pointer-events: none; clip-path: inset(62% 0 0 0); }
 .office-front > span { order: -1; }
 .office-seated-toward .office-character > svg:first-child { transform: none; }
+.pal-art { object-fit: contain; object-position: bottom; image-rendering: pixelated; }
+.pal-art-walk { animation: pal-art-step .4s steps(2) infinite; }
+@keyframes pal-art-step { 50% { transform: translateY(-2px) rotate(-2deg); } }
