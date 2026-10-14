@@ -92,6 +92,92 @@ function useDeliver() {
   return { deliver: (blob: Blob, name: string) => import("@/lib/work-files").then((m) => m.downloadBlob(blob, name)) };
 }
 
+function waitForOAuthCompletion(popup: Window) {
+  return new Promise<string | null>((resolve, reject) => {
+    let poll: number | undefined;
+    const cleanup = () => {
+      window.removeEventListener("message", onMessage);
+      if (poll !== undefined) window.clearInterval(poll);
+    };
+    const onMessage = (event: MessageEvent) => {
+      const type = event.data?.type;
+      if (
+        event.origin !== window.location.origin ||
+        event.source !== popup ||
+        event.data?.connectorId !== "google_calendar" ||
+        (type !== "appUserConnectorOAuthComplete" && type !== "appUserConnectorOAuthFailed")
+      ) return;
+      cleanup();
+      if (type === "appUserConnectorOAuthComplete") {
+        resolve(typeof event.data?.code === "string" ? event.data.code : null);
+        return;
+      }
+      popup.close();
+      reject(new Error("Google Calendar connection failed."));
+    };
+    window.addEventListener("message", onMessage);
+    poll = window.setInterval(() => {
+      if (!popup.closed) return;
+      cleanup();
+      reject(new Error("Google sign-in window was closed before finishing."));
+    }, 500);
+  });
+}
+
+/** Button that connects Google Calendar once, then pushes every shift with one click. */
+function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s: string) => void }) {
+  const session = useSession();
+  const start = useServerFn(startCalendarConnect);
+  const complete = useServerFn(completeCalendarConnect);
+  const push = useServerFn(pushShiftsToCalendar);
+  const status = useServerFn(calendarStatus);
+  const [busy, setBusy] = useState(false);
+  if (!session) return null;
+
+  async function connect(): Promise<boolean> {
+    const popup = window.open("", "lovable-oauth", "width=600,height=720");
+    if (!popup) { onStatus("Popup blocked — allow popups and try again."); return false; }
+    try {
+      const { authorizationUrl } = await start();
+      const completion = waitForOAuthCompletion(popup);
+      popup.location.href = authorizationUrl;
+      const code = await completion;
+      if (code) await complete({ data: { code } });
+      return true;
+    } catch (e) {
+      popup.close();
+      onStatus((e as Error).message);
+      return false;
+    }
+  }
+
+  async function run() {
+    setBusy(true);
+    onStatus("");
+    try {
+      let { connected } = await status();
+      if (!connected) connected = await connect();
+      if (!connected) return;
+      const r = await push({ data: { shifts } });
+      if (!r.connected) {
+        onStatus(r.reconnectRequired ? "Your Google Calendar access needs to be renewed — click again to reconnect." : "Google Calendar is not connected yet — click again to connect.");
+        return;
+      }
+      onStatus(`Added ${r.added} shift${r.added === 1 ? "" : "s"} to your Google Calendar${r.skipped ? ` (${r.skipped} skipped)` : ""}.`);
+    } catch (e) {
+      onStatus((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button size="sm" variant="outline" disabled={busy || !shifts.length} onClick={run}>
+      <CalendarSync className="size-4" /> {busy ? "Working…" : "Add all to Google Calendar"}
+    </Button>
+  );
+}
+
 function ShiftsTab() {
   const [name, setName] = useState(DEFAULT_SCHEDULE_NAME);
   const [shifts, setShifts] = useState<Shift[]>([]);
