@@ -1512,6 +1512,22 @@ h1 {
 .command-buttons { display: flex; gap: .4rem; flex-wrap: wrap; }
 
 .build-version { font-size: 0.7rem; opacity: 0.6; color: var(--muted-foreground); text-align: right; margin: 0.25rem 0; font-family: monospace; }
+.update-check-btn {
+  display: block;
+  margin: 0.25rem 0 0;
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: var(--muted-foreground);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.update-check-btn:hover:not(:disabled) { color: var(--foreground); opacity: 1; }
+.update-check-btn:disabled { cursor: default; opacity: 0.5; }
 
 /* Front desk row of the office picture redrawn above the pals so they can sit and walk behind it. */
 .office-foreground { position: absolute; inset: 0; z-index: 7; pointer-events: none; clip-path: inset(62% 0 0 0); }
