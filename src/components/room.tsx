@@ -603,9 +603,55 @@ export function Room() {
               </span>
             </div>
           </div>
+          <div className="mode-row">
+            <span className="control-label">CONVERSATION MODE</span>
+            <div className="mode-switch">
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={mode === "roundtable"}
+                className={cn(mode === "roundtable" && "mode-active")}
+                onClick={() => setMode("roundtable")}
+              >
+                <Users />
+                Roundtable
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={mode === "broadcast"}
+                className={cn(mode === "broadcast" && "mode-active")}
+                onClick={() => setMode("broadcast")}
+              >
+                <Radio />
+                Broadcast
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={direct}
+                className={cn(direct && "mode-active")}
+                onClick={() => setMode("direct")}
+              >
+                <MessageSquare />
+                One-on-one
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={mode === "solve"}
+                className={cn(mode === "solve" && "mode-active")}
+                onClick={() => setMode("solve")}
+              >
+                <Wrench />
+                Problem solving
+              </Button>
+            </div>
+          </div>
           <div className="topic-section">
             <div className="section-heading">
               <h2>What's on your mind?</h2>
+
               <span className="muted-label">YOU SET THE TOPIC</span>
             </div>
             <div id="recorder-anchor">
