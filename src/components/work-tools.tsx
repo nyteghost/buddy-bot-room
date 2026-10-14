@@ -170,7 +170,8 @@ function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s:
         onStatus(r.reconnectRequired ? "Your Google Calendar access needs to be renewed — click the button again to reconnect." : "Google Calendar is not connected yet — click the button again to connect.");
         return;
       }
-      onStatus(`Added ${r.added} shift${r.added === 1 ? "" : "s"} to your Google Calendar${r.skipped ? ` (${r.skipped} skipped)` : ""}.`);
+      const why = r.reasons?.length ? ` — ${r.reasons.slice(0, 3).join("; ")}${r.reasons.length > 3 ? ` (+${r.reasons.length - 3} more)` : ""}` : "";
+      onStatus(`Added ${r.added} shift${r.added === 1 ? "" : "s"} to your Google Calendar${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
     } catch (e) {
       onStatus((e as Error).message);
     } finally {
