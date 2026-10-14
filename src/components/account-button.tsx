@@ -26,7 +26,7 @@ export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onThem
     loadedFor.current = userId;
     load().then(({ settings }) => {
       if (settings) {
-        setEngine({ kind: normalizeKind(settings.engineKind), groqKey: settings.groqKey, geminiKey: settings.geminiKey, openrouterKey: settings.openrouterKey });
+        setEngine({ kind: normalizeKind(settings.engineKind), groqKey: settings.groqKey, geminiKey: settings.geminiKey, openrouterKey: settings.openrouterKey, nvidiaKey: settings.nvidiaKey });
         if (isCharacterMode(settings.characterMode)) onTheme(settings.characterMode);
       }
       setSynced(true);
@@ -36,12 +36,12 @@ export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onThem
   useEffect(() => {
     if (!synced) return;
     const t = setTimeout(() => {
-      save({ data: { engineKind: engine.kind, characterMode: theme, groqKey: engine.groqKey, geminiKey: engine.geminiKey, openrouterKey: engine.openrouterKey } })
+      save({ data: { engineKind: engine.kind, characterMode: theme, groqKey: engine.groqKey, geminiKey: engine.geminiKey, openrouterKey: engine.openrouterKey, nvidiaKey: engine.nvidiaKey } })
         .then(() => setNote(""))
         .catch((e) => setNote(e instanceof Error ? e.message : "Could not save settings."));
     }, 800);
     return () => clearTimeout(t);
-  }, [synced, engine.kind, engine.groqKey, engine.geminiKey, engine.openrouterKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [synced, engine.kind, engine.groqKey, engine.geminiKey, engine.openrouterKey, engine.nvidiaKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (session === undefined) return null;
   if (!session)
