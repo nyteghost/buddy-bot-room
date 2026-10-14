@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, sheetRowFor, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, parsePastedShifts, sheetRowFor, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
 import { deckReply } from "@/lib/deck-solver";
 import { MessageResponse } from "@/components/ai-elements/message";
 
@@ -104,6 +104,17 @@ function ShiftsTab() {
     } catch (e) { setStatus(`Could not read that workbook: ${(e as Error).message}`); }
   }
   const ics = () => import("@/lib/work-files").then((m) => m.downloadBlob(new Blob([buildIcs(shifts)], { type: "text/calendar" }), "my-shifts.ics"));
+  const [pasted, setPasted] = useState("");
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // this week's Monday
+    return d.toISOString().slice(0, 10);
+  });
+  function readPasted() {
+    const list = parsePastedShifts(pasted, weekStart, name);
+    setShifts(list);
+    setStatus(list.length ? `${list.length} shifts for ${name}.` : `No shifts found — make sure the first line starts with “${name}” and the times look like 9a-6p.`);
+  }
   return (
     <div className="space-y-3 pt-2">
       <div className="flex gap-2">
@@ -111,6 +122,24 @@ function ShiftsTab() {
         {file && <Button variant="outline" onClick={() => load(file)}>Re-read</Button>}
       </div>
       <FilePick accept=".xlsx,.xls" label="Drop a monthly schedule workbook (.xlsx)" onFile={(f) => load(f)} />
+      <details className="rounded-md border border-border p-3">
+        <summary className="cursor-pointer text-sm text-muted-foreground">…or paste your rows from Excel</summary>
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            rows={3}
+            aria-label="Pasted schedule rows"
+            placeholder={"Mark Brown\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t9a-6p\t\t\n603\t9\t9\t9\t9\t9\tOFF\tOFF"}
+            className="w-full rounded-md border border-input bg-background p-2 font-mono text-xs"
+          />
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground" htmlFor="week-start">Week starting (Mon)</label>
+            <Input id="week-start" type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} className="w-auto" />
+            <Button size="sm" onClick={readPasted} disabled={!pasted.trim()}>Read</Button>
+          </div>
+        </div>
+      </details>
       {status && <p className="text-sm">{status}</p>}
       {shifts.length > 0 && (
         <>
