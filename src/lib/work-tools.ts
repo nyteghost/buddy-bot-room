@@ -131,22 +131,33 @@ export function buildIcs(shifts: Shift[], title = "Work shift"): string {
   return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Pixel Pals//Shifts//EN", ...events, "END:VCALENDAR"].join("\r\n");
 }
 
-/** Parses a pasted 3-row schedule block (name row with 7 shift cells, badge/hours row, title row) starting from the week's Monday. */
+/** Parses a pasted schedule block. If the paste includes the date row (7 dates under MON–SUN), those dates are used; otherwise dates fall back to the given week-start Monday. */
 export function parsePastedShifts(text: string, weekStartIso: string, name = DEFAULT_SCHEDULE_NAME): Shift[] {
   const target = name.trim().toLowerCase();
-  const line = text.split(/\r?\n/).find((l) => l.trim().toLowerCase().startsWith(target));
+  const lines = text.split(/\r?\n/);
+  const line = lines.find((l) => l.trim().toLowerCase().startsWith(target));
   if (!line) return [];
+  let dates: string[] = [];
+  for (const l of lines) {
+    const found = l.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g) ?? [];
+    if (found.length >= 7) { dates = found.slice(0, 7).map(reportDateToIso); break; }
+  }
+  if (dates.length < 7) {
+    const monday = new Date(`${weekStartIso}T12:00:00Z`);
+    if (Number.isNaN(monday.getTime())) return [];
+    dates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setUTCDate(d.getUTCDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+  }
   const cells = line.split(/\t| {2,}/).map((c) => c.trim()).slice(1);
-  const monday = new Date(`${weekStartIso}T12:00:00Z`);
-  if (Number.isNaN(monday.getTime())) return [];
   const shifts: Shift[] = [];
   for (let i = 0; i < Math.min(cells.length, 7); i++) {
     const raw = cells[i] ?? "";
     const time = parseShift(raw);
     if (!time) continue;
-    const d = new Date(monday);
-    d.setUTCDate(d.getUTCDate() + i);
-    shifts.push({ date: d.toISOString().slice(0, 10), ...time, raw });
+    shifts.push({ date: dates[i]!, ...time, raw });
   }
   return shifts;
 }
