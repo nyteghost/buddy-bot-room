@@ -74,6 +74,7 @@ export const pushShiftsToCalendar = createServerFn({ method: "POST" })
     if (!connectionAPIKey) return { connected: false as const };
     let added = 0;
     let skipped = 0;
+    const reasons: string[] = [];
     for (const s of data.shifts.slice(0, 60)) {
       const res = await callAsAppUser({
         gatewayBaseUrl: GATEWAY_BASE_URL,
@@ -96,8 +97,16 @@ export const pushShiftsToCalendar = createServerFn({ method: "POST" })
       if (res.ok) added++;
       else {
         skipped++;
-        console.error(`Calendar event insert failed [${res.status}]: ${await res.text()}`);
+        const body = await res.text();
+        console.error(`Calendar event insert failed [${res.status}]: ${body}`);
+        let detail = `Google said no (${res.status})`;
+        try {
+          const parsed = JSON.parse(body);
+          const msg = parsed?.error?.message ?? parsed?.message;
+          if (typeof msg === "string" && msg) detail = msg;
+        } catch { /* keep default */ }
+        reasons.push(`${s.date} ${s.raw}: ${detail}`);
       }
     }
-    return { connected: true as const, added, skipped };
+    return { connected: true as const, added, skipped, reasons };
   });
