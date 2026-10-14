@@ -35,3 +35,6 @@
 - [x] Work tools: Ungerboeck PDF → S/Exmi/MI/MO Excel, my shifts → Google Calendar/.ics, @deck staging, @price vendor search
 
 - [x] Google Calendar auto-upload: per-user App User Connector (google_calendar), "Add all to Google Calendar" button in ShiftsTab
+
+- [x] Schedule Excel matches uploaded CGC/CEPAC weekly layout (new + update existing)
+- [x] Mic recording pal: @record starts/stops browser mic recording, download clip

@@ -54,22 +54,25 @@ function EventsTab() {
   const [entries, setEntries] = useState<EventEntry[]>([]);
   const [status, setStatus] = useState("");
   const [blob, setBlob] = useState<Blob | null>(null);
+  const [merged, setMerged] = useState(false);
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
     try {
       const { readEventPdf, eventsWorkbook } = await import("@/lib/work-files");
-      const rows = (await Promise.all(files.map(readEventPdf))).flat();
+      const pdfs = files.filter((f) => /\.pdf$/i.test(f.name));
+      const existing = files.find((f) => /\.xlsx?$/i.test(f.name));
+      const rows = (await Promise.all(pdfs.map(readEventPdf))).flat();
       const list = summarizeEvents(rows);
-      setEntries(list);
-      setBlob(list.length ? await eventsWorkbook(list) : null);
+      setEntries(list); setMerged(!!existing);
+      setBlob(list.length ? await eventsWorkbook(list, existing) : null);
       const dates = new Set(list.map((e) => e.date)).size;
-      setStatus(list.length ? `${files.length} PDF${files.length > 1 ? "s" : ""} · ${rows.length} lines read · ${list.length} entries across ${dates} days. Escalator row added at the bottom.` : "No show, move-in or move-out lines found.");
+      setStatus(list.length ? `${pdfs.length} PDF${pdfs.length > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${existing ? `Filled into ${existing.name} — engineer shifts kept.` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
     } catch (e) { setStatus(`Could not read that PDF: ${(e as Error).message}`); }
   }
   const { deliver } = useDeliver();
   return (
     <div className="space-y-3 pt-2">
-      <FilePick accept="application/pdf" label="Drop one or more Ungerboeck PDFs (Event Functions or For Scheduling)" onFiles={load} />
+      <FilePick accept="application/pdf,.xlsx" label="Drop Ungerboeck PDFs — add your monthly schedule .xlsx to fill it in" onFiles={load} />
       <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className="text-sm">{status}</p>}
       {entries.length > 0 && (
@@ -82,7 +85,7 @@ function EventsTab() {
               ))}</tbody>
             </table>
           </div>
-          {blob && <Button size="sm" onClick={() => deliver(blob, "event-schedule.xlsx")}><Download className="size-4" /> Download Excel</Button>}
+          {blob && <Button size="sm" onClick={() => deliver(blob, merged ? "schedule-updated.xlsx" : "engineering-schedule.xlsx")}><Download className="size-4" /> Download Excel</Button>}
         </>
       )}
     </div>

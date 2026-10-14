@@ -89,6 +89,7 @@ import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
 import { WorkTools } from "./work-tools";
+import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
 import { priceReply } from "@/lib/work-tools";
 import { cn } from "@/lib/utils";
@@ -132,6 +133,7 @@ export function Room() {
   const [ready, setReady] = useState(false);
 
   const [topic, setTopic] = useState("");
+  const [recorderOpen, setRecorderOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
   const [partner, setPartner] = useState<AgentId>("claude");
@@ -230,6 +232,16 @@ export function Room() {
       setCharacterMode(command);
       setTopic("");
       inputRef.current?.focus();
+      return;
+    }
+    if (!ask && /^@(record|recorder|mic)\b/i.test(topic.trim())) {
+      setRecorderOpen(true);
+      setMessages([
+        ...messages,
+        { id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: topic.trim() }] },
+        { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: "echo", characterMode: modeRef.current }, parts: [{ type: "text", text: "Recorder's open below — press Record when you're ready and Stop when you're done. Nothing records until you press it, and clips stay on this device." }] },
+      ]);
+      setTopic("");
       return;
     }
     const toolReply = ask ? null : deckReply(topic) ?? priceReply(topic);
@@ -582,6 +594,7 @@ export function Room() {
               <h2>What's on your mind?</h2>
               <span className="muted-label">YOU SET THE TOPIC</span>
             </div>
+            {recorderOpen && <MicRecorder onClose={() => setRecorderOpen(false)} />}
             <PromptInput onSubmit={() => start()} className="topic-composer">
               <PromptInputTextarea
                 ref={inputRef}

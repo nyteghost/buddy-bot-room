@@ -215,3 +215,67 @@ export function priceReply(text: string): string | null {
     ...vendors.map((v) => `- [${v.name}](${v.url(q)}) — ${v.taxNote}`),
   ].join("\n");
 }
+
+// ---------- weekly engineering sheet layout ----------
+export const ENGINEER_ROSTER: { name: string; badge: string; title: string }[] = [
+  { name: "Brian Duncan", badge: "600", title: "Director" },
+  { name: "Marty Taylor", badge: "601", title: "Chief" },
+  { name: "Yvens Joseph", badge: "602", title: "Supervisor" },
+  { name: "Mark Brown", badge: "603", title: "Show Srvc Manager" },
+  { name: "Madjid Lakhdari", badge: "604", title: "Show Srvc Supervisor" },
+  { name: "Alemneh Teshome", badge: "608", title: "Show Srvc Eng" },
+  { name: "Alexis Albert", badge: "606", title: "Show Srvc Supervisor" },
+  { name: "Edison Dunkley", badge: "605", title: "Show Srvc Supervisor" },
+  { name: "Franck Pierre-Louis", badge: "607", title: "Facility Srvc Eng" },
+  { name: "Jacquline Dixon", badge: "615", title: "Ops Assistant" },
+  { name: "Jontee King", badge: "On-Call", title: "On-Call Show Srvc Eng" },
+  { name: "Joseph Desoto", badge: "620", title: "Asst. Chief Engineer" },
+  { name: "Daniel Pendleton", badge: "621", title: "CEPAC/CGC Engineer" },
+];
+export const HALL_ROWS = ["Hall A", "Hall B", "Hall C", "Hall D"];
+export const BALLROOM_ROWS = ["BallRoom A", "BallRoom B", "BallRoom E", "BallRoom G", "BallRoom C", "BallRoom D", "BallRoom F"];
+
+/** Monday (ISO date) of the week containing the date. */
+export function mondayOf(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+const addDays = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+export type WeekLayout = {
+  monday: string; dates: string[]; cgc: string[]; escalator: string[]; serviceDesk: string[];
+  rows: Record<string, { text: string; codes: EventCode[] }[]>; other: string[];
+};
+
+/** Groups entries into Monday–Sunday weeks shaped like the CGC engineering schedule. */
+export function weekLayouts(entries: EventEntry[]): WeekLayout[] {
+  const esc = escalatorHours(entries);
+  const mondays = [...new Set(entries.map((e) => mondayOf(e.date)))].sort();
+  return mondays.map((monday) => {
+    const dates = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    const week = entries.filter((e) => dates.includes(e.date));
+    const labels = new Set(week.map((e) => e.space));
+    const other = [...labels].filter((l) => !HALL_ROWS.includes(l) && !BALLROOM_ROWS.includes(l)).sort();
+    const rows: WeekLayout["rows"] = {};
+    for (const label of [...HALL_ROWS, ...BALLROOM_ROWS, ...other]) {
+      rows[label] = dates.map((d) => {
+        const list = week.filter((e) => e.date === d && e.space === label).sort((a, b) => a.start - b.start);
+        if (!list.length) return { text: "", codes: [] };
+        const title = list.find((e) => e.code === "S")?.title ?? list[0]!.title;
+        return { text: [title, ...list.map(entryLabel)].filter(Boolean).join("\n"), codes: [...new Set(list.map((e) => e.code))] };
+      });
+    }
+    const cgc = dates.map((d) => {
+      const day = week.filter((e) => e.date === d);
+      if (!day.length) return "DARK";
+      return `${formatMinutes(Math.min(...day.map((e) => e.start)))}-${formatMinutes(Math.max(...day.map((e) => e.end)))}`;
+    });
+    const escalator = dates.map((d) => { const h = esc.get(d); return h ? escalatorLabel(h) : ""; });
+    const serviceDesk = dates.map((d) => {
+      const desk = week.filter((e) => e.date === d && e.code === "Exmi");
+      return desk.length ? `${formatMinutes(Math.min(...desk.map((e) => e.start)))}-${formatMinutes(Math.max(...desk.map((e) => e.end)))}` : "";
+    });
+    return { monday, dates, cgc, escalator, serviceDesk, rows, other };
+  });
+}
