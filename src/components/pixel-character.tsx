@@ -7,11 +7,13 @@ export function PixelCharacter({
   id,
   className,
   animated = false,
+  walking = false,
   mode: explicitMode,
 }: {
   id: AgentId;
   className?: string;
   animated?: boolean;
+  walking?: boolean;
   mode?: CharacterMode;
 }) {
   const currentMode = useCharacterMode();
@@ -33,9 +35,9 @@ export function PixelCharacter({
       )}
       shapeRendering="crispEdges"
     >
-      {grid.flatMap((row, y) =>
+      {["body", "left-leg", "right-leg"].map((part) => <g key={part} className={walking ? `sprite-walk-${part}` : undefined}>{grid.flatMap((row, y) =>
         [...row].map((pixel, x) =>
-          pixel === "." ? null : (
+          pixel === "." || (y < 24 ? "body" : x < 16 ? "left-leg" : "right-leg") !== part ? null : (
             <rect
               key={`${x}-${y}`}
               className={`sprite-${pixel}`}
@@ -46,7 +48,7 @@ export function PixelCharacter({
             />
           ),
         ),
-      )}
+      )}</g>)}
     </svg>
   );
 }

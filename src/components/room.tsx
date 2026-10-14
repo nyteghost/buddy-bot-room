@@ -56,6 +56,7 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
+import { OfficePal } from "./office-pal";
 import { characterModeCommand, setCharacterMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
@@ -539,7 +540,9 @@ export function Room() {
                 {enabled.length} PALS IN ROOM
               </span>
             </div>
-            {agents.map((a, i) => (
+            {agents.map((a, i) => characterMode === "linux" || characterMode === "assistant" ? (
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={running && speaking === a.id} enabled={enabled.includes(a.id)} />
+            ) : (
               <div
                 key={a.id}
                 className={cn(

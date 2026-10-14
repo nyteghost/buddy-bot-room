@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Application rules
+- Linux and Assistant room movement uses one shared browser-only station choreography and activity renderer, so both modes stay visually in sync without invoking machine actions.
 - Keep the current browser chat separate from named browser-only saved snapshots when signed out; optional Google sign-in syncs saved discussions and settings to the account.
 - Run one streamed model call per character turn through `/api/chat`; browser orchestration controls rounds and cancellation, keeping each server request short.
 - Keep agent identities and mode context rules in a shared browser-safe module; model prompts and gateway clients stay server-only.
