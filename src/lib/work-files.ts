@@ -1,5 +1,5 @@
 // Browser-only file readers for work tools. Libraries load on demand.
-import { DEFAULT_SCHEDULE_NAME, entryLabel, parseShift, reportDateToIso, sheetRowFor, type EventEntry, type EventRow, type Shift } from "./work-tools";
+import { DEFAULT_SCHEDULE_NAME, entryLabel, escalatorHours, escalatorLabel, parseShift, reportDateToIso, sheetRowOrder, type EventEntry, type EventRow, type Shift } from "./work-tools";
 
 type Item = { str: string; x: number; y: number };
 
@@ -11,6 +11,11 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
   const rows: EventRow[] = [];
   type Cols = { usage: number; start: number; end: number; desc: number; reader: number; space: number; notes: number };
   let cols: Cols | null = null;
+  // "For Scheduling" layout: Start | End | Event | Description | Space | Usage | Usage Category | Level, under weekday date headings.
+  let sched: { name: string; x: number }[] | null = null;
+  let day = "";
+  let last: EventRow | null = null;
+  const months = ["january","february","march","april","may","june","july","august","september","october","november","december"];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
@@ -25,6 +30,42 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
     const sorted = [...lines.entries()].sort((a, b) => b[0] - a[0]).map(([, l]) => l.sort((a, b) => a.x - b.x));
     for (const line of sorted) {
       const text = line.map((i) => i.str).join(" ");
+      if (/^\s*Start Time\b/.test(text) && /\bLevel\b/.test(text) && /\bEvent\b/.test(text)) {
+        sched = line.map((i) => ({ name: i.str.trim(), x: i.x }));
+        continue;
+      }
+      if (sched) {
+        const dm = text.match(/(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/);
+        if (dm) {
+          const mo = months.indexOf((dm[1] ?? "").toLowerCase()) + 1;
+          day = `${dm[3]}-${String(mo).padStart(2, "0")}-${(dm[2] ?? "").padStart(2, "0")}`;
+          last = null;
+          continue;
+        }
+        if (!day || /^Page \d+ of/.test(text)) continue;
+        const cell: Record<string, string> = {};
+        for (const it of line) {
+          const col = [...sched].reverse().find((h) => it.x >= h.x - 6) ?? sched[0]!;
+          cell[col.name] = `${cell[col.name] ?? ""} ${it.str.trim()}`.trim();
+        }
+        const start = cell["Start Time"] ?? "";
+        if (!/\d{1,2}:\d{2}\s*[AP]M/i.test(start)) {
+          if (last && cell["Description"]) last.description += ` ${cell["Description"]}`;
+          continue;
+        }
+        last = {
+          level: Number(cell["Level"] ?? 2) || 2,
+          usage: cell["Usage"] ?? "",
+          start,
+          end: cell["End Time"] ?? "",
+          description: cell["Description"] ?? "",
+          space: cell["Space"] ?? "",
+          event: cell["Event"] ?? "",
+          date: day,
+        };
+        rows.push(last);
+        continue;
+      }
       if (/\bUsage\b/.test(text) && /\bSpace\b/.test(text)) {
         const find = (re: RegExp) => line.find((i) => re.test(i.str))?.x ?? 0;
         cols = { usage: find(/^Usage/), start: find(/^Start Time|^Start$/), end: find(/^End Time|^End$/), desc: find(/^Description/), reader: find(/^Reader/), space: find(/^Space/), notes: find(/^Notes/) };
@@ -89,13 +130,15 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
 export async function eventsWorkbook(entries: EventEntry[]): Promise<Blob> {
   const XLSX = await import("xlsx");
   const dates = [...new Set(entries.map((e) => e.date))].sort();
-  const spaces = [...new Set(entries.map((e) => sheetRowFor(e.space)))].sort();
+  const spaces = sheetRowOrder(entries.map((e) => e.space));
   const header = ["SPACE", ...dates.map((d) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" }))];
   const body = spaces.map((space) => [space, ...dates.map((d) => {
-    const list = entries.filter((e) => e.date === d && sheetRowFor(e.space) === space);
+    const list = entries.filter((e) => e.date === d && e.space === space);
     const title = list.find((e) => e.code === "S")?.title ?? list[0]?.title ?? "";
     return list.length ? [title, ...list.map(entryLabel)].join("\n") : "";
   })]);
+  const esc = escalatorHours(entries);
+  body.push(["Escalator", ...dates.map((d) => { const h = esc.get(d); return h ? escalatorLabel(h) : ""; })]);
   const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
   ws["!cols"] = [{ wch: 18 }, ...dates.map(() => ({ wch: 24 }))];
   const wb = XLSX.utils.book_new();
