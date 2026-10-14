@@ -6,18 +6,19 @@ type Station = { home: Point; visit: Point; label: string; activity: string; fac
 
 /** Shared floor routes for Linux and Assistant modes; percentages of the room. */
 export const officeStations: Record<AgentId, Station> = {
-  nova: { home: [26, 31], visit: [14, 44], label: "Gmail", activity: "Drafting mail", facing: "away" },
-  byte: { home: [42.6, 31], visit: [34, 46], label: "Tasks", activity: "Reviewing tasks", facing: "away" },
-  sage: { home: [59.2, 31], visit: [67, 46], label: "Calendar", activity: "Planning an event", facing: "away" },
-  pip: { home: [75.2, 31], visit: [86, 44], label: "Notes", activity: "Writing notes", facing: "away" },
-  echo: { home: [19, 54], visit: [28, 50], label: "Q&A", activity: "Researching an answer", facing: "toward" },
-  rune: { home: [49, 54], visit: [58, 52], label: "System", activity: "Reviewing stats", facing: "toward" },
-  claude: { home: [80, 54], visit: [88, 50], label: "Tux", activity: "Thinking through a fix", facing: "toward" },
+  nova: { home: [26, 28.1], visit: [14, 41.1], label: "Gmail", activity: "Drafting mail", facing: "away" },
+  byte: { home: [42.6, 28.1], visit: [34, 43.1], label: "Tasks", activity: "Reviewing tasks", facing: "away" },
+  sage: { home: [59.2, 28.1], visit: [67, 43.1], label: "Calendar", activity: "Planning an event", facing: "away" },
+  pip: { home: [75.2, 28.1], visit: [86, 41.1], label: "Notes", activity: "Writing notes", facing: "away" },
+  echo: { home: [19, 55.9], visit: [28, 51.9], label: "Q&A", activity: "Researching an answer", facing: "toward" },
+  rune: { home: [49, 55.9], visit: [58, 53.9], label: "System", activity: "Reviewing stats", facing: "toward" },
+  claude: { home: [80, 55.9], visit: [88, 51.9], label: "Tux", activity: "Thinking through a fix", facing: "toward" },
 };
 
 export function officePose(id: AgentId, index: number, elapsed: number) {
-  const { home, visit } = officeStations[id];
-  const aisle: Point = [home[0], 46]; // walkway between the two desk rows
+  const { home, visit, facing } = officeStations[id];
+  // Two lanes in the walkway, so the name tags above opposite rows never stack on one line.
+  const aisle: Point = [home[0], facing === "away" ? 43 : 50.5];
   const corner: Point = [visit[0], aisle[1]];
   const points = [home, home, aisle, corner, visit, visit, corner, aisle, home, home];
   const durations = [6500, 2400, 3200, 2000, 4500, 2000, 3200, 2400, 5000];

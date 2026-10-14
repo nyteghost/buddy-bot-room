@@ -22,4 +22,15 @@ describe("shared assistant station wandering", () => {
       expect(officePose(id, 0, 30200).x).toBe(officeStations[id].home[0]);
     }
   });
+  it("keeps back-row and front-row name tags on separate lines", () => {
+    // A tag sits just above its pal's head, so the two rows only stay readable if the
+    // lowest back-row tag never reaches the highest front-row tag.
+    const back = Object.keys(officeStations).filter((id) => officeStations[id as AgentId].facing === "away") as AgentId[];
+    const front = Object.keys(officeStations).filter((id) => officeStations[id as AgentId].facing === "toward") as AgentId[];
+    for (let elapsed = 0; elapsed < 31000; elapsed += 250) {
+      const lowestBack = Math.max(...back.map((id) => officePose(id, 0, elapsed).y - 10.5));
+      const highestFront = Math.min(...front.map((id) => officePose(id, 0, elapsed).y - 16.7));
+      expect(lowestBack).toBeLessThan(highestFront);
+    }
+  });
 });

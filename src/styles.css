@@ -197,14 +197,14 @@ button {
 }
 .brand-icon {
   display: flex;
-  width: 32px;
-  height: 35px;
+  width: 40px;
+  height: 44px;
   align-items: center;
   justify-content: center;
 }
 .brand-icon .pixel-character {
-  width: 28px;
-  height: 35px;
+  width: 34px;
+  height: 42px;
 }
 .brand-chat {
   color: var(--muted-foreground);
@@ -345,7 +345,7 @@ h1 {
 }
 .scene-pal {
   position: absolute;
-  width: 62px;
+  width: 84px;
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -353,8 +353,8 @@ h1 {
   transition: opacity 0.2s;
 }
 .scene-pal .pixel-character {
-  height: 58px;
-  width: 44px;
+  height: 80px;
+  width: 60px;
   filter: drop-shadow(0 4px 0 var(--scene-ink));
 }
 .scene-pal > span {
@@ -367,7 +367,7 @@ h1 {
   margin-top: 3px;
 }
 .scene-pal-0 { left: 32%; top: 42%; }
-.scene-pal-1 { left: 50%; top: 40%; }
+.scene-pal-1 { left: 50%; top: 38%; }
 .scene-pal-2 { left: 68%; top: 42%; }
 .scene-pal-3 { left: 32%; top: 72%; }
 .scene-pal-4 { left: 50%; top: 74%; }
@@ -519,16 +519,16 @@ h1 {
 }
 .avatar-tile {
   background: var(--muted);
-  height: 48px;
-  width: 40px;
+  height: 58px;
+  width: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
 }
 .avatar-tile .pixel-character {
-  width: 26px;
-  height: 35px;
+  width: 34px;
+  height: 46px;
 }
 .agent-card [role="switch"] {
   width: 25px;
@@ -749,12 +749,12 @@ h1 {
   margin-bottom: 26px;
 }
 .empty-pals .pixel-character {
-  width: 36px;
-  height: 48px;
+  width: 46px;
+  height: 62px;
 }
 .empty-pals .pixel-character:nth-child(2) {
-  width: 48px;
-  height: 64px;
+  width: 60px;
+  height: 80px;
 }
 .pixel-speech {
   position: absolute;
@@ -794,12 +794,12 @@ h1 {
   gap: 11px;
 }
 .message-avatar {
-  width: 28px;
+  width: 38px;
   padding-top: 3px;
 }
 .message-avatar .pixel-character {
-  width: 25px;
-  height: 33px;
+  width: 34px;
+  height: 45px;
 }
 .message-main {
   flex: 1;
@@ -848,8 +848,8 @@ h1 {
   color: var(--muted-foreground);
 }
 .thinking-row .pixel-character {
-  width: 24px;
-  height: 32px;
+  width: 32px;
+  height: 42px;
 }
 .conversation-footer {
   display: flex;
@@ -996,8 +996,8 @@ h1 {
     padding: 9px;
   }
   .scene-pal .pixel-character {
-    height: 42px;
-    width: 32px;
+    height: 58px;
+    width: 44px;
   }
   .scene-pal > span {
     font-size: 7px;
@@ -1366,12 +1366,12 @@ h1 {
 .linux .office-pal {
   left: var(--office-x);
   top: var(--office-y);
-  width: 62px;
+  width: 84px;
   transition: left .18s linear, top .18s linear, opacity .2s;
   z-index: 3;
 }
 .linux .office-pal.office-assigned { transition: left 1s ease, top 1s ease; z-index: 6; }
-.office-character { position: relative; width: 44px; height: 58px; }
+.office-character { position: relative; width: 60px; height: 80px; }
 /* Seated at the desk: tuck the legs behind the chair back and face the monitor. */
 .office-seated-away .office-character > svg:first-child { transform: translateY(-8%); clip-path: inset(0 0 30% 0); filter: drop-shadow(0 0 1px var(--agent-color)); }
 .office-chair { position: absolute; left: 6%; width: 88%; bottom: -2%; height: auto; }
@@ -1387,6 +1387,12 @@ h1 {
 .office-working.agent-echo .office-character > svg { animation: office-sort 1s steps(3) infinite; }
 .office-working.agent-rune .office-character > svg { animation: office-inspect 1.2s steps(3) infinite; }
 .office-working.agent-sage .office-character > svg { animation: office-write 1s steps(3) infinite; }
+/* Hand-drawn art renders as <img>, so it needs the same working animations. */
+.office-working .office-character > img { animation: office-type .6s steps(2) infinite; }
+.office-working.agent-pip .office-character > img { animation: office-write .8s steps(3) infinite; }
+.office-working.agent-echo .office-character > img { animation: office-sort 1s steps(3) infinite; }
+.office-working.agent-rune .office-character > img { animation: office-inspect 1.2s steps(3) infinite; }
+.office-working.agent-sage .office-character > img { animation: office-write 1s steps(3) infinite; }
 .office-task-cue {
   position: absolute;
   bottom: calc(100% + 5px);
@@ -1424,15 +1430,15 @@ h1 {
 @keyframes office-inspect { 50% { transform: rotate(4deg) translateY(-1px); } }
 @keyframes office-cue { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 640px) {
-  .linux .office-pal { width: 38px; }
-  .linux .office-pal .pixel-character, .office-character { width: 26px; height: 32px; }
+  .linux .office-pal { width: 54px; }
+  .linux .office-pal .pixel-character, .office-character { width: 38px; height: 50px; }
   .linux .office-pal > span { font-size: 6px; padding: 2px 3px; }
   .office-task-cue { max-width: 100px; font-size: 6px; gap: 3px; }
   .office-task-cue .thinking-prop { flex-basis: 22px; width: 22px; height: 22px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .linux .office-pal { transition: none; }
-  .office-character > svg, .office-character g, .office-working::after, .office-task-cue { animation: none !important; }
+  .office-character > svg, .office-character > img, .office-character g, .office-working::after, .office-task-cue { animation: none !important; }
 }
 .devteam .scene-pal-0 { left: 26%; top: 36%; }
 .devteam .scene-pal-1 { left: 42%; top: 36%; }
@@ -1509,6 +1515,15 @@ h1 {
 
 /* Front desk row of the office picture redrawn above the pals so they can sit and walk behind it. */
 .office-foreground { position: absolute; inset: 0; z-index: 7; pointer-events: none; clip-path: inset(62% 0 0 0); }
+/* Office name tags float above each pal's head, so the back and front rows never collide. */
+.linux .office-pal > span {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.office-task-cue { bottom: calc(100% + 26px); }
 .office-front > span { order: -1; }
 .office-seated-toward .office-character > svg:first-child { transform: none; }
 .pal-art { object-fit: contain; object-position: bottom; image-rendering: pixelated; }
