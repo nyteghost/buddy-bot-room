@@ -16,8 +16,6 @@ import {
   Square,
   Users,
   X,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -78,9 +76,8 @@ import officeRoomImage from "@/assets/office-room.jpg";
 import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { streamSpeech } from "@/lib/stream-speech";
 import { providerForTurn, useEngine } from "@/lib/engine";
-import { hasWebGPU, localTurn, ollamaTurn, speakFree } from "@/lib/local-llm";
+import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
 import { LinuxActions } from "./linux-actions";
@@ -128,12 +125,7 @@ export function Room() {
   const modeRef = useRef(characterMode);
   modeRef.current = characterMode;
   const [ready, setReady] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(true);
-  const voiceRef = useRef(true);
-  const toggleVoice = () => {
-    voiceRef.current = !voiceRef.current;
-    setVoiceOn(voiceRef.current);
-  };
+
   const [topic, setTopic] = useState("");
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
@@ -211,41 +203,7 @@ export function Room() {
     abortRef.current?.abort();
     replayRef.current?.abort();
   };
-  async function replay(message: RoomMessage) {
-    const agentId = message.metadata?.agentId;
-    if (!agentId || running || !messageText(message).trim()) return;
-    replayRef.current?.abort();
-    if (replayId === message.id) {
-      setReplayId(null);
-      return;
-    }
-    const controller = new AbortController();
-    replayRef.current = controller;
-    setReplayId(message.id);
-    setError("");
-    try {
-      {
-        await speakFree(messageText(message), controller.signal);
-        return;
-      }
-      await streamSpeech(
-        {
-          agentId,
-          text: messageText(message),
-          characterMode: message.metadata?.characterMode ?? characterMode,
-        },
-        controller.signal,
-      );
-    } catch (err) {
-      if (!controller.signal.aborted)
-        setError(err instanceof Error ? err.message : "Voice playback failed.");
-    } finally {
-      if (replayRef.current === controller) {
-        replayRef.current = null;
-        setReplayId(null);
-      }
-    }
-  }
+
   async function start(ask?: { partner: AgentId; text: string }) {
     if (runLock.current) return;
     replayRef.current?.abort();
@@ -255,6 +213,12 @@ export function Room() {
     const direct = ask || mentioned ? true : directMode;
     const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
+    const assistantToggle = ask ? null : assistantCommand(topic);
+    if (assistantToggle !== null) {
+      setAssistantMode(assistantToggle);
+      setTopic("");
+      return;
+    }
     const command = ask ? null : characterModeCommand(topic);
     if (command) {
       setCharacterMode(command);
