@@ -62,6 +62,7 @@ import {
   agents,
   agentName,
   agentPersona,
+  resolveMention,
   models,
   messageText,
   type AgentId,
@@ -134,7 +135,8 @@ export function Room() {
   const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
   const direct = mode === "direct";
-  const tooFew = !direct && enabled.length < 2;
+  const mentionTarget = resolveMention(topic, characterMode);
+  const tooFew = !direct && !mentionTarget && enabled.length < 2;
   const topicDraft = topic;
   const directMode = direct;
   const partnerChoice = partner;
@@ -244,8 +246,9 @@ export function Room() {
     replayRef.current?.abort();
     setReplayId(null);
     const topic = ask?.text ?? topicDraft;
-    const direct = ask ? true : directMode;
-    const partner = ask?.partner ?? partnerChoice;
+    const mentioned = ask ? null : resolveMention(topic, modeRef.current);
+    const direct = ask || mentioned ? true : directMode;
+    const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
     const command = ask ? null : characterModeCommand(topic);
     if (command) {
