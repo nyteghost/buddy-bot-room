@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { desktop } from "@/lib/linux";
@@ -7,77 +7,117 @@ import { isTauri } from "@/lib/local-llm";
 const REPO = "nyteghost/buddy-bot-room";
 const dismissedKey = "pixel-pals-update-dismissed-v1";
 
-/** Desktop only: checks GitHub for a newer commit than the one this app was built from. */
+type Latest = { sha: string; message: string } | null;
+type CheckStatus = "idle" | "checking" | "latest" | "error";
+
+/** Desktop only: an always-visible "Check for updates" button, plus the automatic popup when GitHub has a newer build. */
 export function UpdatePopup() {
-  const [latest, setLatest] = useState<{ sha: string; message: string } | null>(null);
+  const [latest, setLatest] = useState<Latest>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState<CheckStatus>("idle");
+
+  const check = useCallback(async (manual: boolean) => {
+    setStatus("checking");
+    try {
+      const info = await desktop.appInfo();
+      if (!info.sha || info.sha === "unknown") {
+        if (manual) setStatus("error");
+        return;
+      }
+      const res = await fetch(`https://api.github.com/repos/${REPO}/commits/main`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!res.ok) {
+        if (manual) setStatus("error");
+        return;
+      }
+      const json = (await res.json()) as { sha: string; commit?: { message?: string } };
+      if (json.sha === info.sha) {
+        if (manual) setStatus("latest");
+        return;
+      }
+      // Dismissing only silences the automatic popup; a manual check always offers the update.
+      if (!manual && localStorage.getItem(dismissedKey) === json.sha) return;
+      setLatest({ sha: json.sha, message: (json.commit?.message ?? "").split("\n")[0] ?? "" });
+    } catch {
+      /* offline or private repo: stay quiet unless the user asked */
+      if (manual) setStatus("error");
+    }
+  }, []);
 
   useEffect(() => {
     if (!isTauri()) return;
-    let stop = false;
-    async function check() {
-      try {
-        const info = await desktop.appInfo();
-        if (!info.sha || info.sha === "unknown") return;
-        const res = await fetch(`https://api.github.com/repos/${REPO}/commits/main`, {
-          headers: { Accept: "application/vnd.github+json" },
-        });
-        if (!res.ok) return;
-        const json = (await res.json()) as { sha: string; commit?: { message?: string } };
-        if (stop || json.sha === info.sha || localStorage.getItem(dismissedKey) === json.sha) return;
-        setLatest({ sha: json.sha, message: (json.commit?.message ?? "").split("\n")[0] ?? "" });
-      } catch {
-        /* offline or private repo: stay quiet */
-      }
-    }
-    void check();
-    const timer = setInterval(check, 30 * 60 * 1000);
-    return () => {
-      stop = true;
-      clearInterval(timer);
-    };
-  }, []);
+    void check(false);
+    const timer = setInterval(() => void check(false), 30 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [check]);
 
-  if (!latest) return null;
+  // "Up to date" / error feedback is temporary, then the button goes back to its normal label.
+  useEffect(() => {
+    if (status !== "latest" && status !== "error") return;
+    const t = setTimeout(() => setStatus("idle"), 4000);
+    return () => clearTimeout(t);
+  }, [status]);
+
+  if (!isTauri()) return null;
+
   return (
-    <Dialog open onOpenChange={(open) => !open && setLatest(null)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Pixel Pals update available</DialogTitle>
-          <DialogDescription>
-            A newer version is on GitHub{latest.message ? `: “${latest.message}”` : ""}. Update now? A terminal opens,
-            downloads it and rebuilds the app — you may be asked for your password. Restart Pixel Pals when it finishes.
-          </DialogDescription>
-        </DialogHeader>
-        {error && <p className="text-destructive text-sm">{error}</p>}
-        <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              localStorage.setItem(dismissedKey, latest.sha);
-              setLatest(null);
-            }}
-          >
-            No
-          </Button>
-          <Button
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              desktop.runUpdate().then(
-                () => setLatest(null),
-                (e) => {
-                  setBusy(false);
-                  setError(String(e));
-                },
-              );
-            }}
-          >
-            Yes, update
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <button
+        type="button"
+        className="update-check-btn"
+        disabled={status === "checking"}
+        onClick={() => void check(true)}
+      >
+        {status === "checking"
+          ? "Checking…"
+          : status === "latest"
+            ? "You're up to date ✓"
+            : status === "error"
+              ? "Couldn't check — try again"
+              : "Check for updates"}
+      </button>
+      {latest && (
+        <Dialog open onOpenChange={(open) => !open && setLatest(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Pixel Pals update available</DialogTitle>
+              <DialogDescription>
+                A newer version is on GitHub{latest.message ? `: “${latest.message}”` : ""}. Update now? A terminal opens,
+                downloads it and rebuilds the app — you may be asked for your password. Restart Pixel Pals when it finishes.
+              </DialogDescription>
+            </DialogHeader>
+            {error && <p className="text-destructive text-sm">{error}</p>}
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  localStorage.setItem(dismissedKey, latest.sha);
+                  setLatest(null);
+                }}
+              >
+                No
+              </Button>
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  desktop.runUpdate().then(
+                    () => setLatest(null),
+                    (e) => {
+                      setBusy(false);
+                      setError(String(e));
+                    },
+                  );
+                }}
+              >
+                Yes, update
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
