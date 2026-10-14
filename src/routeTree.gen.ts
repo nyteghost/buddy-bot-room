@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
+import { Route as ApiOauthGoogleReturnRouteImport } from './routes/api/oauth/google/return'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,45 @@ const ApiSpeechRoute = ApiSpeechRouteImport.update({
   path: '/api/speech',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOauthGoogleReturnRoute = ApiOauthGoogleReturnRouteImport.update({
+  id: '/api/oauth/google/return',
+  path: '/api/oauth/google/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat' | '/api/speech'
+  fullPaths: '/' | '/api/chat' | '/api/speech' | '/api/oauth/google/return'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat' | '/api/speech'
-  id: '__root__' | '/' | '/api/chat' | '/api/speech'
+  to: '/' | '/api/chat' | '/api/speech' | '/api/oauth/google/return'
+  id:
+    '__root__' | '/' | '/api/chat' | '/api/speech' | '/api/oauth/google/return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
+  ApiOauthGoogleReturnRoute: typeof ApiOauthGoogleReturnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +93,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSpeechRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/oauth/google/return': {
+      id: '/api/oauth/google/return'
+      path: '/api/oauth/google/return'
+      fullPath: '/api/oauth/google/return'
+      preLoaderRoute: typeof ApiOauthGoogleReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +107,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSpeechRoute: ApiSpeechRoute,
+  ApiOauthGoogleReturnRoute: ApiOauthGoogleReturnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
