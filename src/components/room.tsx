@@ -75,6 +75,7 @@ import devRoomImage from "@/assets/devteam-room.jpg";
 import officeRoomImage from "@/assets/office-room.jpg";
 import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
+import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
 import { providerForTurn, useEngine } from "@/lib/engine";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
@@ -479,7 +480,7 @@ export function Room() {
           ))}
           <div className="room-scene">
             <img
-              src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : hell ? hellRoomImage : roomImage}
+              src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
               width={1536}
               height={864}
