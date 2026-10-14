@@ -25,21 +25,44 @@ export function UpdatePopup() {
         if (manual) setStatus("error");
         return;
       }
-      const res = await fetch(`https://api.github.com/repos/${REPO}/commits/main`, {
-        headers: { Accept: "application/vnd.github+json" },
-      });
-      if (!res.ok) {
+      // Desktop: ask GitHub natively (fast). Browser fallback: fetch with a
+      // 10s timeout so a stuck connection can't hang the button forever.
+      let sha = "";
+      let message = "";
+      try {
+        const latest = await desktop.checkUpdate(REPO);
+        sha = latest.sha;
+        message = latest.message;
+      } catch {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10_000);
+        try {
+          const res = await fetch(`https://api.github.com/repos/${REPO}/commits/main`, {
+            headers: { Accept: "application/vnd.github+json" },
+            signal: ctrl.signal,
+          });
+          if (!res.ok) {
+            if (manual) setStatus("error");
+            return;
+          }
+          const json = (await res.json()) as { sha: string; commit?: { message?: string } };
+          sha = json.sha;
+          message = (json.commit?.message ?? "").split("\n")[0] ?? "";
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      if (!sha) {
         if (manual) setStatus("error");
         return;
       }
-      const json = (await res.json()) as { sha: string; commit?: { message?: string } };
-      if (json.sha === info.sha) {
+      if (sha === info.sha) {
         if (manual) setStatus("latest");
         return;
       }
       // Dismissing only silences the automatic popup; a manual check always offers the update.
-      if (!manual && localStorage.getItem(dismissedKey) === json.sha) return;
-      setLatest({ sha: json.sha, message: (json.commit?.message ?? "").split("\n")[0] ?? "" });
+      if (!manual && localStorage.getItem(dismissedKey) === sha) return;
+      setLatest({ sha, message });
     } catch {
       /* offline or private repo: stay quiet unless the user asked */
       if (manual) setStatus("error");
