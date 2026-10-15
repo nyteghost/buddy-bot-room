@@ -1,26 +1,102 @@
-# Buddy Bot Room
+# Pixel Pals — Buddy Bot Room
 
-Can you copy the multi-model AI agent chat room harness in the attached screenshots so that I can do the same, but make the ai agents have pixel characters? Also, make it so I can give them something to talk about and then hit a button to have them start.
+A multi-model AI chat room where a cast of pixel-art characters discuss whatever you give them. Pick a topic, choose a conversation mode, hit start, and watch the pals walk around their office, sit at their desks and talk it out.
 
-This project was built with [Lovable](https://lovable.dev).
+**Live app:** https://buddy-bot-room.lovable.app
 
-**Live app**: https://buddy-bot-room.lovable.app
+---
 
-## Build with Lovable
+## Features
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/12804d65-d2a1-4f59-8779-f480d1faa8f1).
+### The room
+- **Seven pixel pals** with 128×128 hand-drawn sprites that walk, sit at desks and act out tasks.
+- **Themes** — swap the whole cast (names, looks, personalities): Linux, Dungeon Crawler Carl, horror, cyberpunk and more.
+- **Conversation modes** — Roundtable, Broadcast, One-on-one and Problem solving.
+- **@mentions** — talk to one pal directly (`@calendar`, `@gmail`, `@notes`, `@system`, `@terminal`, …).
+- **Assistant Mode** — a switch that turns any cast into office helpers, keeping their names and voices.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+### AI engines
+- **Lovable AI** (default, no setup).
+- **Free keys** — Groq, Gemini, OpenRouter, NVIDIA NIM. Keys travel per request and are never stored on the server (signed-in users get them encrypted).
+- **WebGPU** — runs a small model right in your browser.
+- **Ollama** — your local or remote (Tailscale / Cloudflare Tunnel) server.
+- **Auto** — tries free keys first, then falls back to WebGPU or Ollama.
 
-## Development
+### Saved discussions
+- Multiple chats with auto-save and a slide-out history.
+- Optional Google sign-in syncs chats, theme and engine settings across devices. Signed out, everything stays in the browser.
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+### Work tools (Show Services)
+All run in the browser — files never leave your device.
+- **Events** — drop one or more Ungerboeck / "For Scheduling" PDFs (plus an optional monthly .xlsx) to get a weekly engineering schedule in Excel: halls, ballrooms, escalator and service-desk rows, merged cells for multi-room events, and color coding (green move-in, yellow show, orange move-out, teal move-in+show, blue all three). Existing engineer shifts are preserved.
+- **My shifts** — paste or upload your schedule, download an .ics, or push every shift to your own Google Calendar.
+- **Deck** — `@deck 24x24x32` plans stage decks and stairs, with a link to Deck Builder Pro.
+- **Vendors** — `@price` / `@gear` builds search links for Grainger, McMaster-Carr, Home Depot and 1000bulbs with tax-exempt notes.
+
+### Recorder
+- **Record** button (or `@record` / `@mic`) opens Echo's recorder. Recording starts only when you press it.
+- Long recordings split automatically into 14-minute parts.
+- **Transcribe** labels speakers (Man 1, Woman 1, …). Audio is sent only when you tap Transcribe.
+
+### Linux desktop app
+A Tauri build (`.AppImage`) adds a real terminal, system stats, notes, file listing and self-update. Pals can suggest commands, but **nothing runs without your click**. See [`packaging/README.md`](packaging/README.md).
+
+---
+
+## Tech stack
+
+- [TanStack Start](https://tanstack.com/start) (React 19, Vite 7, SSR on Cloudflare Workers)
+- Tailwind CSS v4 + shadcn/ui + AI Elements
+- Lovable Cloud (auth, database) and Lovable AI Gateway
+- Tauri for the desktop build
+- exceljs / xlsx / pdf.js for the work tools
+
+## Getting started
+
+Requires Node.js 20+ (or Bun).
 
 ```sh
 git clone <this-repository-url>
 cd <repository-name>
-npm i
-npm run dev
+bun install      # or npm i
+bun run dev      # http://localhost:8080
 ```
+
+Run tests:
+
+```sh
+bunx vitest run
+```
+
+### Using a local Ollama
+
+```sh
+OLLAMA_ORIGINS="*" ollama serve
+ollama pull qwen2.5-coder:7b
+```
+
+Then pick **Ollama** (or **Auto**) in the AI engine menu.
+
+## Project layout
+
+```text
+src/
+  routes/          pages and server routes (/api/chat, /api/transcribe, …)
+  components/      room, pals, work tools, recorder, terminal
+  lib/             agents, themes, engines, work-tools, deck solver
+  test/            vitest suites
+src-tauri/         desktop (Linux) app
+packaging/         install scripts and desktop build notes
+```
+
+See [`AGENTS.md`](AGENTS.md) for architecture rules.
+
+## Privacy
+
+- Work tool files are processed entirely in your browser.
+- Microphone and machine actions only happen after you click.
+- Free-engine keys are never stored server-side in plain text.
+
+---
+
+Built with [Lovable](https://lovable.dev) — keep editing in the [Lovable editor](https://lovable.dev/projects/12804d65-d2a1-4f59-8779-f480d1faa8f1). Changes sync both ways with GitHub.
