@@ -16,9 +16,12 @@ const BUILD_DATE = new Date().toISOString().slice(0, 10);
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
+    // nitro/vite builds from this
     server: { entry: "server" },
   },
-  // Stable, explicit browser dependency set so late optimizer discoveries don't swap React mid-session.
+  // Use a stable, explicit browser dependency set. Late optimizer discoveries can
+  // change React's module URL while an open preview still uses the old renderer.
+  // Reject old optimizer hashes instead of serving new code under stale URLs.
   vite: {
     define: {
       __APP_VERSION__: JSON.stringify(BUILD_VERSION),
