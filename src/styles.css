@@ -1592,3 +1592,9 @@ h1 {
 .saved-row-active { background: var(--accent); border-radius: 6px; }
 .history-panel { display: flex; flex-direction: column; gap: 12px; }
 .history-panel .saved-list { max-height: none; flex: 1; }
+
+/* Focus mode: collapse the pixel room into a slim toolbar */
+.compact-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.room-column.is-compact .page-heading,
+.room-column.is-compact .room-scene { display: none; }
+.room-column.is-compact .compact-bar { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
