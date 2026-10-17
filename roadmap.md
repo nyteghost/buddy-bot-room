@@ -1,4 +1,6 @@
 # Pixel Pals Chat
+- [ ] Odysseus-inspired workspace: sidebar, movable room/conversation windows, bottom composer, narrow-screen layout, saved window positions.
+- [ ] Verify workspace toggles, dragging, chat history and bottom composer; record any blocked continuation here.
 - [x] Merge and center shared events across schedule spaces; mixed-activity colors tested in new/uploaded workbooks, real PDF downloads verified, engineer shifts preserved.
 - [x] One-command desktop update: `bash packaging/install.sh` now pulls from GitHub first (packaging/pull.sh clears installer-generated icon/lockfile dirt, FORCE=1 overrides); tested with a stand-in git checkout
 - [x] Shared station wandering and visual task animations in Linux and Assistant modes; tested task transition with controlled Ollama response and desktop/mobile rendering

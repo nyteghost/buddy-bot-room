@@ -12,7 +12,8 @@ import { deleteCloudDiscussion, loadAccount, saveCloudDiscussion } from "@/lib/a
 const activeKey = "pixel-pals-active-chat-v1";
 
 /** Chats save themselves as you talk; the left slide-out panel lists them for one-click switching. */
-export function SavedDiscussions({ messages, mode, theme, running, onOpen }: {
+export function SavedDiscussions({ messages, mode, theme, running, onOpen, openRequest = 0 }: {
+  openRequest?: number;
   messages: RoomMessage[]; mode: Mode; theme: CharacterMode; running: boolean;
   onOpen: (messages: RoomMessage[], theme: CharacterMode, mode: Mode) => void;
 }) {
@@ -65,6 +66,9 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen }: {
     setOpen(true);
     try { setRows(await list()); setError(""); } catch (e) { setError(e instanceof Error ? e.message : "Could not load chats."); }
   }
+  useEffect(() => {
+    if (openRequest) void showPanel();
+  }, [openRequest]); // eslint-disable-line react-hooks/exhaustive-deps
   function newChat() { pick(undefined); lastSaved.current = ""; setStatus(""); onOpen([], theme, mode); setOpen(false); }
 
   return <div className="saved-toolbar">

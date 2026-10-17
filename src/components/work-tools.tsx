@@ -24,7 +24,14 @@ export function WorkTools() {
           <DialogTitle>Show Services tools</DialogTitle>
           <DialogDescription>Everything runs in this browser — files never leave your device.</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="events">
+        <ShowServicesTools />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function ShowServicesTools() {
+  return <Tabs defaultValue="events">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="shifts">My shifts</TabsTrigger>
@@ -35,10 +42,7 @@ export function WorkTools() {
           <TabsContent value="shifts"><ShiftsTab /></TabsContent>
           <TabsContent value="deck"><DeckTab /></TabsContent>
           <TabsContent value="vendors"><VendorsTab /></TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
-  );
+        </Tabs>;
 }
 
 function FilePick({ accept, label, onFile, onFiles }: { accept: string; label: string; onFile?: (f: File) => void; onFiles?: (f: File[]) => void }) {

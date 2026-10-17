@@ -8,8 +8,10 @@ import {
   Download,
   MessageSquare,
   Mic,
-  Maximize2,
-  Minimize2,
+  LayoutGrid,
+  History,
+  PanelLeftClose,
+  PanelLeftOpen,
   Wrench,
   Minus,
   Play,
@@ -91,7 +93,8 @@ import { linuxContext } from "@/lib/linux";
 import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
-import { WorkTools } from "./work-tools";
+import { ShowServicesTools } from "./work-tools";
+import { WorkspaceWindow } from "./workspace-window";
 import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
 import { priceReply } from "@/lib/work-tools";
@@ -137,10 +140,6 @@ export function Room() {
 
   const [topic, setTopic] = useState("");
   const [recorderOpen, setRecorderOpen] = useState(false);
-  useEffect(() => {
-    if (!recorderOpen) return;
-    document.getElementById("recorder-anchor")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [recorderOpen]);
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
   const [partner, setPartner] = useState<AgentId>("claude");
@@ -178,13 +177,26 @@ export function Room() {
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(true);
-  const [compact, setCompact] = useState(false);
+  const [roomOpen, setRoomOpen] = useState(true);
+  const [conversationOpen, setConversationOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [sidebarCompact, setSidebarCompact] = useState(false);
+  const [resetVersion, setResetVersion] = useState(0);
+  const [historyRequest, setHistoryRequest] = useState(0);
   useEffect(() => {
-    if (localStorage.getItem("pixel-pals-compact-v1") === "1") setCompact(true);
+    try {
+      const saved = JSON.parse(localStorage.getItem("pixel-pals-workspace-v1") ?? "null");
+      if (saved) {
+        setRoomOpen(saved.roomOpen !== false);
+        setConversationOpen(saved.conversationOpen !== false);
+        setSidebarCompact(saved.sidebarCompact === true);
+      } else if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
+    } catch { /* optional layout preferences */ }
   }, []);
   useEffect(() => {
-    try { localStorage.setItem("pixel-pals-compact-v1", compact ? "1" : "0"); } catch { /* ignore */ }
-  }, [compact]);
+    if (!ready) return;
+    try { localStorage.setItem("pixel-pals-workspace-v1", JSON.stringify({ roomOpen, conversationOpen, sidebarCompact })); } catch { /* optional storage */ }
+  }, [roomOpen, conversationOpen, sidebarCompact, ready]);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
@@ -228,6 +240,7 @@ export function Room() {
 
   async function start(ask?: { partner: AgentId; text: string }) {
     if (runLock.current) return;
+    setConversationOpen(true);
     replayRef.current?.abort();
     setReplayId(null);
     const topic = ask?.text ?? topicDraft;
@@ -439,7 +452,7 @@ export function Room() {
     running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
   const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
   return (
-    <div className="app-shell">
+    <div className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed")}>
       <header className="app-header">
         <a href="/" className="brand">
           <span className="brand-icon">
@@ -464,7 +477,7 @@ export function Room() {
           >
             <Mic className="size-4" /> Record
           </Button>
-          <WorkTools />
+          <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench className="size-4" /> Work tools</Button>
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
             value={characterMode}
@@ -509,45 +522,17 @@ export function Room() {
           </Dialog>
         </div>
       </header>
-      <main className="workspace">
-        <section className={cn("room-column", compact && "is-compact")}>
-          <div className="compact-bar">
-            <span className="control-label">{compact ? "FOCUS MODE · ROOM HIDDEN" : "ROOM VIEW"}</span>
-            <Button variant="ghost" size="sm" aria-pressed={compact} onClick={() => setCompact((c) => !c)}>
-              {compact ? <Maximize2 className="size-4" /> : <Minimize2 className="size-4" />}
-              {compact ? "Show room" : "Compact"}
-            </Button>
-          </div>
-          <div className="page-heading">
-            <div>
-              <div className="eyebrow">
-                {assistantOn ? "ASSISTANT MODE" : characterMode === "dcc" ? "DUNGEON CRAWLER CARL" : characterMode === "linux" ? "LINUX MODE" : characterMode === "cyberpunk" ? "NEON NETRUNNERS" : characterMode === "devteam" ? "ENGINEERING STANDUP" : characterMode === "matrix" ? "THE MATRIX" : characterMode === "finalfantasy" ? "FINAL FANTASY" : horror
-                  ? "HORROR MODE"
-                  : hell
-                    ? "THE LAMENT CONFIGURATION IS SOLVED"
-                    : "YOUR AI COMMON ROOM"}
-              </div>
-              <h1>
-                {assistantOn ? "Seven assistants." : characterMode === "dcc" ? "Seven crawlers." : characterMode === "linux" ? "Seven assistants." : characterMode === "cyberpunk" ? "Seven netrunners." : characterMode === "devteam" ? "Seven engineers." : characterMode === "matrix" ? "Free your mind." : characterMode === "finalfantasy" ? "Seven heroes." : horror ? "Horror icons." : hell ? "We have such sights" : "A little room."}
-                <br />
-                {assistantOn ? "One helpful crew" : characterMode === "dcc" ? "One safe room" : characterMode === "linux" ? "One penguin" : characterMode === "cyberpunk" ? "One neon grid" : characterMode === "devteam" ? "One codebase" : characterMode === "matrix" ? "Question everything" : characterMode === "finalfantasy" ? "One shared quest" : horror ? "One dark room" : hell ? "to show you" : "Big ideas"}
-                <span className="text-primary">.</span>
-              </h1>
-              <p>
-                {assistantOn ? "Mail, tasks, calendar, notes, Q&A, system — and a terminal helper." : characterMode === "dcc" ? "The galaxy is watching. Loot, banter and a plan to survive." : characterMode === "linux" ? "Mail, tasks, calendar, notes, Q&A, system — and Tux in your terminal." : characterMode === "cyberpunk" ? "Jacked in under the rain, cracking the problem together." : characterMode === "devteam" ? "Everyone at their desk, shipping the best fix together." : characterMode === "matrix" ? "The crew is connected. Beyond the code, new possibilities." : characterMode === "finalfantasy" ? "From seven different worlds, a party comes together." : horror
-                  ? "The masks are on. The conversation begins."
-                  : hell
-                    ? "The Cenobites answer your call. Type “Normal mode” to close the box."
-                    : "Different minds. One conversation. Type “Hellraiser mode” if you dare."}
-              </p>
-            </div>
-            <span className="room-number">
-              ROOM
-              <br />
-              <b>001</b>
-            </span>
-          </div>
-          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
+      <div className="workspace-frame">
+        <nav className="workspace-sidebar" aria-label="Workspace">
+          <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
+          <Button variant="ghost" className="sidebar-item" title="Conversation" aria-pressed={conversationOpen} onClick={() => setConversationOpen((value) => !value)}><MessageSquare /><span>Conversation</span><i className={conversationOpen ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
+          <div className="sidebar-divider" />
+          <Button variant="ghost" className="sidebar-item" title="Saved chats" disabled={running} onClick={() => { setConversationOpen(true); setHistoryRequest((value) => value + 1); }}><History /><span>Saved chats</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
+          <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
           <p className="build-version" title={`Commit ${__APP_COMMIT__} · built ${__APP_BUILD_DATE__}`}>
@@ -558,7 +543,12 @@ export function Room() {
           ) : (
             <p className="linux-note">Tux's terminal, notes, files and system stats work in the Pixel Pals desktop app. Here, pals can still help and give you commands to copy.</p>
           ))}
-          <div className="room-scene">
+</div>
+        </nav>
+        <div className="workspace-stage">
+          <main className="window-canvas" aria-label="Floating workspace">
+            <WorkspaceWindow id="room" title="Pixel room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => setRoomOpen(false)} resetVersion={resetVersion}>
+              <div className="room-column">          <div className="room-scene">
             <img
               src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
@@ -617,105 +607,6 @@ export function Room() {
                 {running ? (direct ? "Chatting" : `Round ${round} of ${rounds}`) : "Ready when you are"}
                 <span className="scene-cursor">_</span>
               </span>
-            </div>
-          </div>
-          <div className="mode-row">
-            <span className="control-label">CONVERSATION MODE</span>
-            <div className="mode-switch">
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={mode === "roundtable"}
-                className={cn(mode === "roundtable" && "mode-active")}
-                onClick={() => setMode("roundtable")}
-              >
-                <Users />
-                Roundtable
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={mode === "broadcast"}
-                className={cn(mode === "broadcast" && "mode-active")}
-                onClick={() => setMode("broadcast")}
-              >
-                <Radio />
-                Broadcast
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={direct}
-                className={cn(direct && "mode-active")}
-                onClick={() => setMode("direct")}
-              >
-                <MessageSquare />
-                One-on-one
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={mode === "solve"}
-                className={cn(mode === "solve" && "mode-active")}
-                onClick={() => setMode("solve")}
-              >
-                <Wrench />
-                Problem solving
-              </Button>
-            </div>
-          </div>
-          <div className="topic-section">
-            <div className="section-heading">
-              <h2>What's on your mind?</h2>
-
-              <span className="muted-label">YOU SET THE TOPIC</span>
-            </div>
-            <div id="recorder-anchor">
-              {recorderOpen && <MicRecorder onClose={() => setRecorderOpen(false)} />}
-            </div>
-            <PromptInput onSubmit={() => start()} className="topic-composer">
-              <PromptInputTextarea
-                ref={inputRef}
-                aria-label="Discussion topic"
-                placeholder="Give your pals something to talk about…"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="min-h-24"
-                disabled={running}
-              />
-              <PromptInputFooter>
-                <span className="composer-label">
-                  <MessageSquare size={13} /> A question, an idea, a rabbit hole.
-                </span>
-                <PromptInputSubmit
-                  aria-label={running ? "Stop discussion" : "Start topic"}
-                  status={running ? "streaming" : "ready"}
-                  onStop={stop}
-                  disabled={
-                    !running &&
-                    (!topic.trim() ||
-                      (!characterModeCommand(topic) && tooFew) ||
-                      !ready)
-                  }
-                />
-              </PromptInputFooter>
-            </PromptInput>
-            <div className="suggestions">
-              {suggestions.map((s) => (
-                <Button
-                  key={s}
-                  variant="ghost"
-                  size="sm"
-                  disabled={running}
-                  onClick={() => {
-                    setTopic(s);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  {s}
-                  <ArrowUpRight size={12} />
-                </Button>
-              ))}
             </div>
           </div>
           <div className="section-heading">
@@ -800,68 +691,9 @@ export function Room() {
               ))}
             </div>
           )}
-          <div className="launch-controls">
-            {direct && (
-
-              <div>
-                <span className="control-label">TALK WITH</span>
-                <select
-                  className="partner-select"
-                  aria-label="Pal to talk with"
-                  value={partner}
-                  disabled={running}
-                  onChange={(e) => setPartner(e.target.value as AgentId)}
-                >
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {agentName(a.id, hell, horror, characterMode)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {!direct && (
-            <div>
-              <span className="control-label">ROUNDS</span>
-              <div className="round-stepper">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Fewer rounds"
-                  disabled={running || rounds <= 1}
-                  onClick={() => setRounds(rounds - 1)}
-                >
-                  <Minus />
-                </Button>
-                <span>{rounds}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="More rounds"
-                  disabled={running || rounds >= 5}
-                  onClick={() => setRounds(rounds + 1)}
-                >
-                  <Plus />
-                </Button>
-              </div>
-            </div>
-            )}
-            <Button
-              className="start-button"
-              onClick={running ? stop : () => void start()}
-              disabled={
-                !running &&
-                (!topic.trim() || (!characterModeCommand(topic) && tooFew) || !ready)
-              }
-            >
-              {running ? <Square /> : <Play fill="currentColor" />}
-              {running ? "Stop" : direct ? "Send" : "Start discussion"}
-            </Button>
-          </div>
-          {tooFew && (
-            <p className="validation-note">Invite at least two pals to start a discussion.</p>
-          )}
-        </section>
+</div>
+            </WorkspaceWindow>
+            <WorkspaceWindow id="conversation" title="Conversation" icon={<MessageSquare className="size-4" />} open={conversationOpen} onClose={() => setConversationOpen(false)} resetVersion={resetVersion}>
         <section className="conversation-panel">
           <div className="conversation-header">
             <h2>
@@ -916,7 +748,7 @@ export function Room() {
               </Dialog>
             </div>
           </div>
-          <SavedDiscussions messages={messages} mode={mode} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
+          <SavedDiscussions openRequest={historyRequest} messages={messages} mode={mode} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
           <div className="conversation-subhead">
             <span className="status-dot" />
             {running
@@ -1042,7 +874,176 @@ export function Room() {
             </span>
           </footer>
         </section>
-      </main>
+            </WorkspaceWindow>
+            <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
+              <ShowServicesTools />
+            </WorkspaceWindow>
+            <WorkspaceWindow id="recorder" title="Echo’s recorder" icon={<Mic className="size-4" />} open={recorderOpen} onClose={() => setRecorderOpen(false)} resetVersion={resetVersion}>
+              <MicRecorder onClose={() => setRecorderOpen(false)} />
+            </WorkspaceWindow>
+            {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
+          </main>
+          <section className="workspace-composer" aria-label="Message composer">
+          <div className="mode-row">
+            <span className="control-label">CONVERSATION MODE</span>
+            <div className="mode-switch">
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={mode === "roundtable"}
+                className={cn(mode === "roundtable" && "mode-active")}
+                onClick={() => setMode("roundtable")}
+              >
+                <Users />
+                Roundtable
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={mode === "broadcast"}
+                className={cn(mode === "broadcast" && "mode-active")}
+                onClick={() => setMode("broadcast")}
+              >
+                <Radio />
+                Broadcast
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={direct}
+                className={cn(direct && "mode-active")}
+                onClick={() => setMode("direct")}
+              >
+                <MessageSquare />
+                One-on-one
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={running}
+                aria-pressed={mode === "solve"}
+                className={cn(mode === "solve" && "mode-active")}
+                onClick={() => setMode("solve")}
+              >
+                <Wrench />
+                Problem solving
+              </Button>
+            </div>
+          </div>
+          <div className="topic-section">
+            <div className="section-heading">
+              <h2>What's on your mind?</h2>
+
+              <span className="muted-label">YOU SET THE TOPIC</span>
+            </div>
+            <PromptInput onSubmit={() => start()} className="topic-composer">
+              <PromptInputTextarea
+                ref={inputRef}
+                aria-label="Discussion topic"
+                placeholder="Give your pals something to talk about…"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="min-h-12"
+                disabled={running}
+              />
+              <PromptInputFooter>
+                <span className="composer-label">
+                  <MessageSquare size={13} /> A question, an idea, a rabbit hole.
+                </span>
+                <PromptInputSubmit
+                  aria-label={running ? "Stop discussion" : "Start topic"}
+                  status={running ? "streaming" : "ready"}
+                  onStop={stop}
+                  disabled={
+                    !running &&
+                    (!topic.trim() ||
+                      (!characterModeCommand(topic) && tooFew) ||
+                      !ready)
+                  }
+                />
+              </PromptInputFooter>
+            </PromptInput>
+            <div className="suggestions">
+              {suggestions.map((s) => (
+                <Button
+                  key={s}
+                  variant="ghost"
+                  size="sm"
+                  disabled={running}
+                  onClick={() => {
+                    setTopic(s);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  {s}
+                  <ArrowUpRight size={12} />
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="launch-controls">
+            {direct && (
+
+              <div>
+                <span className="control-label">TALK WITH</span>
+                <select
+                  className="partner-select"
+                  aria-label="Pal to talk with"
+                  value={partner}
+                  disabled={running}
+                  onChange={(e) => setPartner(e.target.value as AgentId)}
+                >
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {agentName(a.id, hell, horror, characterMode)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {!direct && (
+            <div>
+              <span className="control-label">ROUNDS</span>
+              <div className="round-stepper">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Fewer rounds"
+                  disabled={running || rounds <= 1}
+                  onClick={() => setRounds(rounds - 1)}
+                >
+                  <Minus />
+                </Button>
+                <span>{rounds}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="More rounds"
+                  disabled={running || rounds >= 5}
+                  onClick={() => setRounds(rounds + 1)}
+                >
+                  <Plus />
+                </Button>
+              </div>
+            </div>
+            )}
+            <Button
+              className="start-button"
+              onClick={running ? stop : () => void start()}
+              disabled={
+                !running &&
+                (!topic.trim() || (!characterModeCommand(topic) && tooFew) || !ready)
+              }
+            >
+              {running ? <Square /> : <Play fill="currentColor" />}
+              {running ? "Stop" : direct ? "Send" : "Start discussion"}
+            </Button>
+          </div>
+          {tooFew && (
+            <p className="validation-note">Invite at least two pals to start a discussion.</p>
+          )}
+          </section>
+        </div>
+      </div>
       <footer className="app-footer">
         <span>SMALL PIXELS. BIG PERSPECTIVES.</span>
         <span>

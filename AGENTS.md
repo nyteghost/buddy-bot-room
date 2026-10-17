@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Application rules
+- Keep window movement, visibility and layout persistence in browser-only workspace components; hiding windows must preserve mounted chat, tools and recorder state so work is not discarded.
 - Assistant Mode is a separate browser-persisted switch (not a theme): any theme's cast keeps its name/voice but takes the shared assistant jobs, the office scene and machine helpers; legacy "assistant" theme maps to Linux theme + switch on.
 - Pal voice playback is removed from the room UI to save power; speech modules remain unused.
 - Assistant room movement uses one shared browser-only station choreography and activity renderer, so both modes stay visually in sync without invoking machine actions.
