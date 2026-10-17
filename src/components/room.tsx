@@ -8,6 +8,8 @@ import {
   Download,
   MessageSquare,
   Mic,
+  Maximize2,
+  Minimize2,
   Wrench,
   Minus,
   Play,
@@ -176,6 +178,13 @@ export function Room() {
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(true);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem("pixel-pals-compact-v1") === "1") setCompact(true);
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("pixel-pals-compact-v1", compact ? "1" : "0"); } catch { /* ignore */ }
+  }, [compact]);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
@@ -501,7 +510,14 @@ export function Room() {
         </div>
       </header>
       <main className="workspace">
-        <section className="room-column">
+        <section className={cn("room-column", compact && "is-compact")}>
+          <div className="compact-bar">
+            <span className="control-label">{compact ? "FOCUS MODE · ROOM HIDDEN" : "ROOM VIEW"}</span>
+            <Button variant="ghost" size="sm" aria-pressed={compact} onClick={() => setCompact((c) => !c)}>
+              {compact ? <Maximize2 className="size-4" /> : <Minimize2 className="size-4" />}
+              {compact ? "Show room" : "Compact"}
+            </Button>
+          </div>
           <div className="page-heading">
             <div>
               <div className="eyebrow">
