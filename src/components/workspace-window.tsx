@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { clampWindowPosition, readWindowPosition } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 
+let windowStack = 1;
+
 export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion }: {
   id: string; title: string; icon: ReactNode; open: boolean; onClose: () => void;
   children: ReactNode; resetVersion: number;
@@ -17,7 +19,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   positionRef.current = position;
   const key = `pixel-pals-window-${id}-v1`;
   useEffect(() => {
-    if (open) setFront(Date.now());
+    if (open) setFront(++windowStack);
   }, [open]);
   useEffect(() => {
     try { setPosition(readWindowPosition(localStorage.getItem(key))); } catch { /* optional browser storage */ }
@@ -65,7 +67,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   const style = { "--window-x": position ? `${position.x}px` : undefined, "--window-y": position ? `${position.y}px` : undefined, zIndex: front } as CSSProperties;
   return <section ref={ref} aria-label={title} hidden={!open} style={style}
     className={cn("workspace-window", `window-${id}`, expanded && "window-expanded")}
-    onPointerDownCapture={() => setFront(Date.now())}>
+    onPointerDownCapture={() => setFront(++windowStack)}>
     <div className="window-titlebar" onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
       <span className="window-title">{icon}{title}</span>
       <GripHorizontal className="window-grip size-4" aria-hidden />
