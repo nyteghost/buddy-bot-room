@@ -17,6 +17,9 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   positionRef.current = position;
   const key = `pixel-pals-window-${id}-v1`;
   useEffect(() => {
+    if (open) setFront(Date.now());
+  }, [open]);
+  useEffect(() => {
     try { setPosition(readWindowPosition(localStorage.getItem(key))); } catch { /* optional browser storage */ }
   }, [key]);
   useEffect(() => {
