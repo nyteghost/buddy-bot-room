@@ -1,9 +1,9 @@
-import { googleConfig, googleUser } from "./google-auth.server";
+import { currentUser } from "./accounts.server";
 import { accountFileName, normalizeLocalSettings } from "./local-account";
 import { logServer } from "./server-log.server";
 
 /**
- * Per-Google-account settings for the self-hosted build: one small JSON file per account in
+ * Per-account settings for the self-hosted build: one small JSON file per account in
  * BUDDY_DATA_DIR/accounts (mode 600). Only works for a signed-in, allowed Google user.
  * Keys are stored as typed on your own server's volume (not encrypted), same trust level as the data volume.
  */
@@ -13,13 +13,12 @@ async function fs() {
 const dir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim().replace(/\/+$/, "");
 
 export async function handleAccountLocal(request: Request) {
-  const cfg = googleConfig(process.env);
-  const user = await googleUser(request, cfg);
-  if (!cfg || !user) return Response.json({ error: "Sign in with Google first." }, { status: 401 });
+  const user = await currentUser(request);
+  if (!user) return Response.json({ error: "Sign in first." }, { status: 401 });
   if (!dir()) return Response.json({ error: "No data folder: BUDDY_DATA_DIR isn't set, so settings can't be saved on the server." }, { status: 503 });
   const f = await fs();
   const folder = `${dir()}/accounts`;
-  const path = `${folder}/${await accountFileName(user.email)}`;
+  const path = `${folder}/${await accountFileName(user.username)}`;
   try {
     if (request.method === "GET") {
       try {

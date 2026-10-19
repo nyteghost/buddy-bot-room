@@ -1,23 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, Users } from "lucide-react";
+import { AccountsDialog } from "@/components/accounts-dialog";
 import { Button } from "@/components/ui/button";
 import { normalizeKind, setEngine, useEngine } from "@/lib/engine";
 import { isCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 
-type Me = { google: boolean; email: string | null; name: string | null };
+type Me = { accounts: boolean; user?: { username: string; owner: boolean } | null };
 
 /**
- * Docker build: "Local mode" unless Google sign-in is configured (GOOGLE_CLIENT_ID/SECRET on the server).
- * When it is, the server has already made you sign in; here we show who you are and sync engine settings,
- * keys and theme to that Google account (stored on your server, not Lovable).
+ * Docker build: "Local mode" when accounts are off (BUDDY_ACCOUNTS=0). With accounts on, the server has already
+ * made you sign in; here we show who you are, open the Accounts dialog, and sync engine settings, keys and theme
+ * to your account (stored on your server, not Lovable).
  */
 export function LocalAccountButton({ theme, onTheme }: { theme: CharacterMode; onTheme: (t: CharacterMode) => void }) {
   const engine = useEngine();
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [synced, setSynced] = useState(false);
   const [note, setNote] = useState("");
+  const [dialog, setDialog] = useState(false);
   const loadedFor = useRef<string | undefined>(undefined);
-  const email = me?.google ? me.email : null;
+  const email = me?.accounts ? me.user?.username ?? null : null;
 
   useEffect(() => {
     fetch("/__me").then((r) => r.json()).then((j) => setMe(j as Me)).catch(() => setMe(null));
@@ -51,14 +53,16 @@ export function LocalAccountButton({ theme, onTheme }: { theme: CharacterMode; o
   }, [synced, engine.kind, engine.groqKey, engine.geminiKey, engine.openrouterKey, engine.nvidiaKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!email)
-    return <span className="account-chip" title="Settings and keys stay in this browser. To sign in with Google here, set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_ALLOWED_EMAILS on the server.">Local mode</span>;
+    return <span className="account-chip" title="Settings and keys stay in this browser. Accounts are turned off on this server (BUDDY_ACCOUNTS=0).">Local mode</span>;
   return (
     <span className="account-chip" title={note || `Signed in as ${email}. Settings sync to your account on this server.`}>
-      <span className="account-name">{me?.name || email}</span>
+      <span className="account-name">{email}</span>
+      <Button variant="ghost" size="sm" aria-label="Accounts" onClick={() => setDialog(true)}><Users /></Button>
       <Button variant="ghost" size="sm" aria-label="Sign out" onClick={() => { window.location.href = "/__logout"; }}>
         <LogOut />
       </Button>
       {note && <span className="text-destructive text-xs">{note}</span>}
+      <AccountsDialog open={dialog} onOpenChange={setDialog} />
     </span>
   );
 }

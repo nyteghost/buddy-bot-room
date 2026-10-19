@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiAccountsRouteImport } from './routes/api.accounts'
 import { Route as ApiAccountLocalRouteImport } from './routes/api.account-local'
 import { Route as ApiTraktRouteImport } from './routes/api.trakt'
 import { Route as ApiPlexRouteImport } from './routes/api.plex'
@@ -47,6 +48,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAccountsRoute = ApiAccountsRouteImport.update({
+  id: '/api/accounts',
+  path: '/api/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAccountLocalRoute = ApiAccountLocalRouteImport.update({
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/accounts': typeof ApiAccountsRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/trakt': typeof ApiTraktRoute
   '/api/plex': typeof ApiPlexRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/accounts': typeof ApiAccountsRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/trakt': typeof ApiTraktRoute
   '/api/plex': typeof ApiPlexRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/accounts': typeof ApiAccountsRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/trakt': typeof ApiTraktRoute
   '/api/plex': typeof ApiPlexRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/accounts'
     | '/api/account-local'
     | '/api/trakt'
     | '/api/plex'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/accounts'
     | '/api/account-local'
     | '/api/trakt'
     | '/api/plex'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/accounts'
     | '/api/account-local'
     | '/api/trakt'
     | '/api/plex'
@@ -201,6 +213,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiAccountsRoute: typeof ApiAccountsRoute
   ApiAccountLocalRoute: typeof ApiAccountLocalRoute
   ApiTraktRoute: typeof ApiTraktRoute
   ApiPlexRoute: typeof ApiPlexRoute
@@ -247,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/accounts': {
+      id: '/api/accounts'
+      path: '/api/accounts'
+      fullPath: '/api/accounts'
+      preLoaderRoute: typeof ApiAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/account-local': {
@@ -321,6 +341,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiAccountsRoute: ApiAccountsRoute,
   ApiAccountLocalRoute: ApiAccountLocalRoute,
   ApiTraktRoute: ApiTraktRoute,
   ApiPlexRoute: ApiPlexRoute,
