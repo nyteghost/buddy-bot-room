@@ -316,6 +316,8 @@ What the report tells you:
 
 **Requirements:** Trakt set up ([7.4](#74-trakt), public list or history), accounts on, and your iPhone able to reach Pixel Pals (HTTPS address).
 
+**Shortcut:** the quickest way is the **Connect iPhone** button (phone icon next to your name in the top bar). It creates the token, fills in your real address, and gives a Copy button for every value (URL, `Authorization` header, `Content-Type`) with the steps beside them. It has a tab for the share sheet too. The manual steps below show the same thing.
+
 **Step 1: create a Shortcut access token.** Sign in → top bar → people icon (*Accounts*) → **iPhone Shortcut access token → Create token**. Copy it now; it's shown once. It only works for `/api/notes-sync`.
 
 **Step 2: build the Shortcut** (Shortcuts app → **+**):

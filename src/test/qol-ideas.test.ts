@@ -11,6 +11,7 @@ import { friendlyError } from "@/lib/friendly-error";
 import { chunkText, docContext, isReadableDoc, retrieve, tokenize } from "@/lib/rag";
 import { planAdd } from "@/lib/documents";
 import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
+import { notesSyncUrl, shareSheetUrl, bearerHeader, isSecure, notesSteps, shareSteps } from "@/lib/iphone-setup";
 import { providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
@@ -1069,5 +1070,27 @@ describe("Claude (paid) provider", () => {
   });
   it("needs a key", () => {
     expect(claudeProvider({ ...base, claudeMode: "only", anthropicKey: " " })).toBeUndefined();
+  });
+});
+
+describe("Connect iPhone helper", () => {
+  it("builds the notes-sync URL from the options", () => {
+    expect(notesSyncUrl({ origin: "https://pp.ts.net/" })).toBe("https://pp.ts.net/api/notes-sync?format=report&skip=1");
+    expect(notesSyncUrl({ origin: "http://10.0.0.5:8090", format: "note", skipTitle: false, list: "movies to see" })).toBe("http://10.0.0.5:8090/api/notes-sync?format=note&list=movies+to+see");
+  });
+  it("builds the share-sheet address and bearer header", () => {
+    expect(shareSheetUrl("https://pp.ts.net//")).toBe("https://pp.ts.net/?q=");
+    expect(bearerHeader(" pp_abc ")).toBe("Bearer pp_abc");
+  });
+  it("detects secure origins", () => {
+    expect(isSecure("https://x")).toBe(true);
+    expect(isSecure("http://x")).toBe(false);
+  });
+  it("gives copyable values in the steps, with a placeholder until a token exists", () => {
+    const withToken = notesSteps("https://x/api/notes-sync?format=report", "pp_t", "Watch list");
+    const send = withToken.find((s) => s.copy);
+    expect(send?.copy?.map((c) => c.value)).toContain("Bearer pp_t");
+    expect(notesSteps("u", "", "").find((s) => s.copy)?.copy?.[1]?.value).toContain("create your token");
+    expect(shareSteps("https://x/?q=").some((s) => s.copy?.[0]?.value === "https://x/?q=")).toBe(true);
   });
 });

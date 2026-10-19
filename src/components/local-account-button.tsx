@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { LogOut, Users } from "lucide-react";
+import { LogOut, Smartphone, Users } from "lucide-react";
+import { ConnectIphoneDialog } from "@/components/connect-iphone-dialog";
 import { AccountsDialog } from "@/components/accounts-dialog";
 import { Button } from "@/components/ui/button";
 import { SYNC_KEYS } from "@/lib/settings-io";
@@ -24,6 +25,7 @@ export function LocalAccountButton(_props: { theme: CharacterMode; onTheme: (t: 
   const [synced, setSynced] = useState(false);
   const [note, setNote] = useState("");
   const [dialog, setDialog] = useState(false);
+  const [phone, setPhone] = useState(false);
   const loadedFor = useRef<string | undefined>(undefined);
   const lastSent = useRef("");
   const email = me?.accounts ? me.user?.username ?? null : null;
@@ -81,12 +83,14 @@ export function LocalAccountButton(_props: { theme: CharacterMode; onTheme: (t: 
   return (
     <span className="account-chip" title={note || `Signed in as ${email}. Your settings sync to your account on this server.`}>
       <span className="account-name">{email}</span>
+      <Button variant="ghost" size="sm" aria-label="Connect iPhone" title="Connect iPhone (Shortcuts)" onClick={() => setPhone(true)}><Smartphone /></Button>
       <Button variant="ghost" size="sm" aria-label="Accounts" onClick={() => setDialog(true)}><Users /></Button>
       <Button variant="ghost" size="sm" aria-label="Sign out" onClick={() => { window.location.href = "/__logout"; }}>
         <LogOut />
       </Button>
       {note && <span className="text-destructive text-xs">{note}</span>}
       <AccountsDialog open={dialog} onOpenChange={setDialog} />
+      <ConnectIphoneDialog open={phone} onOpenChange={setPhone} />
     </span>
   );
 }
