@@ -1,4 +1,5 @@
 import { cleanKey, providerById } from "@/lib/key-providers";
+import { validateCustomUrl } from "@/lib/custom-provider";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -13,8 +14,21 @@ const CHECKS: Record<string, Check> = {
 
 /** POST { provider, key }. Makes one free "list models" request to confirm the key is accepted. Nothing is stored. */
 export async function handleKeyTest(request: Request): Promise<Response> {
-  let body: { provider?: unknown; key?: unknown } = {};
+  let body: { provider?: unknown; key?: unknown; baseUrl?: unknown } = {};
   try { body = (await request.json()) as typeof body; } catch { return json({ ok: false, message: "Bad request." }, 400); }
+  if (body.provider === "custom") {
+    const url = validateCustomUrl(body.baseUrl, process.env["ALLOW_PRIVATE_CUSTOM"] === "1");
+    if (!url.ok) return json({ ok: false, message: url.error }, 400);
+    const key = typeof body.key === "string" ? cleanKey(body.key) : "";
+    try {
+      const res = await fetch(`${url.url}/models`, { headers: key ? { authorization: `Bearer ${key}` } : {}, signal: AbortSignal.timeout(10_000) });
+      if (res.ok) return json({ ok: true, message: "Works." });
+      if (res.status === 401 || res.status === 403) return json({ ok: false, message: "The provider rejected this key." });
+      return json({ ok: false, message: `The provider answered ${res.status} (some providers don't list models; try a message instead).` });
+    } catch {
+      return json({ ok: false, message: "Couldn't reach that address from the server." });
+    }
+  }
   const provider = typeof body.provider === "string" ? providerById(body.provider) : undefined;
   const key = typeof body.key === "string" ? cleanKey(body.key) : "";
   const check = provider ? CHECKS[provider.id] : undefined;

@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { localModelChoices } from "@/lib/gpu-tier";
 import { FreeKeysWizard } from "@/components/free-keys-wizard";
 import { LocalAiPanel } from "@/components/local-ai-panel";
+import { CUSTOM_PRESETS } from "@/lib/custom-provider";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
@@ -233,6 +234,7 @@ export function EngineSettingsDialog() {
               {engine.claudeMode !== "off" && !engine.anthropicKey.trim() && <p className="text-destructive">Add a Claude key above, or turn this off.</p>}
               {engine.claudeMode !== "off" && engine.anthropicKey.trim() && <p className="text-amber-600">Claude is ON: replies it writes are billed to your Anthropic account.</p>}
             </div>
+            <CustomProviderBox />
             <p className="text-sm text-muted-foreground">
               Keys are saved only in this browser (and encrypted in your account if signed in).
             </p>
@@ -286,6 +288,69 @@ export function WebGpuUsageBox({ active }: { active: boolean }) {
         </div>
       )}
     </div>
+  );
+}
+
+function CustomProviderBox() {
+  const engine = useEngine();
+  const [test, setTest] = useState("");
+  async function runTest() {
+    setTest("Testing…");
+    try {
+      const res = await fetch("/api/keytest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "custom", baseUrl: engine.customBaseUrl, key: engine.customKey }) });
+      const j = (await res.json()) as { ok?: boolean; message?: string };
+      setTest(`${j.ok ? "✓" : "✗"} ${j.message ?? ""}`);
+    } catch {
+      setTest("✗ Couldn't reach the Pixel Pals server.");
+    }
+  }
+  const active = engine.customMode !== "off";
+  return (
+    <details className="rounded-lg border p-3 text-sm" open={active}>
+      <summary className="cursor-pointer font-medium">Custom provider (any OpenAI-compatible API){active ? " · ON" : ""}</summary>
+      <div className="mt-2 grid gap-2">
+        <p className="text-muted-foreground">
+          For Hugging Face, Mistral, Cerebras, or any provider with an OpenAI-style API. It stays <b>off</b> until you choose how to use it. Some providers are free, some charge: tick the box below if yours charges, and Pixel Pals will warn you when it's on.
+        </p>
+        <label className="grid gap-1">
+          <span className="font-medium">Start from</span>
+          <select
+            className="rounded-md border bg-background px-2 py-2"
+            value=""
+            onChange={(e) => {
+              const p = CUSTOM_PRESETS.find((x) => x.id === e.target.value);
+              if (p) setEngine({ customName: p.label, customBaseUrl: p.baseUrl, customModel: p.model });
+            }}
+          >
+            <option value="">Choose a preset…</option>
+            {CUSTOM_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label} ({p.note})</option>)}
+          </select>
+        </label>
+        {CUSTOM_PRESETS.filter((p) => p.label === engine.customName).map((p) => (
+          <a key={p.id} className="text-primary underline" href={p.keyUrl} target="_blank" rel="noreferrer">Get a {p.label} key</a>
+        ))}
+        <input className="rounded-md border bg-background px-2 py-2" placeholder="Name (for you), e.g. Hugging Face" value={engine.customName} onChange={(e) => setEngine({ customName: e.target.value })} />
+        <input className="rounded-md border bg-background px-2 py-2" placeholder="Base URL, e.g. https://router.huggingface.co/v1" autoCapitalize="none" value={engine.customBaseUrl} onChange={(e) => setEngine({ customBaseUrl: e.target.value })} />
+        <input className="rounded-md border bg-background px-2 py-2" type="password" placeholder="API key" value={engine.customKey} onChange={(e) => setEngine({ customKey: e.target.value })} />
+        <input className="rounded-md border bg-background px-2 py-2" placeholder="Model, e.g. Qwen/Qwen2.5-7B-Instruct" autoCapitalize="none" value={engine.customModel} onChange={(e) => setEngine({ customModel: e.target.value })} />
+        <label className="flex items-center gap-2"><input type="checkbox" checked={engine.customPaid} onChange={(e) => setEngine({ customPaid: e.target.checked })} /> This provider charges money (shows a cost warning)</label>
+        <label className="grid gap-1">
+          <span className="font-medium">How to use it</span>
+          <select className="rounded-md border bg-background px-2 py-2" value={engine.customMode} onChange={(e) => setEngine({ customMode: e.target.value as ClaudeMode })}>
+            <option value="off">Off</option>
+            <option value="share">Share turns with my other keys</option>
+            <option value="only">Use only this provider</option>
+          </select>
+        </label>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" className="h-11 sm:h-8" onClick={() => void runTest()}>Test</Button>
+          {test && <span className="text-xs text-muted-foreground">{test}</span>}
+        </div>
+        {active && engine.customPaid && <p className="rounded-md border border-amber-500/60 bg-amber-500/10 p-2 text-amber-600">PAID: replies from {engine.customName || "this provider"} are billed to your account there. Check their pricing and set a spending limit.</p>}
+        {active && !engine.customPaid && <p className="text-muted-foreground">Free tiers have rate limits and terms of their own. Replies from {engine.customName || "this provider"} count against your account there.</p>}
+        {active && (!engine.customBaseUrl.trim() || !engine.customModel.trim()) && <p className="text-destructive">Enter a base URL and a model, or turn this off.</p>}
+      </div>
+    </details>
   );
 }
 

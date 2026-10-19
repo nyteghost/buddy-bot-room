@@ -16,7 +16,8 @@ import { parseNvidiaSmi, modelBudgetGb, describeHardware } from "@/lib/hardware"
 import { CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
 import { parseLibraryPage, parsePulls, sizeToGb, feedToCatalog, newSuggestions } from "@/lib/model-feed";
 import { parseProviderReadme, keyPageFor, isSupported } from "@/lib/provider-feed";
-import { providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
+import { validateCustomUrl, isCustomModel, CUSTOM_PRESETS } from "@/lib/custom-provider";
+import { customProvider, providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
 import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
@@ -42,7 +43,7 @@ import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch,
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
-const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, localPals: {} as Record<string, string>, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
+const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, localPals: {} as Record<string, string>, customName: "", customBaseUrl: "", customKey: "", customModel: "", customPaid: false, customMode: "off" as const, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
 
 describe("context trimming", () => {
   const msgs = (n: number, len: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: "x".repeat(len) }));
@@ -1247,5 +1248,38 @@ describe("Free provider list", () => {
     expect(isSupported("Groq")).toBe(true);
     expect(isSupported("Google AI Studio")).toBe(true);
     expect(isSupported("Cerebras")).toBe(false);
+  });
+});
+
+describe("Custom OpenAI-compatible provider", () => {
+  const base = { ...engineBase, kind: "cloud" as const, groqKey: "g", customBaseUrl: "https://api.example.com/v1/", customModel: "m-1", customKey: "k" };
+  it("accepts public https addresses and tidies them", () => {
+    expect(validateCustomUrl("https://router.huggingface.co/v1/")).toEqual({ ok: true, url: "https://router.huggingface.co/v1" });
+    for (const p of CUSTOM_PRESETS) expect(validateCustomUrl(p.baseUrl).ok).toBe(true);
+  });
+  it("refuses private, local and unsafe addresses by default", () => {
+    for (const bad of ["http://api.example.com/v1", "https://localhost:11434/v1", "https://10.0.0.5/v1", "https://192.168.1.2/v1", "https://169.254.169.254/", "https://[::1]/v1", "https://myserver/v1", "https://box.local/v1", "https://user:pw@api.example.com/v1", "not a url", ""])
+      expect(validateCustomUrl(bad).ok).toBe(false);
+  });
+  it("lets the server owner allow a LAN endpoint", () => {
+    expect(validateCustomUrl("http://10.0.0.5:1234/v1", true)).toEqual({ ok: true, url: "http://10.0.0.5:1234/v1" });
+  });
+  it("validates model names", () => {
+    expect(isCustomModel("Qwen/Qwen2.5-7B-Instruct")).toBe(true);
+    expect(isCustomModel("llama3.1-8b:free")).toBe(true);
+    expect(isCustomModel("a b")).toBe(false);
+    expect(isCustomModel("")).toBe(false);
+  });
+  it("is never used while off, and joins the rotation or runs alone when asked", () => {
+    expect(customProvider(base)).toBeUndefined();
+    expect(turnProviders(base).map((p) => p.kind)).toEqual(["groq"]);
+    expect(turnProviders({ ...base, customMode: "share" }).map((p) => p.kind)).toEqual(["groq", "custom"]);
+    const only = turnProviders({ ...base, customMode: "only" });
+    expect(only.length).toBe(1);
+    expect(only[0]).toMatchObject({ kind: "custom", model: "m-1" });
+  });
+  it("needs a base URL and a model", () => {
+    expect(customProvider({ ...base, customMode: "only", customModel: "" })).toBeUndefined();
+    expect(customProvider({ ...base, customMode: "only", customBaseUrl: " " })).toBeUndefined();
   });
 });

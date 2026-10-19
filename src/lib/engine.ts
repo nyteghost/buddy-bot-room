@@ -7,7 +7,7 @@ export type ReplyLength = "short" | "medium" | "long";
 export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 800, long: 1500 };
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 /** Claude is a PAID provider, so it is never part of the free rotation unless the user opts in. */
-export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server"; apiKey: string; model?: string; maxTokens?: number };
+export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server" | "custom"; apiKey: string; model?: string; maxTokens?: number; baseUrl?: string };
 export type ClaudeMode = "off" | "share" | "only";
 export const CLAUDE_MODELS = [
   { id: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)", price: "$0.10 in / $0.50 out per 1M tokens" },
@@ -30,6 +30,14 @@ export type EngineSettings = {
   localAuto: boolean;
   /** Optional model per pal id; overrides task routing. */
   localPals: Record<string, string>;
+  /** Your own OpenAI-compatible provider. Off until you choose a mode. */
+  customName: string;
+  customBaseUrl: string;
+  customKey: string;
+  customModel: string;
+  /** Tick this if the provider charges money; shows a warning. */
+  customPaid: boolean;
+  customMode: ClaudeMode;
   anthropicKey: string;
   claudeMode: ClaudeMode;
   claudeModel: string;
@@ -52,6 +60,12 @@ const fallback: EngineSettings = {
   localFast: "",
   localAuto: true,
   localPals: {},
+  customName: "",
+  customBaseUrl: "",
+  customKey: "",
+  customModel: "",
+  customPaid: false,
+  customMode: "off",
   anthropicKey: "",
   claudeMode: "off",
   claudeModel: DEFAULT_CLAUDE_MODEL,
@@ -115,10 +129,17 @@ export function claudeProvider(s: EngineSettings): TurnProvider | undefined {
 }
 
 /** Everything that may answer a turn: the free keys, plus Claude only if the user switched it on. */
+export function customProvider(s: EngineSettings): TurnProvider | undefined {
+  if ((s.customMode !== "share" && s.customMode !== "only") || !s.customBaseUrl.trim() || !s.customModel.trim()) return undefined;
+  return { kind: "custom", apiKey: s.customKey.trim(), model: s.customModel.trim(), baseUrl: s.customBaseUrl.trim() };
+}
+
 export function turnProviders(s: EngineSettings): TurnProvider[] {
   const claude = claudeProvider(s);
+  const custom = customProvider(s);
   if (claude && s.claudeMode === "only") return [claude];
-  return claude ? [...availableProviders(s), claude] : availableProviders(s);
+  if (custom && s.customMode === "only") return [custom];
+  return [...availableProviders(s), ...(claude ? [claude] : []), ...(custom ? [custom] : [])];
 }
 
 /** The model on the Ollama inside the stack, chosen per task when routing is on. */

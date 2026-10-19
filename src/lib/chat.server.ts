@@ -15,6 +15,7 @@ import { DM_SETTING, dmTask, isDmRole } from "./campaign";
 
 import { ollamaBase } from "./ollama.server";
 import { isModelName } from "./model-catalog";
+import { isCustomModel, validateCustomUrl } from "./custom-provider";
 const CLAUDE_IDS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
 
 export async function handleChat(request: Request) {
@@ -141,7 +142,7 @@ export async function handleChat(request: Request) {
     }
     // Free cloud engines with the user's own key (never stored on the server).
     const engine = body.engine;
-    if (!engine || !["groq", "gemini", "openrouter", "nvidia", "anthropic", "ollama-server"].includes(engine.kind))
+    if (!engine || !["groq", "gemini", "openrouter", "nvidia", "anthropic", "ollama-server", "custom"].includes(engine.kind))
       return Response.json({ error: "Add a free key in AI engine settings, or choose In-browser." }, { status: 400 });
     {
       const localServer = engine.kind === "ollama-server";
@@ -149,13 +150,19 @@ export async function handleChat(request: Request) {
         return Response.json({ error: "Local AI isn't set up on this server. Add Ollama to the stack (see the README) or choose another engine." }, { status: 400 });
       if (localServer && !isModelName(engine.model))
         return Response.json({ error: "Pick a Local AI model in engine settings." }, { status: 400 });
-      if (!localServer && (typeof engine.apiKey !== "string" || !engine.apiKey.trim()))
+      const custom = engine.kind === "custom";
+      const customUrl = custom ? validateCustomUrl(engine.baseUrl, process.env["ALLOW_PRIVATE_CUSTOM"] === "1") : null;
+      if (customUrl && !customUrl.ok) return Response.json({ error: customUrl.error }, { status: 400 });
+      if (custom && !isCustomModel(engine.model)) return Response.json({ error: "Enter a model name for your custom provider." }, { status: 400 });
+      if (!localServer && !custom && (typeof engine.apiKey !== "string" || !engine.apiKey.trim()))
         return Response.json({ error: "Add your free API key in Engine settings." }, { status: 400 });
       const provider = createOpenAICompatible({
         name: engine.kind,
-        apiKey: localServer ? "ollama" : engine.apiKey.trim(),
+        apiKey: localServer ? "ollama" : custom ? String(engine.apiKey ?? "").trim() || "none" : engine.apiKey.trim(),
         baseURL:
-          localServer
+          customUrl && customUrl.ok
+            ? customUrl.url
+            : localServer
             ? `${ollamaBase()}/v1`
             : engine.kind === "anthropic"
             ? "https://api.anthropic.com/v1"
@@ -168,12 +175,12 @@ export async function handleChat(request: Request) {
                 : "https://generativelanguage.googleapis.com/v1beta/openai",
       });
       const free = streamText({
-        model: provider(localServer ? String(engine.model) : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
+        model: provider(custom ? String(engine.model) : localServer ? String(engine.model) : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
         abortSignal: request.signal,
         maxRetries: 0,
-        ...(engine.kind === "anthropic" ? { maxOutputTokens: 1500 } : {}),
+        ...(engine.kind === "anthropic" || custom ? { maxOutputTokens: 1500 } : {}),
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
         onError: logStreamError,
       });

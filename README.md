@@ -160,6 +160,12 @@ In **Free keys** (engine settings) the **Get free keys** panel walks you through
 
 Under **Get free keys → More free providers** the server shows a list of free-tier and trial-credit LLM APIs with their limits and a link to each one's key page (or its website when I don't have a key-page link). It reads the community-maintained list at github.com/cheahjs/free-llm-api-resources once a day (and on **Check now**), so new providers show up without an update. The list isn't checked by Pixel Pals; limits and terms change, so read them before signing up. Providers Pixel Pals can already use are marked **works here**; the rest are listed for reference. Set `PROVIDER_FEED=0` to never fetch it.
 
+### Custom provider (any OpenAI-compatible API)
+
+For Hugging Face, Mistral, Cerebras and most providers on the community list, use **Custom provider** in the engine settings: pick a preset or enter a **base URL** (for example `https://router.huggingface.co/v1`), an **API key** and a **model** name, then press **Test**. It stays **off** until you choose *Share turns with my other keys* or *Use only this provider*. Tick **This provider charges money** if it does, and an amber **PAID** warning shows while it's on. Only providers that speak the OpenAI chat format work; a provider with its own format (for example Jev, which returns structured scores rather than chat text) can't be used this way.
+
+The server makes the call for you, so it only accepts public `https://` addresses. To use a model on your own network (LM Studio, vLLM, another PC), the server owner sets `ALLOW_PRIVATE_CUSTOM=1` on the stack.
+
 ### Claude (paid)
 
 Claude is the one **paid** option. It is billed to your own Anthropic account, separately from any Claude subscription. In the engine settings, the amber **Claude (Anthropic) — paid service** box has:
@@ -505,6 +511,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `OLLAMA_MODELS` | `qwen2.5:7b` | Models downloaded on first start |
 | `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
 | `OLLAMA_PORT` | `11434` | Published Ollama port |
+| `ALLOW_PRIVATE_CUSTOM` | empty | `1` lets the Custom provider use private/LAN addresses (http allowed) |
 | `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
