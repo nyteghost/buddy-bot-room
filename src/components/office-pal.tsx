@@ -37,7 +37,7 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   return (
     <div
       style={position}
-      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
+      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !active && `office-dir-${pose.heading}`, enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
       aria-label={`${station.label}: ${working ? station.activity : walking ? "walking to a station" : "at a station"}`}
     >
