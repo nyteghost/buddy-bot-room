@@ -6,14 +6,19 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { selfHostedPlugin } from "./vite-self-hosted";
 
 // Build version: 1.0.<commit count> (+short hash), stamped automatically on every build.
 function git(cmd: string) { try { return execSync(`git ${cmd}`, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } }
-// Portainer clones shallowly, so the commit count would be wrong there; show "1.0.x" instead of a misleading number.
-const SHALLOW = git("rev-parse --is-shallow-repository") === "true";
-const BUILD_VERSION = `1.0.${SHALLOW ? "x" : git("rev-list --count HEAD") || "0"}`;
-const BUILD_COMMIT = git("rev-parse --short HEAD") || "local";
+// The Docker build has no git history (Portainer clones without it), so it writes .build-info.json from GitHub instead.
+function stamp(): { count?: string; commit?: string } {
+  try { return JSON.parse(readFileSync(".build-info.json", "utf8")); } catch { return {}; }
+}
+const info = stamp();
+const SHALLOW = git("rev-parse --is-shallow-repository") !== "false";
+const BUILD_VERSION = `1.0.${(!SHALLOW && git("rev-list --count HEAD")) || info.count || (SHALLOW ? "x" : "0")}`;
+const BUILD_COMMIT = git("rev-parse --short HEAD") || info.commit || "local";
 const BUILD_DATE = new Date().toISOString().slice(0, 10);
 
 export default defineConfig({

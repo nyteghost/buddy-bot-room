@@ -9,10 +9,16 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 # git lets the build stamp the real version and commit on the sidebar label.
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/* && git config --global --add safe.directory /app
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates && rm -rf /var/lib/apt/lists/* && git config --global --add safe.directory /app
 COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 COPY . .
+# Portainer builds without git history, so ask GitHub which commit this is (a public-repo lookup).
+# This layer sits after COPY, so it re-runs whenever the code changes. Failure is harmless: the label just says "local".
+ARG BUDDY_REPO=nyteghost/buddy-bot-room
+RUN SHA=$(curl -fsSL --max-time 15 -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/$BUDDY_REPO/commits/main" 2>/dev/null | cut -c1-7); \
+    COUNT=$(curl -fsSI --max-time 15 "https://api.github.com/repos/$BUDDY_REPO/commits?per_page=1&sha=main" 2>/dev/null | grep -i '^link:' | sed -n 's/.*[?&]page=\([0-9]*\)>; rel="last".*/\1/p'); \
+    printf '{"count":"%s","commit":"%s"}' "$COUNT" "$SHA" > /app/.build-info.json; cat /app/.build-info.json; echo
 # Where the app finds SearXNG (web search) from inside the container. Override in .env.local.
 ENV SEARXNG_URL=http://host.docker.internal:8081 BUDDY_ALLOW_ALL_HOSTS=1 BUDDY_SELF_HOSTED=1
 ENV BUDDY_DATA_DIR=/data
