@@ -31,6 +31,8 @@ export type SlashAction =
   | { type: "roll"; expr: string }
   | { type: "plex"; query: string }
   | { type: "watch"; mood: string }
+  | { type: "trakt"; list: string }
+  | { type: "next"; list: string; mood: string }
   | { type: "server" }
   | { type: "diagnose" }
   | { type: "dm"; sub: "start" | "end" | "status" | "character" | "fact" | "unfact"; text: string; n?: number };
@@ -86,6 +88,8 @@ export const slashCommands = [
   { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
   { name: "watch", usage: "/watch [mood]", description: "What should we watch tonight? The pals pick from your Plex library" },
+  { name: "next", usage: "/next [list:name] [mood]", description: "What should we watch next? The pals pick from your Trakt list (needs TRAKT_CLIENT_ID)" },
+  { name: "trakt", usage: "/trakt [lists|<list>]", description: "Show your Trakt lists, or the items in one" },
   { name: "plex", usage: "/plex <title|recent>", description: "Look in your Plex library (needs PLEX_URL)" },
   { name: "server", usage: "/server", description: "Check your Unraid server now" },
   { name: "diagnose", usage: "/diagnose", description: "What's wrong with my server? The pals look at Unraid and advise" },
@@ -171,6 +175,12 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
     case "plex":
       return { ok: true, action: { type: "plex", query: rawArg || "recent" } };
+    case "trakt":
+      return { ok: true, action: { type: "trakt", list: rawArg } };
+    case "next": {
+      const m = /^list:(\S+)\s*(.*)$/i.exec(rawArg);
+      return { ok: true, action: { type: "next", list: m?.[1] ?? "", mood: (m ? m[2] : rawArg) ?? "" } };
+    }
     case "watch": case "tonight":
       return { ok: true, action: { type: "watch", mood: rawArg } };
     case "server": case "unraid":

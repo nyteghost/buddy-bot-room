@@ -128,6 +128,7 @@ import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact
 import { parseDice, rollDice, secureRng } from "@/lib/dice";
 import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/lib/unraid";
 import { UnraidBanner } from "./unraid-banner";
+import { nextTopic, traktListsMarkdown, traktMarkdown, type TraktItem, type TraktList } from "@/lib/trakt";
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
@@ -568,6 +569,8 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "trakt": void trakt(action.list, command, null); return;
+      case "next": void trakt(action.list, command, action.mood); return;
       case "server": void serverCheck(command, false); return;
       case "diagnose": void serverCheck(command, true); return;
       case "roll": {
@@ -656,6 +659,22 @@ export function Room() {
       return say(command, "I couldn't reach the Plex service.");
     }
   }
+  /** /trakt shows lists or one list; /next hands the list to the pals to pick from. Talks to Trakt only, never Plex. */
+  async function trakt(list: string, command: string, mood: string | null) {
+    try {
+      const wantLists = mood === null && list.trim().toLowerCase() === "lists";
+      const res = await fetch(`/api/trakt?${wantLists ? "mode=lists" : list.trim() ? `list=${encodeURIComponent(list.trim())}` : ""}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return say(command, json.error ?? "The Trakt lookup failed.");
+      if (wantLists) return say(command, traktListsMarkdown((json.lists ?? []) as TraktList[]));
+      const items = (json.items ?? []) as TraktItem[];
+      const name = String(json.list ?? (list || "watchlist"));
+      if (mood !== null) return items.some((i) => !i.watched) ? void start(undefined, nextTopic(mood, name, items)) : say(command, `There's nothing unwatched in the Trakt list “${name}”.`);
+      return say(command, traktMarkdown(name, items));
+    } catch {
+      return say(command, "I couldn't reach the Trakt service.");
+    }
+  }
   /** /server shows Unraid's health; /diagnose also hands it to the pals to reason about. */
   async function serverCheck(command: string, discuss: boolean) {
     try {
@@ -727,6 +746,7 @@ export function Room() {
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
+    { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
     { id: "watch", group: "Chat", label: "What should we watch tonight?", keywords: "plex movie show tv", run: () => void plex("", "/watch", "") },
     { id: "srv", group: "Chat", label: "Check my Unraid server", keywords: "server health status", run: () => void serverCheck("/server", false) },
     { id: "srv-why", group: "Chat", label: "What's wrong with my server? (pals diagnose)", keywords: "unraid diagnose", run: () => void serverCheck("/diagnose", true) },

@@ -16,6 +16,8 @@ import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
+import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
+import { traktConfig } from "@/lib/trakt.server";
 import { plexMarkdown, shapePlex, watchTopic } from "@/lib/plex";
 import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch, nextWatch, problemsOf, shapeContainers, shapeDisks, shapeUptime, statusMarkdown } from "@/lib/unraid";
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
@@ -619,5 +621,53 @@ describe("plex", () => {
     expect(parseSlash("/plex")).toEqual({ ok: true, action: { type: "plex", query: "recent" } });
     expect(parseSlash("/watch cozy comedy")).toEqual({ ok: true, action: { type: "watch", mood: "cozy comedy" } });
     expect(parseSlash("/watch")).toEqual({ ok: true, action: { type: "watch", mood: "" } });
+  });
+});
+
+describe("trakt", () => {
+  const list = [
+    { rank: 1, type: "movie", movie: { title: "Dune", year: 2021, ids: { trakt: 11 } } },
+    { rank: 2, type: "show", show: { title: "Severance", year: 2022, ids: { trakt: 22 } } },
+    { rank: 3, type: "season", season: { number: 1 } },
+    { rank: 4, type: "movie", movie: { title: "Dune", year: 2021, ids: { trakt: 11 } } },
+    { rank: 5, type: "movie", movie: { title: "Heat", year: 1995, ids: { trakt: 33 } } },
+  ];
+  it("shapes list items, skipping seasons and duplicates", () => {
+    expect(shapeTrakt(list).map((i) => i.title)).toEqual(["Dune", "Severance", "Heat"]);
+    expect(shapeTrakt(null)).toEqual([]);
+    expect(shapeTrakt(list, 1).length).toBe(1);
+  });
+  it("marks watched movies only", () => {
+    const seen = watchedMovieIds([{ movie: { ids: { trakt: 11 } } }, { movie: { ids: {} } }]);
+    const items = markWatched(shapeTrakt(list), seen);
+    expect(items.map((i) => !!i.watched)).toEqual([true, false, false]);
+  });
+  it("shapes lists and rejects bad slugs", () => {
+    expect(shapeTraktLists([{ name: "Movie Night", item_count: 4, ids: { slug: "movie-night" } }, { name: "x", ids: { slug: "../etc" } }])).toEqual([{ name: "Movie Night", slug: "movie-night", count: 4 }]);
+    expect(isSlug("movie-night_2")).toBe(true);
+    expect(isSlug("a/b")).toBe(false);
+    expect(isSlug("")).toBe(false);
+  });
+  it("writes markdown and the pals topic, leaving watched out", () => {
+    const items = markWatched(shapeTrakt(list), new Set([11]));
+    expect(traktMarkdown("watchlist", items)).toContain("1. **Dune** (2021) · Movie · ✓ watched");
+    expect(traktMarkdown("watchlist", items)).toContain("2 unwatched");
+    const topic = nextTopic("cozy", "watchlist", items);
+    expect(topic).toContain("Severance (2022)");
+    expect(topic).not.toContain("- Dune");
+    expect(topic).toContain("cozy");
+    expect(traktListsMarkdown([])).toContain("TRAKT_ACCESS_TOKEN");
+  });
+  it("reads its config from the environment", () => {
+    expect(traktConfig({})).toBeNull();
+    expect(traktConfig({ TRAKT_CLIENT_ID: "abc" })).toBeNull();
+    expect(traktConfig({ TRAKT_CLIENT_ID: "abc", TRAKT_USER: "@nyte" })).toEqual({ clientId: "abc", user: "nyte", list: "watchlist", token: "" });
+    expect(traktConfig({ TRAKT_CLIENT_ID: "abc", TRAKT_USER: "nyte", TRAKT_LIST: "bad/list" })?.list).toBe("watchlist");
+  });
+  it("has /trakt and /next commands", () => {
+    expect(parseSlash("/trakt lists")).toEqual({ ok: true, action: { type: "trakt", list: "lists" } });
+    expect(parseSlash("/next")).toEqual({ ok: true, action: { type: "next", list: "", mood: "" } });
+    expect(parseSlash("/next cozy comedy")).toEqual({ ok: true, action: { type: "next", list: "", mood: "cozy comedy" } });
+    expect(parseSlash("/next list:movie-night something short")).toEqual({ ok: true, action: { type: "next", list: "movie-night", mood: "something short" } });
   });
 });

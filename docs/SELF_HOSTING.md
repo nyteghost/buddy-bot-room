@@ -86,6 +86,16 @@ Set `UNRAID_URL` (for example `http://10.200.1.30`) and `UNRAID_API_KEY` (Unraid
 
 `/server` shows the current status and `/diagnose` (or the banner's *What's wrong?* button) hands the facts to the pals for advice. Everything is read-only. It can't watch while the Pixel Pals box itself is down. If your Unraid version has no API or the key is rejected, the watcher still tells you whether the server answers at all.
 
+## Trakt: `/next` and `/trakt`
+
+Pixel Pals reads your Trakt lists straight from Trakt's API (no Plex involved) and the pals pick what to watch next from one.
+
+1. On trakt.tv go to *Settings → Your API Apps → New Application*. Any name, type *Development*, and `http://localhost:5173/callback` as the redirect URI (it is never used; Pixel Pals only reads public lists with the Client ID). Copy the **Client ID** from the app's page.
+2. In the stack's environment variables add `TRAKT_CLIENT_ID`, `TRAKT_USER` (your Trakt username) and optionally `TRAKT_LIST` (the list's short name; default `watchlist`). Then *Pull and redeploy*.
+3. Public lists need nothing more. For private lists also set `TRAKT_ACCESS_TOKEN`.
+
+Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
+
 ## Plex: `/plex` and "What should we watch tonight?"
 
 Set `PLEX_URL` (for example `http://10.200.1.X:32400`) and `PLEX_TOKEN` in the stack's environment variables. To find the token: in Plex's web app open any item → ⋯ → *Get Info* → *View XML*, and copy the `X-Plex-Token=` value from the address bar. Then:
