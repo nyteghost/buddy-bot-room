@@ -57,3 +57,7 @@ The default "Lovable AI" engine only works on Lovable's hosting. Self-hosted, pi
 free Groq/Gemini/OpenRouter/NVIDIA key in AI engine settings. Ollama is called by your **browser**, so the
 URL must be reachable from the machine you browse on, and Ollama needs
 `OLLAMA_ORIGINS="*" OLLAMA_HOST=0.0.0.0 ollama serve`.
+
+## Sign-in
+
+The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Dockerfile). Google sign-in goes through Lovable Cloud and can't redirect back to a LAN address, so the Sign in button is replaced by a "Local mode" label. Engine settings, keys and theme are saved in the browser instead of an account. Sign-in still works on the Lovable-hosted app.

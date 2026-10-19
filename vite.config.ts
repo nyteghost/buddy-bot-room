@@ -30,6 +30,9 @@ export default defineConfig({
       __APP_VERSION__: JSON.stringify(BUILD_VERSION),
       __APP_COMMIT__: JSON.stringify(BUILD_COMMIT),
       __APP_BUILD_DATE__: JSON.stringify(BUILD_DATE),
+      // True only in the self-hosted Docker build (the Dockerfile sets BUDDY_SELF_HOSTED=1): Lovable Cloud
+      // Google sign-in cannot redirect back to a LAN address, so the UI shows "Local mode" instead.
+      __SELF_HOSTED__: JSON.stringify(process.env["BUDDY_SELF_HOSTED"] === "1"),
     },
     optimizeDeps: {
       noDiscovery: true,

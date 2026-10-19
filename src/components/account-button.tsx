@@ -43,6 +43,8 @@ export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onThem
     return () => clearTimeout(t);
   }, [synced, engine.kind, engine.groqKey, engine.geminiKey, engine.openrouterKey, engine.nvidiaKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (__SELF_HOSTED__)
+    return <span className="account-chip" title="Sign-in is only available on the Lovable-hosted app. Settings and keys stay in this browser.">Local mode</span>;
   if (session === undefined) return null;
   if (!session)
     return (

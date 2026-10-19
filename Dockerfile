@@ -12,7 +12,7 @@ COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 COPY . .
 # Where the app finds SearXNG (web search) from inside the container. Override in .env.local.
-ENV SEARXNG_URL=http://host.docker.internal:8081 BUDDY_ALLOW_ALL_HOSTS=1
+ENV SEARXNG_URL=http://host.docker.internal:8081 BUDDY_ALLOW_ALL_HOSTS=1 BUDDY_SELF_HOSTED=1
 EXPOSE 8090
 
 FROM base AS prod
