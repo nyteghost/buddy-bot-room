@@ -19,6 +19,7 @@ import { parseSlash } from "@/lib/slash-commands";
 import { accountFileName, normalizeAccountData } from "@/lib/local-account";
 import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
+import { capPerOwner, visibleTo } from "@/lib/store.server";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
 import { traktConfig } from "@/lib/trakt.server";
@@ -820,5 +821,20 @@ describe("note sync (Trakt wins, read-only)", () => {
     expect(a === newToken()).toBe(false);
     expect(await hashToken(a)).not.toContain(a);
     expect(await hashToken(a)).toBe(await hashToken(a));
+  });
+});
+
+describe("per-account chats", () => {
+  const row = (id: string, owner?: string, shared?: boolean) => ({ id, title: id, messages: [], theme: "normal", mode: "roundtable", updatedAt: "2026-01-01", ...(owner ? { owner } : {}), ...(shared ? { shared } : {}) });
+  it("shows your chats, shared chats and old ownerless chats", () => {
+    expect(visibleTo(row("a", "nyte"), "nyte")).toBe(true);
+    expect(visibleTo(row("a", "mom"), "nyte")).toBe(false);
+    expect(visibleTo(row("a", "mom", true), "nyte")).toBe(true);
+    expect(visibleTo(row("a"), "nyte")).toBe(true);
+    expect(visibleTo(row("a", "mom"), "")).toBe(true);
+  });
+  it("caps chats per owner, not overall", () => {
+    const rows = [row("1", "a"), row("2", "a"), row("3", "b"), row("4", "a"), row("5", "b")];
+    expect(capPerOwner(rows, 2).map((r) => r.id)).toEqual(["1", "2", "3", "5"]);
   });
 });

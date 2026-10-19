@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { History, Plus, Trash2, Check, Pin, PinOff, Pencil, Search } from "lucide-react";
+import { History, Plus, Trash2, Check, Pin, PinOff, Pencil, Search, Share2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import type { RoomMessage, Mode } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { chatTitle, type SavedDiscussion } from "@/lib/saved-discussions";
-import { deleteLocalOrServer, listLocalOrServer, saveLocalOrServer, storeWhere } from "@/lib/chat-store";
+import { deleteLocalOrServer, listLocalOrServer, saveLocalOrServer, shareOnServer, storeWhere } from "@/lib/chat-store";
 import { displayTitle, filterRows, renameChat, sortRows, togglePin, updateChatMeta, useChatMeta } from "@/lib/chat-meta";
 import { useSession } from "@/hooks/use-session";
 import { deleteCloudDiscussion, loadAccount, saveCloudDiscussion } from "@/lib/account.functions";
@@ -94,7 +94,7 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
       <SheetContent side="left" className="history-panel">
         <SheetHeader>
           <SheetTitle>Your chats</SheetTitle>
-          <SheetDescription>{signedIn ? "Synced to your account — available on any device you sign in on." : where === "server" ? "Saved on your server — every browser on your network sees these." : "Saved in this browser. Sign in to sync across devices."}</SheetDescription>
+          <SheetDescription>{signedIn ? "Synced to your account — available on any device you sign in on." : where === "server" ? "Saved on your server. With accounts, each chat is private to you unless you share it (the share icon)." : "Saved in this browser. Sign in to sync across devices."}</SheetDescription>
         </SheetHeader>
         <Button size="sm" className="mx-4" onClick={newChat}><Plus size={14} /> New chat</Button>
         <label className="saved-search mx-4">
@@ -105,11 +105,14 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
           {!rows.length && <p className="px-2 text-sm text-muted-foreground">No chats yet.</p>}
           {rows.length > 0 && !shown.length && <p className="px-2 text-sm text-muted-foreground">No chats match that search.</p>}
           {shown.map((row) => <div key={row.id} className={`saved-row${row.id === id ? " saved-row-active" : ""}`}>
-            <Button className="saved-row-open" variant="ghost" onClick={() => { pick(row.id); lastSaved.current = `${row.id}:${row.messages.length}:${row.messages[row.messages.length - 1]?.id}:${row.theme}:${row.mode}`; onOpen(row.messages, row.theme, row.mode); setOpen(false); }}>
-              <span>{meta.pins.includes(row.id) && <Pin size={11} className="inline mr-1" />}{displayTitle(meta, row.id, row.title)}<small>{new Date(row.updatedAt).toLocaleString()}</small></span>
+            <Button className="saved-row-open" variant="ghost" onClick={() => { const mine = row.mine !== false; pick(mine ? row.id : undefined); lastSaved.current = mine ? `${row.id}:${row.messages.length}:${row.messages[row.messages.length - 1]?.id}:${row.theme}:${row.mode}` : ""; onOpen(row.messages, row.theme, row.mode); setOpen(false); }}>
+              <span>{meta.pins.includes(row.id) && <Pin size={11} className="inline mr-1" />}{displayTitle(meta, row.id, row.title)}<small>{new Date(row.updatedAt).toLocaleString()}{row.mine === false ? ` · shared by ${row.ownerName}` : row.shared ? " · shared" : ""}</small></span>
             </Button>
             <Button size="icon" variant="ghost" aria-label={meta.pins.includes(row.id) ? "Unpin" : "Pin"} onClick={() => updateChatMeta((m) => togglePin(m, row.id))}>{meta.pins.includes(row.id) ? <PinOff size={15} /> : <Pin size={15} />}</Button>
             <Button size="icon" variant="ghost" aria-label="Rename" onClick={() => { const next = window.prompt("Rename this chat (leave empty to use the automatic title):", displayTitle(meta, row.id, row.title)); if (next !== null) updateChatMeta((m) => renameChat(m, row.id, next)); }}><Pencil size={15} /></Button>
+            {row.ownerName !== undefined && row.mine !== false && <Button size="icon" variant="ghost" aria-label={row.shared ? "Stop sharing" : "Share with everyone"} title={row.shared ? "Shared with everyone. Click to make private." : "Private. Click to share with everyone."} onClick={async () => {
+              try { await shareOnServer(row.id, !row.shared); setRows((r) => r.map((x) => (x.id === row.id ? { ...x, shared: !row.shared } : x))); setError(""); } catch (e) { setError(e instanceof Error ? e.message : "Could not change sharing."); }
+            }}><Share2 size={15} className={row.shared ? "text-primary" : ""} /></Button>}
             <Button size="icon" variant="ghost" aria-label={`Delete ${row.title}`} onClick={async () => {
               if (!window.confirm(`Delete “${row.title}”?`)) return;
               try {

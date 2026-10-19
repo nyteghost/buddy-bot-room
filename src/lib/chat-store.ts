@@ -37,6 +37,12 @@ export async function saveLocalOrServer(row: SavedDiscussion): Promise<void> {
   if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "The server couldn't save this chat.");
 }
 
+/** Share (or unshare) one of your chats with everyone who has an account. Server store only. */
+export async function shareOnServer(id: string, shared: boolean): Promise<void> {
+  const res = await fetch("/api/store", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, shared }) });
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "The server couldn't change sharing.");
+}
+
 export async function deleteLocalOrServer(id: string): Promise<void> {
   if (!(await useServer())) return writeDiscussions(readDiscussions().filter((r) => r.id !== id));
   const res = await fetch(`/api/store?id=${encodeURIComponent(id)}`, { method: "DELETE" });

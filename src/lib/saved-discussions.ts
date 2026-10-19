@@ -1,7 +1,7 @@
 import type { RoomMessage, Mode } from "./agents";
 import { isCharacterMode, type CharacterMode } from "./hellraiser";
 
-export type SavedDiscussion = { id: string; title: string; messages: RoomMessage[]; theme: CharacterMode; mode: Mode; updatedAt: string };
+export type SavedDiscussion = { id: string; title: string; messages: RoomMessage[]; theme: CharacterMode; mode: Mode; updatedAt: string; /** Set by the server when accounts are on. */ mine?: boolean; ownerName?: string; shared?: boolean };
 export const savedDiscussionsKey = "pixel-pals-saved-discussions-v1";
 export function readDiscussions(): SavedDiscussion[] {
   const raw = localStorage.getItem(savedDiscussionsKey);
