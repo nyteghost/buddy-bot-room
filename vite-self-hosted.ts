@@ -24,7 +24,7 @@ export function selfHostedPlugin(): Plugin {
           }
           const chunks: Buffer[] = [];
           // Only the login form needs its body read; any other request must reach the app with its body intact.
-          const isLogin = req.method === "POST" && url.pathname === "/__login";
+          const isLogin = req.method === "POST" && ["/__login", "/__signin", "/__signup"].includes(url.pathname);
           if (isLogin) for await (const chunk of req) chunks.push(Buffer.from(chunk));
           const headers = new Headers();
           for (const [k, v] of Object.entries(req.headers as Record<string, string | string[] | undefined>)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
