@@ -1766,3 +1766,29 @@ h1 {
 .notes-panel form { display: flex; gap: 6px; }
 .message-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
 .room-message:hover .message-actions, .message-actions:focus-within { opacity: 1; }
+
+/* Debug log dialog */
+.debug-dialog { max-width: min(760px, 94vw); }
+.debug-text { width: 100%; height: min(52vh, 420px); resize: vertical; font: 12px/1.45 ui-monospace, monospace; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--muted); color: var(--foreground); white-space: pre; overflow: auto; }
+.debug-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.debug-note { font-size: 12px; opacity: 0.8; }
+
+/* Saved chats search */
+.saved-search { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+.saved-search input { flex: 1; background: transparent; border: 0; outline: 0; font: inherit; color: inherit; }
+
+/* Notes panel: documents and pal instructions */
+.pal-note { width: 100%; min-height: 64px; resize: vertical; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: inherit; font: inherit; font-size: 13px; }
+.docs-actions { margin-top: 6px; }
+.docs-note { font-size: 12px; opacity: 0.8; margin: 6px 0 0; }
+
+/* Touch and small screens: reply actions are always visible, and each window fills the stage
+   (the one you opened last is on top; use the sidebar icons to switch). */
+@media (hover: none) { .message-actions { opacity: 1; } }
+@media (max-width: 700px) {
+  .window-canvas { margin: 6px; }
+  .workspace-window, .workspace-window.window-sized { left: 0; top: 0; width: 100%; height: 100%; }
+  .window-titlebar { cursor: default; }
+  .slash-menu { max-height: 30vh; overflow: auto; }
+  .debug-text { height: 42vh; }
+}

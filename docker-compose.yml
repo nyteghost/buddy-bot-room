@@ -15,6 +15,14 @@ services:
     env_file:
       - path: .env.local
         required: false
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - buddy-data:/data   # saved chats and the server log live here
     extra_hosts:
       # lets the container reach services on the host, e.g. an existing SearXNG on :8081
       - "host.docker.internal:host-gateway"
@@ -28,3 +36,6 @@ services:
     restart: unless-stopped
     volumes:
       - ./config/searxng:/etc/searxng
+
+volumes:
+  buddy-data:

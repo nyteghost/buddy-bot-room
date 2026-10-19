@@ -26,6 +26,9 @@ import {
   Square,
   Users,
   X,
+  Bug,
+  GitBranch,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -103,13 +106,24 @@ import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
 import { priceReply } from "@/lib/work-tools";
 import { cn } from "@/lib/utils";
-import { parseSlash, slashSuggestions, helpText, type SlashAction } from "@/lib/slash-commands";
+import { parseSlash, slashSuggestions, helpText, modeNames, themeNames, type SlashAction } from "@/lib/slash-commands";
 import { freshRecall, promptHistory, recallStep, type RecallState } from "@/lib/prompt-recall";
 import { replaceEmojiShortcodes } from "@/lib/emoji-shortcodes";
 import { celebrate } from "@/lib/confetti";
 import { CompareDialog } from "./compare-dialog";
 import { SeerrDialog } from "./seerr-dialog";
 import { NotesPanel } from "./notes-panel";
+import { DebugLogDialog } from "./debug-log-dialog";
+import { installGlobalLogging, logClient } from "@/lib/debug-log";
+import { warmOllama } from "@/lib/ollama-models";
+import { CommandPalette, type PaletteAction } from "./command-palette";
+import { matchShortcut, shortcutList } from "@/lib/shortcuts";
+import { friendlyError } from "@/lib/friendly-error";
+import { allChunks, getDocs } from "@/lib/documents";
+import { docContext, retrieve } from "@/lib/rag";
+import { getNotes } from "@/lib/agent-notes";
+import { applyBackup, buildBackup } from "@/lib/settings-io";
+import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
 import { addEntry, addTodo, clearDone, getWorkbench, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
@@ -136,6 +150,12 @@ export function Room() {
     setCloud(value);
   }
   const engine = useEngine();
+  useEffect(() => { installGlobalLogging(); }, []);
+  // Preload the Ollama model as soon as it's the chosen engine, so the first reply isn't slow.
+  useEffect(() => {
+    if (engine.kind !== "ollama" && engine.kind !== "auto-ollama") return;
+    void warmOllama(engine.ollamaUrl, engine.ollamaModel).then((ok) => { if (ok) logClient("info", `Ollama model ${engine.ollamaModel} preloaded`); });
+  }, [engine.kind, engine.ollamaUrl, engine.ollamaModel]);
   const hell = characterMode === "hellraiser";
   const horror = characterMode === "horror";
   useEffect(() => {
@@ -166,7 +186,7 @@ export function Room() {
   const partnerChoice = partner;
   const [desktopApp, setDesktopApp] = useState(false);
   useEffect(() => setDesktopApp(isTauri()), []);
-  const startRef = useRef<(ask?: { partner: AgentId; text: string }) => Promise<void>>(async () => {});
+  const startRef = useRef<(ask?: { partner: AgentId; text: string }, override?: string) => Promise<void>>(async () => {});
   useEffect(() => {
     const onAsk = (e: Event) => {
       const detail = (e as CustomEvent<{ partner: AgentId; text: string }>).detail;
@@ -188,6 +208,7 @@ export function Room() {
   const [speaking, setSpeaking] = useState<AgentId | null>(null);
   const [round, setRound] = useState(0);
   const [error, setError] = useState("");
+  useEffect(() => { if (error) logClient("error", `Shown to user: ${error}`); }, [error]);
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(true);
@@ -196,6 +217,11 @@ export function Room() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [forkSignal, setForkSignal] = useState(0);
+  const [regen, setRegen] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
   const [compareQuestion, setCompareQuestion] = useState("");
   const [seerrQuery, setSeerrQuery] = useState<SeerrQuery | null>(null);
   const [sidebarCompact, setSidebarCompact] = useState(false);
@@ -329,6 +355,10 @@ export function Room() {
     setMessages(transcript);
     setTopic("");
     inputRef.current?.focus();
+    // Chat with your files: pull the passages that best match this question (no AI call needed).
+    const notesNow = getNotes();
+    const docsNow = getDocs();
+    const docText = docsNow.length ? docContext(retrieve(allChunks(docsNow), topic)) : "";
     try {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
@@ -358,6 +388,9 @@ export function Room() {
             mode: direct ? ("direct" as Mode) : mode,
             assistant: assistantRef.current,
             memoryContext: promptContext(getWorkbench()),
+            contextChars: engine.kind === "local" || engine.kind === "ollama" ? 6000 : 12000,
+            agentNote: notesNow[agent.id] ?? "",
+            docContext: docText,
             linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
           };
           const fetchPrompt = async () => {
@@ -456,8 +489,11 @@ export function Room() {
       }
       if (mode === "solve" && !direct && !controller.signal.aborted) celebrate();
     } catch (err) {
-      if (!controller.signal.aborted)
-        setError(err instanceof Error ? err.message : "The discussion could not continue.");
+      if (!controller.signal.aborted) {
+        const raw = err instanceof Error ? err.message : "The discussion could not continue.";
+        logClient("error", "discussion failed", err);
+        setError(friendlyError(raw, { engine: engine.kind, ollamaUrl: engine.ollamaUrl, ollamaModel: engine.ollamaModel }));
+      }
     } finally {
       setRunning(false);
       setSpeaking(null);
@@ -479,7 +515,7 @@ export function Room() {
   function runSlash(action: SlashAction, command: string) {
     switch (action.type) {
       case "help": return say(command, helpText());
-      case "clear": setMessages([]); setRound(0); setError(""); return;
+      case "clear": newChat(); return;
       case "stop": stop(); return;
       case "export": exportChat(); return say(command, "Chat downloaded as Markdown.");
       case "record": setRecorderOpen(true); return say(command, "Recorder is open — press Record, then Stop.");
@@ -515,6 +551,8 @@ export function Room() {
         updateWorkbench((w) => ({ ...w, todos: clearDone(w.todos) }));
         return say(command, "Cleared the finished to-dos.");
       case "tasks": setNotesOpen(true); return;
+      case "log": setLogOpen(true); return;
+      case "library": void library(action.query, command); return;
       case "compare": setCompareQuestion(action.question); setCompareOpen(true); return;
       case "search": void webSearch(action.query, command, false); return;
       case "research": void webSearch(action.query, command, true); return;
@@ -541,6 +579,106 @@ export function Room() {
     setMessages(messages.slice(0, index));
     inputRef.current?.focus();
   }
+  /** Start a fresh chat (and a fresh saved-chat record). */
+  function newChat() {
+    if (runLock.current) return;
+    setMessages([]); setRound(0); setError(""); setForkSignal((v) => v + 1);
+    inputRef.current?.focus();
+  }
+  /** Jellyfin lookup: shows what's in your library (needs JELLYFIN_URL on the server). */
+  async function library(query: string, command: string) {
+    try {
+      const res = await fetch(`/api/jellyfin?q=${encodeURIComponent(query)}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return say(command, json.error ?? "The library lookup failed.");
+      return say(command, libraryMarkdown(query, (json.items ?? []) as LibraryItem[], json.publicUrl));
+    } catch {
+      return say(command, "I couldn't reach the library service.");
+    }
+  }
+  /** Re-run the last question: drop the replies after it and ask again. */
+  function regenerate() {
+    if (running) return;
+    const at = messages.map((m) => m.role).lastIndexOf("user");
+    const last = messages[at];
+    if (at < 0 || !last) return;
+    setRegen(messageText(last));
+    setMessages(messages.slice(0, at));
+  }
+  /** Continue from an earlier message as a separate saved chat. */
+  function branchFrom(id: string) {
+    const at = messages.findIndex((m) => m.id === id);
+    if (at < 0 || running) return;
+    setMessages(messages.slice(0, at + 1));
+    setForkSignal((v) => v + 1);
+  }
+  useEffect(() => {
+    if (regen === null || running) return;
+    const text = regen;
+    setRegen(null);
+    void startRef.current?.(undefined, text);
+  }, [regen, running]); // eslint-disable-line react-hooks/exhaustive-deps
+  function download(name: string, text: string, type: string) {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const link = document.createElement("a");
+    link.href = url; link.download = name; link.click();
+    URL.revokeObjectURL(url);
+  }
+  function exportSettings(includeKeys: boolean) {
+    download(includeKeys ? "pixel-pals-backup-with-keys.json" : "pixel-pals-backup.json", JSON.stringify(buildBackup(localStorage, includeKeys), null, 2), "application/json");
+    say("/backup", includeKeys ? "Backup downloaded, including your API keys. Keep that file private." : "Backup downloaded. API keys were left out for safety.");
+  }
+  async function importSettings(file: File | undefined) {
+    if (!file) return;
+    const result = applyBackup(localStorage, await file.text());
+    if (!result.ok) return say("/restore", result.error);
+    logClient("info", `settings restored (${result.restored.length} sections)`);
+    say("/restore", `Restored ${result.restored.length} sections. Reloading…`);
+    setTimeout(() => window.location.reload(), 900);
+  }
+  const palette: PaletteAction[] = [
+    { id: "win-room", group: "Windows", label: "Toggle Pixel room", run: () => setRoomOpen((v) => !v) },
+    { id: "win-tools", group: "Windows", label: "Toggle Work tools", run: () => setToolsOpen((v) => !v) },
+    { id: "win-rec", group: "Windows", label: "Toggle Recorder", run: () => setRecorderOpen((v) => !v) },
+    { id: "win-notes", group: "Windows", label: "Open Notes, tasks, documents & pal instructions", keywords: "memories todos files", run: () => setNotesOpen(true) },
+    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); } },
+    { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
+    { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
+    { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: regenerate },
+    { id: "chat-export", group: "Chat", label: "Export this chat as Markdown", run: exportChat },
+    { id: "chat-stop", group: "Chat", label: "Stop the discussion", hint: "Esc", run: stop },
+    { id: "chat-compare", group: "Chat", label: "Compare models (blind test)", run: () => { setCompareQuestion(""); setCompareOpen(true); } },
+    ...modeNames.map((m): PaletteAction => ({ id: `mode-${m}`, group: "Mode", label: `Mode: ${m}`, run: () => setMode(m as Mode) })),
+    ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
+    { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
+    { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
+    { id: "log", group: "Help", label: "Debug log (copy for Claude)", hint: "Ctrl+Shift+L", keywords: "bug error report", run: () => setLogOpen(true) },
+    { id: "help", group: "Help", label: "List slash commands", run: () => say("/help", helpText()) },
+    { id: "keys", group: "Help", label: "Keyboard shortcuts", run: () => say("/shortcuts", "Keyboard shortcuts:\n" + shortcutList.map((k) => `• \`${k.keys}\` — ${k.label}`).join("\n")) },
+    { id: "bk-out", group: "Backup", label: "Export settings (without API keys)", keywords: "download save backup", run: () => exportSettings(false) },
+    { id: "bk-keys", group: "Backup", label: "Export settings including API keys", run: () => exportSettings(true) },
+    { id: "bk-in", group: "Backup", label: "Import settings from a backup file…", keywords: "restore upload", run: () => importRef.current?.click() },
+  ];
+  const shortcutState = useRef({ running, dialogOpen: false });
+  shortcutState.current = { running, dialogOpen: compareOpen || logOpen || paletteOpen || !!seerrQuery };
+  const actionsRef = useRef({ newChat, stop, palette: () => setPaletteOpen((v) => !v), focus: () => inputRef.current?.focus(), sidebar: () => setSidebarCompact((v) => !v), log: () => setLogOpen(true) });
+  actionsRef.current = { newChat, stop, palette: () => setPaletteOpen((v) => !v), focus: () => inputRef.current?.focus(), sidebar: () => setSidebarCompact((v) => !v), log: () => setLogOpen(true) };
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const action = matchShortcut(e, shortcutState.current.running, shortcutState.current.dialogOpen);
+      if (!action) return;
+      e.preventDefault();
+      const a = actionsRef.current;
+      if (action === "palette") a.palette();
+      else if (action === "newChat") a.newChat();
+      else if (action === "focusComposer") a.focus();
+      else if (action === "toggleSidebar") a.sidebar();
+      else if (action === "debugLog") a.log();
+      else a.stop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   function onComposerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
     if (e.key === "Tab" && suggestions_.length) {
@@ -651,6 +789,9 @@ export function Room() {
           </Dialog>
         </div>
       </header>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
+      <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void importSettings(e.target.files?.[0]); e.target.value = ""; }} />
+      <DebugLogDialog open={logOpen} onOpenChange={setLogOpen} context={[`engine: ${engine.kind}${engine.kind.includes("ollama") ? ` (${engine.ollamaUrl} · ${engine.ollamaModel})` : ""}`, `theme: ${characterMode} · mode: ${mode} · rounds: ${rounds}`, `messages in chat: ${messages.length}`, `last error shown: ${error || "none"}`]} />
       <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} initialQuestion={compareQuestion} />
       <SeerrDialog query={seerrQuery} onClose={() => setSeerrQuery(null)} onRequested={(summary) => say(`@seerr ${seerrQuery?.title ?? ""}${seerrQuery?.is4k ? " 4k" : ""}`.trim(), summary)} />
       <div className="workspace-frame">
@@ -661,6 +802,7 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes, memories and to-dos" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes &amp; tasks</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Copy a bug report for Claude" onClick={() => setLogOpen(true)}><Bug /><span>Debug log</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
           <div className="sidebar-divider" />
           <Button variant="ghost" className="sidebar-item" title="Saved chats" disabled={running} onClick={() => { setConversationOpen(true); setHistoryRequest((value) => value + 1); }}><History /><span>Saved chats</span></Button>
@@ -881,7 +1023,7 @@ export function Room() {
               </Dialog>
             </div>
           </div>
-          <SavedDiscussions openRequest={historyRequest} messages={messages} mode={mode} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
+          <SavedDiscussions openRequest={historyRequest} forkSignal={forkSignal} messages={messages} mode={mode} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
           <div className="conversation-subhead">
             <span className="status-dot" />
             {running
@@ -966,9 +1108,19 @@ export function Room() {
                         {!running && (
                           <div className="message-actions">
                             {m.role === "assistant" ? (
-                              <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
-                                <Copy size={13} />
-                              </MessageAction>
+                              <>
+                                <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
+                                  <Copy size={13} />
+                                </MessageAction>
+                                {m.id === lastMessage?.id && m.metadata?.agentId !== "echo" && (
+                                  <MessageAction tooltip="Regenerate" label="Regenerate answer" onClick={regenerate}>
+                                    <RefreshCw size={13} />
+                                  </MessageAction>
+                                )}
+                                <MessageAction tooltip="Branch a new chat from here" label="Branch from here" onClick={() => branchFrom(m.id)}>
+                                  <GitBranch size={13} />
+                                </MessageAction>
+                              </>
                             ) : (
                               <MessageAction tooltip="Edit and resend" label="Edit and resend" onClick={() => editAndRetry(m.id)}>
                                 <Pencil size={13} />

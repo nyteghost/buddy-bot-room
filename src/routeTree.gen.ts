@@ -14,8 +14,9 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
-import { Route as ApiSearchRouteImport } from './routes/api.search'
-import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiStoreRouteImport } from './routes/api.store'
+import { Route as ApiJellyfinRouteImport } from './routes/api.jellyfin'
+import { Route as ApiDebuglogRouteImport } from './routes/api.debuglog'
 import { Route as ApiTranscribeRouteImport } from './routes/api.transcribe'
 import { Route as ApiOauthGoogleReturnRouteImport } from './routes/api/oauth/google/return'
 
@@ -44,6 +45,21 @@ const ApiSeerrRoute = ApiSeerrRouteImport.update({
   path: '/api/seerr',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStoreRoute = ApiStoreRouteImport.update({
+  id: '/api/store',
+  path: '/api/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiJellyfinRoute = ApiJellyfinRouteImport.update({
+  id: '/api/jellyfin',
+  path: '/api/jellyfin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDebuglogRoute = ApiDebuglogRouteImport.update({
+  id: '/api/debuglog',
+  path: '/api/debuglog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
@@ -61,6 +77,9 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/store': typeof ApiStoreRoute
+  '/api/jellyfin': typeof ApiJellyfinRoute
+  '/api/debuglog': typeof ApiDebuglogRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
@@ -70,6 +89,9 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/store': typeof ApiStoreRoute
+  '/api/jellyfin': typeof ApiJellyfinRoute
+  '/api/debuglog': typeof ApiDebuglogRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
@@ -80,6 +102,9 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/store': typeof ApiStoreRoute
+  '/api/jellyfin': typeof ApiJellyfinRoute
+  '/api/debuglog': typeof ApiDebuglogRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
@@ -91,6 +116,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/store'
+    | '/api/jellyfin'
+    | '/api/debuglog'
     | '/api/transcribe'
     | '/api/oauth/google/return'
   fileRoutesByTo: FileRoutesByTo
@@ -100,6 +128,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/store'
+    | '/api/jellyfin'
+    | '/api/debuglog'
     | '/api/transcribe'
     | '/api/oauth/google/return'
   id:
@@ -109,6 +140,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/store'
+    | '/api/jellyfin'
+    | '/api/debuglog'
     | '/api/transcribe'
     | '/api/oauth/google/return'
   fileRoutesById: FileRoutesById
@@ -119,6 +153,9 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiStoreRoute: typeof ApiStoreRoute
+  ApiJellyfinRoute: typeof ApiJellyfinRoute
+  ApiDebuglogRoute: typeof ApiDebuglogRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiOauthGoogleReturnRoute: typeof ApiOauthGoogleReturnRoute
 }
@@ -160,6 +197,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSeerrRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/store': {
+      id: '/api/store'
+      path: '/api/store'
+      fullPath: '/api/store'
+      preLoaderRoute: typeof ApiStoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/jellyfin': {
+      id: '/api/jellyfin'
+      path: '/api/jellyfin'
+      fullPath: '/api/jellyfin'
+      preLoaderRoute: typeof ApiJellyfinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/debuglog': {
+      id: '/api/debuglog'
+      path: '/api/debuglog'
+      fullPath: '/api/debuglog'
+      preLoaderRoute: typeof ApiDebuglogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -183,6 +241,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiStoreRoute: ApiStoreRoute,
+  ApiJellyfinRoute: ApiJellyfinRoute,
+  ApiDebuglogRoute: ApiDebuglogRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiOauthGoogleReturnRoute: ApiOauthGoogleReturnRoute,
 }

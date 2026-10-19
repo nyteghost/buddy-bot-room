@@ -1,6 +1,7 @@
 # For Portainer: Stacks -> Add stack -> Repository, "Compose path" = docker-compose.portainer.yml
 # Settings come from the stack's "Environment variables" panel (no .env.local file needed):
-#   SEERR_URL, SEERR_API_KEY, SEARXNG_URL, BUDDY_PORT  (all optional)
+#   SEERR_URL, SEERR_API_KEY, SEARXNG_URL, BUDDY_PORT, BUDDY_PASSWORD,
+#   JELLYFIN_URL, JELLYFIN_API_KEY, JELLYFIN_PUBLIC_URL  (all optional)
 services:
   buddy-bot:
     build:
@@ -16,5 +17,20 @@ services:
       SEARXNG_URL: ${SEARXNG_URL:-http://host.docker.internal:8081}
       SEERR_URL: ${SEERR_URL:-}
       SEERR_API_KEY: ${SEERR_API_KEY:-}
+      BUDDY_PASSWORD: ${BUDDY_PASSWORD:-}
+      JELLYFIN_URL: ${JELLYFIN_URL:-}
+      JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      JELLYFIN_PUBLIC_URL: ${JELLYFIN_PUBLIC_URL:-}
+    volumes:
+      - buddy-data:/data   # saved chats and the server log live here
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+volumes:
+  buddy-data:

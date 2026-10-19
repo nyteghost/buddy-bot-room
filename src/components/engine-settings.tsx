@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { availableProviders, setEngine, useEngine, type EngineKind, type ReplyLength } from "@/lib/engine";
+import { deletePreset, makePreset, presetToEngine, savePreset, updatePresets, usePresets } from "@/lib/presets";
 import { useOllamaModels } from "@/lib/ollama-models";
 import {
   chosenLocalModel,
@@ -37,6 +38,9 @@ export function EngineSettingsDialog() {
   const installedModels = useOllamaModels(engine.ollamaUrl, engine.kind === "ollama" || engine.kind === "auto-ollama");
   const [progress, setProgress] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const presets = usePresets();
+  const [presetName, setPresetName] = useState("");
+  const [presetPick, setPresetPick] = useState("");
   const count = availableProviders(engine).length;
   const label =
     engine.kind === "local"
@@ -88,6 +92,23 @@ export function EngineSettingsDialog() {
               <div className="text-sm text-muted-foreground">{o.note}</div>
             </button>
           ))}
+        </div>
+        <div className="grid gap-2 text-sm">
+          <span className="font-medium">Presets <small className="text-muted-foreground">(engine choice and Ollama settings — never your keys)</small></span>
+          {presets.length > 0 && (
+            <div className="flex gap-2">
+              <select aria-label="Saved presets" className="h-9 flex-1 rounded-md border border-input bg-background px-2" value={presetPick} onChange={(e) => setPresetPick(e.target.value)}>
+                <option value="">Choose a preset…</option>
+                {presets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+              </select>
+              <Button type="button" size="sm" disabled={!presetPick} onClick={() => { const p = presets.find((x) => x.name === presetPick); if (p) setEngine(presetToEngine(p)); }}>Use</Button>
+              <Button type="button" size="sm" variant="ghost" disabled={!presetPick} onClick={() => { updatePresets((l) => deletePreset(l, presetPick)); setPresetPick(""); }}>Delete</Button>
+            </div>
+          )}
+          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const p = makePreset(presetName, engine); if (p) { updatePresets((l) => savePreset(l, p)); setPresetPick(p.name); setPresetName(""); } }}>
+            <Input aria-label="Preset name" placeholder="Name this setup, e.g. Fast Groq" value={presetName} onChange={(e) => setPresetName(e.target.value)} />
+            <Button type="submit" size="sm" disabled={!presetName.trim()}>Save current</Button>
+          </form>
         </div>
         {(engine.kind === "ollama" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3 text-sm">

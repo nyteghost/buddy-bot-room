@@ -24,7 +24,9 @@ export type SlashAction =
   | { type: "tasks" }
   | { type: "search"; query: string }
   | { type: "research"; query: string }
-  | { type: "compare"; question: string };
+  | { type: "compare"; question: string }
+  | { type: "log" }
+  | { type: "library"; query: string };
 export type SlashResult = { ok: true; action: SlashAction } | { ok: false; error: string };
 
 export const MIN_ROUNDS = 1;
@@ -53,8 +55,8 @@ const THEMES: Record<string, ThemeId> = {
   dcc: "dcc", carl: "dcc",
   linux: "linux",
 };
-const modeNames = ["roundtable", "broadcast", "direct", "solve"];
-const themeNames = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux"];
+export const modeNames = ["roundtable", "broadcast", "direct", "solve"];
+export const themeNames = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux"];
 
 export const slashCommands = [
   { name: "help", usage: "/help", description: "List every command" },
@@ -76,6 +78,8 @@ export const slashCommands = [
   { name: "tasks", usage: "/tasks", description: "Open notes, memories and to-dos" },
   { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
+  { name: "library", usage: "/library <title|recent>", description: "Look in your Jellyfin library (needs JELLYFIN_URL)" },
+  { name: "log", usage: "/log", description: "Open the debug log to copy for a bug report" },
   { name: "compare", usage: "/compare <question>", description: "Blind side-by-side model test" },
 ] as const;
 
@@ -152,6 +156,10 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "search", query: rawArg } } : fail("What should I search for? /search best 4k projector");
     case "research":
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
+    case "library": case "lib": case "jellyfin":
+      return { ok: true, action: { type: "library", query: rawArg || "recent" } };
+    case "log": case "debug":
+      return { ok: true, action: { type: "log" } };
     case "compare":
       return { ok: true, action: { type: "compare", question: rawArg } };
     default:

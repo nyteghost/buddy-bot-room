@@ -61,3 +61,12 @@ URL must be reachable from the machine you browse on, and Ollama needs
 ## Sign-in
 
 The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Dockerfile). Google sign-in goes through Lovable Cloud and can't redirect back to a LAN address, so the Sign in button is replaced by a "Local mode" label. Engine settings, keys and theme are saved in the browser instead of an account. Sign-in still works on the Lovable-hosted app.
+
+## Password, health, logs and saved chats
+
+- **Password:** set `BUDDY_PASSWORD` (Portainer env var, or `.env.local`). Everyone must enter it once per browser (a 30-day cookie that holds a hash, never the password). Leave it empty for no gate. Eight wrong tries from one address lock that address out for ten minutes.
+- **Healthcheck:** the container answers `/__health`; Portainer shows it as healthy/unhealthy and `restart: unless-stopped` brings it back after a crash.
+- **Saved chats** are stored on the server in the `buddy-data` volume (`/data/chats.json`), so every browser on your network sees the same chats. Pins and renames are per browser.
+- **Debug log:** sidebar → *Debug log* (or `/log`, or Ctrl+Shift+L) → *Copy report*, then paste it to Claude. It contains the app version, your engine settings (never keys), recent server events and browser errors, with API keys and passwords stripped. The same server events are in the container's logs in Portainer.
+- **Jellyfin (`/library <title>` or `/library recent`):** set `JELLYFIN_URL` and `JELLYFIN_API_KEY` (and optionally `JELLYFIN_PUBLIC_URL` for clickable links). Create the key in Jellyfin → Dashboard → API Keys.
+- **Backup:** Ctrl+K → *Export settings* / *Import settings*. Exports leave API keys out unless you pick the "including API keys" option.

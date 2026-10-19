@@ -1,3 +1,4 @@
+import { logServer } from "./server-log.server";
 import { shapeSeerr } from "./seerr";
 
 /** Seerr address and API key live only in the server's environment; the browser never sees them. */
@@ -27,6 +28,7 @@ export async function handleSeerr(request: Request) {
         headers,
         signal: AbortSignal.timeout(10000),
       });
+      if (!res.ok) logServer("warn", `Seerr search answered ${res.status}`);
       if (!res.ok) return Response.json({ error: `Seerr answered ${res.status} — check SEERR_API_KEY.` }, { status: 502 });
       return Response.json({ results: shapeSeerr(await res.json()) });
     }
@@ -44,11 +46,13 @@ export async function handleSeerr(request: Request) {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) {
+      logServer("warn", `Seerr request answered ${res.status}`);
       const detail = (await res.json().catch(() => null))?.message;
       return Response.json({ error: typeof detail === "string" ? detail : `Seerr answered ${res.status}.` }, { status: 502 });
     }
     return Response.json({ ok: true });
-  } catch {
+  } catch (error) {
+    logServer("error", `Can't reach Seerr at ${cfg.base}`, error);
     return Response.json({ error: `Can't reach Seerr at ${cfg.base}.` }, { status: 502 });
   }
 }

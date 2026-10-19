@@ -6,6 +6,7 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { execSync } from "node:child_process";
+import { selfHostedPlugin } from "./vite-self-hosted";
 
 // Build version: 1.0.<commit count> (+short hash), stamped automatically on every build.
 function git(cmd: string) { try { return execSync(`git ${cmd}`, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } }
@@ -23,6 +24,8 @@ export default defineConfig({
   // change React's module URL while an open preview still uses the old renderer.
   // Reject old optimizer hashes instead of serving new code under stale URLs.
   vite: {
+    // Docker build only: password gate + /__health for the dev server (src/server.ts covers production builds).
+    ...(process.env["BUDDY_SELF_HOSTED"] === "1" ? { plugins: [selfHostedPlugin()] } : {}),
     // Self-hosting only (the Dockerfile sets this): accept any Host header so the dev server works
     // behind a reverse proxy or a LAN hostname. Unset on Lovable, so its config is untouched.
     ...(process.env["BUDDY_ALLOW_ALL_HOSTS"] === "1" ? { server: { allowedHosts: true as const } } : {}),

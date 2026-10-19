@@ -31,3 +31,6 @@
 - Web search and Seerr run only through server routes (src/lib/search.server.ts, seerr.server.ts); their addresses and the Seerr API key come from server environment variables and are never read from the request or sent to the browser. Seerr requests always need a user click in SeerrDialog.
 - Memories, notes and to-dos live only in browser storage (src/lib/workbench.ts); only memories and open to-dos are sent to pals, as clamped data (`memoryContext`) the server labels as non-instructions.
 - Compare mode uses a neutral prompt (`neutral: true` on /api/chat, or the shared NEUTRAL_SYSTEM for Ollama/WebGPU) so results reflect the model, not a pal persona.
+- Self-hosted only (BUDDY_SELF_HOSTED / BUDDY_PASSWORD / BUDDY_DATA_DIR): the password gate lives in src/lib/gate.server.ts and is applied by src/server.ts (production) and vite-self-hosted.ts (the Docker dev server); it must never read a request body except the login form, and is a no-op when BUDDY_PASSWORD is unset so Lovable is unaffected. Server-side chats (store.server.ts) load node:fs lazily and only when BUDDY_DATA_DIR is set.
+- Anything copyable into a bug report goes through redact() (src/lib/redact.ts); never log API keys, passwords or request bodies.
+- Jellyfin address/key come only from server environment variables (jellyfin.server.ts), like Seerr.
