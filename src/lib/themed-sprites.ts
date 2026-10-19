@@ -84,6 +84,7 @@ export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "dev
       echo: ["I", "B", "S", "X", "U"],
       rune: ["G", "B", "r", "O", "E"],
       claude: ["K", "S", "X", "M", "E"],
+      saiyan: ["N", "B", "M", "X", "E"],
     };
     const [jacket, shade, neon, glow, skin] = look[id];
     head(skin, skin === "U" ? "V" : "T"); eyes(glow);
@@ -113,6 +114,7 @@ export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "dev
       echo: ["G", "B", "H", "J", "U"],
       rune: ["I", "B", "r", "R", "E"],
       claude: ["r", "B", "J", "H", "E"],
+      saiyan: ["r", "B", "Q", "R", "E"],
     };
     const [hood, hoodShade, hc, hl, skin] = look[id];
     head(skin, skin === "U" ? "V" : "T"); eyes(); hair(hc, hl);

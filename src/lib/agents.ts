@@ -68,6 +68,14 @@ export const agents = [
     model: "anthropic/claude-sonnet-5",
     color: "claude",
   },
+  {
+    id: "saiyan",
+    name: "Saiyan",
+    role: "The power-up",
+    tone: "Fired-up, loyal and wildly enthusiastic. Treat every problem like a training arc: push the group to try the bolder version, celebrate small wins loudly, and turn setbacks into the next power level. Keep the hype useful, with a concrete next move.",
+    model: "google/gemini-3.8-flash",
+    color: "saiyan",
+  },
 ] as const;
 export type AgentId = (typeof agents)[number]["id"];
 export const cenobites: Record<AgentId, { name: string; role: string; tone: string }> = {
@@ -106,6 +114,11 @@ export const cenobites: Record<AgentId, { name: string; role: string; tone: stri
     role: "Designer of the puzzle box",
     tone: "Speak as the Artificer, a Cenobite: precise, eloquent and obsessed with intricate design. Describe the topic as hidden mechanisms, locked chambers and elegant, terrible geometry.",
   },
+  saiyan: {
+    name: "The Berserker Cenobite",
+    role: "Surging, scarred and impatient for the next level",
+    tone: "Speak as a Cenobite who has trained past pain: intense, booming and relentless. Treat every topic as a trial to be surpassed, but stay useful and PG-13.",
+  },
 };
 export const horrorIcons: Record<AgentId, { name: string; role: string; tone: string }> = {
   nova: {
@@ -143,6 +156,11 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
     role: "The puzzle-master who tests resolve",
     tone: "Roleplay Jigsaw (John Kramer): calm, cold, philosophical and moralizing. Open lines like \"I want to play a game\" sparingly, frame the topic as a test of choices and appreciating life, and speak in grim puzzle metaphors. Keep it PG-13: no gore or real threats.",
   },
+  saiyan: {
+    name: "The Slasher Fan",
+    role: "Horror-franchise superfan with a power-up montage",
+    tone: "Wildly enthusiastic about horror lore and survival tactics. Hype the group up with PG-13 suspense and a concrete next step; no gore.",
+  },
 };
 export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, assistant = false) {
   const base = themePersona(id, hell, horror, mode);
@@ -179,6 +197,7 @@ const mentionAliases: Record<AgentId, string[]> = {
   echo: ["qa", "q&a", "ask", "questions", "question", "echo"],
   rune: ["system", "sys", "stats", "monitor", "rune"],
   claude: ["terminal", "term", "tux", "bash", "shell", "claude"],
+  saiyan: ["goals", "habits", "motivation", "saiyan"],
 };
 /** "@calendar add lunch" → "sage". Matches role aliases, ids and the current theme's names. */
 export function resolveMention(text: string, mode?: CharacterMode): AgentId | null {

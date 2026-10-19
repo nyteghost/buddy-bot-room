@@ -75,6 +75,11 @@ const props: Record<AgentId, Prop> = {
       ...r(9, 3, 3, 3, "accent", "tp-draw-c"), ...r(5, 8, 6, 1, "glow", "tp-draw-c"),
     ],
   },
+  // Power-up: charging a ki blast that grows and flickers.
+  saiyan: {
+    label: "charging a ki blast",
+    pixels: [...r(5, 5, 6, 6, "glow", "tp-flicker"), ...r(6, 3, 4, 10, "glow", "tp-flicker"), ...r(3, 7, 10, 2, "glow", "tp-flicker"), ...r(6, 6, 4, 4, "paper"), [2, 2, "accent", "tp-twinkle-a"], [13, 3, "accent", "tp-twinkle-b"], [3, 13, "accent", "tp-twinkle-c"], [13, 12, "accent", "tp-twinkle-a"]],
+  },
 };
 
 
@@ -100,7 +105,7 @@ const fireball = (): Px[] => [...r(4, 5, 8, 7, "red", "tp-flicker"), ...r(6, 2, 
 const gunblade = (): Px[] => [...r(1, 6, 10, 2, "metal"), ...r(11, 5, 4, 4, "dark"), ...r(12, 9, 2, 4, "dark"), [3, 6, "paper", "tp-twinkle-a"], [7, 7, "paper", "tp-twinkle-b"]];
 const daggers = (): Px[] => [...r(2, 2, 1, 9, "metal", "tp-scribble"), ...r(1, 11, 3, 1, "accent"), ...r(13, 2, 1, 9, "metal", "tp-wrench"), ...r(12, 11, 3, 1, "accent"), [7, 6, "glow", "tp-twinkle-a"]];
 
-const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
+const themed: Partial<Record<CharacterMode, Record<Exclude<AgentId, "saiyan">, Prop>>> = {
   horror: {
     nova: { label: "making a spooky phone call", pixels: phone() },
     byte: { label: "sharpening a machete", pixels: blade() },
@@ -167,7 +172,7 @@ const themed: Partial<Record<CharacterMode, Record<AgentId, Prop>>> = {
 };
 
 export function ThinkingProp({ id, mode = "normal" }: { id: AgentId; mode?: CharacterMode }) {
-  const prop = themed[mode === "assistant" ? "linux" : mode]?.[id] ?? props[id];
+  const prop = (id === "saiyan" ? undefined : themed[mode === "assistant" ? "linux" : mode]?.[id]) ?? props[id];
   if (!prop) return null;
   return (
     <svg

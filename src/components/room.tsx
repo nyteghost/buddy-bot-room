@@ -216,7 +216,7 @@ export function Room() {
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
   const [partner, setPartner] = useState<AgentId>("claude");
-  const [enabled, setEnabled] = useState<AgentId[]>(agents.map((a) => a.id));
+  const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan").map((a) => a.id)); // Saiyan joins when you switch him on
   const direct = mode === "direct";
   const mentionTarget = resolveMention(topic, characterMode);
   const tooFew = !direct && !mentionTarget && enabled.length < 2;
@@ -249,6 +249,7 @@ export function Room() {
     echo: agents[4].model,
     rune: agents[5].model,
     claude: agents[6].model,
+    saiyan: agents[7].model,
   });
   const [running, setRunning] = useState(false);
   // Read replies aloud (opt-in, browser speech): after each discussion finishes, each new reply in its pal's voice.
@@ -662,6 +663,16 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "trakt-write": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/trakt-write", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: action.op, text: action.text }) });
+            const json = (await res.json()) as { text?: string; error?: string };
+            say(command, json.text ?? json.error ?? "Nothing came back.");
+          } catch { say(command, "I couldn't reach the server."); }
+        })();
+        return;
+      }
       case "schedule": {
         void (async () => {
           try {

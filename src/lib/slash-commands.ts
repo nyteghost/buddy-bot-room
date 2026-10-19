@@ -1,6 +1,7 @@
 import type { Mode } from "./agents";
 import type { CharacterMode } from "./hellraiser";
 import { parseDice } from "./dice";
+import { parseWrite } from "./trakt-write";
 
 /** Room controls you can type instead of click. Pure parsing only — the Room runs the action. */
 export type ThemeId = Exclude<CharacterMode, "assistant">;
@@ -32,6 +33,7 @@ export type SlashAction =
   | { type: "plex"; query: string }
   | { type: "watch"; mood: string }
   | { type: "trakt"; list: string }
+  | { type: "trakt-write"; op: string; text: string }
   | { type: "request"; title: string }
   | { type: "backup"; now: boolean }
   | { type: "brief"; send: boolean }
@@ -105,7 +107,7 @@ export const slashCommands = [
   { name: "brief", usage: "/brief [send]", description: "Today's morning brief (add send to push it to your phone)" },
   { name: "backup", usage: "/backup [now]", description: "Show the nightly backup status, or back up now (owner)" },
   { name: "request", usage: "/request <title> [4k]", description: "Request a title through Seerr (same as @seerr)" },
-  { name: "trakt", usage: "/trakt [lists|<list>]", description: "Show your Trakt lists, or the items in one" },
+  { name: "trakt", usage: "/trakt [lists|<list>|connect|status|add <title>|watched <title>|remove <title>]", description: "Show your Trakt lists, or add/mark titles once connected" },
   { name: "plex", usage: "/plex <title|recent>", description: "Look in your Plex library (needs PLEX_URL)" },
   { name: "server", usage: "/server", description: "Check your Unraid server now" },
   { name: "diagnose", usage: "/diagnose", description: "What's wrong with my server? The pals look at Unraid and advise" },
@@ -213,8 +215,11 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "backup", now: arg === "now" } };
     case "request":
       return rawArg ? { ok: true, action: { type: "request", title: rawArg } } : fail("Which title? /request Dune Part Two");
-    case "trakt":
+    case "trakt": {
+      const w = parseWrite(rawArg);
+      if (w) return { ok: true, action: { type: "trakt-write", op: w.op, text: w.text } };
       return { ok: true, action: { type: "trakt", list: rawArg } };
+    }
     case "next": {
       const m = /^list:(\S+)\s*(.*)$/i.exec(rawArg);
       return { ok: true, action: { type: "next", list: m?.[1] ?? "", mood: (m ? m[2] : rawArg) ?? "" } };

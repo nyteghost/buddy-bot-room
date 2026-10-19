@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
-import { officePose, officeStations } from "@/lib/office-motion";
+import { officePose, officeStations, type Heading } from "@/lib/office-motion";
+import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
@@ -26,6 +27,7 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   }, [active]);
   const station = officeStations[id];
   const pose = officePose(id, index, elapsed);
+  const directional = hasFacingArt(id);
   const working = active && arrived;
   const walking = enabled && (active ? !arrived : pose.walking);
   // Seated whenever the pal is parked at its own desk chair.
@@ -37,12 +39,12 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   return (
     <div
       style={position}
-      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !active && `office-dir-${pose.heading}`, enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !active && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
+      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !active && !directional && `office-dir-${pose.heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !active && !directional && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
       aria-label={`${station.label}: ${working ? station.activity : walking ? "walking to a station" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} back={seated && station.facing === "away"} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, pose.heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{station.label}</span>
     </div>
   );
@@ -57,4 +59,12 @@ function ChairBack() {
       <rect x="3" y="8" width="10" height="1" className="chair-back" />
     </svg>
   );
+}
+
+/** Which way a pal with directional art looks: the way it walks, toward the monitors when seated in the back row, otherwise at you. */
+function facingOf(directional: boolean, active: boolean, walking: boolean, seated: boolean, side: "away" | "toward", heading: Heading): Heading | undefined {
+  if (!directional) return undefined;
+  if (active) return walking ? "n" : side === "away" ? "n" : "s";
+  if (walking) return heading;
+  return seated && side === "away" ? "n" : "s";
 }

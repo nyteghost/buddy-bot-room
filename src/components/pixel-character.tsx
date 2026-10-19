@@ -3,7 +3,7 @@ import type { AgentId } from "@/lib/agents";
 import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
 import { spriteRuns, to128 } from "@/lib/sprite-upscale";
-import { palArt } from "@/lib/pal-art";
+import { facingArt, hasFacingArt, palArt, type Facing } from "@/lib/pal-art";
 
 export function PixelCharacter({
   id,
@@ -11,6 +11,7 @@ export function PixelCharacter({
   animated = false,
   walking = false,
   back = false,
+  facing,
   mode: explicitMode,
 }: {
   id: AgentId;
@@ -19,20 +20,23 @@ export function PixelCharacter({
   walking?: boolean;
   /** Seen from behind (seated facing a monitor): face pixels become hair. */
   back?: boolean;
+  /** Which way the pal faces. Only pals with directional art (Saiyan) use it; the default is facing the viewer. */
+  facing?: Facing | undefined;
   mode?: CharacterMode;
 }) {
   const currentMode = useCharacterMode();
   const mode = explicitMode ?? currentMode;
-  const art = back ? undefined : palArt(id, mode);
+  const directional = hasFacingArt(id) ? facingArt(id, facing ?? "s") : undefined;
+  const art = directional ?? (back ? undefined : palArt(id, mode));
   if (art) {
     return (
       <img
         src={art}
-        width={128}
-        height={128}
+        width={directional ? 64 : 128}
+        height={directional ? 64 : 128}
         alt={`${id} pixel character`}
         draggable={false}
-        className={cn("pixel-character native-sprite pal-art", `agent-${id}`, animated && "character-bounce", walking && "pal-art-walk", className)}
+        className={cn("pixel-character native-sprite pal-art", directional && "pal-directional", `agent-${id}`, animated && "character-bounce", walking && "pal-art-walk", className)}
       />
     );
   }

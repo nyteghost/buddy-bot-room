@@ -106,7 +106,8 @@ Your data lives in the `buddy-data` volume and survives updates.
 
 ## 4. The room
 
-- **Seven pixel pals** with hand-drawn 128×128 sprites that walk, sit at desks and act out tasks.
+- **Seven pixel pals, plus Saiyan** with hand-drawn sprites that walk, sit at desks and act out tasks. In the Linux/Assistant office they walk in all eight directions and lean, shrink and grow slightly as they turn.
+- **Saiyan** (the eighth pal, a cyberpunk dragon-ball fan: "the power-up", motivation and goals) has real art for every facing direction, so he turns to face where he is walking and shows his back at a desk. He is **off by default**; switch him on under *The pals*. Mention him with `@saiyan` or `@goals`. Art lives in `src/assets/pals/saiyan/` (`north.png` … `south-west.png`); replace those eight files to change him.
 - **Themes** swap the entire cast (names, looks, personalities, room): Normal, Hellraiser, Horror, Matrix, Final Fantasy, Dev Team, Cyberpunk, Dungeon Crawler Carl and Linux.
 - **Conversation modes:**
   - *Roundtable*: pals respond to each other.

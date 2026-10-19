@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { cosine, candidateChunks, rerank } from "@/lib/embed-rerank";
 import { wantsWeb, webContext } from "@/lib/web-context";
+import { bestMatch, parseWrite, pollSeconds, syncBody } from "@/lib/trakt-write";
+import { agents, agentPersona, agentName, resolveMention } from "@/lib/agents";
 import { servicesReport } from "@/lib/status";
 import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, MAX_SCHEDULES } from "@/lib/schedules";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
@@ -1424,5 +1426,46 @@ describe("scheduled tasks", () => {
     expect(scheduleDue({ ...s, last: "2026-10-19" }, mon, "America/New_York")).toBe(false);
     expect(scheduleDue(s, sat, "America/New_York")).toBe(false);
     expect(scheduleDue(s, new Date("2026-10-19T12:40:00Z"), "America/New_York")).toBe(false);
+  });
+});
+
+describe("Trakt write-back", () => {
+  it("parses write commands but leaves list names alone", () => {
+    expect(parseWrite("add The Matrix")).toEqual({ op: "add", text: "The Matrix" });
+    expect(parseWrite("seen Dune")).toEqual({ op: "watched", text: "Dune" });
+    expect(parseWrite("rm Dune")).toEqual({ op: "remove", text: "Dune" });
+    expect(parseWrite("connect")).toEqual({ op: "connect", text: "" });
+    expect(parseWrite("watchlist")).toBeNull();
+    expect(parseWrite("lists")).toBeNull();
+    expect(parseWrite("")).toBeNull();
+  });
+  it("picks the first usable search result and builds the body", () => {
+    const m = bestMatch([{ type: "person" }, { type: "movie", movie: { title: "Dune", year: 2021, ids: { trakt: 123 } } }]);
+    expect(m).toEqual({ kind: "movie", title: "Dune", year: 2021, id: 123 });
+    expect(syncBody(m!)).toEqual({ movies: [{ ids: { trakt: 123 } }] });
+    expect(syncBody({ kind: "show", title: "x", id: 9 })).toEqual({ shows: [{ ids: { trakt: 9 } }] });
+    expect(bestMatch([])).toBeNull();
+    expect(bestMatch("nope")).toBeNull();
+  });
+  it("keeps the poll interval sane", () => {
+    expect(pollSeconds(1)).toBe(5);
+    expect(pollSeconds(500)).toBe(60);
+    expect(pollSeconds(undefined)).toBe(5);
+  });
+});
+
+describe("Saiyan, the eighth pal", () => {
+  it("is a pal with a persona in every theme", () => {
+    expect(agents.some((a) => a.id === "saiyan")).toBe(true);
+    for (const mode of ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux", "assistant"] as const) {
+      const p = agentPersona("saiyan", mode === "hellraiser", mode === "horror", mode);
+      expect(p.name.length).toBeGreaterThan(2);
+      expect(p.tone.length).toBeGreaterThan(20);
+    }
+    expect(agentName("saiyan", false, false, "cyberpunk")).toBe("Saiyan");
+  });
+  it("can be @mentioned", () => {
+    expect(resolveMention("@saiyan help me plan", "normal")).toBe("saiyan");
+    expect(resolveMention("@goals set a target", "linux")).toBe("saiyan");
   });
 });

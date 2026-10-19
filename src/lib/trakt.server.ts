@@ -49,7 +49,9 @@ export async function handleTrakt(request: Request) {
   const list = (url.searchParams.get("list") ?? "").trim() || cfg.list;
   if (!isSlug(list)) return Response.json({ error: "That isn't a valid Trakt list name — use the short name shown by /trakt lists." }, { status: 400 });
   const headers: Record<string, string> = { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": cfg.clientId };
-  if (cfg.token) headers["Authorization"] = `Bearer ${cfg.token}`;
+  // A token from /trakt connect (stored on the server) works like TRAKT_ACCESS_TOKEN and unlocks private lists.
+  const token = cfg.token || (await import("./trakt-write.server").then((m) => m.storedTraktToken()).catch(() => ""));
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const get = (path: string) => fetch(`${API}${path}`, { headers, signal: AbortSignal.timeout(10000) });
   const user = encodeURIComponent(cfg.user);
   try {

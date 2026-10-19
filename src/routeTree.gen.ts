@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiTraktWriteRouteImport } from './routes/api.trakt-write'
 import { Route as ApiSttRouteImport } from './routes/api.stt'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
 import { Route as ApiStatusRouteImport } from './routes/api.status'
@@ -58,6 +59,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTraktWriteRoute = ApiTraktWriteRouteImport.update({
+  id: '/api/trakt-write',
+  path: '/api/trakt-write',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSttRoute = ApiSttRouteImport.update({
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/status': typeof ApiStatusRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/status': typeof ApiStatusRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/status': typeof ApiStatusRoute
@@ -251,6 +260,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/trakt-write'
     | '/api/stt'
     | '/api/schedules'
     | '/api/status'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/trakt-write'
     | '/api/stt'
     | '/api/schedules'
     | '/api/status'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/trakt-write'
     | '/api/stt'
     | '/api/schedules'
     | '/api/status'
@@ -333,6 +345,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiTraktWriteRoute: typeof ApiTraktWriteRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
   ApiStatusRoute: typeof ApiStatusRoute
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/trakt-write': {
+      id: '/api/trakt-write'
+      path: '/api/trakt-write'
+      fullPath: '/api/trakt-write'
+      preLoaderRoute: typeof ApiTraktWriteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stt': {
@@ -541,6 +561,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiTraktWriteRoute: ApiTraktWriteRoute,
   ApiSttRoute: ApiSttRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,
   ApiStatusRoute: ApiStatusRoute,
