@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { availableProviders, setEngine, useEngine, type EngineKind, type ReplyLength } from "@/lib/engine";
+import { CLAUDE_MODELS, setEngine, turnProviders, useEngine, type ClaudeMode, type EngineKind, type ReplyLength } from "@/lib/engine";
 import { deletePreset, makePreset, presetToEngine, savePreset, updatePresets, usePresets } from "@/lib/presets";
 import { useOllamaModels } from "@/lib/ollama-models";
 import {
@@ -42,7 +42,7 @@ export function EngineSettingsDialog() {
   const presets = usePresets();
   const [presetName, setPresetName] = useState("");
   const [presetPick, setPresetPick] = useState("");
-  const count = availableProviders(engine).length;
+  const count = turnProviders(engine).length;
   const label =
     engine.kind === "local"
       ? "In-browser"
@@ -191,6 +191,45 @@ export function EngineSettingsDialog() {
               href="https://build.nvidia.com/settings/api-keys"
               placeholder="nvapi-..."
             />
+            <div className="grid gap-2 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm">
+              <p className="font-medium">Claude (Anthropic) — paid service</p>
+              <p className="text-muted-foreground">
+                Unlike the providers above, Claude charges per use on your Anthropic account (Haiku 5.5 is about $0.10 in / $0.50 out per million tokens, so a discussion costs a few cents). It stays <b>off</b> until you choose how to use it. Set a monthly spending limit at console.anthropic.com.
+              </p>
+              <KeyField
+                label="Claude API key"
+                value={engine.anthropicKey}
+                onChange={(anthropicKey) => setEngine({ anthropicKey })}
+                href="https://console.anthropic.com/settings/keys"
+                placeholder="sk-ant-..."
+              />
+              <label className="grid gap-1">
+                <span className="font-medium">How to use Claude</span>
+                <select
+                  className="rounded-md border bg-background px-2 py-2"
+                  value={engine.claudeMode}
+                  onChange={(e) => setEngine({ claudeMode: e.target.value as ClaudeMode })}
+                >
+                  <option value="off">Off (never charged)</option>
+                  <option value="share">Share turns with my free keys (some replies are paid)</option>
+                  <option value="only">Use only Claude (every reply is paid)</option>
+                </select>
+              </label>
+              <label className="grid gap-1">
+                <span className="font-medium">Model</span>
+                <select
+                  className="rounded-md border bg-background px-2 py-2"
+                  value={engine.claudeModel}
+                  onChange={(e) => setEngine({ claudeModel: e.target.value })}
+                >
+                  {CLAUDE_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label} · {m.price}</option>
+                  ))}
+                </select>
+              </label>
+              {engine.claudeMode !== "off" && !engine.anthropicKey.trim() && <p className="text-destructive">Add a Claude key above, or turn this off.</p>}
+              {engine.claudeMode !== "off" && engine.anthropicKey.trim() && <p className="text-amber-600">Claude is ON: replies it writes are billed to your Anthropic account.</p>}
+            </div>
             <p className="text-sm text-muted-foreground">
               Keys are saved only in this browser (and encrypted in your account if signed in).
             </p>

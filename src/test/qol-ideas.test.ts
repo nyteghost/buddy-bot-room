@@ -11,6 +11,7 @@ import { friendlyError } from "@/lib/friendly-error";
 import { chunkText, docContext, isReadableDoc, retrieve, tokenize } from "@/lib/rag";
 import { planAdd } from "@/lib/documents";
 import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
+import { providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
 import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
@@ -36,7 +37,7 @@ import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch,
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
-const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
+const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
 
 describe("context trimming", () => {
   const msgs = (n: number, len: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: "x".repeat(len) }));
@@ -1043,5 +1044,30 @@ describe("free key helper", () => {
   });
   it("counts the keys that are filled in", () => {
     expect(keyCount({ groqKey: "x", geminiKey: " ", openrouterKey: "", nvidiaKey: "y" })).toBe(2);
+  });
+});
+
+describe("Claude (paid) provider", () => {
+  const base = { ...engineBase, kind: "cloud" as const, groqKey: "g", anthropicKey: "sk-ant-" + "x".repeat(30) };
+  it("is recognised by its key prefix", () => {
+    expect(detectProvider("sk-ant-api03-" + "z".repeat(30))?.id).toBe("anthropic");
+    expect(detectProvider("sk-or-v1-" + "z".repeat(30))?.id).toBe("openrouter");
+  });
+  it("never answers while switched off, even with a key", () => {
+    expect(claudeProvider(base)).toBeUndefined();
+    expect(turnProviders(base).map((p) => p.kind)).toEqual(["groq"]);
+  });
+  it("shares turns with free keys only when asked", () => {
+    const shared = turnProviders({ ...base, claudeMode: "share" });
+    expect(shared.map((p) => p.kind)).toEqual(["groq", "anthropic"]);
+    expect(providerForTurn({ ...base, claudeMode: "share" }, 1)?.kind).toBe("anthropic");
+  });
+  it("can be the only engine, and falls back to Haiku for an unknown model", () => {
+    const only = turnProviders({ ...base, claudeMode: "only", claudeModel: "nope" });
+    expect(only.length).toBe(1);
+    expect(only[0]?.model).toBe("claude-haiku-5-5");
+  });
+  it("needs a key", () => {
+    expect(claudeProvider({ ...base, claudeMode: "only", anthropicKey: " " })).toBeUndefined();
   });
 });

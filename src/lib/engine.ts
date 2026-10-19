@@ -5,12 +5,25 @@ export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama";
 export type ReplyLength = "short" | "medium" | "long";
 export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 800, long: 1500 };
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
+/** Claude is a PAID provider, so it is never part of the free rotation unless the user opts in. */
+export type TurnProvider = { kind: FreeProvider | "anthropic"; apiKey: string; model?: string };
+export type ClaudeMode = "off" | "share" | "only";
+export const CLAUDE_MODELS = [
+  { id: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)", price: "$0.10 in / $0.50 out per 1M tokens" },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5", price: "$2 in / $10 out per 1M tokens" },
+  { id: "claude-opus-5-5", label: "Opus 5.5", price: "$4 in / $20 out per 1M tokens" },
+] as const;
+export const DEFAULT_CLAUDE_MODEL = CLAUDE_MODELS[0].id;
 export type EngineSettings = {
   kind: EngineKind;
   groqKey: string;
   geminiKey: string;
   openrouterKey: string;
   nvidiaKey: string;
+  /** Paid. Used only when claudeMode is not "off". */
+  anthropicKey: string;
+  claudeMode: ClaudeMode;
+  claudeModel: string;
   ollamaUrl: string;
   ollamaModel: string;
   /** How long local-model replies may run: short (default), medium or long. */
@@ -24,6 +37,9 @@ const fallback: EngineSettings = {
   geminiKey: "",
   openrouterKey: "",
   nvidiaKey: "",
+  anthropicKey: "",
+  claudeMode: "off",
+  claudeModel: DEFAULT_CLAUDE_MODEL,
   ollamaUrl: "http://localhost:11434/v1",
   ollamaModel: "qwen2.5:7b",
   replyLength: "short",
@@ -77,8 +93,21 @@ export function availableProviders(s: EngineSettings): { kind: FreeProvider; api
 }
 
 /** Spread pals across all entered keys so each provider's free limit is shared out. */
-export function providerForTurn(s: EngineSettings, turnIndex: number) {
-  const list = availableProviders(s);
+export function claudeProvider(s: EngineSettings): TurnProvider | undefined {
+  const apiKey = (s.anthropicKey ?? "").trim();
+  if (!apiKey || (s.claudeMode !== "share" && s.claudeMode !== "only")) return undefined;
+  return { kind: "anthropic", apiKey, model: CLAUDE_MODELS.some((m) => m.id === s.claudeModel) ? s.claudeModel : DEFAULT_CLAUDE_MODEL };
+}
+
+/** Everything that may answer a turn: the free keys, plus Claude only if the user switched it on. */
+export function turnProviders(s: EngineSettings): TurnProvider[] {
+  const claude = claudeProvider(s);
+  if (claude && s.claudeMode === "only") return [claude];
+  return claude ? [...availableProviders(s), claude] : availableProviders(s);
+}
+
+export function providerForTurn(s: EngineSettings, turnIndex: number): TurnProvider | undefined {
+  const list = turnProviders(s);
   return list.length ? list[turnIndex % list.length] : undefined;
 }
 

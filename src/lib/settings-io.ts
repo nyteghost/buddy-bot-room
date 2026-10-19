@@ -40,7 +40,7 @@ export function validSyncData(v: unknown): Record<string, string> | null {
   return out;
 }
 
-const SECRET_FIELDS = ["groqKey", "geminiKey", "openrouterKey", "nvidiaKey"];
+const SECRET_FIELDS = ["groqKey", "geminiKey", "openrouterKey", "nvidiaKey", "anthropicKey"];
 const MAX_BYTES = 8_000_000;
 
 export type StorageLike = { getItem(k: string): string | null; setItem(k: string, v: string): void };

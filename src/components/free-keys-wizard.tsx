@@ -37,7 +37,7 @@ export function FreeKeysWizard() {
     if (!provider) { setNote("That doesn't look like a Groq, Gemini, OpenRouter or NVIDIA key. Paste it into the matching box below."); return; }
     setEngine({ [provider.field]: key });
     setPaste("");
-    setNote(`Saved as your ${provider.name} key. Testing…`);
+    setNote(provider.paid ? `Saved as your ${provider.name} key (PAID service). It stays off until you choose how to use it in the Claude section below. Testing…` : `Saved as your ${provider.name} key. Testing…`);
     void run(provider, key);
   }
 
@@ -52,10 +52,10 @@ export function FreeKeysWizard() {
   return (
     <div className="grid gap-3 rounded-lg border p-3 text-sm">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium">Get free keys ({keyCount(engine)} of {KEY_PROVIDERS.length})</span>
+        <span className="font-medium">Get free keys ({keyCount(engine)} of {KEY_PROVIDERS.filter((p) => !p.paid).length})</span>
       </div>
       <p className="text-muted-foreground">
-        Each provider needs you to sign in once and create a key on their site (Pixel Pals can't do that part for you). Tap <b>Open key page</b>, copy the key, then come back and paste it below. It's matched to the right provider and tested automatically.
+        Claude is a paid service and stays off until you turn it on below. Each provider needs you to sign in once and create a key on their site (Pixel Pals can't do that part for you). Tap <b>Open key page</b>, copy the key, then come back and paste it below. It's matched to the right provider and tested automatically.
       </p>
       <div className="flex gap-2">
         <Input
@@ -75,7 +75,7 @@ export function FreeKeysWizard() {
           return (
             <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
               <div className="min-w-0">
-                <div className="font-medium">{p.name}</div>
+                <div className="font-medium">{p.name}{p.paid && <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">PAID</span>}</div>
                 <div className="text-xs text-muted-foreground">{p.free}</div>
               </div>
               <div className="flex items-center gap-2">

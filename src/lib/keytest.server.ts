@@ -7,6 +7,7 @@ const CHECKS: Record<string, Check> = {
   groq: { url: "https://api.groq.com/openai/v1/models", headers: (k) => ({ authorization: `Bearer ${k}` }) },
   openrouter: { url: "https://openrouter.ai/api/v1/auth/key", headers: (k) => ({ authorization: `Bearer ${k}` }) },
   nvidia: { url: "https://integrate.api.nvidia.com/v1/models", headers: (k) => ({ authorization: `Bearer ${k}` }) },
+  anthropic: { url: "https://api.anthropic.com/v1/models?limit=1", headers: (k) => ({ "x-api-key": k, "anthropic-version": "2023-06-01" }) },
   gemini: { url: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", headers: (k) => ({ "x-goog-api-key": k }) },
 };
 

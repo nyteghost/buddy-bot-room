@@ -135,6 +135,7 @@ Open **Free keys** (or *AI engine*) in the top bar. Pick one engine or let **Aut
 | **Gemini** | https://aistudio.google.com/app/apikey | Free tier |
 | **OpenRouter** | https://openrouter.ai/keys | Has free models |
 | **NVIDIA NIM** | https://build.nvidia.com | Free credits |
+| **Claude (Anthropic)** | https://console.anthropic.com/settings/keys | **Paid**, billed per use. Off until you enable it (see below) |
 | **Ollama** | Your own machine | No key; fully local |
 | **WebGPU** | Runs in your browser | Small model, nothing leaves the device |
 | **Auto** | | Free keys first, then WebGPU or Ollama |
@@ -148,6 +149,16 @@ In **Free keys** (engine settings) the **Get free keys** panel walks you through
 1. Tap **Open key page** and create a key there.
 2. Copy it, come back, and either paste it into **Paste a key here** or tap **Add from clipboard**. The provider is recognised from the key's prefix (`gsk_` Groq, `AIza` Gemini, `sk-or-` OpenRouter, `nvapi-` NVIDIA) and saved in the right slot.
 3. It is tested automatically (one free "list models" request from the server). Tap **Test** any time to re-check. A green tick means the key works.
+
+### Claude (paid)
+
+Claude is the one **paid** option. It is billed to your own Anthropic account, separately from any Claude subscription. In the engine settings, the amber **Claude (Anthropic) — paid service** box has:
+
+- **Claude API key:** create it at console.anthropic.com → Settings → API Keys. Add a small amount of credit and set a monthly spending limit there.
+- **How to use Claude:** *Off* (default, never charged), *Share turns with my free keys* (some replies are paid), or *Use only Claude* (every reply is paid). Pasting a key never turns it on by itself.
+- **Model:** Haiku 5.5 (about $0.10 in / $0.50 out per million tokens, a few cents per discussion), Sonnet 5.5 ($2 / $10) or Opus 5.5 ($4 / $20).
+
+Compare models only uses the free keys, so it never spends Claude credit.
 
 ### Setting up Ollama
 

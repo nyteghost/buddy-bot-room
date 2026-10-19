@@ -1,8 +1,10 @@
-import type { EngineSettings, FreeProvider } from "@/lib/engine";
+import type { EngineSettings } from "@/lib/engine";
 
 export type KeyProvider = {
-  id: FreeProvider;
-  field: "groqKey" | "geminiKey" | "openrouterKey" | "nvidiaKey";
+  id: "groq" | "gemini" | "openrouter" | "nvidia" | "anthropic";
+  field: "groqKey" | "geminiKey" | "openrouterKey" | "nvidiaKey" | "anthropicKey";
+  /** True for providers that charge money. */
+  paid?: boolean;
   name: string;
   url: string;
   free: string;
@@ -16,6 +18,7 @@ export const KEY_PROVIDERS: KeyProvider[] = [
   { id: "gemini", field: "geminiKey", name: "Gemini", url: "https://aistudio.google.com/apikey", free: "Free tier in Google AI Studio (2.5 Flash).", placeholder: "AIza...", pattern: /^AIza[0-9A-Za-z_-]{30,}$/ },
   { id: "openrouter", field: "openrouterKey", name: "OpenRouter", url: "https://openrouter.ai/keys", free: "Has free models (Llama 3.3 70B).", placeholder: "sk-or-...", pattern: /^sk-or-[A-Za-z0-9_-]{20,}$/ },
   { id: "nvidia", field: "nvidiaKey", name: "NVIDIA NIM", url: "https://build.nvidia.com/settings/api-keys", free: "Free credits (Llama 3.1 70B).", placeholder: "nvapi-...", pattern: /^nvapi-[A-Za-z0-9_-]{20,}$/ },
+  { id: "anthropic", field: "anthropicKey", name: "Claude (Anthropic)", paid: true, url: "https://console.anthropic.com/settings/keys", free: "PAID. Billed per use; Haiku 5.5 costs about $0.10 in / $0.50 out per million tokens.", placeholder: "sk-ant-...", pattern: /^sk-ant-[A-Za-z0-9_-]{20,}$/ },
 ];
 
 /** Strips quotes, whitespace and a leading "Bearer " from something pasted. */
@@ -33,7 +36,7 @@ export function providerById(id: string): KeyProvider | undefined {
   return KEY_PROVIDERS.find((p) => p.id === id);
 }
 
-/** How many of the four free providers have a key entered. */
+/** How many of the free providers have a key entered (Claude is paid and counted separately). */
 export function keyCount(s: Pick<EngineSettings, "groqKey" | "geminiKey" | "openrouterKey" | "nvidiaKey">): number {
   return [s.groqKey, s.geminiKey, s.openrouterKey, s.nvidiaKey].filter((k) => k.trim()).length;
 }
