@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiBriefRouteImport } from './routes/api.brief'
 import { Route as ApiBackupRouteImport } from './routes/api.backup'
 import { Route as ApiNotesSyncRouteImport } from './routes/api.notes-sync'
 import { Route as ApiAccountsRouteImport } from './routes/api.accounts'
@@ -50,6 +51,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBriefRoute = ApiBriefRouteImport.update({
+  id: '/api/brief',
+  path: '/api/brief',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiBackupRoute = ApiBackupRouteImport.update({
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/brief': typeof ApiBriefRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/accounts': typeof ApiAccountsRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/brief': typeof ApiBriefRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/accounts': typeof ApiAccountsRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/brief': typeof ApiBriefRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/accounts': typeof ApiAccountsRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/brief'
     | '/api/backup'
     | '/api/notes-sync'
     | '/api/accounts'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/brief'
     | '/api/backup'
     | '/api/notes-sync'
     | '/api/accounts'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/brief'
     | '/api/backup'
     | '/api/notes-sync'
     | '/api/accounts'
@@ -237,6 +249,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiBriefRoute: typeof ApiBriefRoute
   ApiBackupRoute: typeof ApiBackupRoute
   ApiNotesSyncRoute: typeof ApiNotesSyncRoute
   ApiAccountsRoute: typeof ApiAccountsRoute
@@ -286,6 +299,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/brief': {
+      id: '/api/brief'
+      path: '/api/brief'
+      fullPath: '/api/brief'
+      preLoaderRoute: typeof ApiBriefRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/backup': {
@@ -381,6 +401,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiBriefRoute: ApiBriefRoute,
   ApiBackupRoute: ApiBackupRoute,
   ApiNotesSyncRoute: ApiNotesSyncRoute,
   ApiAccountsRoute: ApiAccountsRoute,

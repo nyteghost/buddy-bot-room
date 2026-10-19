@@ -111,6 +111,10 @@ With Plex set up too, each unwatched item is marked **📺 in Plex** or **not in
 
 Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
 
+## Morning brief
+
+Set `BRIEF_TIME` (for example `08:00`, in `BUDDY_TZ`) and `NTFY_URL` and Pixel Pals pushes one short message to your phone each morning: whether Unraid is healthy, the last backup, **tonight's pick** from your Trakt list (preferring what's already in Plex, with two alternatives) and what's new in Plex. Each part appears only if that service is set up. The pick is a plain daily choice from your list, not an AI opinion, so it works without any API keys. Type `/brief` in the chat to preview it, or `/brief send` to push it to your phone right now.
+
 ## Nightly backup
 
 Every night at `BUDDY_BACKUP_TIME` (default 03:30, in `BUDDY_TZ`, default America/New_York) Pixel Pals copies its data folder (accounts, saved chats, per-account settings) into `/backups` and keeps the newest `BUDDY_BACKUP_KEEP` copies (default 14). If the server was off at that time, it makes one soon after starting. Type `/backup` in the chat to see the status, or `/backup now` to make one right away (owner only). The status is also in the Debug log.

@@ -21,6 +21,7 @@ import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
 import { capPerOwner, visibleTo } from "@/lib/store.server";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
+import { buildBrief, dailyPicks, unraidLine } from "@/lib/brief";
 import { ageText, isDue, parseHm, validZone, zonedParts } from "@/lib/schedule";
 import { backupName, insideData, isBackupName, pruneList } from "@/lib/backup";
 import { plexHas } from "@/lib/trakt";
@@ -914,5 +915,47 @@ describe("schedule and backup naming", () => {
     expect(insideData("/data", "/data/")).toBe(true);
     expect(insideData("/backups", "/data")).toBe(false);
     expect(insideData("/database", "/data")).toBe(false);
+  });
+});
+
+describe("morning brief", () => {
+  const items = [
+    { title: "Dune", kind: "movie" as const, year: 2021, inPlex: true },
+    { title: "Heat", kind: "movie" as const, year: 1995, inPlex: false },
+    { title: "Andor", kind: "show" as const, inPlex: true },
+    { title: "Alien", kind: "movie" as const, year: 1979, inPlex: true, watched: true },
+    { title: "Fargo", kind: "movie" as const, year: 1996, inPlex: true },
+  ];
+  it("picks the same titles all day, preferring unwatched ones in Plex", () => {
+    const a = dailyPicks(items, "2026-10-19");
+    expect(a.map((i) => i.title)).toEqual(dailyPicks(items, "2026-10-19").map((i) => i.title));
+    expect(a.length).toBe(3);
+    expect(a.every((i) => i.inPlex === true && !i.watched)).toBe(true);
+    expect(new Set(a.map((i) => i.title)).size).toBe(3);
+    expect(dailyPicks([{ title: "Heat", kind: "movie" as const, inPlex: false }], "x").map((i) => i.title)).toEqual(["Heat"]);
+    expect(dailyPicks([], "x")).toEqual([]);
+    expect(dailyPicks([{ title: "Alien", kind: "movie" as const, watched: true }], "x")).toEqual([]);
+  });
+  it("describes Unraid in one line", () => {
+    const base = { checkedAt: 0, reachable: true, disks: [{ name: "d1", status: "DISK_OK", tempC: 38 }], containers: [{ name: "a", state: "running" }, { name: "b", state: "exited" }], notes: [], problems: [] as string[], uptimeSeconds: 90000 };
+    expect(unraidLine(base)).toBe("Unraid is healthy (1/2 containers running, hottest disk 38°C, up 1d 1h).");
+    expect(unraidLine({ ...base, reachable: false })).toContain("unreachable");
+    expect(unraidLine({ ...base, problems: ["Disk d2 reports DISK_DSBL."] })).toContain("needs attention: Disk d2 reports DISK_DSBL.");
+    expect(unraidLine(undefined)).toBe("");
+    expect(unraidLine(null)).toContain("waiting");
+  });
+  it("builds a readable brief and degrades gracefully", () => {
+    const b = buildBrief({ day: "2026-10-19", backup: "Latest backup: pixelpals-2026-10-19-0330 (5 hours ago).", picks: [items[0]!, items[2]!, items[4]!], recent: ["A", "B"] });
+    expect(b.title).toBe("Good morning — Mon, Oct 19");
+    expect(b.body).toContain("Tonight's pick: Dune (2021) — in Plex");
+    expect(b.body).toContain("Or: Andor, Fargo (1996)");
+    expect(b.body).toContain("New in Plex: A, B");
+    expect(buildBrief({ day: "2026-10-19", picks: [items[1]!] }).body).toContain("not in Plex yet (/request it)");
+    expect(buildBrief({ day: "2026-10-19" }).body).toContain("Nothing to report");
+  });
+  it("has /brief", () => {
+    expect(parseSlash("/brief")).toEqual({ ok: true, action: { type: "brief", send: false } });
+    expect(parseSlash("/brief send")).toEqual({ ok: true, action: { type: "brief", send: true } });
+    expect(parseSlash("/backup now")).toEqual({ ok: true, action: { type: "backup", now: true } });
   });
 });

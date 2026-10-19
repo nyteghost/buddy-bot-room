@@ -120,6 +120,11 @@ export function startWatcher(): void {
   (w.timer as { unref?: () => void }).unref?.();
 }
 
+/** The watcher's latest finished check, or null if none yet (used by the morning brief). */
+export function unraidSnapshot(): UnraidStatus | null {
+  return watcher().state.last ?? null;
+}
+
 export async function handleUnraid(request: Request) {
   const cfg = unraidConfig();
   if (!cfg) return Response.json({ configured: false });

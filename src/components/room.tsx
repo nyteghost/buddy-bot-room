@@ -569,6 +569,7 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "brief": void briefCmd(command, action.send); return;
       case "backup": void backupCmd(command, action.now); return;
       case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
       case "trakt": void trakt(action.list, command, null); return;
@@ -675,6 +676,16 @@ export function Room() {
       return say(command, traktMarkdown(name, items));
     } catch {
       return say(command, "I couldn't reach the Trakt service.");
+    }
+  }
+  /** /brief previews the morning brief; /brief send pushes it to your phone. */
+  async function briefCmd(command: string, send: boolean) {
+    try {
+      const res = await fetch("/api/brief", { method: send ? "POST" : "GET" });
+      const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+      return say(command, json.text ?? json.error ?? "The brief failed.");
+    } catch {
+      return say(command, "I couldn't reach the brief service.");
     }
   }
   /** /backup shows the nightly backup status; /backup now makes one. */
