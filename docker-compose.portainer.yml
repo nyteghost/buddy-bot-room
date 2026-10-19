@@ -1,0 +1,19 @@
+# For Portainer: Stacks -> Add stack -> Repository, "Compose path" = docker-compose.portainer.yml
+# Settings come from the stack's "Environment variables" panel (no .env.local file needed):
+#   SEERR_URL, SEERR_API_KEY, SEARXNG_URL, BUDDY_PORT  (all optional)
+services:
+  buddy-bot:
+    build:
+      context: .
+      target: dev
+    image: buddy-bot-room:local
+    container_name: buddy-bot-room
+    restart: unless-stopped
+    ports:
+      - "${BUDDY_PORT:-8090}:8090"
+    environment:
+      SEARXNG_URL: ${SEARXNG_URL:-http://host.docker.internal:8081}
+      SEERR_URL: ${SEERR_URL:-}
+      SEERR_API_KEY: ${SEERR_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

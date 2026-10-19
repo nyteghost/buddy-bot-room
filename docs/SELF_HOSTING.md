@@ -31,6 +31,16 @@ your LAN.
 dev server. This project targets Cloudflare Workers by default, so treat this as untested until it works
 on your machine; fall back to the default `dev` target if it doesn't.
 
+## Portainer
+
+1. Portainer → **Stacks → Add stack → Repository**.
+2. Repository URL `https://github.com/nyteghost/buddy-bot-room`, reference `refs/heads/main`.
+   If the repo is private, switch on *Authentication* and use a GitHub personal access token.
+3. **Compose path:** `docker-compose.portainer.yml`
+4. Optional **Environment variables:** `SEERR_URL`, `SEERR_API_KEY`, `SEARXNG_URL`, `BUDDY_PORT`.
+5. **Deploy the stack**, then open `http://<host>:8090`. To update, open the stack and press
+   *Pull and redeploy* (turn on *Re-build image*).
+
 ## Without Docker
 
 ```bash
