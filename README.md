@@ -124,6 +124,12 @@ Your data lives in the `buddy-data` volume and survives updates.
 
 ---
 
+### Focus mode (calm, chat-only view)
+
+Click the expand icon in the header, type `/focus`, or press `Ctrl+Shift+F`. The pixel room, sidebar, tab bar and extra panels disappear, the chat fills the screen as a centred reading column with softer colours, no animation and no avatars, and the message box sits quietly at the bottom. It works the same on desktop and phone.
+
+Everything else is still one tap away: the **⋯ menu** (top right) holds engine settings, Record, Voice, Work tools, Accounts and the rest, and **Options** under the message box brings back the conversation mode and rounds. Leave with the same button, `/focus off` or `Ctrl+Shift+F`. It is remembered per device, so your phone and your PC can differ.
+
 ## 5. AI engines and API keys
 
 Open **Free keys** (or *AI engine*) in the top bar. Pick one engine or let **Auto** try several.
@@ -212,9 +218,10 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/voice [on\|off]` | Read replies aloud |
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
+| `/focus [on\|off]` | Focus mode: calm, chat-only view |
 | `/log` | Debug log |
 
-**Keyboard shortcuts:** `Ctrl+K` palette · `Ctrl+Shift+O` new chat · `Ctrl+Shift+L` debug log · `Ctrl+/` shortcut list · `Ctrl+B` sidebar · `Esc` stop (and silence voice).
+**Keyboard shortcuts:** `Ctrl+K` palette · `Ctrl+Shift+O` new chat · `Ctrl+Shift+F` focus mode · `Ctrl+Shift+L` debug log · `Ctrl+/` shortcut list · `Ctrl+B` sidebar · `Esc` stop (and silence voice).
 
 ---
 

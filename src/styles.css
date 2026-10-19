@@ -1859,3 +1859,66 @@ html, body { overscroll-behavior: none; }
   .workspace-sidebar { padding: 6px 4px; }
   .sidebar-item { height: 40px; }
 }
+
+/* ---- Focus mode: a calm, chat-only view (desktop and phone) ---- */
+.focus-options-btn { display: none; }
+.header-focus-btn { display: inline-flex; width: 40px; height: 40px; margin-left: auto; margin-right: 6px; }
+.app-shell.focus-mode {
+  --background: oklch(0.205 0.004 75);
+  --card: oklch(0.205 0.004 75);
+  --muted: oklch(0.245 0.004 75);
+  --secondary: oklch(0.26 0.005 75);
+  --accent: oklch(0.27 0.005 75);
+  --border: oklch(0.3 0.005 75);
+  --primary: oklch(0.74 0.07 55);
+  --muted-foreground: oklch(0.7 0.01 75);
+  background: var(--background);
+}
+.focus-mode, .focus-mode * { animation: none !important; transition: none !important; }
+/* Header: just the name, the focus toggle and a menu. */
+.focus-mode.modular-workspace .app-header { min-height: 48px; padding: max(6px, env(safe-area-inset-top)) 14px 6px; border-bottom: 0; background: transparent; position: relative; flex-wrap: nowrap; }
+.focus-mode .brand { font-size: 15px; opacity: .85; }
+.focus-mode .brand-icon, .focus-mode .brand-chat, .focus-mode .lab-badge { display: none; }
+.focus-mode .brand .text-primary { color: inherit; }
+.focus-mode .app-header .header-menu-btn { display: inline-flex; width: 40px; height: 40px; }
+.focus-mode.modular-workspace .header-right { display: none; position: absolute; z-index: 60; top: 100%; right: 10px; width: min(420px, calc(100% - 20px)); padding: 10px; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--workspace-shadow); max-height: calc(var(--vvh, 100dvh) - 80px); overflow: auto; grid-template-columns: 1fr 1fr; }
+.focus-mode.modular-workspace .header-right.header-open { display: grid; }
+.focus-mode .header-right .engine-trigger, .focus-mode .header-right .mobile-only { display: inline-flex; justify-content: flex-start; height: 44px; font-size: 13px; padding: 0 10px; }
+.focus-mode .header-right .theme-select, .focus-mode .header-right .assistant-toggle { grid-column: 1 / -1; width: 100%; min-width: 0; height: 44px; }
+/* Hide everything that isn't the conversation. */
+.focus-mode .workspace-sidebar, .focus-mode .mobile-strip, .focus-mode .window-room, .focus-mode .conversation-header, .focus-mode .conversation-footer, .focus-mode .window-conversation > .window-titlebar { display: none !important; }
+.focus-mode .workspace-frame { display: block; }
+.focus-mode .window-canvas { margin: 0; }
+.focus-mode .window-conversation { position: absolute; inset: 0; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.focus-mode .window-conversation .window-body { background: transparent; }
+.focus-mode .modular-workspace .conversation-panel, .focus-mode .conversation-panel { border: 0; background: transparent; }
+/* A calm reading column, like a document. */
+.focus-mode .chat-content { max-width: 760px; margin: 0 auto; padding: 18px 20px 28px; gap: 28px; width: 100%; }
+.focus-mode .room-message { gap: 0; }
+.focus-mode .message-avatar { display: none; }
+.focus-mode .message-heading { margin-bottom: 4px; }
+.focus-mode .message-heading b { color: var(--muted-foreground) !important; font-size: 12px; font-weight: 600; }
+.focus-mode .message-heading > span { display: none; }
+.focus-mode .message-heading > span.ml-auto { display: inline; }
+.focus-mode .room-message [data-streamdown], .focus-mode .room-message [data-streamdown] p { font-size: 16px; line-height: 1.7; }
+.focus-mode .room-message .user-message-content { background: var(--secondary); border-radius: 14px; padding: 10px 14px; width: auto; max-width: 85%; margin-left: auto; }
+.focus-mode .room-message.is-user .message-heading { display: none; }
+.focus-mode .verdict-message { border: 0; background: transparent; box-shadow: none; }
+.focus-mode .thinking-row .pixel-character, .focus-mode .scene-top { display: none; }
+.focus-mode .chat-empty .pixel-character, .focus-mode .empty-caption { display: none; }
+.focus-mode .chat-empty h3 { font-size: 24px; font-weight: 500; }
+/* Composer: one quiet box, options tucked away. */
+.focus-mode .workspace-composer { max-width: 800px; width: 100%; margin: 0 auto; border-top: 0; background: transparent; padding: 8px 16px max(14px, env(safe-area-inset-bottom)); grid-template-columns: minmax(0, 1fr) auto; }
+.focus-mode .workspace-composer .topic-section .section-heading { display: none; }
+.focus-mode .workspace-composer .topic-composer textarea { font-size: 16px; min-height: 52px; }
+.focus-mode .workspace-composer .topic-composer [data-slot="input-group"] { border-radius: 16px; background: var(--muted); border-color: var(--border); }
+.focus-mode:not(.focus-options) .workspace-composer .mode-row, .focus-mode:not(.focus-options) .workspace-composer .launch-controls > div { display: none; }
+.focus-mode .focus-options-btn { display: inline-block; grid-column: 1 / -1; justify-self: end; font-size: 11px; color: var(--muted-foreground); background: none; border: 0; padding: 2px 4px; min-height: 28px; order: 9; }
+.focus-mode .unraid-banner { font-size: 12px; padding: 6px 14px; }
+/* Phone: nothing but the chat; the ⋯ menu holds everything else. */
+@media (max-width: 700px) {
+  .focus-mode .workspace-frame { display: block; }
+  .focus-mode .workspace-stage { height: 100%; }
+  .focus-mode .chat-content { padding: 12px 14px 20px; }
+  .focus-mode .workspace-composer { padding: 6px 10px max(10px, env(safe-area-inset-bottom)); }
+}

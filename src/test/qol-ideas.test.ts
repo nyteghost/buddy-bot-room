@@ -1156,3 +1156,15 @@ describe("Local AI: hardware, recommendations and routing", () => {
     expect(p?.model).toBe("qwen2.5-coder:7b");
   });
 });
+
+describe("Focus mode", () => {
+  it("parses /focus", () => {
+    expect(parseSlash("/focus")).toEqual({ ok: true, action: { type: "focus", mode: "toggle" } });
+    expect(parseSlash("/focus on")).toEqual({ ok: true, action: { type: "focus", mode: "on" } });
+    expect(parseSlash("/calm off")).toEqual({ ok: true, action: { type: "focus", mode: "off" } });
+  });
+  it("has the Ctrl+Shift+F shortcut", () => {
+    expect(matchShortcut({ key: "F", ctrlKey: true, metaKey: false, shiftKey: true, altKey: false }, false, false)).toBe("focusMode");
+    expect(matchShortcut({ key: "f", ctrlKey: true, metaKey: false, shiftKey: false, altKey: false }, false, false)).toBeNull();
+  });
+});

@@ -32,6 +32,8 @@ import {
   Volume2,
   VolumeX,
   Ellipsis,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -186,6 +188,11 @@ export function Room() {
   const [topic, setTopic] = useState("");
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Focus mode: a calm, chat-only view. Saved per device (a phone and a desktop can differ).
+  const [focusMode, setFocusMode] = useState(false);
+  const [focusOptions, setFocusOptions] = useState(false);
+  useEffect(() => { try { setFocusMode(localStorage.getItem("pixel-pals-focus-v1") === "1"); } catch { /* optional storage */ } }, []);
+  useEffect(() => { try { localStorage.setItem("pixel-pals-focus-v1", focusMode ? "1" : "0"); } catch { /* optional storage */ } if (!focusMode) setFocusOptions(false); }, [focusMode]);
   // Phones: swipe right from the left edge opens saved chats.
   useEffect(() => {
     let sx = 0, sy = 0, edge = false;
@@ -620,6 +627,12 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "focus": {
+        const next = action.mode === "toggle" ? !focusMode : action.mode === "on";
+        setFocusMode(next);
+        if (next) setConversationOpen(true);
+        return say(command, next ? "Focus mode is on: just the chat. Use the Focus button or /focus off to bring everything back." : "Focus mode is off.");
+      }
       case "voice": {
         if (!canSpeak) return say(command, "This browser can't read aloud (no speech engine found).");
         const next = action.mode === "toggle" ? !voice.auto : action.mode === "on";
@@ -828,6 +841,7 @@ export function Room() {
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
+    { id: "focus", group: "View", label: focusMode ? "Leave focus mode" : "Focus mode (just the chat)", hint: "Ctrl+Shift+F", keywords: "calm minimal distraction fullscreen expand chat", run: () => runSlash({ type: "focus", mode: "toggle" }, "/focus") },
     { id: "voice", group: "Chat", label: voice.auto ? "Turn off reading replies aloud" : "Read replies aloud", keywords: "voice speak tts sound audio", run: () => runSlash({ type: "voice", mode: "toggle" }, "/voice") },
     { id: "watch", group: "Chat", label: "What should we watch tonight?", keywords: "plex movie show tv", run: () => void plex("", "/watch", "") },
     { id: "srv", group: "Chat", label: "Check my Unraid server", keywords: "server health status", run: () => void serverCheck("/server", false) },
@@ -841,8 +855,8 @@ export function Room() {
   ];
   const shortcutState = useRef({ running, dialogOpen: false });
   shortcutState.current = { running, dialogOpen: compareOpen || logOpen || paletteOpen || !!seerrQuery };
-  const actionsRef = useRef({ newChat, stop, palette: () => setPaletteOpen((v) => !v), focus: () => inputRef.current?.focus(), sidebar: () => setSidebarCompact((v) => !v), log: () => setLogOpen(true) });
-  actionsRef.current = { newChat, stop, palette: () => setPaletteOpen((v) => !v), focus: () => inputRef.current?.focus(), sidebar: () => setSidebarCompact((v) => !v), log: () => setLogOpen(true) };
+  const actionsRef = useRef({ newChat, stop, palette: () => setPaletteOpen((v) => !v), focus: () => inputRef.current?.focus(), sidebar: () => setSidebarCompact((v) => !v), log: () => setLogOpen(true), focusMode: () => setFocusMode((v) => !v) });
+  actionsRef.current = { newChat, stop, palette: () => setPaletteOpen((v) => !v), focus: () => inputRef.current?.focus(), sidebar: () => setSidebarCompact((v) => !v), log: () => setLogOpen(true), focusMode: () => setFocusMode((v) => !v) };
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       const action = matchShortcut(e, shortcutState.current.running, shortcutState.current.dialogOpen);
@@ -854,6 +868,7 @@ export function Room() {
       else if (action === "focusComposer") a.focus();
       else if (action === "toggleSidebar") a.sidebar();
       else if (action === "debugLog") a.log();
+      else if (action === "focusMode") a.focusMode();
       else a.stop();
     };
     window.addEventListener("keydown", onKey);
@@ -899,7 +914,7 @@ export function Room() {
     running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
   const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
   return (
-    <div className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed")}>
+    <div className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
         <a href="/" className="brand">
           <span className="brand-icon">
@@ -910,6 +925,7 @@ export function Room() {
             <span className="brand-chat"> / chat</span>
           </span>
         </a>
+        <Button variant="ghost" size="icon" className="header-focus-btn" aria-label={focusMode ? "Leave focus mode" : "Focus mode"} aria-pressed={focusMode} title={focusMode ? "Leave focus mode (Ctrl+Shift+F)" : "Focus mode: just the chat (Ctrl+Shift+F)"} onClick={() => setFocusMode((v) => !v)}>{focusMode ? <Minimize2 /> : <Maximize2 />}</Button>
         <Button variant="ghost" size="icon" className="header-menu-btn" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Ellipsis /></Button>
         <div
           className={cn("header-right", menuOpen && "header-open")}
@@ -1392,6 +1408,7 @@ export function Room() {
             {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && !notesOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
           </main>
           <section className="workspace-composer" aria-label="Message composer">
+            <button type="button" className="focus-options-btn" aria-expanded={focusOptions} onClick={() => setFocusOptions((v) => !v)}>{focusOptions ? "Hide options" : "Options"}</button>
           <div className="mode-row">
             <span className="control-label">CONVERSATION MODE</span>
             <div className="mode-switch">
