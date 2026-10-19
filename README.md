@@ -162,6 +162,10 @@ Compare models only uses the free keys, so it never spends Claude credit.
 
 ### Setting up Ollama
 
+**Portainer stack:** Ollama is already included in `docker-compose.portainer.yml`. After deploying, a one-time helper downloads the models in `OLLAMA_MODELS` (default `qwen2.5:7b`; use a space-separated list for more). In Pixel Pals → engine settings choose **Ollama** and set the address to `http://<this-machine>:11434/v1` (your browser calls it directly, so use an address your phone or PC can reach). It runs on CPU by default; with the NVIDIA Container Toolkit installed on the host, set `OLLAMA_RUNTIME=nvidia` to use the GPU. `OLLAMA_PORT` changes the port. Models are kept in the `ollama-models` volume.
+
+**Already running Ollama elsewhere, or not using Portainer:**
+
 ```sh
 OLLAMA_ORIGINS="*" OLLAMA_HOST=0.0.0.0 ollama serve
 ollama pull qwen2.5-coder:7b

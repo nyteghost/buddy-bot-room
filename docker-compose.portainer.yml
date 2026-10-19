@@ -2,7 +2,9 @@
 # Settings come from the stack's "Environment variables" panel (no .env.local file needed):
 #   SEERR_URL, SEERR_API_KEY, SEARXNG_URL, BUDDY_PORT, BUDDY_PASSWORD,
 #   JELLYFIN_URL, JELLYFIN_API_KEY, JELLYFIN_PUBLIC_URL,
-#   PLEX_URL, PLEX_TOKEN, BUDDY_ACCOUNTS, TRAKT_CLIENT_ID, TRAKT_USER, TRAKT_LIST, TRAKT_ACCESS_TOKEN, UNRAID_URL, UNRAID_API_KEY, UNRAID_CHECK_SECONDS, NTFY_URL, BUDDY_TZ, BRIEF_TIME, BUDDY_BACKUP_PATH, BUDDY_BACKUP_TIME, BUDDY_BACKUP_KEEP  (all optional)
+#   PLEX_URL, PLEX_TOKEN, BUDDY_ACCOUNTS, TRAKT_CLIENT_ID, TRAKT_USER, TRAKT_LIST, TRAKT_ACCESS_TOKEN, UNRAID_URL, UNRAID_API_KEY, UNRAID_CHECK_SECONDS, NTFY_URL, BUDDY_TZ, BRIEF_TIME, BUDDY_BACKUP_PATH, BUDDY_BACKUP_TIME, BUDDY_BACKUP_KEEP, OLLAMA_PORT, OLLAMA_MODELS, OLLAMA_RUNTIME  (all optional)
+# Ollama is included in this stack. It starts on CPU; for an NVIDIA GPU set OLLAMA_RUNTIME=nvidia (needs the NVIDIA Container Toolkit on the host).
+# In Pixel Pals' engine settings use the Ollama address  http://<this-machine>:11434/v1  (your browser calls it directly).
 services:
   buddy-bot:
     build:
@@ -51,6 +53,34 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: buddy-ollama
+    restart: unless-stopped
+    runtime: ${OLLAMA_RUNTIME:-runc}   # set OLLAMA_RUNTIME=nvidia to use an NVIDIA GPU
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_ORIGINS: "*"   # Pixel Pals calls Ollama from your browser
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - ollama-models:/root/.ollama
+
+  # One-shot helper: downloads the models in OLLAMA_MODELS (space separated) the first time, then exits.
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: buddy-ollama-pull
+    restart: "no"
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      MODELS: ${OLLAMA_MODELS:-qwen2.5:7b}
+    entrypoint: ["/bin/sh", "-c", "until ollama list >/dev/null 2>&1; do sleep 2; done; for m in $$MODELS; do ollama pull $$m; done"]
+
 volumes:
   buddy-backups:
   buddy-data:
+  ollama-models:
