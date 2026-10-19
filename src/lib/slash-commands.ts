@@ -29,6 +29,8 @@ export type SlashAction =
   | { type: "log" }
   | { type: "library"; query: string }
   | { type: "roll"; expr: string }
+  | { type: "server" }
+  | { type: "diagnose" }
   | { type: "dm"; sub: "start" | "end" | "status" | "character" | "fact" | "unfact"; text: string; n?: number };
 export type SlashResult = { ok: true; action: SlashAction } | { ok: false; error: string };
 
@@ -81,6 +83,8 @@ export const slashCommands = [
   { name: "tasks", usage: "/tasks", description: "Open notes, memories and to-dos" },
   { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
+  { name: "server", usage: "/server", description: "Check your Unraid server now" },
+  { name: "diagnose", usage: "/diagnose", description: "What's wrong with my server? The pals look at Unraid and advise" },
   { name: "dm", usage: "/dm start <premise>", description: "Dungeon Master mode: start, end, status, character, fact" },
   { name: "roll", usage: "/roll <2d6+3|d20 adv>", description: "Roll dice" },
   { name: "library", usage: "/library <title|recent>", description: "Look in your Jellyfin library (needs JELLYFIN_URL)" },
@@ -161,6 +165,10 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "search", query: rawArg } } : fail("What should I search for? /search best 4k projector");
     case "research":
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
+    case "server": case "unraid":
+      return { ok: true, action: { type: "server" } };
+    case "diagnose": case "whatswrong":
+      return { ok: true, action: { type: "diagnose" } };
     case "roll": case "r": case "dice": {
       const expr = rawArg || "d20";
       const d = parseDice(expr);

@@ -126,6 +126,8 @@ import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
 import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign, type DmRole } from "@/lib/campaign";
 import { parseDice, rollDice, secureRng } from "@/lib/dice";
+import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/lib/unraid";
+import { UnraidBanner } from "./unraid-banner";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
 import { addEntry, addTodo, clearDone, getWorkbench, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
@@ -563,6 +565,8 @@ export function Room() {
       case "tasks": setNotesOpen(true); return;
       case "log": setLogOpen(true); return;
       case "library": void library(action.query, command); return;
+      case "server": void serverCheck(command, false); return;
+      case "diagnose": void serverCheck(command, true); return;
       case "roll": {
         const spec = parseDice(action.expr);
         if (!spec.ok) return say(command, spec.error);
@@ -636,6 +640,20 @@ export function Room() {
       return say(command, "I couldn't reach the library service.");
     }
   }
+  /** /server shows Unraid's health; /diagnose also hands it to the pals to reason about. */
+  async function serverCheck(command: string, discuss: boolean) {
+    try {
+      const res = await fetch("/api/unraid?refresh=1");
+      const json = (await res.json().catch(() => null)) as UnraidReply | null;
+      if (!res.ok || !json) return say(command, "I couldn't ask the server about Unraid.");
+      if (!json.configured) return say(command, NOT_SET_UP);
+      if (!json.status) return say(command, "No check has finished yet. Try again in a few seconds.");
+      if (discuss) return void start(undefined, diagnoseTopic(json.status));
+      return say(command, statusMarkdown(json.status));
+    } catch {
+      return say(command, "I couldn't reach the Pixel Pals server to check Unraid.");
+    }
+  }
   /** Re-run the last question: drop the replies after it and ask again. */
   function regenerate() {
     if (running) return;
@@ -693,6 +711,8 @@ export function Room() {
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
+    { id: "srv", group: "Chat", label: "Check my Unraid server", keywords: "server health status", run: () => void serverCheck("/server", false) },
+    { id: "srv-why", group: "Chat", label: "What's wrong with my server? (pals diagnose)", keywords: "unraid diagnose", run: () => void serverCheck("/diagnose", true) },
     { id: "log", group: "Help", label: "Debug log (copy for Claude)", hint: "Ctrl+Shift+L", keywords: "bug error report", run: () => setLogOpen(true) },
     { id: "help", group: "Help", label: "List slash commands", run: () => say("/help", helpText()) },
     { id: "keys", group: "Help", label: "Keyboard shortcuts", run: () => say("/shortcuts", "Keyboard shortcuts:\n" + shortcutList.map((k) => `• \`${k.keys}\` — ${k.label}`).join("\n")) },
@@ -830,6 +850,7 @@ export function Room() {
           </Dialog>
         </div>
       </header>
+      <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void importSettings(e.target.files?.[0]); e.target.value = ""; }} />
       <DebugLogDialog open={logOpen} onOpenChange={setLogOpen} context={[`engine: ${engine.kind}${engine.kind.includes("ollama") ? ` (${engine.ollamaUrl} · ${engine.ollamaModel})` : ""}`, `theme: ${characterMode} · mode: ${mode} · rounds: ${rounds}`, `messages in chat: ${messages.length}`, `last error shown: ${error || "none"}`]} />

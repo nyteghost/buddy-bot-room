@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { isAbortError } from "./lib/ai/stream-errors.server";
 import { gate } from "./lib/gate.server";
+import { startWatcher } from "./lib/unraid.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -54,6 +55,7 @@ export default {
       if (url.pathname === "/__health") return new Response("ok");
       const stopped = await gate(request, typeof process !== "undefined" ? process.env["BUDDY_PASSWORD"] : undefined);
       if (stopped) return stopped;
+      if (typeof process !== "undefined" && process.env["UNRAID_URL"]) startWatcher();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

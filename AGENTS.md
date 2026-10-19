@@ -35,3 +35,4 @@
 - Anything copyable into a bug report goes through redact() (src/lib/redact.ts); never log API keys, passwords or request bodies.
 - Jellyfin address/key come only from server environment variables (jellyfin.server.ts), like Seerr.
 - Dungeon Master mode (src/lib/campaign.ts, dice.ts): while a campaign is active the first seated pal is the DM and the rest are party members, one pass per player action; the browser sends `campaign: {role, context}` and chat.server.ts swaps in the DM/party task. Dice are rolled in the browser with crypto randomness and the last few rolls go to the DM as context, so pals never invent rolls. Campaign state is browser-only.
+- Unraid (src/lib/unraid.ts pure, unraid.server.ts I/O): read-only. The address, API key and ntfy URL come only from server env vars and never reach the browser or logs; a down alert needs two failed checks in a row; the watcher state lives on globalThis so the Vite plugin and routes share it.

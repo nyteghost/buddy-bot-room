@@ -16,6 +16,7 @@ import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
+import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch, nextWatch, problemsOf, shapeContainers, shapeDisks, shapeUptime, statusMarkdown } from "@/lib/unraid";
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
@@ -472,5 +473,103 @@ describe("dm and roll commands", () => {
   });
   it("rejects missing arguments", () => {
     for (const bad of ["/dm start", "/dm character", "/dm fact", "/dm forget", "/dm forget x", "/dm dance"]) expect(parseSlash(bad)).toMatchObject({ ok: false });
+  });
+});
+
+describe("unraid shaping", () => {
+  it("reads disks across parity, data and cache and ignores unnamed ones", () => {
+    const r = shapeDisks({ array: { state: "STARTED", parities: [{ name: "parity", status: "DISK_OK", temp: 34 }], disks: [{ name: "disk1", status: "DISK_OK", temp: 0 }, { status: "DISK_OK" }], caches: [{ name: "cache", status: "DISK_DSBL", temp: 41 }] } });
+    expect(r.state).toBe("STARTED");
+    expect(r.disks).toEqual([{ name: "parity", status: "DISK_OK", tempC: 34 }, { name: "disk1", status: "DISK_OK" }, { name: "cache", status: "DISK_DSBL", tempC: 41 }]);
+    expect(shapeDisks(null)).toEqual({ disks: [] });
+  });
+  it("reads containers from either API shape", () => {
+    const a = shapeContainers({ dockerContainers: [{ names: ["/plex"], state: "RUNNING", autoStart: true }, { names: ["deluge"], state: "EXITED", autoStart: false }] });
+    expect(a).toEqual([{ name: "plex", state: "running", autoStart: true }, { name: "deluge", state: "exited", autoStart: false }]);
+    expect(shapeContainers({ docker: { containers: [{ names: ["/sonarr"], state: "paused" }] } })).toEqual([{ name: "sonarr", state: "paused" }]);
+    expect(shapeContainers({})).toEqual([]);
+  });
+  it("reads uptime as seconds or a boot time, and ignores nonsense", () => {
+    expect(shapeUptime({ info: { os: { uptime: 3600 } } })).toBe(3600);
+    const boot = new Date(Date.now() - 7200_000).toISOString();
+    expect(Math.abs((shapeUptime({ info: { os: { uptime: boot } } }) ?? 0) - 7200) < 5).toBe(true);
+    expect(shapeUptime({ info: { os: { uptime: "soon" } } })).toBe(undefined);
+    expect(shapeUptime(null)).toBe(undefined);
+  });
+});
+
+describe("unraid problems", () => {
+  it("is quiet when all is well", () => expect(problemsOf({ arrayState: "STARTED", disks: [{ name: "d1", status: "DISK_OK", tempC: 38 }, { name: "d2", status: "DISK_NP" }], containers: [{ name: "plex", state: "running", autoStart: true }, { name: "x", state: "exited", autoStart: false }] })).toEqual([]));
+  it("flags a stopped array, bad disks, heat and dead auto-start containers", () => {
+    const p = problemsOf({ arrayState: "STOPPED", disks: [{ name: "d1", status: "DISK_DSBL" }, { name: "d2", status: "DISK_OK", tempC: 52 }, { name: "d3", status: "DISK_OK", tempC: 63 }], containers: [{ name: "plex", state: "exited", autoStart: true }] });
+    expect(p.length).toBe(5);
+    expect(p.join(" ")).toContain("not started");
+    expect(p.join(" ")).toContain("very hot");
+    expect(p.join(" ")).toContain("running warm");
+    expect(p.join(" ")).toContain("auto-start");
+  });
+  it("an unreachable server has no disk problems to report", () => expect(buildStatus({ now: 1, reachable: false }).problems).toEqual([]));
+  it("writes readable summaries", () => {
+    expect(statusMarkdown(buildStatus({ now: 1, reachable: false }))).toContain("unreachable");
+    const ok = buildStatus({ now: 1, reachable: true, apiOk: true, disks: { state: "STARTED", disks: [{ name: "d1", status: "DISK_OK", tempC: 30 }] }, containers: [{ name: "a", state: "running" }], uptimeSeconds: 90000 });
+    expect(statusMarkdown(ok)).toContain("healthy");
+    expect(statusMarkdown(ok)).toContain("1/1 containers running");
+    expect(statusMarkdown(ok)).toContain("up 1d 1h");
+    expect(statusMarkdown(buildStatus({ now: 1, reachable: true, apiOk: false }))).toContain("rejected the key");
+    expect(diagnoseTopic(buildStatus({ now: 1, reachable: false }))).toContain("NOT reachable");
+  });
+});
+
+describe("unraid watcher state machine", () => {
+  const up = (t: number, problems: string[] = []) => ({ ...buildStatus({ now: t, reachable: true }), problems });
+  const down = (t: number) => buildStatus({ now: t, reachable: false });
+  it("needs two failed checks before saying down, then alerts once", () => {
+    expect(FAILS_BEFORE_DOWN).toBe(2);
+    let r = nextWatch(initialWatch, up(0));
+    expect(r.events).toEqual([]);
+    r = nextWatch(r.state, down(60_000));
+    expect(r.events).toEqual([]);
+    expect(r.state.phase).toBe("up");
+    r = nextWatch(r.state, down(120_000));
+    expect(r.events).toEqual([{ type: "down", since: 120_000 }]);
+    r = nextWatch(r.state, down(180_000));
+    expect(r.events).toEqual([]);
+    expect(r.state.downSince).toBe(120_000);
+  });
+  it("a single blip does not alert and resets the count", () => {
+    let r = nextWatch(initialWatch, up(0));
+    r = nextWatch(r.state, down(1));
+    r = nextWatch(r.state, up(2));
+    expect(r.events).toEqual([]);
+    expect(r.state.fails).toBe(0);
+    r = nextWatch(r.state, down(3));
+    expect(r.events).toEqual([]);
+  });
+  it("says back with how long it was down", () => {
+    let r = nextWatch(initialWatch, down(0));
+    r = nextWatch(r.state, down(60_000));
+    r = nextWatch(r.state, up(360_000));
+    expect(r.events).toEqual([{ type: "up", downFor: 300 }]);
+    expect(r.state.phase).toBe("up");
+  });
+  it("alerts on new problems once, and when they clear", () => {
+    let r = nextWatch(initialWatch, up(0, ["Disk d1 reports DISK_DSBL."]));
+    expect(r.events).toEqual([{ type: "problems", problems: ["Disk d1 reports DISK_DSBL."] }]);
+    r = nextWatch(r.state, up(60, ["Disk d1 reports DISK_DSBL."]));
+    expect(r.events).toEqual([]);
+    r = nextWatch(r.state, up(120, ["Disk d1 reports DISK_DSBL.", "Disk d2 is very hot (61°C)."]));
+    expect(r.events.length).toBe(1);
+    r = nextWatch(r.state, up(180));
+    expect(r.events).toEqual([{ type: "cleared" }]);
+  });
+  it("describes events for notifications", () => {
+    expect(eventText({ type: "down", since: 0 }).priority).toBe("urgent");
+    expect(eventText({ type: "up", downFor: 300 }).body).toContain("5m");
+    expect(eventText({ type: "problems", problems: ["a", "b"] }).body).toBe("a b");
+  });
+  it("has /server and /diagnose commands", () => {
+    expect(parseSlash("/server")).toEqual({ ok: true, action: { type: "server" } });
+    expect(parseSlash("/diagnose")).toEqual({ ok: true, action: { type: "diagnose" } });
+    expect(parseSlash("/whatswrong")).toEqual({ ok: true, action: { type: "diagnose" } });
   });
 });

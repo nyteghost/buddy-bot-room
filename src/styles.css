@@ -1792,3 +1792,9 @@ h1 {
   .slash-menu { max-height: 30vh; overflow: auto; }
   .debug-text { height: 42vh; }
 }
+
+/* Unraid status banner */
+.unraid-banner { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; padding: 8px 16px; font-size: 13px; }
+.unraid-down { background: #7f1d1d; color: #fff; }
+.unraid-warn { background: #78350f; color: #fff; }
+.unraid-actions { display: flex; gap: 6px; flex-wrap: wrap; }

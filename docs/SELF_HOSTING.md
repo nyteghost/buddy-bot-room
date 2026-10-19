@@ -74,3 +74,14 @@ The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Docke
 ## Dungeon Master mode
 
 `/dm start <premise>` begins a campaign: the first pal in the room narrates, the others are your party, and you just say what you do. `/roll d20`, `/roll 2d6+3` and `/roll d20 adv` roll real dice (a natural 20 throws confetti) and the DM sees your recent rolls. `/dm character <text>` and `/dm fact <text>` keep details the story must not forget; `/dm status` shows them and `/dm end` goes back to normal discussions. The same controls are in the Notes & tasks window.
+
+## Unraid watcher
+
+Set `UNRAID_URL` (for example `http://10.200.1.30`) and `UNRAID_API_KEY` (Unraid → Settings → Management Access → API Keys; a read-only key is enough) in the stack's environment variables, then redeploy. The server checks Unraid every `UNRAID_CHECK_SECONDS` (default 60) and:
+
+- shows a **red banner** when it can't reach Unraid (after two failed checks in a row, so one blip doesn't alarm you) and an **amber banner** for warnings (array not started, a disk that isn't OK or is running hot, an auto-start container that isn't running);
+- sends a **browser notification** when that changes (click *Enable notifications* on the banner once; browsers only allow this on HTTPS or localhost);
+- sends a **phone push** if `NTFY_URL` is set. Install the free ntfy app, subscribe to a long random topic, and set `NTFY_URL=https://ntfy.sh/<that topic>`;
+- writes each change to the server log (see the Debug log).
+
+`/server` shows the current status and `/diagnose` (or the banner's *What's wrong?* button) hands the facts to the pals for advice. Everything is read-only. It can't watch while the Pixel Pals box itself is down. If your Unraid version has no API or the key is rejected, the watcher still tells you whether the server answers at all.
