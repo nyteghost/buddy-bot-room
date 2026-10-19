@@ -162,9 +162,18 @@ Compare models only uses the free keys, so it never spends Claude credit.
 
 ### Setting up Ollama
 
-**Portainer stack:** Ollama is already included in `docker-compose.portainer.yml`. After deploying, a one-time helper downloads the models in `OLLAMA_MODELS` (default `qwen2.5:7b`; use a space-separated list for more). In Pixel Pals → engine settings choose **Ollama** and set the address to `http://<this-machine>:11434/v1` (your browser calls it directly, so use an address your phone or PC can reach). It runs on CPU by default; with the NVIDIA Container Toolkit installed on the host, set `OLLAMA_RUNTIME=nvidia` to use the GPU. `OLLAMA_PORT` changes the port. Models are kept in the `ollama-models` volume.
+**Portainer stack (Local AI, recommended):** Ollama is included in `docker-compose.portainer.yml`, and Pixel Pals talks to it from the server, so there is no address to type and no HTTPS problem. Choose the engine **Local AI (this server)** in the engine settings. The panel there:
 
-**Already running Ollama elsewhere, or not using Portainer:**
+- shows what it found: **CPU, RAM and GPU** (the GPU needs `OLLAMA_RUNTIME=nvidia` on the stack plus the NVIDIA Container Toolkit on the host; otherwise set `LOCAL_VRAM_GB` to your card's memory, or it assumes CPU);
+- **suggests the best model per task** that fits your hardware, with a **Download** button that shows progress. Suggestions are chosen by memory: the largest model per task that fits your GPU's VRAM (or a conservative slice of RAM on CPU). The catalogue is a fixed list of well-known Ollama models, so check the Ollama library for newer ones; use **More models** for anything else in the list;
+- lets you pick a **model per task**: *Chat* (default), *Code* (messages that look like programming), *Reasoning* (Problem-solving mode and step-by-step questions) and *Quick replies* (very short messages). With **Choose automatically** on, each message is routed by what it looks like; turn it off to always use the Chat model. Tasks you leave as "Same as Chat" use the Chat model;
+- lists installed models with a remove button.
+
+First-start models come from `OLLAMA_MODELS` (default `qwen2.5:7b`; space-separated list for more). `OLLAMA_PORT` changes the published port, which you only need if something outside the stack wants to reach Ollama. Switching models makes the first reply after a switch slower, because it has to load.
+
+**Pointing at another Ollama:** set `OLLAMA_URL` (for example `http://10.200.1.40:11434`) and use the same engine.
+
+**Direct from the browser (older method):** the **Ollama** engine calls Ollama from your browser, so its address must be reachable from the device you browse on:
 
 ```sh
 OLLAMA_ORIGINS="*" OLLAMA_HOST=0.0.0.0 ollama serve
@@ -479,6 +488,11 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `BUDDY_BACKUP_PATH` | volume `buddy-backups` | Host folder for backups |
 | `BUDDY_BACKUP_TIME` | `03:30` | Nightly backup time |
 | `BUDDY_BACKUP_KEEP` | `14` | Copies to keep |
+| `OLLAMA_URL` | `http://ollama:11434` (Portainer stack) | Ollama used by the Local AI engine; empty turns it off |
+| `OLLAMA_MODELS` | `qwen2.5:7b` | Models downloaded on first start |
+| `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
+| `OLLAMA_PORT` | `11434` | Published Ollama port |
+| `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 
 Internal (set by the Docker image/compose, rarely changed): `BUDDY_SELF_HOSTED=1`, `BUDDY_DATA_DIR=/data`, `BUDDY_BACKUP_DIR=/backups`.
 

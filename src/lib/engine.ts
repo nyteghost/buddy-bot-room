@@ -1,12 +1,13 @@
 import { useSyncExternalStore } from "react";
+import { pickModel, type RouteHint } from "./model-catalog";
 
 /** Which brain powers the pals. All options are free: "cloud" shares every entered free key, "local" runs in the browser. */
-export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama";
+export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama" | "local-server";
 export type ReplyLength = "short" | "medium" | "long";
 export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 800, long: 1500 };
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 /** Claude is a PAID provider, so it is never part of the free rotation unless the user opts in. */
-export type TurnProvider = { kind: FreeProvider | "anthropic"; apiKey: string; model?: string };
+export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server"; apiKey: string; model?: string; maxTokens?: number };
 export type ClaudeMode = "off" | "share" | "only";
 export const CLAUDE_MODELS = [
   { id: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)", price: "$0.10 in / $0.50 out per 1M tokens" },
@@ -21,6 +22,12 @@ export type EngineSettings = {
   openrouterKey: string;
   nvidiaKey: string;
   /** Paid. Used only when claudeMode is not "off". */
+  localChat: string;
+  localCode: string;
+  localReasoning: string;
+  localFast: string;
+  /** Pick the Code / Reasoning / Quick model automatically from what each message looks like. */
+  localAuto: boolean;
   anthropicKey: string;
   claudeMode: ClaudeMode;
   claudeModel: string;
@@ -37,6 +44,11 @@ const fallback: EngineSettings = {
   geminiKey: "",
   openrouterKey: "",
   nvidiaKey: "",
+  localChat: "qwen2.5:7b",
+  localCode: "",
+  localReasoning: "",
+  localFast: "",
+  localAuto: true,
   anthropicKey: "",
   claudeMode: "off",
   claudeModel: DEFAULT_CLAUDE_MODEL,
@@ -49,7 +61,7 @@ let cache: EngineSettings | null = null;
 
 /** Older saves used "lovable", "groq" or "gemini"; they all become the shared free cloud mode. */
 export function normalizeKind(kind: unknown): EngineKind {
-  return kind === "local" || kind === "auto" || kind === "ollama" || kind === "auto-ollama" ? kind : "cloud";
+  return kind === "local" || kind === "auto" || kind === "ollama" || kind === "auto-ollama" || kind === "local-server" ? kind : "cloud";
 }
 
 function read(): EngineSettings {
@@ -106,7 +118,13 @@ export function turnProviders(s: EngineSettings): TurnProvider[] {
   return claude ? [...availableProviders(s), claude] : availableProviders(s);
 }
 
-export function providerForTurn(s: EngineSettings, turnIndex: number): TurnProvider | undefined {
+/** The model on the Ollama inside the stack, chosen per task when routing is on. */
+export function localServerProvider(s: EngineSettings, hint: RouteHint = {}): TurnProvider {
+  return { kind: "ollama-server", apiKey: "", model: pickModel(s, hint), maxTokens: replyTokens[s.replyLength] };
+}
+
+export function providerForTurn(s: EngineSettings, turnIndex: number, hint: RouteHint = {}): TurnProvider | undefined {
+  if (s.kind === "local-server") return localServerProvider(s, hint);
   const list = turnProviders(s);
   return list.length ? list[turnIndex % list.length] : undefined;
 }

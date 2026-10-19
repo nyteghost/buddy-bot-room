@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiOllamaRouteImport } from './routes/api.ollama'
 import { Route as ApiKeytestRouteImport } from './routes/api.keytest'
 import { Route as ApiBriefRouteImport } from './routes/api.brief'
 import { Route as ApiBackupRouteImport } from './routes/api.backup'
@@ -52,6 +53,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOllamaRoute = ApiOllamaRouteImport.update({
+  id: '/api/ollama',
+  path: '/api/ollama',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiKeytestRoute = ApiKeytestRouteImport.update({
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/ollama': typeof ApiOllamaRoute
   '/api/keytest': typeof ApiKeytestRoute
   '/api/brief': typeof ApiBriefRoute
   '/api/backup': typeof ApiBackupRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/ollama': typeof ApiOllamaRoute
   '/api/keytest': typeof ApiKeytestRoute
   '/api/brief': typeof ApiBriefRoute
   '/api/backup': typeof ApiBackupRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/ollama': typeof ApiOllamaRoute
   '/api/keytest': typeof ApiKeytestRoute
   '/api/brief': typeof ApiBriefRoute
   '/api/backup': typeof ApiBackupRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/ollama'
     | '/api/keytest'
     | '/api/brief'
     | '/api/backup'
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/ollama'
     | '/api/keytest'
     | '/api/brief'
     | '/api/backup'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/ollama'
     | '/api/keytest'
     | '/api/brief'
     | '/api/backup'
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiOllamaRoute: typeof ApiOllamaRoute
   ApiKeytestRoute: typeof ApiKeytestRoute
   ApiBriefRoute: typeof ApiBriefRoute
   ApiBackupRoute: typeof ApiBackupRoute
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ollama': {
+      id: '/api/ollama'
+      path: '/api/ollama'
+      fullPath: '/api/ollama'
+      preLoaderRoute: typeof ApiOllamaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/keytest': {
@@ -421,6 +441,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiOllamaRoute: ApiOllamaRoute,
   ApiKeytestRoute: ApiKeytestRoute,
   ApiBriefRoute: ApiBriefRoute,
   ApiBackupRoute: ApiBackupRoute,

@@ -25,11 +25,13 @@ import {
 import { cn } from "@/lib/utils";
 import { localModelChoices } from "@/lib/gpu-tier";
 import { FreeKeysWizard } from "@/components/free-keys-wizard";
+import { LocalAiPanel } from "@/components/local-ai-panel";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
   { kind: "auto", label: "Auto (fastest)", note: "Free keys answer first (about 40× faster); the in-browser model takes over if a key hits its limit." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once, then loads from cache." },
+  { kind: "local-server", label: "Local AI (this server)", note: "Uses the Ollama in your Pixel Pals stack. Nothing to type: models are chosen per task and downloaded from here." },
   { kind: "ollama", label: "Local server / Ollama", note: "Uses Ollama or llama.cpp on your computer for full native GPU speed." },
   { kind: "auto-ollama", label: "Auto (keys + Ollama)", note: "Free keys answer first; your local Ollama server takes over if a key hits its limit or none are set." },
 ];
@@ -160,6 +162,7 @@ export function EngineSettingsDialog() {
             </p>
           </div>
         )}
+        {engine.kind === "local-server" && <LocalAiPanel />}
         {(engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3">
             <FreeKeysWizard />

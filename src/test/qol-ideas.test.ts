@@ -12,6 +12,8 @@ import { chunkText, docContext, isReadableDoc, retrieve, tokenize } from "@/lib/
 import { planAdd } from "@/lib/documents";
 import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
 import { notesSyncUrl, shareSheetUrl, bearerHeader, isSecure, notesSteps, shareSteps } from "@/lib/iphone-setup";
+import { parseNvidiaSmi, modelBudgetGb, describeHardware } from "@/lib/hardware";
+import { CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
 import { providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
@@ -38,7 +40,7 @@ import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch,
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
-const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
+const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
 
 describe("context trimming", () => {
   const msgs = (n: number, len: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: "x".repeat(len) }));
@@ -1092,5 +1094,59 @@ describe("Connect iPhone helper", () => {
     expect(send?.copy?.map((c) => c.value)).toContain("Bearer pp_t");
     expect(notesSteps("u", "", "").find((s) => s.copy)?.copy?.[1]?.value).toContain("create your token");
     expect(shareSteps("https://x/?q=").some((s) => s.copy?.[0]?.value === "https://x/?q=")).toBe(true);
+  });
+});
+
+describe("Local AI: hardware, recommendations and routing", () => {
+  const gpu3080 = { cpu: "Ryzen 7", cores: 16, ramGb: 32, gpus: [{ name: "RTX 3080", vramGb: 10 }], gpuSource: "nvidia-smi" as const };
+  const cpuOnly = { cpu: "Intel i5", cores: 8, ramGb: 16, gpus: [], gpuSource: "none" as const };
+  it("reads nvidia-smi output", () => {
+    expect(parseNvidiaSmi("NVIDIA GeForce RTX 3080, 10240\n")).toEqual([{ name: "NVIDIA GeForce RTX 3080", vramGb: 10 }]);
+    expect(parseNvidiaSmi("garbage")).toEqual([]);
+  });
+  it("budgets VRAM when a GPU exists, otherwise a slice of RAM", () => {
+    expect(modelBudgetGb(gpu3080)).toEqual({ gb: 10, onGpu: true });
+    expect(modelBudgetGb(cpuOnly)).toEqual({ gb: 6, onGpu: false });
+    expect(describeHardware(cpuOnly)).toContain("no GPU");
+  });
+  it("recommends models that fit a 10 GB GPU, one per task", () => {
+    const rec = recommend(gpu3080);
+    const by = Object.fromEntries(rec.map((r) => [r.task, r.model.id]));
+    expect(by["chat"]).toBe("gemma2:9b");
+    expect(by["code"]).toBe("qwen2.5-coder:7b");
+    for (const r of rec) expect(needGb(r.model) <= 10).toBe(true);
+    expect(rec.length).toBe(4);
+  });
+  it("recommends small models on a CPU-only machine", () => {
+    for (const r of recommend(cpuOnly)) expect(r.model.gb <= 5).toBe(true);
+  });
+  it("reports fit honestly", () => {
+    const big = CATALOG.find((m) => m.id === "llama3.3:70b")!;
+    expect(fitFor(big, gpu3080)).toBe("no");
+    const mid = CATALOG.find((m) => m.id === "qwen2.5:14b")!;
+    expect(fitFor(mid, gpu3080)).toBe("cpu");
+  });
+  it("routes by task", () => {
+    expect(pickTask({ text: "why is my python function throwing an exception?" })).toBe("code");
+    expect(pickTask({ mode: "solve", text: "What should we do about the budget for the next quarter please" })).toBe("reasoning");
+    expect(pickTask({ text: "hi" })).toBe("fast");
+    expect(pickTask({ text: "Tell me about the history of the lighthouse at Alexandria please" })).toBe("chat");
+  });
+  it("falls back to the chat model, and routing can be switched off", () => {
+    const s = { localChat: "qwen2.5:7b", localCode: "qwen2.5-coder:7b", localReasoning: "", localFast: "", localAuto: true };
+    expect(pickModel(s, { text: "fix this bug in my regex" })).toBe("qwen2.5-coder:7b");
+    expect(pickModel(s, { mode: "solve", text: "prove it step by step" })).toBe("qwen2.5:7b");
+    expect(pickModel({ ...s, localAuto: false }, { text: "fix this bug in my regex" })).toBe("qwen2.5:7b");
+  });
+  it("validates model names", () => {
+    expect(isModelName("qwen2.5-coder:7b")).toBe(true);
+    expect(isModelName("hf.co/user/model:Q4_K_M")).toBe(true);
+    expect(isModelName("../etc/passwd")).toBe(false);
+    expect(isModelName("a b")).toBe(false);
+  });
+  it("uses the Local AI server as the provider when selected", () => {
+    const p = providerForTurn({ ...engineBase, kind: "local-server" as const, localCode: "qwen2.5-coder:7b" }, 0, { text: "refactor this function" });
+    expect(p?.kind).toBe("ollama-server");
+    expect(p?.model).toBe("qwen2.5-coder:7b");
   });
 });

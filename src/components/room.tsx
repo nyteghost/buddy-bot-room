@@ -448,7 +448,7 @@ export function Room() {
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current,
             memoryContext: promptContext(getWorkbench()),
-            contextChars: engine.kind === "local" || engine.kind === "ollama" ? 6000 : 12000,
+            contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             docContext: docText,
             linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
@@ -494,7 +494,8 @@ export function Room() {
               setMessages([...transcript, answer]);
             }
           };
-          const provider = providerForTurn(engine, turnIndex);
+          const lastUser = [...transcript].reverse().find((m) => m.role === "user");
+          const provider = providerForTurn(engine, turnIndex, { mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" });
           const runOllama = async () =>
             consume(
               await ollamaTurn(
@@ -516,6 +517,9 @@ export function Room() {
                 await runOllama();
               }
             }
+          } else if (engine.kind === "local-server") {
+            if (!provider) throw new Error("Local AI isn't available.");
+            await consume(await runCloud(provider));
           } else if (engine.kind === "ollama") {
             await consume(
               await ollamaTurn(

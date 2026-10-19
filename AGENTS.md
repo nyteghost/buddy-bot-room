@@ -44,3 +44,8 @@
 - Trakt (trakt.ts pure, trakt.server.ts I/O): read-only on Trakt (GETs to api.trakt.tv only); with `plex=1` it also searches Plex (read-only) to mark which titles are already there, and Plex failures just leave titles unmarked; TRAKT_CLIENT_ID/TRAKT_ACCESS_TOKEN stay in server env. List and user names must pass isSlug before entering a URL. /next gives the pals the list as data and tells them to pick only from it.
 - Installable app: public/manifest.webmanifest and the icons are listed in PUBLIC_FILES (gate.server.ts) so the browser can fetch them without cookies; keep that list to static, non-sensitive files. /?q= only prefills the message box and never sends.
 - Plex (plex.ts pure, plex.server.ts I/O): read-only; PLEX_URL and PLEX_TOKEN come only from server env and are never returned to the browser. /watch gives the pals the library list as data and tells them to recommend only from it.
+
+## Local AI (server-side Ollama)
+- Engine kind `local-server` sends `/api/chat` an `ollama-server` provider; the server calls `OLLAMA_URL` (never a browser-supplied URL). Model names are validated with `isModelName`.
+- `/api/ollama` reports status, installed models and hardware, and pulls/removes models. Hardware comes from `os` plus `nvidia-smi` (or `LOCAL_VRAM_GB`); model suggestions are pure code in `src/lib/model-catalog.ts` and are tested.
+- Claude (paid) and Local AI are never part of the free-key rotation; both are opt-in.
