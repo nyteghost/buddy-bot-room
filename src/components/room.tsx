@@ -495,7 +495,7 @@ export function Room() {
             }
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
-          const provider = providerForTurn(engine, turnIndex, { mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" });
+          const provider = providerForTurn(engine, turnIndex, { agentId: agent.id, mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" });
           const runOllama = async () =>
             consume(
               await ollamaTurn(

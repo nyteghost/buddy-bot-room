@@ -65,8 +65,8 @@ export function fitLabel(fit: Fit, onGpu: boolean): string {
   return "too big for this machine";
 }
 
-export type RouteHint = { mode?: string; text?: string };
-export type LocalModels = { localChat: string; localCode: string; localReasoning: string; localFast: string; localAuto: boolean };
+export type RouteHint = { mode?: string; text?: string; agentId?: string };
+export type LocalModels = { localChat: string; localCode: string; localReasoning: string; localFast: string; localAuto: boolean; localPals?: Record<string, string> };
 
 const CODE_RE = /```|\b(function|const|def|class|import|stack ?trace|exception|compile|regex|sql|typescript|javascript|python|bash|docker|git|npm|bun|api|bug|refactor)\b|[{};]\s*$/im;
 const REASON_RE = /\b(prove|step[- ]by[- ]step|puzzle|riddle|derive|calculate|math|logic|trade-?offs?|work out)\b/i;
@@ -81,8 +81,11 @@ export function pickTask(hint: RouteHint): TaskKey {
 
 export const DEFAULT_LOCAL_MODEL = "qwen2.5:7b";
 
-/** Chooses the model for a turn. With routing off, or when a task has no model set, the Chat model is used. */
+/** Chooses the model for a turn: the pal's own model if set, else by task. With routing off, or when a task has no model set, the Chat model is used. */
 export function pickModel(s: LocalModels, hint: RouteHint): string {
+  // A model you assigned to a specific pal always wins.
+  const mine = hint.agentId ? s.localPals?.[hint.agentId]?.trim() : "";
+  if (mine) return mine;
   const chat = s.localChat.trim() || DEFAULT_LOCAL_MODEL;
   if (!s.localAuto) return chat;
   const task = pickTask(hint);

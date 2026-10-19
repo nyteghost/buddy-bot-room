@@ -28,6 +28,8 @@ export type EngineSettings = {
   localFast: string;
   /** Pick the Code / Reasoning / Quick model automatically from what each message looks like. */
   localAuto: boolean;
+  /** Optional model per pal id; overrides task routing. */
+  localPals: Record<string, string>;
   anthropicKey: string;
   claudeMode: ClaudeMode;
   claudeModel: string;
@@ -49,6 +51,7 @@ const fallback: EngineSettings = {
   localReasoning: "",
   localFast: "",
   localAuto: true,
+  localPals: {},
   anthropicKey: "",
   claudeMode: "off",
   claudeModel: DEFAULT_CLAUDE_MODEL,

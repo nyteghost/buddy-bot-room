@@ -3,6 +3,7 @@ import { Download, Trash2, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { setEngine, useEngine } from "@/lib/engine";
 import { describeHardware, modelBudgetGb, type Hardware } from "@/lib/hardware";
+import { agents } from "@/lib/agents";
 import { CATALOG, TASKS, fitFor, fitLabel, recommend, type TaskKey } from "@/lib/model-catalog";
 
 type Status = {
@@ -131,6 +132,30 @@ export function LocalAiPanel() {
               </label>
             ))}
             <span className="text-xs text-muted-foreground">Switching between models makes the first reply after a switch slower while it loads. GPUs with less memory reload models when they change.</span>
+          </div>
+
+          <div className="grid gap-2">
+            <span className="font-medium">Model per pal <span className="text-xs font-normal text-muted-foreground">(optional, overrides the task choice above)</span></span>
+            {agents.map((a) => {
+              const current = engine.localPals[a.id] ?? "";
+              return (
+                <label key={a.id} className="flex items-center justify-between gap-2">
+                  <span>{a.name}</span>
+                  <select
+                    className="min-w-0 flex-1 rounded-md border bg-background px-2 py-2 sm:max-w-[60%]"
+                    value={current}
+                    onChange={(e) => {
+                      const next = { ...engine.localPals };
+                      if (e.target.value) next[a.id] = e.target.value; else delete next[a.id];
+                      setEngine({ localPals: next });
+                    }}
+                  >
+                    <option value="">Automatic (by task)</option>
+                    {choices(current).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+              );
+            })}
           </div>
 
           <div className="grid gap-2">

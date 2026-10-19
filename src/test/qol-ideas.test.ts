@@ -40,7 +40,7 @@ import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch,
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
-const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
+const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, localPals: {} as Record<string, string>, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
 
 describe("context trimming", () => {
   const msgs = (n: number, len: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: "x".repeat(len) }));
@@ -1137,6 +1137,12 @@ describe("Local AI: hardware, recommendations and routing", () => {
     expect(pickModel(s, { text: "fix this bug in my regex" })).toBe("qwen2.5-coder:7b");
     expect(pickModel(s, { mode: "solve", text: "prove it step by step" })).toBe("qwen2.5:7b");
     expect(pickModel({ ...s, localAuto: false }, { text: "fix this bug in my regex" })).toBe("qwen2.5:7b");
+  });
+  it("lets a pal's own model override task routing", () => {
+    const s = { localChat: "qwen2.5:7b", localCode: "qwen2.5-coder:7b", localReasoning: "", localFast: "", localAuto: true, localPals: { tux: "deepseek-r1:7b" } };
+    expect(pickModel(s, { agentId: "tux", text: "fix this bug in my regex" })).toBe("deepseek-r1:7b");
+    expect(pickModel(s, { agentId: "nova", text: "fix this bug in my regex" })).toBe("qwen2.5-coder:7b");
+    expect(pickModel({ ...s, localAuto: false }, { agentId: "tux", text: "hello there" })).toBe("deepseek-r1:7b");
   });
   it("validates model names", () => {
     expect(isModelName("qwen2.5-coder:7b")).toBe(true);
