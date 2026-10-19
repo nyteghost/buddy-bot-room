@@ -174,6 +174,7 @@ Compare models only uses the free keys, so it never spends Claude credit.
 - **suggests the best model per task** that fits your hardware, with a **Download** button that shows progress. Suggestions are chosen by memory: the largest model per task that fits your GPU's VRAM (or a conservative slice of RAM on CPU). The catalogue is a fixed list of well-known Ollama models, so check the Ollama library for newer ones; use **More models** for anything else in the list;
 - lets you pick a **model per task**: *Chat* (default), *Code* (messages that look like programming), *Reasoning* (Problem-solving mode and step-by-step questions) and *Quick replies* (very short messages). With **Choose automatically** on, each message is routed by what it looks like; turn it off to always use the Chat model. Tasks you leave as "Same as Chat" use the Chat model;
 - lets you give **each pal its own model** (for example one pal on a coding model and another on a chat model). A pal's own model overrides the task choice;
+- shows **New on Ollama**: the Pixel Pals server reads ollama.com's public model library about once a day (and on **Check now**), and lists newly published, popular models that fit your hardware, with the task they're probably good at. They are labelled *Not tested by Pixel Pals*. Ollama has no official API for this, so it reads the library web page; if that page changes and can't be read, the panel says so and keeps the built-in suggestions. Set `MODEL_FEED=0` to never contact ollama.com;
 - lists installed models with a remove button.
 
 First-start models come from `OLLAMA_MODELS` (default `qwen2.5:7b`; space-separated list for more). `OLLAMA_PORT` changes the published port, which you only need if something outside the stack wants to reach Ollama. Switching models makes the first reply after a switch slower, because it has to load.
@@ -500,6 +501,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `OLLAMA_MODELS` | `qwen2.5:7b` | Models downloaded on first start |
 | `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
 | `OLLAMA_PORT` | `11434` | Published Ollama port |
+| `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 
 Internal (set by the Docker image/compose, rarely changed): `BUDDY_SELF_HOSTED=1`, `BUDDY_DATA_DIR=/data`, `BUDDY_BACKUP_DIR=/backups`.

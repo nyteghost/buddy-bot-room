@@ -14,6 +14,7 @@ import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
 import { notesSyncUrl, shareSheetUrl, bearerHeader, isSecure, notesSteps, shareSteps } from "@/lib/iphone-setup";
 import { parseNvidiaSmi, modelBudgetGb, describeHardware } from "@/lib/hardware";
 import { CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
+import { parseLibraryPage, parsePulls, sizeToGb, feedToCatalog, newSuggestions } from "@/lib/model-feed";
 import { providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
@@ -1166,5 +1167,51 @@ describe("Focus mode", () => {
   it("has the Ctrl+Shift+F shortcut", () => {
     expect(matchShortcut({ key: "F", ctrlKey: true, metaKey: false, shiftKey: true, altKey: false }, false, false)).toBe("focusMode");
     expect(matchShortcut({ key: "f", ctrlKey: true, metaKey: false, shiftKey: false, altKey: false }, false, false)).toBeNull();
+  });
+});
+
+describe("Ollama library feed", () => {
+  const li = (name: string, sizes: string[], caps: string[], pulls: string, updated: string) =>
+    `<li x-test-model class="x"><a href="/library/${name}"><span x-test-model-title>${name}</span>` +
+    sizes.map((z) => `<span x-test-size class="a">${z}</span>`).join("") +
+    caps.map((c) => `<span x-test-capability>${c}</span>`).join("") +
+    `<span x-test-pull-count>${pulls}</span><span x-test-updated>${updated}</span></a></li>`;
+  const page = `<ul>${li("alpha-coder", ["7b", "14b"], ["tools"], "52.1K", "2 days ago")}${li("deep-think", ["8b", "32b"], ["thinking", "tools"], "1.2M", "3 days ago")}${li("embedder", ["300m"], ["embedding"], "90K", "1 day ago")}${li("tiny-new", ["1b"], [], "20K", "yesterday")}${li("obscure", ["7b"], [], "800", "yesterday")}${li("cloudy", [], ["cloud"], "50K", "1 day ago")}</ul>`;
+  const hw = { cpu: "x", cores: 8, ramGb: 32, gpus: [{ name: "GPU", vramGb: 10 }], gpuSource: "nvidia-smi" as const };
+  it("reads pull counts and sizes", () => {
+    expect(parsePulls("21.5K")).toBe(21500);
+    expect(parsePulls("1.2M")).toBe(1200000);
+    expect(parsePulls("1,081")).toBe(1081);
+    expect(sizeToGb("7b")).toBe(4.6);
+    expect(sizeToGb("270m")).toBe(0.5);
+    expect(sizeToGb("30b-a3b")).toBeNull();
+  });
+  it("parses the library listing", () => {
+    const feed = parseLibraryPage(page);
+    expect(feed.map((m) => m.name)).toEqual(["alpha-coder", "deep-think", "embedder", "tiny-new", "obscure", "cloudy"]);
+    expect(feed[0]?.sizes).toEqual(["7b", "14b"]);
+    expect(feed[1]?.pulls).toBe(1200000);
+  });
+  it("returns nothing when the layout is not recognised", () => {
+    expect(parseLibraryPage("<html><body>nothing here</body></html>")).toEqual([]);
+  });
+  it("skips embedding, cloud-only and rarely used models and infers tasks", () => {
+    const cat = feedToCatalog(parseLibraryPage(page));
+    const ids = cat.map((c) => c.id);
+    expect(ids).toContain("alpha-coder:7b");
+    expect(ids).not.toContain("embedder:300m");
+    expect(ids).not.toContain("obscure:7b");
+    expect(cat.find((c) => c.id === "alpha-coder:7b")?.task).toBe("code");
+    expect(cat.find((c) => c.id === "deep-think:8b")?.task).toBe("reasoning");
+    expect(cat.find((c) => c.id === "tiny-new:1b")?.task).toBe("fast");
+  });
+  it("suggests only new models that fit, skipping installed and already-known ones", () => {
+    const feed = parseLibraryPage(page);
+    const out = newSuggestions(feed, hw, new Set(["deep-think:8b"]), new Set());
+    const ids = out.map((o) => o.model.id);
+    expect(ids).toContain("alpha-coder:7b");
+    expect(ids).not.toContain("alpha-coder:14b");
+    expect(ids).not.toContain("deep-think:8b");
+    expect(out.every((o) => o.fit !== "no")).toBe(true);
   });
 });

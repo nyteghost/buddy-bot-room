@@ -1,6 +1,7 @@
 import { readHardware } from "@/lib/hardware.server";
 import { isModelName } from "@/lib/model-catalog";
 import { logServer } from "./server-log.server";
+import { currentFeed, feedEnabled, refreshFeed } from "./model-feed.server";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -29,6 +30,8 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
         reachable: true,
         hardware,
         models: models.map((m) => ({ name: m.name, gb: Math.round(((m.size ?? 0) / 1024 ** 3) * 10) / 10 })),
+        feed: await currentFeed(),
+        feedEnabled: feedEnabled(),
         loaded: loaded.map((m) => ({ name: m.name, onGpu: (m.size_vram ?? 0) > 0 })),
       });
     } catch {
@@ -38,6 +41,7 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
   let body: { action?: unknown; model?: unknown } = {};
   try { body = (await request.json()) as typeof body; } catch { return json({ error: "Bad request." }, 400); }
+  if (body.action === "refresh-feed") return feedEnabled() ? json({ feed: await refreshFeed() }) : json({ error: "Model list updates are turned off (MODEL_FEED=0)." }, 400);
   if (!isModelName(body.model)) return json({ error: "That isn't a valid model name." }, 400);
   if (body.action === "pull") {
     try {

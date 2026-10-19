@@ -2,12 +2,15 @@ import { backupAgeMs, backupConfig, runBackup } from "./backup.server";
 import { briefConfig, sendBrief } from "./brief.server";
 import { isDue, zonedParts } from "./schedule";
 import { logServer } from "./server-log.server";
+import { startFeedTimer } from "./model-feed.server";
+import { ollamaBase } from "./ollama.server";
 
 /** One 30-second ticker for the daily jobs. Idempotent. Does nothing unless a job is configured. */
 type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string };
 const holder = globalThis as unknown as { __buddyScheduler?: S };
 
 export function startScheduler(): void {
+  if (ollamaBase()) startFeedTimer();
   if (holder.__buddyScheduler?.timer) return;
   if (!backupConfig() && !briefConfig()) return;
   const s: S = (holder.__buddyScheduler ??= { lastBackupDay: "", lastBriefDay: "" });

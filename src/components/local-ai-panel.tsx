@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { setEngine, useEngine } from "@/lib/engine";
 import { describeHardware, modelBudgetGb, type Hardware } from "@/lib/hardware";
 import { agents } from "@/lib/agents";
+import { newSuggestions, type FeedModel } from "@/lib/model-feed";
 import { CATALOG, TASKS, fitFor, fitLabel, recommend, type TaskKey } from "@/lib/model-catalog";
 
 type Status = {
@@ -13,6 +14,8 @@ type Status = {
   hardware?: Hardware;
   models?: { name: string; gb: number }[];
   loaded?: { name: string; onGpu: boolean }[];
+  feed?: { fetchedAt: string; models: FeedModel[]; error?: string } | null;
+  feedEnabled?: boolean;
 };
 
 const FIELD: Record<TaskKey, "localChat" | "localCode" | "localReasoning" | "localFast"> = { chat: "localChat", code: "localCode", reasoning: "localReasoning", fast: "localFast" };
@@ -67,6 +70,14 @@ export function LocalAiPanel() {
     }
   }
 
+  async function refreshFeed() {
+    setNote("Checking Ollama for new models…");
+    const res = await fetch("/api/ollama", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "refresh-feed", model: "x" }) });
+    const j = (await res.json().catch(() => ({}))) as { feed?: Status["feed"]; error?: string };
+    setNote(j.feed?.error ? `Couldn't update the list: ${j.feed.error}` : j.error ?? "Model list updated.");
+    load();
+  }
+
   async function remove(model: string) {
     if (!window.confirm(`Remove ${model} from this server?`)) return;
     const res = await fetch("/api/ollama", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete", model }) });
@@ -87,6 +98,7 @@ export function LocalAiPanel() {
   const has = (id: string) => names.has(id) || names.has(`${id}:latest`);
   const rec = hw ? recommend(hw) : [];
   const onGpu = hw ? modelBudgetGb(hw).onGpu : false;
+  const newOnes = hw && status.feed?.models.length ? newSuggestions(status.feed.models, hw, names as Set<string>, new Set<string>(CATALOG.map((c) => c.id))) : [];
   const choices = (current: string) => (current && !names.has(current) ? [current, ...installed.map((m) => m.name)] : installed.map((m) => m.name));
 
   return (
@@ -168,6 +180,26 @@ export function LocalAiPanel() {
               </div>
             ))}
           </div>
+
+          {status.feedEnabled !== false && (
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">New on Ollama <span className="text-xs font-normal text-muted-foreground">{status.feed?.fetchedAt ? `checked ${new Date(status.feed.fetchedAt).toLocaleDateString()}` : "not checked yet"}</span></span>
+                <Button size="sm" variant="ghost" className="h-11 sm:h-8" onClick={() => void refreshFeed()}>Check now</Button>
+              </div>
+              {status.feed?.error && <span className="text-xs text-destructive">Last update failed: {status.feed.error}</span>}
+              {newOnes.length === 0 && !status.feed?.error && <span className="text-xs text-muted-foreground">Nothing new that fits this machine. The list refreshes itself about once a day from ollama.com.</span>}
+              {newOnes.map(({ model: m, fit }) => (
+                <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+                  <div className="min-w-0">
+                    <div>{m.id} <span className="text-xs text-muted-foreground">({m.gb} GB, about {m.task})</span></div>
+                    <div className="text-xs text-muted-foreground">{m.note} · {fitLabel(fit, onGpu)}. Not tested by Pixel Pals.</div>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-11 sm:h-8" disabled={!!busy[m.id]} onClick={() => void pull(m.id)}>{busy[m.id] ?? "Download"}</Button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <details className="rounded-md border px-3 py-2">
             <summary className="cursor-pointer">More models</summary>
