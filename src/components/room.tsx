@@ -29,6 +29,8 @@ import {
   Bug,
   GitBranch,
   RefreshCw,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -130,6 +132,7 @@ import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/l
 import { UnraidBanner } from "./unraid-banner";
 import { nextTopic, traktListsMarkdown, traktMarkdown, type TraktItem, type TraktList } from "@/lib/trakt";
 import { sharedText } from "@/lib/share-prefill";
+import { setVoiceSettings, speakItems, stopSpeaking, useSpeakingId, useVoice, voiceSupported } from "@/lib/voice";
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
@@ -219,6 +222,25 @@ export function Room() {
     claude: agents[6].model,
   });
   const [running, setRunning] = useState(false);
+  // Read replies aloud (opt-in, browser speech): after each discussion finishes, each new reply in its pal's voice.
+  const voice = useVoice();
+  const speakingMessage = useSpeakingId();
+  const [canSpeak, setCanSpeak] = useState(false);
+  useEffect(() => { setCanSpeak(voiceSupported()); }, []);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const runStart = useRef(0);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (running && !wasRunning.current) { runStart.current = messagesRef.current.length; stopSpeaking(); }
+    if (!running && wasRunning.current && voice.auto) {
+      const items = messagesRef.current.slice(runStart.current)
+        .filter((m) => m.role === "assistant" && messageText(m).trim())
+        .map((m) => ({ id: m.id, text: messageText(m), agentId: String(m.metadata?.agentId ?? "echo") }));
+      if (items.length) void speakItems(items);
+    }
+    wasRunning.current = running;
+  }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
   const [speaking, setSpeaking] = useState<AgentId | null>(null);
   const [round, setRound] = useState(0);
   const [error, setError] = useState("");
@@ -293,6 +315,7 @@ export function Room() {
   }, [messages, ready, cloud]);
 
   const stop = () => {
+    stopSpeaking();
     abortRef.current?.abort();
     replayRef.current?.abort();
   };
@@ -577,6 +600,13 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "voice": {
+        if (!canSpeak) return say(command, "This browser can't read aloud (no speech engine found).");
+        const next = action.mode === "toggle" ? !voice.auto : action.mode === "on";
+        if (!next) stopSpeaking();
+        setVoiceSettings({ auto: next });
+        return say(command, next ? "Voice is on: I'll read each discussion's replies aloud when it finishes, in a different voice per pal. Use the speaker button on any reply to hear just that one. (iPhone: sound plays only after you've tapped something on the page.)" : "Voice is off.");
+      }
       case "brief": void briefCmd(command, action.send); return;
       case "backup": void backupCmd(command, action.now); return;
       case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
@@ -778,6 +808,7 @@ export function Room() {
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
+    { id: "voice", group: "Chat", label: voice.auto ? "Turn off reading replies aloud" : "Read replies aloud", keywords: "voice speak tts sound audio", run: () => runSlash({ type: "voice", mode: "toggle" }, "/voice") },
     { id: "watch", group: "Chat", label: "What should we watch tonight?", keywords: "plex movie show tv", run: () => void plex("", "/watch", "") },
     { id: "srv", group: "Chat", label: "Check my Unraid server", keywords: "server health status", run: () => void serverCheck("/server", false) },
     { id: "srv-why", group: "Chat", label: "What's wrong with my server? (pals diagnose)", keywords: "unraid diagnose", run: () => void serverCheck("/diagnose", true) },
@@ -873,6 +904,11 @@ export function Room() {
           >
             <Mic className="size-4" /> Record
           </Button>
+          {canSpeak && (
+            <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={voice.auto} title={voice.auto ? "Replies are read aloud. Click to turn off." : "Read replies aloud"} onClick={() => { if (voice.auto) stopSpeaking(); setVoiceSettings({ auto: !voice.auto }); }}>
+              {voice.auto ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Voice
+            </Button>
+          )}
           <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench className="size-4" /> Work tools</Button>
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
@@ -1246,6 +1282,11 @@ export function Room() {
                                 <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
                                   <Copy size={13} />
                                 </MessageAction>
+                                {canSpeak && (
+                                  <MessageAction tooltip={speakingMessage === m.id ? "Stop reading" : "Read aloud"} label={speakingMessage === m.id ? "Stop reading" : "Read aloud"} onClick={() => { if (speakingMessage === m.id) stopSpeaking(); else void speakItems([{ id: m.id, text: messageText(m), agentId: String(m.metadata?.agentId ?? "echo") }]); }}>
+                                    {speakingMessage === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                                  </MessageAction>
+                                )}
                                 {m.id === lastMessage?.id && m.metadata?.agentId !== "echo" && (
                                   <MessageAction tooltip="Regenerate" label="Regenerate answer" onClick={regenerate}>
                                     <RefreshCw size={13} />

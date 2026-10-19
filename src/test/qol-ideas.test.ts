@@ -21,6 +21,7 @@ import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
 import { capPerOwner, visibleTo } from "@/lib/store.server";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
+import { chunkSpeech, pickVoice, speechText, voiceProfile } from "@/lib/tts";
 import { sharedText } from "@/lib/share-prefill";
 import { PUBLIC_FILES } from "@/lib/gate.server";
 import { buildBrief, dailyPicks, unraidLine } from "@/lib/brief";
@@ -977,5 +978,49 @@ describe("share-sheet prefill and public app files", () => {
     expect((await gate(new Request("http://x/manifest.webmanifest"), "pw"))).toBe(null);
     expect((await gate(new Request("http://x/apple-touch-icon.png"), "pw"))).toBe(null);
     expect((await gate(new Request("http://x/"), "pw"))?.status).toBe(401);
+  });
+});
+
+describe("read aloud", () => {
+  it("turns markdown into speakable text", () => {
+    expect(speechText("## Title\n\n**Bold** and _italic_ with `code`.")).toBe("Title. Bold and italic with code.");
+    expect(speechText("See [the docs](https://example.com/x) or https://example.com/y now")).toBe("See the docs or link now");
+    expect(speechText("Before\n```js\nconst a = 1;\n```\nAfter")).toBe("Before. (code omitted). After");
+    expect(speechText("- one\n- two\n1. three")).toBe("one. two. three");
+    expect(speechText("![a cat](http://x/y.png) here")).toBe("a cat here");
+    expect(speechText("")).toBe("");
+    expect(speechText("x".repeat(9000)).length).toBe(5000);
+  });
+  it("splits into sentence-sized chunks without losing words", () => {
+    const text = "First sentence here. Second one is a little longer than the first. Third!";
+    for (const max of [30, 60, 180]) {
+      const chunks = chunkSpeech(text, max);
+      expect(chunks.every((c) => c.length <= max)).toBe(true);
+      expect(chunks.join(" ").replace(/\s+/g, " ")).toBe(text);
+    }
+    const long = "word ".repeat(100).trim() + ".";
+    const parts = chunkSpeech(long, 50);
+    expect(parts.every((c) => c.length <= 50)).toBe(true);
+    expect(parts.join(" ").split(" ").length).toBe(100);
+    expect(chunkSpeech("")).toEqual([]);
+  });
+  it("gives each pal a stable voice and profile", () => {
+    const voices = [{ name: "Zoe", lang: "en-US" }, { name: "Alex", lang: "en-GB" }, { name: "Marie", lang: "fr-FR" }, { name: "Sam", lang: "en-US" }];
+    const a = pickVoice(voices, "nova", "en-US");
+    expect(a).toBe(pickVoice(voices, "nova", "en-US"));
+    expect(["Zoe", "Alex", "Sam"].includes(a ?? "")).toBe(true);
+    expect(pickVoice(voices, "nova", "fr-CA")).toBe("Marie");
+    expect(pickVoice(voices, "nova", "ja-JP") !== undefined).toBe(true);
+    expect(pickVoice([], "nova", "en-US")).toBeUndefined();
+    const p = voiceProfile("byte");
+    expect(p).toEqual(voiceProfile("byte"));
+    expect(p.pitch >= 0.78 && p.pitch <= 1.36).toBe(true);
+    expect(p.rate >= 0.94 && p.rate <= 1.09).toBe(true);
+    expect(new Set(["nova", "byte", "sage", "pip", "echo", "claude"].map((i) => JSON.stringify(voiceProfile(i)))).size).toBeGreaterThan(3);
+  });
+  it("has /voice", () => {
+    expect(parseSlash("/voice")).toEqual({ ok: true, action: { type: "voice", mode: "toggle" } });
+    expect(parseSlash("/voice on")).toEqual({ ok: true, action: { type: "voice", mode: "on" } });
+    expect(parseSlash("/voice off")).toEqual({ ok: true, action: { type: "voice", mode: "off" } });
   });
 });

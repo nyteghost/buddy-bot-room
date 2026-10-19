@@ -111,6 +111,10 @@ With Plex set up too, each unwatched item is marked **📺 in Plex** or **not in
 
 Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
 
+## Voice replies
+
+Click **Voice** in the top bar (or type `/voice`, or use Ctrl+K) and each discussion's replies are read aloud when it finishes, every pal in a different voice and pitch. The speaker button on any reply reads just that one; Esc or the stop button silences it. It uses your device's own built-in voices, so there's nothing to install, no keys and no data leaves the device. It's off by default and remembered per browser (and synced with your account). On iPhone, Safari only plays sound after you've tapped something on the page, which sending a message counts as. Voice quality depends on the voices installed on the device.
+
 ## Install on your iPhone (home-screen app)
 
 Open Pixel Pals in Safari at your HTTPS address, tap **Share → Add to Home Screen**. It opens full-screen with its own icon, like an app. (Android Chrome: menu → *Install app*.) Needs the HTTPS address; sign-in cookies last 30 days.

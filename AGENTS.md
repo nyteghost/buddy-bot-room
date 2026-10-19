@@ -12,7 +12,7 @@
 ## Application rules
 - Keep window movement, visibility and layout persistence in browser-only workspace components; hiding windows must preserve mounted chat, tools and recorder state so work is not discarded.
 - Assistant Mode is a separate browser-persisted switch (not a theme): any theme's cast keeps its name/voice but takes the shared assistant jobs, the office scene and machine helpers; legacy "assistant" theme maps to Linux theme + switch on.
-- Pal voice playback is removed from the room UI to save power; speech modules remain unused.
+- Pal voice playback via the server (Gemini) stays removed to save power; reading replies aloud is opt-in only (off by default) and uses the browser's own speechSynthesis (src/lib/voice.ts, tts.ts), so it costs no keys or server calls. It never starts without the user turning it on or tapping a speaker button.
 - Assistant room movement uses one shared browser-only station choreography and activity renderer, so both modes stay visually in sync without invoking machine actions.
 - Keep the current browser chat separate from named browser-only saved snapshots when signed out; optional Google sign-in syncs saved discussions and settings to the account.
 - Run one streamed model call per character turn through `/api/chat`; browser orchestration controls rounds and cancellation, keeping each server request short.
