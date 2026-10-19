@@ -569,6 +569,7 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "backup": void backupCmd(command, action.now); return;
       case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
       case "trakt": void trakt(action.list, command, null); return;
       case "next": void trakt(action.list, command, action.mood); return;
@@ -674,6 +675,16 @@ export function Room() {
       return say(command, traktMarkdown(name, items));
     } catch {
       return say(command, "I couldn't reach the Trakt service.");
+    }
+  }
+  /** /backup shows the nightly backup status; /backup now makes one. */
+  async function backupCmd(command: string, now: boolean) {
+    try {
+      const res = await fetch("/api/backup", { method: now ? "POST" : "GET" });
+      const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+      return say(command, json.text ?? json.error ?? "The backup check failed.");
+    } catch {
+      return say(command, "I couldn't reach the backup service.");
     }
   }
   /** /server shows Unraid's health; /diagnose also hands it to the pals to reason about. */

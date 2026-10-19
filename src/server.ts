@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { isAbortError } from "./lib/ai/stream-errors.server";
 import { gate } from "./lib/gate.server";
+import { startScheduler } from "./lib/scheduler.server";
 import { startWatcher } from "./lib/unraid.server";
 
 type ServerEntry = {
@@ -56,6 +57,7 @@ export default {
       const stopped = await gate(request, typeof process !== "undefined" ? process.env["BUDDY_PASSWORD"] : undefined);
       if (stopped) return stopped;
       if (typeof process !== "undefined" && process.env["UNRAID_URL"]) startWatcher();
+      if (typeof process !== "undefined" && (process.env["BUDDY_BACKUP_DIR"] || process.env["BRIEF_TIME"])) startScheduler();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

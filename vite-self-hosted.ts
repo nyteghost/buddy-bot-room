@@ -3,6 +3,7 @@
 import type { Plugin } from "vite";
 import { gate } from "./src/lib/gate.server";
 import { logServer } from "./src/lib/server-log.server";
+import { startScheduler } from "./src/lib/scheduler.server";
 import { startWatcher } from "./src/lib/unraid.server";
 
 export function selfHostedPlugin(): Plugin {
@@ -11,6 +12,8 @@ export function selfHostedPlugin(): Plugin {
     configureServer(server) {
       // Start watching Unraid as soon as the server boots (no-op unless UNRAID_URL is set).
       startWatcher();
+      // Daily jobs (backup, morning brief): no-op unless configured.
+      startScheduler();
       server.middlewares.use(async (req, res, next) => {
         try {
           const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);

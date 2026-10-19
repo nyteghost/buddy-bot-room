@@ -111,6 +111,16 @@ With Plex set up too, each unwatched item is marked **📺 in Plex** or **not in
 
 Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
 
+## Nightly backup
+
+Every night at `BUDDY_BACKUP_TIME` (default 03:30, in `BUDDY_TZ`, default America/New_York) Pixel Pals copies its data folder (accounts, saved chats, per-account settings) into `/backups` and keeps the newest `BUDDY_BACKUP_KEEP` copies (default 14). If the server was off at that time, it makes one soon after starting. Type `/backup` in the chat to see the status, or `/backup now` to make one right away (owner only). The status is also in the Debug log.
+
+By default backups go to a Docker volume on the same machine, which doesn't protect you from a disk failure. For real protection, point them at your Unraid box:
+1. On the CachyOS host, mount an Unraid share, for example with NFS or SMB at `/mnt/unraid/pixelpals-backups`.
+2. In the Portainer stack add `BUDDY_BACKUP_PATH=/mnt/unraid/pixelpals-backups` and Pull and redeploy.
+
+Backups contain password hashes and API keys, so keep that share private. To restore: stop the stack, copy a backup folder's contents back into the `buddy-data` volume (or the data folder), and start it again.
+
 ## Sync an iPhone Note with Trakt
 
 Pixel Pals can compare a Note (one title per line) with your Trakt list and watch history. It is **read-only on Trakt**; Trakt wins:

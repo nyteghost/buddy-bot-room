@@ -21,6 +21,8 @@ import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
 import { capPerOwner, visibleTo } from "@/lib/store.server";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
+import { ageText, isDue, parseHm, validZone, zonedParts } from "@/lib/schedule";
+import { backupName, insideData, isBackupName, pruneList } from "@/lib/backup";
 import { plexHas } from "@/lib/trakt";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
 import { traktConfig } from "@/lib/trakt.server";
@@ -863,5 +865,54 @@ describe("trakt x plex", () => {
   it("has /request", () => {
     expect(parseSlash("/request Dune Part Two")).toEqual({ ok: true, action: { type: "request", title: "Dune Part Two" } });
     expect(parseSlash("/request")?.ok).toBe(false);
+  });
+});
+
+describe("schedule and backup naming", () => {
+  it("reads clock time in a zone, not the machine's", () => {
+    const d = new Date("2026-10-19T12:30:00Z");
+    expect(zonedParts(d, "America/New_York").hm).toBe("08:30");
+    expect(zonedParts(d, "America/New_York").day).toBe("2026-10-19");
+    expect(zonedParts(d, "UTC").hm).toBe("12:30");
+    expect(zonedParts(new Date("2026-10-20T02:00:00Z"), "America/New_York").day).toBe("2026-10-19");
+    expect(zonedParts(d, "Not/AZone").hm).toBe("12:30");
+    expect(zonedParts(d, "America/New_York").stamp).toBe("2026-10-19-0830");
+  });
+  it("validates zones and times", () => {
+    expect(validZone("America/New_York")).toBe("America/New_York");
+    expect(validZone("nope")).toBeNull();
+    expect(validZone(undefined)).toBeNull();
+    expect(parseHm("08:05", "03:30")).toBe("08:05");
+    expect(parseHm("8:5", "03:30")).toBe("03:30");
+    expect(parseHm("25:00", "03:30")).toBe("03:30");
+    expect(parseHm(undefined, "03:30")).toBe("03:30");
+  });
+  it("fires once a day inside a short window after the target", () => {
+    const tz = "America/New_York";
+    expect(isDue(new Date("2026-10-19T07:30:30Z"), tz, "03:30", "")).toBe(true);
+    expect(isDue(new Date("2026-10-19T07:30:30Z"), tz, "03:30", "2026-10-19")).toBe(false);
+    expect(isDue(new Date("2026-10-19T07:29:00Z"), tz, "03:30", "")).toBe(false);
+    expect(isDue(new Date("2026-10-19T07:45:00Z"), tz, "03:30", "")).toBe(false);
+    expect(isDue(new Date("2026-10-19T07:40:00Z"), tz, "03:30", "2026-10-18")).toBe(true);
+  });
+  it("describes ages", () => {
+    expect(ageText(30_000)).toBe("just now");
+    expect(ageText(30 * 60_000)).toBe("30 minutes ago");
+    expect(ageText(5 * 3600_000)).toBe("5 hours ago");
+    expect(ageText(72 * 3600_000)).toBe("3 days ago");
+  });
+  it("only ever prunes our own backups, oldest first", () => {
+    const names = ["pixelpals-2026-10-01-0330", "pixelpals-2026-10-03-0330", "pixelpals-2026-10-02-0330", "notes", ".partial-pixelpals-2026-10-04-0330", "pixelpals-2026-10-04-0330"];
+    expect(pruneList(names, 2)).toEqual(["pixelpals-2026-10-01-0330", "pixelpals-2026-10-02-0330"]);
+    expect(pruneList(names, 10)).toEqual([]);
+    expect(pruneList(names, 0)).toEqual(["pixelpals-2026-10-01-0330", "pixelpals-2026-10-02-0330", "pixelpals-2026-10-03-0330"]);
+    expect(isBackupName(backupName("2026-10-19-0330"))).toBe(true);
+    expect(isBackupName("pixelpals-x")).toBe(false);
+  });
+  it("refuses a backup folder inside the data folder", () => {
+    expect(insideData("/data/backups", "/data")).toBe(true);
+    expect(insideData("/data", "/data/")).toBe(true);
+    expect(insideData("/backups", "/data")).toBe(false);
+    expect(insideData("/database", "/data")).toBe(false);
   });
 });

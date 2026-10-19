@@ -33,6 +33,7 @@ export type SlashAction =
   | { type: "watch"; mood: string }
   | { type: "trakt"; list: string }
   | { type: "request"; title: string }
+  | { type: "backup"; now: boolean }
   | { type: "next"; list: string; mood: string }
   | { type: "server" }
   | { type: "diagnose" }
@@ -90,6 +91,7 @@ export const slashCommands = [
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
   { name: "watch", usage: "/watch [mood]", description: "What should we watch tonight? The pals pick from your Plex library" },
   { name: "next", usage: "/next [list:name] [mood]", description: "What should we watch next? The pals pick from your Trakt list (needs TRAKT_CLIENT_ID)" },
+  { name: "backup", usage: "/backup [now]", description: "Show the nightly backup status, or back up now (owner)" },
   { name: "request", usage: "/request <title> [4k]", description: "Request a title through Seerr (same as @seerr)" },
   { name: "trakt", usage: "/trakt [lists|<list>]", description: "Show your Trakt lists, or the items in one" },
   { name: "plex", usage: "/plex <title|recent>", description: "Look in your Plex library (needs PLEX_URL)" },
@@ -177,6 +179,8 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
     case "plex":
       return { ok: true, action: { type: "plex", query: rawArg || "recent" } };
+    case "backup":
+      return { ok: true, action: { type: "backup", now: arg === "now" } };
     case "request":
       return rawArg ? { ok: true, action: { type: "request", title: rawArg } } : fail("Which title? /request Dune Part Two");
     case "trakt":
