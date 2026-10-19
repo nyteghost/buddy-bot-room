@@ -38,6 +38,7 @@ export type SlashAction =
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
   | { type: "status" }
+  | { type: "schedule"; op: "list" | "add" | "remove" | "run"; text: string }
   | { type: "web"; mode: "on" | "off" | "toggle" }
   | { type: "next"; list: string; mood: string }
   | { type: "server" }
@@ -96,6 +97,7 @@ export const slashCommands = [
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
   { name: "watch", usage: "/watch [mood]", description: "What should we watch tonight? The pals pick from your Plex library" },
   { name: "next", usage: "/next [list:name] [mood]", description: "What should we watch next? The pals pick from your Trakt list (needs TRAKT_CLIENT_ID)" },
+  { name: "schedule", usage: "/schedule add 08:00 weekdays <question> | list | remove N | run N", description: "Have the pals answer something on a schedule and send it to your phone (owner only; free keys and Local AI only)" },
   { name: "status", usage: "/status", description: "Check that Local AI, search, Plex, Seerr, Jellyfin, Unraid and backups are all working" },
   { name: "web", usage: "/web [on|off]", description: "Let the pals search the web on their own when a question needs current facts" },
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
@@ -189,6 +191,14 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
     case "plex":
       return { ok: true, action: { type: "plex", query: rawArg || "recent" } };
+    case "schedule": case "schedules": case "cron": {
+      const m = /^\s*(add|list|remove|rm|run)?\s*([\s\S]*)$/i.exec(rawArg);
+      const op = (m?.[1] ?? "list").toLowerCase();
+      const text = (m?.[2] ?? "").trim();
+      if (op === "add" && !text) return fail("Use: /schedule add 08:00 weekdays what should I know today?");
+      if ((op === "remove" || op === "rm" || op === "run") && !text) return fail(`Which one? /schedule ${op} 1`);
+      return { ok: true, action: { type: "schedule", op: op === "rm" ? "remove" : (op as "list" | "add" | "remove" | "run"), text } };
+    }
     case "status": case "health":
       return { ok: true, action: { type: "status" } };
     case "web": case "autosearch":

@@ -21,11 +21,11 @@
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
    - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet)
-8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup)
+8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
 11. [Dungeon Master mode](#11-dungeon-master-mode)
-12. [Voice replies](#12-voice-replies)
+12. [Voice replies and dictation](#12-voice-replies-and-dictation)
 13. [Work tools and the recorder](#13-work-tools-and-the-recorder)
 14. [Configuration reference](#14-configuration-reference)
 15. [Troubleshooting](#15-troubleshooting)
@@ -238,6 +238,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
 | `/focus [on\|off]` | Focus mode: calm, chat-only view |
+| `/schedule add 08:00 <question>` | Scheduled tasks sent to your phone; also `list`, `run N`, `remove N` (owner only, [8.3](#83-scheduled-tasks)) |
 | `/web [on\|off]` | Automatic web lookup: when a question needs current facts (latest, price, news, a question with a `?`), the pals search your SearXNG first and cite the links. Off by default |
 | `/status` | One-shot health check: Local AI, search, Plex, Seerr, Jellyfin, Unraid, Trakt, ntfy and backups. Shows names and problems only, never addresses or keys |
 | `/log` | Debug log |
@@ -403,7 +404,7 @@ Whatever you share lands in the message box, ready to send (nothing is sent auto
 
 ## 8. Automatic jobs
 
-Both run on the server at times in `BUDDY_TZ` (default `America/New_York`).
+These run on the server at times in `BUDDY_TZ` (default `America/New_York`).
 
 ### 8.1 Morning brief
 
@@ -427,6 +428,35 @@ At `BUDDY_BACKUP_TIME` (default `03:30`) the server copies its data folder (acco
 - **Restore:** stop the stack, copy a backup folder's contents into the `buddy-data` volume, start again.
 
 Backups contain password hashes and API keys, so keep that share private.
+
+### 8.3 Scheduled tasks
+
+Have the pals answer something on a schedule and send the answer to your phone.
+
+```
+/schedule add 08:00 weekdays what should I know about today in tech?
+/schedule add 18:30 daily is my Unraid array healthy and anything worth watching tonight?
+/schedule list
+/schedule run 1
+/schedule remove 2
+```
+
+- Times are 24-hour in `BUDDY_TZ`; days are `daily` (default), `weekdays` or `weekends`. Up to 12 tasks.
+- **Owner only**, because tasks run with the owner account's saved settings. Open the room once after adding a key so your settings sync to the server.
+- Answers go to your phone through **ntfy** (`NTFY_URL`) and/or **Telegram** ([8.4](#84-telegram-bot)).
+- **Only free keys and Local AI are used.** Claude and your Custom provider never run unattended, so nothing can spend money while you're away.
+- If a question looks like it needs current facts, the server searches your SearXNG first ([7.1](#71-web-search-searxng)).
+- Tasks live in `schedules.json` in the data volume (and are included in backups).
+
+### 8.4 Telegram bot
+
+Message your pals from your phone, anywhere, without opening the website.
+
+1. In Telegram, message **@BotFather**, send `/newbot` and copy the token it gives you.
+2. Set `TELEGRAM_BOT_TOKEN` in the stack and redeploy. Message your new bot once: it replies with your **chat id**.
+3. Set `TELEGRAM_CHAT_ID` to that number and redeploy. Only that chat is answered; everyone else is ignored.
+
+Then just type a question. `/status` checks your services. It uses long-polling, so you don't need a public address, and like scheduled tasks it only uses free keys and Local AI.
 
 ---
 
@@ -472,11 +502,22 @@ The same controls are in the *Notes & tasks* window.
 
 ---
 
-## 12. Voice replies
+## 12. Voice replies and dictation
+
+### 12.1 Voice replies
 
 Click **Voice** in the top bar (or `/voice`) and each discussion's replies are read aloud when it finishes, every pal in a different voice and pitch. The speaker button on any reply reads just that one; `Esc` silences it.
 
 It uses your device's built-in voices: nothing to install, no keys, and no audio data leaves the device. Off by default; synced with your account. On iPhone, Safari only plays sound after you've tapped something on the page (sending a message counts).
+
+### 12.2 Dictation (microphone button)
+
+Speak instead of typing. A small microphone appears next to Send once a speech server is running; tap it, talk, tap again, and the text lands in the message box (nothing is sent automatically).
+
+- Start the optional **Whisper** container: in Portainer add the environment variable `COMPOSE_PROFILES=voice` and *Pull and redeploy*. Nothing leaves your network.
+- The first dictation downloads the speech model (`WHISPER_MODEL`, default `Systran/faster-whisper-small`), so allow a minute and try again if it fails once. Use `WHISPER_IMAGE` to pick a different image (for example a GPU build).
+- Already have a Whisper server? Set `WHISPER_URL` to it (it must offer `/v1/audio/transcriptions` and `/health`).
+- Recordings stop at 60 seconds and are never stored. Browsers only allow the microphone over HTTPS or `localhost` ([section 3](#3-first-run-accounts-and-https)).
 
 ---
 
@@ -525,6 +566,10 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
+| `COMPOSE_PROFILES` | empty | `voice` starts the Whisper dictation container |
+| `WHISPER_URL` | `http://whisper:8000` | Speech server for the microphone button |
+| `WHISPER_MODEL` / `WHISPER_IMAGE` | small model / CPU image | What the Whisper container runs |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | empty | Telegram bot ([8.4](#84-telegram-bot)) |
 
 Internal (set by the Docker image/compose, rarely changed): `BUDDY_SELF_HOSTED=1`, `BUDDY_DATA_DIR=/data`, `BUDDY_BACKUP_DIR=/backups`.
 

@@ -14,6 +14,8 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiSttRouteImport } from './routes/api.stt'
+import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
 import { Route as ApiStatusRouteImport } from './routes/api.status'
 import { Route as ApiEmbedRouteImport } from './routes/api.embed'
 import { Route as ApiProvidersRouteImport } from './routes/api.providers'
@@ -56,6 +58,16 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSttRoute = ApiSttRouteImport.update({
+  id: '/api/stt',
+  path: '/api/stt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSchedulesRoute = ApiSchedulesRouteImport.update({
+  id: '/api/schedules',
+  path: '/api/schedules',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStatusRoute = ApiStatusRouteImport.update({
@@ -155,6 +167,8 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/stt': typeof ApiSttRoute
+  '/api/schedules': typeof ApiSchedulesRoute
   '/api/status': typeof ApiStatusRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/providers': typeof ApiProvidersRoute
@@ -180,6 +194,8 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/stt': typeof ApiSttRoute
+  '/api/schedules': typeof ApiSchedulesRoute
   '/api/status': typeof ApiStatusRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/providers': typeof ApiProvidersRoute
@@ -206,6 +222,8 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/stt': typeof ApiSttRoute
+  '/api/schedules': typeof ApiSchedulesRoute
   '/api/status': typeof ApiStatusRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/providers': typeof ApiProvidersRoute
@@ -233,6 +251,8 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/stt'
+    | '/api/schedules'
     | '/api/status'
     | '/api/embed'
     | '/api/providers'
@@ -258,6 +278,8 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/stt'
+    | '/api/schedules'
     | '/api/status'
     | '/api/embed'
     | '/api/providers'
@@ -283,6 +305,8 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/stt'
+    | '/api/schedules'
     | '/api/status'
     | '/api/embed'
     | '/api/providers'
@@ -309,6 +333,8 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiSttRoute: typeof ApiSttRoute
+  ApiSchedulesRoute: typeof ApiSchedulesRoute
   ApiStatusRoute: typeof ApiStatusRoute
   ApiEmbedRoute: typeof ApiEmbedRoute
   ApiProvidersRoute: typeof ApiProvidersRoute
@@ -364,6 +390,20 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stt': {
+      id: '/api/stt'
+      path: '/api/stt'
+      fullPath: '/api/stt'
+      preLoaderRoute: typeof ApiSttRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/schedules': {
+      id: '/api/schedules'
+      path: '/api/schedules'
+      fullPath: '/api/schedules'
+      preLoaderRoute: typeof ApiSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/status': {
@@ -501,6 +541,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiSttRoute: ApiSttRoute,
+  ApiSchedulesRoute: ApiSchedulesRoute,
   ApiStatusRoute: ApiStatusRoute,
   ApiEmbedRoute: ApiEmbedRoute,
   ApiProvidersRoute: ApiProvidersRoute,

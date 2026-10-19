@@ -60,6 +60,11 @@ async function sessionSecret(): Promise<string> {
   return value;
 }
 
+/** The owner account's name (the first account), or null. Used by jobs that run without a signed-in request. */
+export async function ownerName(): Promise<string | null> {
+  return (await readUsers()).find((u) => u.owner)?.username ?? null;
+}
+
 export async function userCount(): Promise<number> {
   return (await readUsers()).length;
 }

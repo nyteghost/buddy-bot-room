@@ -128,6 +128,7 @@ import { matchShortcut, shortcutList } from "@/lib/shortcuts";
 import { friendlyError } from "@/lib/friendly-error";
 import { allChunks, getDocs } from "@/lib/documents";
 import { docContext } from "@/lib/rag";
+import { MicButton } from "@/components/mic-button";
 import { smartRetrieve } from "@/lib/smart-docs";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
@@ -661,6 +662,16 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "schedule": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/schedules", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: action.op, text: action.text }) });
+            const json = (await res.json()) as { text?: string; error?: string };
+            say(command, json.text ?? json.error ?? "Nothing came back.");
+          } catch { say(command, "I couldn't reach the server."); }
+        })();
+        return;
+      }
       case "status": {
         void (async () => {
           try {
@@ -1541,6 +1552,7 @@ export function Room() {
                 <span className="composer-label">
                   <MessageSquare size={13} /> A question, an idea, a rabbit hole.
                 </span>
+                <MicButton disabled={running} onText={(t) => { setTopic((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t)); inputRef.current?.focus(); }} />
                 <PromptInputSubmit
                   aria-label={running ? "Stop discussion" : "Start topic"}
                   status={running ? "streaming" : "ready"}

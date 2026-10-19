@@ -1942,3 +1942,12 @@ html, body { overscroll-behavior: none; }
   .focus-mode .chat-content { padding: 12px 14px 20px; }
   .focus-mode .workspace-composer { padding: 6px 10px max(10px, env(safe-area-inset-bottom)); }
 }
+
+/* Dictation button */
+.mic-button-wrap { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; margin-right: 6px; }
+.mic-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.mic-button:hover:not(:disabled) { color: var(--foreground); }
+.mic-button[data-state="recording"] { color: #fff; background: #d33; border-color: #d33; animation: mic-pulse 1.2s ease-in-out infinite; }
+.mic-note { color: var(--muted-foreground); font-size: 11px; max-width: 180px; }
+@keyframes mic-pulse { 50% { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .mic-button[data-state="recording"] { animation: none; } }

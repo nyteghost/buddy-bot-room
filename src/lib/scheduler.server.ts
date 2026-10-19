@@ -5,16 +5,20 @@ import { logServer } from "./server-log.server";
 import { startFeedTimer } from "./model-feed.server";
 import { startProviderTimer } from "./provider-feed.server";
 import { ollamaBase } from "./ollama.server";
+import { tickSchedules } from "./schedules.server";
+import { startTelegram } from "./telegram.server";
 
 /** One 30-second ticker for the daily jobs. Idempotent. Does nothing unless a job is configured. */
 type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string };
+const dataDir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim();
 const holder = globalThis as unknown as { __buddyScheduler?: S };
 
 export function startScheduler(): void {
   if (ollamaBase()) startFeedTimer();
   startProviderTimer();
   if (holder.__buddyScheduler?.timer) return;
-  if (!backupConfig() && !briefConfig()) return;
+  startTelegram();
+  if (!backupConfig() && !briefConfig() && !dataDir()) return;
   const s: S = (holder.__buddyScheduler ??= { lastBackupDay: "", lastBriefDay: "" });
   logServer("info", "Scheduler started");
   s.timer = setInterval(() => { void tick(s); }, 30_000);
@@ -36,6 +40,7 @@ async function tick(s: S): Promise<void> {
     s.lastBackupDay = zonedParts(now, cfg.tz).day;
     await runBackup(cfg, now);
   }
+  await tickSchedules(now).catch(() => undefined);
   const brief = briefConfig();
   if (brief && isDue(now, brief.tz, brief.time, s.lastBriefDay)) {
     s.lastBriefDay = zonedParts(now, brief.tz).day;

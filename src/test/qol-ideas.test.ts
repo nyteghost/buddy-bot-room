@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cosine, candidateChunks, rerank } from "@/lib/embed-rerank";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { servicesReport } from "@/lib/status";
+import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, MAX_SCHEDULES } from "@/lib/schedules";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
 import { TtlCache } from "@/lib/ttl-cache";
 import { gate, safeEqual, readCookie } from "@/lib/gate.server";
@@ -1392,5 +1393,36 @@ describe("status text", () => {
     expect(t).toContain("⚠ Seerr — no answer");
     expect(t).toContain("Jellyfin — not set up");
     expect(t).toContain("Backups: off");
+  });
+});
+
+describe("scheduled tasks", () => {
+  it("parses add arguments", () => {
+    expect(parseScheduleArgs("8:05 weekdays what is new")).toEqual({ time: "08:05", days: "weekdays", prompt: "what is new" });
+    expect(parseScheduleArgs("07:30 summarise my day")).toEqual({ time: "07:30", days: "daily", prompt: "summarise my day" });
+    expect("error" in parseScheduleArgs("25:00 hi")).toBe(true);
+    expect("error" in parseScheduleArgs("hello")).toBe(true);
+  });
+  it("adds, caps, lists and removes", () => {
+    let list = parseSchedules([]);
+    for (let i = 0; i < MAX_SCHEDULES; i++) { const r = addSchedule(list, "08:00", "daily", `q${i}`, `id${i}`); expect(r.ok).toBe(true); if (r.ok) list = r.list; }
+    expect(addSchedule(list, "08:00", "daily", "x", "z").ok).toBe(false);
+    expect(scheduleList(list)).toContain("1. 08:00 daily — q0");
+    const r = removeSchedule(list, "2");
+    expect(r.removed?.prompt).toBe("q1");
+    expect(r.list.length).toBe(MAX_SCHEDULES - 1);
+    expect(removeSchedule(list, "99").removed).toBeUndefined();
+  });
+  it("drops bad saved rows", () => {
+    expect(parseSchedules([{ id: "a", time: "99:99", prompt: "x" }, { id: "b", time: "09:00", prompt: "ok", days: "weekends" }, "junk"]).map((x) => x.id)).toEqual(["b"]);
+  });
+  it("runs once per day, only on matching days", () => {
+    const s = { id: "a", time: "08:00", days: "weekdays" as const, prompt: "p", last: "", lastResult: "" };
+    const mon = new Date("2026-10-19T12:02:00Z"); // 08:02 Monday in New York
+    const sat = new Date("2026-10-24T12:02:00Z");
+    expect(scheduleDue(s, mon, "America/New_York")).toBe(true);
+    expect(scheduleDue({ ...s, last: "2026-10-19" }, mon, "America/New_York")).toBe(false);
+    expect(scheduleDue(s, sat, "America/New_York")).toBe(false);
+    expect(scheduleDue(s, new Date("2026-10-19T12:40:00Z"), "America/New_York")).toBe(false);
   });
 });

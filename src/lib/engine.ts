@@ -89,6 +89,16 @@ export function normalizeKind(kind: unknown): EngineKind {
   return kind === "local" || kind === "auto" || kind === "ollama" || kind === "auto-ollama" || kind === "local-server" ? kind : "cloud";
 }
 
+/** Settings from a saved JSON string (the account snapshot on the server). Missing fields get defaults. */
+export function engineFromJson(raw: string | null | undefined): EngineSettings {
+  try {
+    const parsed = JSON.parse(raw ?? "null");
+    return parsed && typeof parsed === "object" ? { ...fallback, ...parsed, kind: normalizeKind(parsed.kind) } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function read(): EngineSettings {
   if (cache) return cache;
   try {
