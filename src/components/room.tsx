@@ -569,6 +569,7 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
       case "trakt": void trakt(action.list, command, null); return;
       case "next": void trakt(action.list, command, action.mood); return;
       case "server": void serverCheck(command, false); return;
@@ -659,11 +660,11 @@ export function Room() {
       return say(command, "I couldn't reach the Plex service.");
     }
   }
-  /** /trakt shows lists or one list; /next hands the list to the pals to pick from. Talks to Trakt only, never Plex. */
+  /** /trakt shows lists or one list; /next hands the list to the pals to pick from. Items are marked when Plex already has them. */
   async function trakt(list: string, command: string, mood: string | null) {
     try {
       const wantLists = mood === null && list.trim().toLowerCase() === "lists";
-      const res = await fetch(`/api/trakt?${wantLists ? "mode=lists" : list.trim() ? `list=${encodeURIComponent(list.trim())}` : ""}`);
+      const res = await fetch(`/api/trakt?${wantLists ? "mode=lists" : `plex=1${list.trim() ? `&list=${encodeURIComponent(list.trim())}` : ""}`}`);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) return say(command, json.error ?? "The Trakt lookup failed.");
       if (wantLists) return say(command, traktListsMarkdown((json.lists ?? []) as TraktList[]));

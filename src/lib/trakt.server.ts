@@ -1,5 +1,7 @@
 import { logServer } from "./server-log.server";
-import { isSlug, markWatched, shapeTrakt, shapeTraktLists, watchedMovieIds } from "./trakt";
+import { plexConfig } from "./plex.server";
+import { shapePlex } from "./plex";
+import { isSlug, markWatched, plexHas, shapeTrakt, shapeTraktLists, watchedMovieIds, type TraktItem } from "./trakt";
 
 const API = "https://api.trakt.tv";
 
@@ -13,6 +15,23 @@ export function traktConfig(env: Record<string, string | undefined> = process.en
   if (!clientId || !isSlug(user)) return null;
   const list = (env["TRAKT_LIST"] ?? "watchlist").trim() || "watchlist";
   return { clientId, user, list: isSlug(list) ? list : "watchlist", token: (env["TRAKT_ACCESS_TOKEN"] ?? "").trim() };
+}
+
+/** Marks which unwatched items Plex already has. Best effort: no Plex configured (or it's down) leaves them unmarked. */
+export async function addPlexAvailability(items: TraktItem[], limit = 40): Promise<TraktItem[]> {
+  const cfg = plexConfig();
+  if (!cfg) return items;
+  const todo = items.filter((i) => !i.watched).slice(0, limit);
+  const has = new Map<TraktItem, boolean>();
+  for (let i = 0; i < todo.length; i += 6) {
+    await Promise.all(todo.slice(i, i + 6).map(async (item) => {
+      try {
+        const res = await fetch(`${cfg.base}/hubs/search?${new URLSearchParams({ query: item.title, limit: "8" })}`, { headers: { "X-Plex-Token": cfg.token, Accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+        if (res.ok) has.set(item, plexHas(item, shapePlex(await res.json(), 20)));
+      } catch { /* Plex unreachable: leave unmarked */ }
+    }));
+  }
+  return items.map((i) => (has.has(i) ? { ...i, inPlex: has.get(i) as boolean } : i));
 }
 
 /** Shared by /api/trakt and the note sync: one authenticated GET against Trakt. */
@@ -50,6 +69,7 @@ export async function handleTrakt(request: Request) {
       const seen = await get(`/users/${user}/watched/movies`);
       if (seen.ok) items = markWatched(items, watchedMovieIds(await seen.json()));
     } catch { /* optional */ }
+    if (url.searchParams.get("plex") === "1") items = await addPlexAvailability(items);
     return Response.json({ list, items });
   } catch (error) {
     logServer("error", "Can't reach Trakt", error);

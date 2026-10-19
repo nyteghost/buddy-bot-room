@@ -107,6 +107,8 @@ Pixel Pals reads your Trakt lists straight from Trakt's API (no Plex involved) a
 2. In the stack's environment variables add `TRAKT_CLIENT_ID`, `TRAKT_USER` (your Trakt username) and optionally `TRAKT_LIST` (the list's short name; default `watchlist`). Then *Pull and redeploy*.
 3. Public lists need nothing more. For private lists also set `TRAKT_ACCESS_TOKEN`.
 
+With Plex set up too, each unwatched item is marked **📺 in Plex** or **not in Plex**, and `/next` tells the pals to prefer what you can watch right now. For anything not in Plex, type `/request <title>` (or `@seerr <title>`) to open the Seerr request dialog.
+
 Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
 
 ## Sync an iPhone Note with Trakt

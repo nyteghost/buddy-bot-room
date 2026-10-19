@@ -21,6 +21,7 @@ import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
 import { capPerOwner, visibleTo } from "@/lib/store.server";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
+import { plexHas } from "@/lib/trakt";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
 import { traktConfig } from "@/lib/trakt.server";
 import { plexMarkdown, shapePlex, watchTopic } from "@/lib/plex";
@@ -836,5 +837,31 @@ describe("per-account chats", () => {
   it("caps chats per owner, not overall", () => {
     const rows = [row("1", "a"), row("2", "a"), row("3", "b"), row("4", "a"), row("5", "b")];
     expect(capPerOwner(rows, 2).map((r) => r.id)).toEqual(["1", "2", "3", "5"]);
+  });
+});
+
+describe("trakt x plex", () => {
+  const found = [{ title: "Dune", kind: "movie" as const, year: 2021 }, { title: "The Bear", kind: "show" as const, year: 2022 }];
+  it("matches by name, kind and year within one", () => {
+    expect(plexHas({ title: "Dune", kind: "movie", year: 2021 }, found)).toBe(true);
+    expect(plexHas({ title: "Dune", kind: "movie", year: 2022 }, found)).toBe(true);
+    expect(plexHas({ title: "Dune", kind: "movie", year: 1984 }, found)).toBe(false);
+    expect(plexHas({ title: "Dune", kind: "show" }, found)).toBe(false);
+    expect(plexHas({ title: "Bear", kind: "show", year: 2022 }, found)).toBe(true);
+    expect(plexHas({ title: "Heat", kind: "movie" }, found)).toBe(false);
+  });
+  it("shows Plex status in the list and tells the pals to prefer what's in Plex", () => {
+    const items = [{ title: "Dune", kind: "movie" as const, year: 2021, inPlex: true }, { title: "Heat", kind: "movie" as const, year: 1995, inPlex: false }, { title: "Andor", kind: "show" as const }];
+    expect(traktMarkdown("watchlist", items)).toContain("1. **Dune** (2021) · Movie · 📺 in Plex");
+    expect(traktMarkdown("watchlist", items)).toContain("· not in Plex");
+    const topic = nextTopic("", "watchlist", items);
+    expect(topic).toContain("- Dune (2021) — movie [in Plex]");
+    expect(topic).toContain("- Heat (1995) — movie [not in Plex]");
+    expect(topic).toContain("/request");
+    expect(nextTopic("", "watchlist", [{ title: "Andor", kind: "show" as const }])).not.toContain("/request");
+  });
+  it("has /request", () => {
+    expect(parseSlash("/request Dune Part Two")).toEqual({ ok: true, action: { type: "request", title: "Dune Part Two" } });
+    expect(parseSlash("/request")?.ok).toBe(false);
   });
 });
