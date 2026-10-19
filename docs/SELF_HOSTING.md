@@ -39,7 +39,10 @@ on your machine; fall back to the default `dev` target if it doesn't.
 3. **Compose path:** `docker-compose.portainer.yml`
 4. Optional **Environment variables:** `SEERR_URL`, `SEERR_API_KEY`, `SEARXNG_URL`, `BUDDY_PORT`.
 5. **Deploy the stack**, then open `http://<host>:8090`. To update, open the stack and press
-   *Pull and redeploy* (turn on *Re-build image*).
+   *Pull and redeploy*; the compose file's `pull_policy: build` makes it rebuild the image.
+
+Newer Portainer versions ask for a **Source** first: choose *Create new source*, give it a name, enter the
+repository URL, and add a token only if the repo is private.
 
 ## Without Docker
 
