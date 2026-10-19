@@ -1,5 +1,5 @@
 import { currentUser } from "./accounts.server";
-import { accountFileName, normalizeLocalSettings } from "./local-account";
+import { accountFileName, normalizeAccountData } from "./local-account";
 import { logServer } from "./server-log.server";
 
 /**
@@ -22,16 +22,16 @@ export async function handleAccountLocal(request: Request) {
   try {
     if (request.method === "GET") {
       try {
-        return Response.json({ settings: normalizeLocalSettings(JSON.parse(await f.readFile(path, "utf8"))) });
+        return Response.json({ data: normalizeAccountData(JSON.parse(await f.readFile(path, "utf8")))?.data ?? null });
       } catch (e) {
-        if ((e as { code?: string }).code === "ENOENT") return Response.json({ settings: null });
+        if ((e as { code?: string }).code === "ENOENT") return Response.json({ data: null });
         throw e;
       }
     }
     if (request.method === "PUT") {
       const text = await request.text();
-      if (text.length > 10_000) return Response.json({ error: "Those settings are too large." }, { status: 413 });
-      const settings = normalizeLocalSettings(JSON.parse(text));
+      if (text.length > 2_000_000) return Response.json({ error: "Your settings are too large to sync (documents are the usual cause)." }, { status: 413 });
+      const settings = normalizeAccountData(JSON.parse(text));
       if (!settings) return Response.json({ error: "Those settings weren't valid." }, { status: 400 });
       await f.mkdir(folder, { recursive: true, mode: 0o700 });
       await f.writeFile(`${path}.tmp`, JSON.stringify(settings), { encoding: "utf8", mode: 0o600 });

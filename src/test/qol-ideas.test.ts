@@ -16,7 +16,8 @@ import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
-import { accountFileName, normalizeLocalSettings } from "@/lib/local-account";
+import { accountFileName, normalizeAccountData } from "@/lib/local-account";
+import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
@@ -710,12 +711,18 @@ describe("accounts", () => {
     expect(await readSession("junk", "secret")).toBeNull();
     expect(await readSession("", "secret")).toBeNull();
   });
-  it("normalizes per-account settings and file names", async () => {
-    const good = { engineKind: "auto", characterMode: "matrix", groqKey: "a", geminiKey: "", openrouterKey: "", nvidiaKey: "" };
-    expect(normalizeLocalSettings(good)).toEqual(good);
-    expect(normalizeLocalSettings({ ...good, engineKind: "evil" })).toBeNull();
-    expect(normalizeLocalSettings({ ...good, groqKey: "x".repeat(501) })).toBeNull();
-    expect(normalizeLocalSettings(null)).toBeNull();
+  it("validates the settings snapshot that follows an account", async () => {
+    const good = { "pixel-pals-engine-v1": JSON.stringify({ kind: "auto", groqKey: "k" }), "pixel-pals-presets-v1": "[]", "pixel-pals-character-mode-v1": "matrix" };
+    expect(validSyncData(good)).toEqual(good);
+    expect(normalizeAccountData({ data: good })?.data["pixel-pals-character-mode-v1"]).toBe("matrix");
+    expect(validSyncData({ "pixel-pals-engine-v1": "{not json" })).toBeNull();
+    expect(validSyncData({ "evil-key": "{}" })).toBeNull();
+    expect(validSyncData({ "pixel-pals-character-mode-v1": "x".repeat(301) })).toBeNull();
+    expect(validSyncData({ "pixel-pals-docs-v1": JSON.stringify("x".repeat(1_900_000)) })).toBeNull();
+    expect(validSyncData([])).toBeNull();
+    expect(normalizeAccountData(null)).toBeNull();
+    expect(SYNC_KEYS.includes("pixel-pals-saved-discussions-v1")).toBe(false);
+    expect(SYNC_KEYS.includes("pixel-pals-agent-notes-v1")).toBe(true);
     const a = await accountFileName("Nyte");
     expect(a).toBe(await accountFileName(" nyte "));
     expect(a).toMatch(/^[0-9a-f]{32}\.json$/);

@@ -16,6 +16,29 @@ export const BACKUP_KEYS = [
   "pixel-pals-campaign-v1",
   "pixel-pals-workspace-v1",
 ] as const;
+/** Keys that follow a signed-in account on the self-hosted build. Saved chats are excluded: the server store handles those. */
+export const SYNC_JSON_KEYS: readonly string[] = BACKUP_KEYS.filter((k) => k !== "pixel-pals-saved-discussions-v1");
+/** Small plain-string settings (theme, assistant switch, local model, notes folder). */
+export const SYNC_PLAIN_KEYS: readonly string[] = ["pixel-pals-character-mode-v1", "pixel-pals-assistant-mode-v1", "pixel-pals-local-model-v1", "pixel-pals-notes-dir-v1"];
+export const SYNC_KEYS: readonly string[] = [...SYNC_JSON_KEYS, ...SYNC_PLAIN_KEYS];
+export const SYNC_MAX_BYTES = 1_800_000;
+
+/** Validates a settings snapshot from the browser. Unknown keys, bad JSON and oversize snapshots are rejected. */
+export function validSyncData(v: unknown): Record<string, string> | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const out: Record<string, string> = {};
+  let total = 0;
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (!SYNC_KEYS.includes(k) || typeof val !== "string") return null;
+    if (SYNC_PLAIN_KEYS.includes(k)) { if (val.length > 300) return null; }
+    else { try { JSON.parse(val); } catch { return null; } }
+    total += k.length + val.length;
+    if (total > SYNC_MAX_BYTES) return null;
+    out[k] = val;
+  }
+  return out;
+}
+
 const SECRET_FIELDS = ["groqKey", "geminiKey", "openrouterKey", "nvidiaKey"];
 const MAX_BYTES = 8_000_000;
 

@@ -2,23 +2,30 @@ import { useEffect, useRef, useState } from "react";
 import { LogOut, Users } from "lucide-react";
 import { AccountsDialog } from "@/components/accounts-dialog";
 import { Button } from "@/components/ui/button";
-import { normalizeKind, setEngine, useEngine } from "@/lib/engine";
-import { isCharacterMode, type CharacterMode } from "@/lib/hellraiser";
+import { SYNC_KEYS } from "@/lib/settings-io";
+import type { CharacterMode } from "@/lib/hellraiser";
 
 type Me = { accounts: boolean; user?: { username: string; owner: boolean } | null };
 
+function snapshot(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try { for (const k of SYNC_KEYS) { const v = localStorage.getItem(k); if (v !== null) out[k] = v; } } catch { /* storage unavailable */ }
+  return out;
+}
+
 /**
  * Docker build: "Local mode" when accounts are off (BUDDY_ACCOUNTS=0). With accounts on, the server has already
- * made you sign in; here we show who you are, open the Accounts dialog, and sync engine settings, keys and theme
- * to your account (stored on your server, not Lovable).
+ * made you sign in; here we show who you are, open the Accounts dialog, and sync every setting (engine, keys, theme,
+ * presets, pal notes, documents, campaign, layout…) to your account, stored on your server. Chats are handled by the chat store.
+ * On the first load after signing in, your account's settings win (one reload applies them); after that this browser's changes are uploaded.
  */
-export function LocalAccountButton({ theme, onTheme }: { theme: CharacterMode; onTheme: (t: CharacterMode) => void }) {
-  const engine = useEngine();
+export function LocalAccountButton(_props: { theme: CharacterMode; onTheme: (t: CharacterMode) => void }) {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [synced, setSynced] = useState(false);
   const [note, setNote] = useState("");
   const [dialog, setDialog] = useState(false);
   const loadedFor = useRef<string | undefined>(undefined);
+  const lastSent = useRef("");
   const email = me?.accounts ? me.user?.username ?? null : null;
 
   useEffect(() => {
@@ -29,33 +36,50 @@ export function LocalAccountButton({ theme, onTheme }: { theme: CharacterMode; o
     if (!email || loadedFor.current === email) return;
     loadedFor.current = email;
     fetch("/api/account-local").then(async (r) => {
-      const json = (await r.json().catch(() => ({}))) as { settings?: Record<string, string> | null; error?: string };
+      const json = (await r.json().catch(() => ({}))) as { data?: Record<string, string> | null; error?: string };
       if (!r.ok) throw new Error(json.error ?? "Could not load your settings.");
-      const s = json.settings;
-      if (s) {
-        setEngine({ kind: normalizeKind(s["engineKind"] ?? ""), groqKey: s["groqKey"] ?? "", geminiKey: s["geminiKey"] ?? "", openrouterKey: s["openrouterKey"] ?? "", nvidiaKey: s["nvidiaKey"] ?? "" });
-        if (isCharacterMode(s["characterMode"] ?? "")) onTheme(s["characterMode"] as CharacterMode);
+      const server = json.data;
+      if (server && Object.keys(server).length) {
+        const local = snapshot();
+        const differs = Object.entries(server).some(([k, v]) => local[k] !== v);
+        const guard = `pixel-pals-synced-${email}`;
+        let already = false;
+        try { already = sessionStorage.getItem(guard) === "1"; } catch { /* optional */ }
+        if (differs && !already) {
+          for (const [k, v] of Object.entries(server)) localStorage.setItem(k, v);
+          try { sessionStorage.setItem(guard, "1"); } catch { /* optional */ }
+          window.location.reload();
+          return;
+        }
+        lastSent.current = JSON.stringify(server);
       }
       setSynced(true);
     }).catch((e) => setNote(e instanceof Error ? e.message : "Could not load your settings."));
-  }, [email]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [email]);
 
+  // Upload whenever this browser's settings change (checked every few seconds; cheap string compare).
   useEffect(() => {
     if (!synced) return;
-    const t = setTimeout(() => {
-      fetch("/api/account-local", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ engineKind: engine.kind, characterMode: theme, groqKey: engine.groqKey, geminiKey: engine.geminiKey, openrouterKey: engine.openrouterKey, nvidiaKey: engine.nvidiaKey }),
-      }).then(async (r) => { setNote(r.ok ? "" : ((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Could not save settings."); })
+    const tick = () => {
+      const data = snapshot();
+      const body = JSON.stringify(data);
+      if (body === lastSent.current) return;
+      fetch("/api/account-local", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) })
+        .then(async (r) => {
+          if (r.ok) { lastSent.current = body; setNote(""); }
+          else setNote(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Could not save settings.");
+        })
         .catch(() => setNote("Could not save settings."));
-    }, 800);
-    return () => clearTimeout(t);
-  }, [synced, engine.kind, engine.groqKey, engine.geminiKey, engine.openrouterKey, engine.nvidiaKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
+    };
+    tick();
+    const t = setInterval(tick, 4000);
+    return () => clearInterval(t);
+  }, [synced]);
 
   if (!email)
     return <span className="account-chip" title="Settings and keys stay in this browser. Accounts are turned off on this server (BUDDY_ACCOUNTS=0).">Local mode</span>;
   return (
-    <span className="account-chip" title={note || `Signed in as ${email}. Settings sync to your account on this server.`}>
+    <span className="account-chip" title={note || `Signed in as ${email}. Your settings sync to your account on this server.`}>
       <span className="account-name">{email}</span>
       <Button variant="ghost" size="sm" aria-label="Accounts" onClick={() => setDialog(true)}><Users /></Button>
       <Button variant="ghost" size="sm" aria-label="Sign out" onClick={() => { window.location.href = "/__logout"; }}>
