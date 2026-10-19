@@ -669,7 +669,7 @@ export function Room() {
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
           <p className="build-version" title={`Commit ${__APP_COMMIT__} · built ${__APP_BUILD_DATE__}`}>
-            {desktopApp ? "Desktop" : "Web"} v{__APP_VERSION__} · {__APP_COMMIT__}
+            c{desktopApp ? "Desktop" : "Web"} v{__APP_VERSION__} · {__APP_COMMIT__}
           </p>
           {assistantOn && (desktopApp ? (
             <Suspense fallback={<div className="linux-terminal">Opening terminal…</div>}><LinuxTerminal /></Suspense>
