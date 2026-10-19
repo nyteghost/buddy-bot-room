@@ -38,7 +38,7 @@ A multi-model AI chat room where a cast of pixel-art characters discuss whatever
 
 ### Saved discussions
 - Multiple chats with auto-save and a slide-out history.
-- Optional Google sign-in syncs chats, theme and engine settings across devices. Signed out, everything stays in the browser.
+- On the Lovable-hosted app, optional Google sign-in syncs chats, theme and engine settings across devices. In the Docker build, use the built-in accounts instead (see below). Signed out, everything stays in the browser.
 
 ### Work tools (Show Services)
 All run in the browser — files never leave your device.
@@ -56,6 +56,64 @@ All run in the browser — files never leave your device.
 A Tauri build (`.AppImage`) adds a real terminal, system stats, notes, file listing and self-update. Pals can suggest commands, but **nothing runs without your click**. See [`packaging/README.md`](packaging/README.md).
 
 ---
+
+## Self-hosting with Docker (everything below needs this)
+
+```sh
+git clone https://github.com/nyteghost/buddy-bot-room ~/buddy-bot-room && cd ~/buddy-bot-room
+cp .env.local.example .env.local     # optional: put the settings from the table below here
+docker compose up -d --build         # then open http://<this-machine>:8090
+```
+
+Portainer: *Stacks → Add stack → Repository*, compose path `docker-compose.portainer.yml`, add the variables you want, deploy. Update with *Pull and redeploy* (or `git pull && docker compose up -d --build`). Full details: [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
+### Accounts and settings
+- **First visit:** create a username and password. That account is the **owner**. Do this right after deploying; until then anyone who reaches the page could. Setting `BUDDY_PASSWORD` makes it a *setup password* the form asks for.
+- **Add people:** your name (top bar) → *Accounts* → add a username and password. Owners can also reset or remove accounts; everyone can change their own password.
+- **Everything follows you:** engine settings, API keys, theme, presets, pal memories, to-dos, documents, Dungeon Master campaign and layout sync to your account on every device. Last change wins.
+- **Chats are private** to each account. Click the share icon on a chat in the Chats list to share it with everyone who has an account.
+- **Forgot the owner password?** Stop the stack, delete `users.json` from the `buddy-data` volume, start, and create a new owner. `BUDDY_ACCOUNTS=0` turns accounts off.
+- **Phone / HTTPS:** on the host run `sudo tailscale serve --bg --https=443 http://localhost:8090`, then use `https://<machine>.<tailnet>.ts.net` on your devices.
+
+### Handy built-ins
+- **Command palette** Ctrl+K, **debug log** Ctrl+Shift+L (or `/log`; *Copy report* and paste it to Claude), **health** at `/__health`.
+- **Settings export/import:** Ctrl+K → *Export settings* / *Import settings*.
+- **Dungeon Master:** `/dm start <premise>`, `/roll d20`, `/roll 2d6+3`, `/roll d20 adv`, `/dm character|fact <text>`, `/dm status`, `/dm end`.
+- **Voice replies:** the *Voice* button or `/voice` reads replies aloud in a different voice per pal; the speaker button reads one reply. Off by default.
+- **Install on iPhone:** Safari → Share → *Add to Home Screen* (needs the HTTPS address). A Shortcut that opens `https://<address>/?q=<text>` puts shared text in the message box.
+
+### Media: Plex, Trakt, Jellyfin, Seerr
+- **Plex** (`PLEX_URL`, `PLEX_TOKEN`): `/plex <title>`, `/plex recent`, `/watch [mood]`. The token is the `X-Plex-Token=` value in an item's *Get Info → View XML* address.
+- **Trakt** (`TRAKT_CLIENT_ID`, `TRAKT_USER`, optional `TRAKT_LIST`, `TRAKT_ACCESS_TOKEN` for private lists): create an app at trakt.tv → Settings → Your API Apps and copy its Client ID. `/trakt lists`, `/trakt <list>`, `/next [list:name] [mood]` have the pals pick from the list, marking each item **in Plex** or not.
+- **Seerr** (`SEERR_URL`, `SEERR_API_KEY`): `@seerr Dune 4k` or `/request <title>` opens a confirm dialog.
+- **Jellyfin** (`JELLYFIN_URL`, `JELLYFIN_API_KEY`): `/library <title>` or `/library recent`.
+- **Web search** (`SEARXNG_URL`): `/search`, `/research`.
+
+### Unraid watcher and phone alerts
+Set `UNRAID_URL` and `UNRAID_API_KEY` (read-only key is fine). Red/amber banners appear when Unraid is unreachable or unhealthy; `/server` shows status and `/diagnose` asks the pals for advice. For phone pushes install the free **ntfy** app, subscribe to a long random topic and set `NTFY_URL=https://ntfy.sh/<topic>` (no need to host it on Unraid).
+
+### Morning brief
+Set `BRIEF_TIME` (e.g. `08:00`) and `NTFY_URL`. You get one push with Unraid health, last backup, tonight's Trakt pick (preferring what's in Plex) and what's new in Plex. `/brief` previews it, `/brief send` pushes it now.
+
+### Nightly backup
+Pixel Pals copies its data folder to `/backups` at `BUDDY_BACKUP_TIME` (default 03:30) and keeps `BUDDY_BACKUP_KEEP` copies (default 14). `/backup` shows status, `/backup now` runs one (owner). To keep backups off the machine, mount an Unraid share and set `BUDDY_BACKUP_PATH=/mnt/unraid/pixelpals-backups`. Restore by stopping the stack and copying a backup folder back into the `buddy-data` volume.
+
+### Sync an iPhone Note with Trakt
+Read-only on Trakt: watched movies get ✓, started shows ▶, your own marks are never removed. Create an access token (Accounts → *iPhone Shortcut access token*), then build a Shortcut: **Find Notes** → **Get Details of Notes (Body)** → **Get Contents of URL** `POST https://<address>/api/notes-sync?format=report&skip=1` with headers `Authorization: Bearer <token>`, `Content-Type: text/plain` and the body as the request body → **Show Result**. Use `format=note` for the whole note with marks added. Details in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
+### Settings reference
+| Variable | Purpose |
+|---|---|
+| `BUDDY_PORT` | Port (default 8090) |
+| `BUDDY_PASSWORD` | Setup password for the first account (or the shared gate if `BUDDY_ACCOUNTS=0`) |
+| `BUDDY_ACCOUNTS` | `0` turns built-in accounts off |
+| `BUDDY_TZ` | Time zone for schedules (default America/New_York) |
+| `SEARXNG_URL`, `SEERR_URL`, `SEERR_API_KEY` | Search and requests |
+| `PLEX_URL`, `PLEX_TOKEN`, `JELLYFIN_URL`, `JELLYFIN_API_KEY` | Media libraries |
+| `TRAKT_CLIENT_ID`, `TRAKT_USER`, `TRAKT_LIST`, `TRAKT_ACCESS_TOKEN` | Trakt |
+| `UNRAID_URL`, `UNRAID_API_KEY`, `UNRAID_CHECK_SECONDS` | Unraid watcher |
+| `NTFY_URL`, `BRIEF_TIME` | Phone pushes and morning brief |
+| `BUDDY_BACKUP_PATH`, `BUDDY_BACKUP_TIME`, `BUDDY_BACKUP_KEEP` | Backups |
 
 ## Tech stack
 
