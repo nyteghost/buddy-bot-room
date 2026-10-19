@@ -85,7 +85,7 @@ services:
       - ollama
     environment:
       OLLAMA_HOST: http://ollama:11434
-      MODELS: ${OLLAMA_MODELS:-qwen2.5:7b}
+      MODELS: ${OLLAMA_MODELS:-qwen2.5:7b nomic-embed-text}
     entrypoint: ["/bin/sh", "-c", "until ollama list >/dev/null 2>&1; do sleep 2; done; for m in $$MODELS; do ollama pull $$m; done"]
 
 volumes:

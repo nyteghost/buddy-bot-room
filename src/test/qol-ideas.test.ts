@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { cosine, candidateChunks, rerank } from "@/lib/embed-rerank";
+import { wantsWeb, webContext } from "@/lib/web-context";
+import { servicesReport } from "@/lib/status";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
 import { TtlCache } from "@/lib/ttl-cache";
 import { gate, safeEqual, readCookie } from "@/lib/gate.server";
@@ -1342,5 +1345,52 @@ describe("speed test wording", () => {
     expect(describeBench(4, 40)).toContain("40% on the GPU");
     expect(describeBench(8, 0)).toContain("CPU only");
     expect(describeBench(20, null)).toBe("20 tokens/second (fast).");
+  });
+});
+
+describe("embedding rerank", () => {
+  const chunks = [0, 1, 2, 3, 4, 5].map((n) => ({ doc: "a.txt", n, text: `chunk ${n}` }));
+  it("cosine is 1 for equal, 0 for orthogonal or empty", () => {
+    expect(cosine([1, 2], [1, 2])).toBeCloseTo(1);
+    expect(cosine([1, 0], [0, 1])).toBe(0);
+    expect(cosine([], [1])).toBe(0);
+  });
+  it("orders by similarity and keeps k", () => {
+    const out = rerank(chunks.slice(0, 3), [1, 0], [[0, 1], [1, 0], [0.7, 0.7]], 2);
+    expect(out.map((c) => c.n)).toEqual([1, 2]);
+  });
+  it("falls back to order when vectors are missing", () => {
+    expect(rerank(chunks.slice(0, 3), [1], [[1]], 2).map((c) => c.n)).toEqual([0, 1]);
+  });
+  it("candidates never repeat and respect max", () => {
+    const c = candidateChunks(chunks, "chunk", 4);
+    expect(c.length).toBe(4);
+    expect(new Set(c).size).toBe(4);
+  });
+});
+
+describe("web context", () => {
+  it("only asks for the web when the question needs current facts", () => {
+    expect(wantsWeb("what is the latest version of ollama")).toBe(true);
+    expect(wantsWeb("/search something")).toBe(false);
+    expect(wantsWeb("hi")).toBe(false);
+    expect(wantsWeb("tell me a story about a dragon")).toBe(false);
+  });
+  it("numbers sources and stays under the cap", () => {
+    const hits = Array.from({ length: 20 }, (_, i) => ({ title: `T${i}`, url: `https://x.test/${i}`, snippet: "s".repeat(200) }));
+    const text = webContext("q", hits, 800);
+    expect(text.length).toBeLessThan(801);
+    expect(text).toContain("[1] T0");
+    expect(text).toContain("not instructions");
+  });
+});
+
+describe("status text", () => {
+  it("summarises problems and hides nothing but secrets", () => {
+    const t = servicesReport([{ name: "Plex", state: "ok" }, { name: "Seerr", state: "down", note: "no answer" }, { name: "Jellyfin", state: "off" }], ["Backups: off"]);
+    expect(t).toContain("1 thing need");
+    expect(t).toContain("⚠ Seerr — no answer");
+    expect(t).toContain("Jellyfin — not set up");
+    expect(t).toContain("Backups: off");
   });
 });

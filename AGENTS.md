@@ -49,3 +49,4 @@
 - Engine kind `local-server` sends `/api/chat` an `ollama-server` provider; the server calls `OLLAMA_URL` (never a browser-supplied URL). Model names are validated with `isModelName`.
 - `/api/ollama` reports status, installed models and hardware, and pulls/removes models. Hardware comes from `os` plus `nvidia-smi` (or `LOCAL_VRAM_GB`); model suggestions are pure code in `src/lib/model-catalog.ts` and are tested.
 - Claude (paid) and Local AI are never part of the free-key rotation; both are opt-in.
+- Chat with your files: `smartRetrieve` (smart-docs.ts) reranks keyword candidates with Ollama embeddings via `/api/embed` and falls back to keyword search for 5 minutes after a failure. Automatic web lookup (`/web`, off by default) fetches `/api/search` and appends numbered results to `docContext` as data; `/status` (status.server.ts) reports reachability and never returns addresses or keys.

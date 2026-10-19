@@ -127,7 +127,10 @@ import { CommandPalette, type PaletteAction } from "./command-palette";
 import { matchShortcut, shortcutList } from "@/lib/shortcuts";
 import { friendlyError } from "@/lib/friendly-error";
 import { allChunks, getDocs } from "@/lib/documents";
-import { docContext, retrieve } from "@/lib/rag";
+import { docContext } from "@/lib/rag";
+import { smartRetrieve } from "@/lib/smart-docs";
+import { wantsWeb, webContext } from "@/lib/web-context";
+import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
@@ -420,7 +423,15 @@ export function Room() {
     // Chat with your files: pull the passages that best match this question (no AI call needed).
     const notesNow = getNotes();
     const docsNow = getDocs();
-    const docText = docsNow.length ? docContext(retrieve(allChunks(docsNow), topic)) : "";
+    let docText = docsNow.length ? docContext(await smartRetrieve(allChunks(docsNow), topic)) : "";
+    // Optional: let the pals look things up themselves when the question needs current facts (/web on).
+    if (autoSearch.get() && wantsWeb(topic)) {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(topic.trim().slice(0, 200))}`, { signal: AbortSignal.timeout(8000) });
+        const json = (await res.json()) as { hits?: SearchHit[] };
+        if (res.ok && json.hits?.length) docText = `${docText}\n\n${webContext(topic.trim(), json.hits.slice(0, 5))}`.trim();
+      } catch { /* search is optional; carry on without it */ }
+    }
     try {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
@@ -650,6 +661,21 @@ export function Room() {
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
+      case "status": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/status");
+            const json = (await res.json()) as { text?: string };
+            say(command, json.text ?? "No status available.");
+          } catch { say(command, "I couldn't reach the server to check."); }
+        })();
+        return;
+      }
+      case "web": {
+        const next = action.mode === "toggle" ? !autoSearch.get() : action.mode === "on";
+        autoSearch.set(next);
+        return say(command, next ? "Web lookup is on: when a question needs current facts the pals will search first and cite what they find. Needs your SearXNG set up. /web off to stop." : "Web lookup is off. /search and /research still work.");
+      }
       case "focus": {
         const next = action.mode === "toggle" ? !focusMode : action.mode === "on";
         setFocusMode(next);
@@ -864,6 +890,8 @@ export function Room() {
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
+    { id: "web-lookup", group: "Chat", label: autoSearch.get() ? "Turn off automatic web lookup" : "Turn on automatic web lookup", keywords: "search internet current facts", run: () => runSlash({ type: "web", mode: "toggle" }, "/web") },
+    { id: "status", group: "Chat", label: "Check services (status)", keywords: "health ollama plex unraid", run: () => runSlash({ type: "status" }, "/status") },
     { id: "focus", group: "View", label: focusMode ? "Leave focus mode" : "Focus mode (just the chat)", hint: "Ctrl+Shift+F", keywords: "calm minimal distraction fullscreen expand chat", run: () => runSlash({ type: "focus", mode: "toggle" }, "/focus") },
     { id: "voice", group: "Chat", label: voice.auto ? "Turn off reading replies aloud" : "Read replies aloud", keywords: "voice speak tts sound audio", run: () => runSlash({ type: "voice", mode: "toggle" }, "/voice") },
     { id: "watch", group: "Chat", label: "What should we watch tonight?", keywords: "plex movie show tv", run: () => void plex("", "/watch", "") },

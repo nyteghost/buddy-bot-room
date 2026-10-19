@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiStatusRouteImport } from './routes/api.status'
 import { Route as ApiEmbedRouteImport } from './routes/api.embed'
 import { Route as ApiProvidersRouteImport } from './routes/api.providers'
 import { Route as ApiOllamaRouteImport } from './routes/api.ollama'
@@ -55,6 +56,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatusRoute = ApiStatusRouteImport.update({
+  id: '/api/status',
+  path: '/api/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEmbedRoute = ApiEmbedRouteImport.update({
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/status': typeof ApiStatusRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/providers': typeof ApiProvidersRoute
   '/api/ollama': typeof ApiOllamaRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/status': typeof ApiStatusRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/providers': typeof ApiProvidersRoute
   '/api/ollama': typeof ApiOllamaRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/status': typeof ApiStatusRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/providers': typeof ApiProvidersRoute
   '/api/ollama': typeof ApiOllamaRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/status'
     | '/api/embed'
     | '/api/providers'
     | '/api/ollama'
@@ -248,6 +258,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/status'
     | '/api/embed'
     | '/api/providers'
     | '/api/ollama'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/status'
     | '/api/embed'
     | '/api/providers'
     | '/api/ollama'
@@ -297,6 +309,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiStatusRoute: typeof ApiStatusRoute
   ApiEmbedRoute: typeof ApiEmbedRoute
   ApiProvidersRoute: typeof ApiProvidersRoute
   ApiOllamaRoute: typeof ApiOllamaRoute
@@ -351,6 +364,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/status': {
+      id: '/api/status'
+      path: '/api/status'
+      fullPath: '/api/status'
+      preLoaderRoute: typeof ApiStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/embed': {
@@ -481,6 +501,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiStatusRoute: ApiStatusRoute,
   ApiEmbedRoute: ApiEmbedRoute,
   ApiProvidersRoute: ApiProvidersRoute,
   ApiOllamaRoute: ApiOllamaRoute,

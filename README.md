@@ -193,6 +193,8 @@ Compare models only uses the free keys, so it never spends Claude credit.
 - shows **New on Ollama**: the Pixel Pals server reads ollama.com's public model library about once a day (and on **Check now**), and lists newly published, popular models that fit your hardware, with the task they're probably good at. They are labelled *Not tested by Pixel Pals*. Ollama has no official API for this, so it reads the library web page; if that page changes and can't be read, the panel says so and keeps the built-in suggestions. Set `MODEL_FEED=0` to never contact ollama.com;
 - lists installed models with a remove button.
 
+Chat with your files uses `nomic-embed-text` (pulled with the first-start models) to find passages by meaning, so a question can match a document that uses different words. If it isn't there, search quietly falls back to keywords.
+
 First-start models come from `OLLAMA_MODELS` (default `qwen2.5:7b`; space-separated list for more). `OLLAMA_PORT` changes the published port, which you only need if something outside the stack wants to reach Ollama. Switching models makes the first reply after a switch slower, because it has to load.
 
 **Pointing at another Ollama:** set `OLLAMA_URL` (for example `http://10.200.1.40:11434`) and use the same engine.
@@ -236,6 +238,8 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
 | `/focus [on\|off]` | Focus mode: calm, chat-only view |
+| `/web [on\|off]` | Automatic web lookup: when a question needs current facts (latest, price, news, a question with a `?`), the pals search your SearXNG first and cite the links. Off by default |
+| `/status` | One-shot health check: Local AI, search, Plex, Seerr, Jellyfin, Unraid, Trakt, ntfy and backups. Shows names and problems only, never addresses or keys |
 | `/log` | Debug log |
 
 **Keyboard shortcuts:** `Ctrl+K` palette · `Ctrl+Shift+O` new chat · `Ctrl+Shift+F` focus mode · `Ctrl+Shift+L` debug log · `Ctrl+/` shortcut list · `Ctrl+B` sidebar · `Esc` stop (and silence voice).
@@ -514,7 +518,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `BUDDY_BACKUP_TIME` | `03:30` | Nightly backup time |
 | `BUDDY_BACKUP_KEEP` | `14` | Copies to keep |
 | `OLLAMA_URL` | `http://ollama:11434` (Portainer stack) | Ollama used by the Local AI engine; empty turns it off |
-| `OLLAMA_MODELS` | `qwen2.5:7b` | Models downloaded on first start |
+| `OLLAMA_MODELS` | `qwen2.5:7b nomic-embed-text` | Models downloaded on first start |
 | `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
 | `OLLAMA_PORT` | `11434` | Published Ollama port |
 | `ALLOW_PRIVATE_CUSTOM` | empty | `1` lets the Custom provider use private/LAN addresses (http allowed) |

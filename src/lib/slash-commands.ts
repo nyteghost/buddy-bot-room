@@ -37,6 +37,8 @@ export type SlashAction =
   | { type: "brief"; send: boolean }
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
+  | { type: "status" }
+  | { type: "web"; mode: "on" | "off" | "toggle" }
   | { type: "next"; list: string; mood: string }
   | { type: "server" }
   | { type: "diagnose" }
@@ -94,6 +96,8 @@ export const slashCommands = [
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
   { name: "watch", usage: "/watch [mood]", description: "What should we watch tonight? The pals pick from your Plex library" },
   { name: "next", usage: "/next [list:name] [mood]", description: "What should we watch next? The pals pick from your Trakt list (needs TRAKT_CLIENT_ID)" },
+  { name: "status", usage: "/status", description: "Check that Local AI, search, Plex, Seerr, Jellyfin, Unraid and backups are all working" },
+  { name: "web", usage: "/web [on|off]", description: "Let the pals search the web on their own when a question needs current facts" },
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
   { name: "voice", usage: "/voice [on|off]", description: "Read replies aloud (your browser's own voices)" },
   { name: "brief", usage: "/brief [send]", description: "Today's morning brief (add send to push it to your phone)" },
@@ -185,6 +189,10 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
     case "plex":
       return { ok: true, action: { type: "plex", query: rawArg || "recent" } };
+    case "status": case "health":
+      return { ok: true, action: { type: "status" } };
+    case "web": case "autosearch":
+      return { ok: true, action: { type: "web", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
     case "focus": case "calm":
       return { ok: true, action: { type: "focus", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
     case "voice": case "speak":
