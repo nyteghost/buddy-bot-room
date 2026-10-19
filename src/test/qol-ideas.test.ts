@@ -16,6 +16,8 @@ import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
+import { accountFileName, normalizeLocalSettings } from "@/lib/local-account";
+import { authUrl, checkClaims, decodeIdToken, googleConfig, googleUser, handleGoogle, isAllowedEmail, originOf, readSession, signSession } from "@/lib/google-auth.server";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
 import { traktConfig } from "@/lib/trakt.server";
 import { plexMarkdown, shapePlex, watchTopic } from "@/lib/plex";
@@ -669,5 +671,86 @@ describe("trakt", () => {
     expect(parseSlash("/next")).toEqual({ ok: true, action: { type: "next", list: "", mood: "" } });
     expect(parseSlash("/next cozy comedy")).toEqual({ ok: true, action: { type: "next", list: "", mood: "cozy comedy" } });
     expect(parseSlash("/next list:movie-night something short")).toEqual({ ok: true, action: { type: "next", list: "movie-night", mood: "something short" } });
+  });
+});
+
+describe("google sign-in", () => {
+  const cfg = googleConfig({ GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "csecret", GOOGLE_ALLOWED_EMAILS: "Me@Gmail.com, @family.org", BUDDY_PUBLIC_URL: "https://pals.ts.net/" })!;
+  const req = (path: string, headers: Record<string, string> = {}) => new Request("http://10.0.0.5:8090" + path, { headers });
+  const b64u = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const idToken = (claims: Record<string, unknown>) => `h.${b64u(claims)}.s`;
+  it("is off without a client id and secret", () => {
+    expect(googleConfig({})).toBeNull();
+    expect(googleConfig({ GOOGLE_CLIENT_ID: "x" })).toBeNull();
+    expect(cfg.allowed).toEqual(["me@gmail.com", "@family.org"]);
+    expect(cfg.publicUrl).toBe("https://pals.ts.net");
+  });
+  it("allows listed emails and domains only", () => {
+    expect(isAllowedEmail("ME@gmail.com", cfg.allowed)).toBe(true);
+    expect(isAllowedEmail("kid@family.org", cfg.allowed)).toBe(true);
+    expect(isAllowedEmail("evil@notfamily.org", cfg.allowed)).toBe(false);
+    expect(isAllowedEmail("x@evilfamily.org", cfg.allowed)).toBe(false);
+    expect(isAllowedEmail("me@gmail.com.evil.com", cfg.allowed)).toBe(false);
+    expect(isAllowedEmail("anyone@gmail.com", [])).toBe(false);
+  });
+  it("uses the public address, else the forwarded one", () => {
+    expect(originOf(req("/"), cfg)).toBe("https://pals.ts.net");
+    const bare = { ...cfg, publicUrl: "" };
+    expect(originOf(req("/", { host: "pals.ts.net", "x-forwarded-proto": "https" }), bare)).toBe("https://pals.ts.net");
+  });
+  it("signs sessions and rejects tampering and expiry", async () => {
+    const value = await signSession({ email: "me@gmail.com", name: "Mé", sub: "1" }, "csecret", 1_000_000);
+    expect((await readSession(value, "csecret", 1_000_000))?.email).toBe("me@gmail.com");
+    expect((await readSession(value, "csecret", 1_000_000))?.name).toBe("Mé");
+    expect(await readSession(value, "other", 1_000_000)).toBeNull();
+    expect(await readSession(value.replace(/^./, "x"), "csecret", 1_000_000)).toBeNull();
+    expect(await readSession(value, "csecret", 1_000_000 + 31 * 24 * 3600 * 1000)).toBeNull();
+    expect(await readSession("junk", "csecret")).toBeNull();
+  });
+  it("only trusts a session whose email is still allowed", async () => {
+    const value = await signSession({ email: "me@gmail.com", name: "", sub: "" }, "csecret");
+    expect((await googleUser(req("/", { cookie: `buddy_google=${value}` }), cfg))?.email).toBe("me@gmail.com");
+    expect(await googleUser(req("/", { cookie: `buddy_google=${value}` }), { ...cfg, allowed: ["other@gmail.com"] })).toBeNull();
+    expect(await googleUser(req("/"), cfg)).toBeNull();
+    expect(await googleUser(req("/", { cookie: `buddy_google=${value}` }), null)).toBeNull();
+  });
+  it("checks id token claims", () => {
+    const ok = { iss: "https://accounts.google.com", aud: "cid", exp: 2000, nonce: "n1", email: "me@gmail.com", email_verified: true, name: "Me", sub: "9" };
+    expect(checkClaims(ok, "cid", "n1", 1_000_000)).toEqual({ user: { email: "me@gmail.com", name: "Me", sub: "9" } });
+    for (const bad of [{ iss: "evil.com" }, { aud: "other" }, { exp: 500 }, { nonce: "zzz" }, { email_verified: false }, { email: "" }]) expect("error" in checkClaims({ ...ok, ...bad }, "cid", "n1", 1_000_000)).toBe(true);
+    expect("error" in checkClaims(null, "cid", "n1")).toBe(true);
+    expect(decodeIdToken(idToken({ a: 1 }))).toEqual({ a: 1 });
+    expect(decodeIdToken("nope")).toBeNull();
+  });
+  it("builds the Google address with state, nonce and the redirect", () => {
+    const u = new URL(authUrl(cfg, "https://pals.ts.net/__google/callback", "st", "no"));
+    expect(u.origin + u.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(u.searchParams.get("redirect_uri")).toBe("https://pals.ts.net/__google/callback");
+    expect(u.searchParams.get("state")).toBe("st");
+    expect(u.searchParams.get("nonce")).toBe("no");
+    expect(u.searchParams.get("scope")).toBe("openid email profile");
+  });
+  it("starts sign-in, refuses mismatched callbacks, and signs out", async () => {
+    const start = (await handleGoogle(req("/__google"), cfg))!;
+    expect(start.status).toBe(303);
+    expect(start.headers.get("location")).toContain("accounts.google.com");
+    expect(start.headers.get("set-cookie")).toContain("buddy_oauth=");
+    expect(start.headers.get("set-cookie")).toContain("Secure");
+    expect((await handleGoogle(req("/__google"), { ...cfg, allowed: [] }))?.status).toBe(403);
+    expect((await handleGoogle(req("/__google/callback?code=c&state=wrong", { cookie: "buddy_oauth=right.nonce" }), cfg))?.status).toBe(400);
+    expect((await handleGoogle(req("/__google/callback?error=access_denied"), cfg))?.status).toBe(400);
+    expect((await handleGoogle(req("/__logout"), cfg))?.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(await handleGoogle(req("/anything-else"), cfg)).toBeNull();
+  });
+  it("normalizes per-account settings", async () => {
+    const good = { engineKind: "auto", characterMode: "matrix", groqKey: "a", geminiKey: "", openrouterKey: "", nvidiaKey: "" };
+    expect(normalizeLocalSettings(good)).toEqual(good);
+    expect(normalizeLocalSettings({ ...good, engineKind: "evil" })).toBeNull();
+    expect(normalizeLocalSettings({ ...good, groqKey: "x".repeat(501) })).toBeNull();
+    expect(normalizeLocalSettings(null)).toBeNull();
+    const a = await accountFileName("Me@Gmail.com");
+    expect(a).toBe(await accountFileName(" me@gmail.com "));
+    expect(a).toMatch(/^[0-9a-f]{32}\.json$/);
+    expect(a === (await accountFileName("other@gmail.com"))).toBe(false);
   });
 });

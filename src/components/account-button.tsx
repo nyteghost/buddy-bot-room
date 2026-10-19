@@ -4,13 +4,21 @@ import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { lovable } from "@/integrations/lovable/index";
 import { supabase } from "@/integrations/supabase/client";
+import { LocalAccountButton } from "@/components/local-account-button";
 import { useSession } from "@/hooks/use-session";
 import { loadAccount, saveSettings } from "@/lib/account.functions";
 import { normalizeKind, setEngine, useEngine } from "@/lib/engine";
 import { isCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 
 /** Google sign-in that syncs engine, keys (encrypted on the server) and theme to the account. */
-export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onTheme: (t: CharacterMode) => void }) {
+type Props = { theme: CharacterMode; onTheme: (t: CharacterMode) => void };
+
+/** Lovable-hosted app: Google sign-in through Lovable Cloud. Docker build: server-side Google sign-in (or "Local mode"). */
+export function AccountButton(props: Props) {
+  return __SELF_HOSTED__ ? <LocalAccountButton {...props} /> : <CloudAccountButton {...props} />;
+}
+
+function CloudAccountButton({ theme, onTheme }: Props) {
   const session = useSession();
   const engine = useEngine();
   const load = useServerFn(loadAccount);
@@ -43,8 +51,6 @@ export function AccountButton({ theme, onTheme }: { theme: CharacterMode; onThem
     return () => clearTimeout(t);
   }, [synced, engine.kind, engine.groqKey, engine.geminiKey, engine.openrouterKey, engine.nvidiaKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (__SELF_HOSTED__)
-    return <span className="account-chip" title="Sign-in is only available on the Lovable-hosted app. Settings and keys stay in this browser.">Local mode</span>;
   if (session === undefined) return null;
   if (!session)
     return (

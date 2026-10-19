@@ -60,7 +60,7 @@ URL must be reachable from the machine you browse on, and Ollama needs
 
 ## Sign-in
 
-The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Dockerfile). Google sign-in goes through Lovable Cloud and can't redirect back to a LAN address, so the Sign in button is replaced by a "Local mode" label. Engine settings, keys and theme are saved in the browser instead of an account. Sign-in still works on the Lovable-hosted app.
+The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Dockerfile). Lovable's Google sign-in can't redirect back to a LAN address, so the button is replaced by a "Local mode" label (or your own Google sign-in, see below). Engine settings, keys and theme are saved in the browser instead of an account. Sign-in still works on the Lovable-hosted app.
 
 ## Password, health, logs and saved chats
 
@@ -85,6 +85,22 @@ Set `UNRAID_URL` (for example `http://10.200.1.30`) and `UNRAID_API_KEY` (Unraid
 - writes each change to the server log (see the Debug log).
 
 `/server` shows the current status and `/diagnose` (or the banner's *What's wrong?* button) hands the facts to the pals for advice. Everything is read-only. It can't watch while the Pixel Pals box itself is down. If your Unraid version has no API or the key is rejected, the watcher still tells you whether the server answers at all.
+
+## Google sign-in (Docker)
+
+Instead of (or as well as) the shared password you can require Google sign-in. Only the emails you list can get in, and each person's engine settings, keys and theme follow their Google account across devices (saved on your server's `buddy-data` volume, not on Lovable). Saved chats stay shared by everyone who is allowed in.
+
+Google only accepts an `https://` return address (not a plain `10.x` IP), so open Pixel Pals through Tailscale HTTPS first (`sudo tailscale serve --bg --https=443 http://localhost:8090`).
+
+1. Go to console.cloud.google.com → create a project → *APIs & Services → OAuth consent screen* (User type *External*, leave it in *Testing*, and add your Google emails under *Test users*).
+2. *Credentials → Create credentials → OAuth client ID → Web application*. Under *Authorized redirect URIs* add `https://<your-name>.ts.net/__google/callback` (the exact address you open Pixel Pals at, plus `/__google/callback`).
+3. Copy the **Client ID** and **Client secret** and add these stack variables:
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_ALLOWED_EMAILS` (comma separated; `@example.com` allows a domain)
+   - `BUDDY_PUBLIC_URL` (the same `https://<your-name>.ts.net` address)
+4. *Pull and redeploy*. Opening the page now shows **Sign in with Google**; if `BUDDY_PASSWORD` is also set, either works.
+
+Remove an email from `GOOGLE_ALLOWED_EMAILS` and redeploy to cut that person off. If sign-in fails, the page names the reason (for example `redirect_uri_mismatch` means the URI in step 2 doesn't match exactly), and the Debug log has the details.
 
 ## Trakt: `/next` and `/trakt`
 
