@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiPlexRouteImport } from './routes/api.plex'
 import { Route as ApiUnraidRouteImport } from './routes/api.unraid'
 import { Route as ApiStoreRouteImport } from './routes/api.store'
 import { Route as ApiJellyfinRouteImport } from './routes/api.jellyfin'
@@ -44,6 +45,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlexRoute = ApiPlexRouteImport.update({
+  id: '/api/plex',
+  path: '/api/plex',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUnraidRoute = ApiUnraidRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/plex': typeof ApiPlexRoute
   '/api/unraid': typeof ApiUnraidRoute
   '/api/store': typeof ApiStoreRoute
   '/api/jellyfin': typeof ApiJellyfinRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/plex': typeof ApiPlexRoute
   '/api/unraid': typeof ApiUnraidRoute
   '/api/store': typeof ApiStoreRoute
   '/api/jellyfin': typeof ApiJellyfinRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/plex': typeof ApiPlexRoute
   '/api/unraid': typeof ApiUnraidRoute
   '/api/store': typeof ApiStoreRoute
   '/api/jellyfin': typeof ApiJellyfinRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/plex'
     | '/api/unraid'
     | '/api/store'
     | '/api/jellyfin'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/plex'
     | '/api/unraid'
     | '/api/store'
     | '/api/jellyfin'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/plex'
     | '/api/unraid'
     | '/api/store'
     | '/api/jellyfin'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiPlexRoute: typeof ApiPlexRoute
   ApiUnraidRoute: typeof ApiUnraidRoute
   ApiStoreRoute: typeof ApiStoreRoute
   ApiJellyfinRoute: typeof ApiJellyfinRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plex': {
+      id: '/api/plex'
+      path: '/api/plex'
+      fullPath: '/api/plex'
+      preLoaderRoute: typeof ApiPlexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/unraid': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiPlexRoute: ApiPlexRoute,
   ApiUnraidRoute: ApiUnraidRoute,
   ApiStoreRoute: ApiStoreRoute,
   ApiJellyfinRoute: ApiJellyfinRoute,

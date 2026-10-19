@@ -85,3 +85,12 @@ Set `UNRAID_URL` (for example `http://10.200.1.30`) and `UNRAID_API_KEY` (Unraid
 - writes each change to the server log (see the Debug log).
 
 `/server` shows the current status and `/diagnose` (or the banner's *What's wrong?* button) hands the facts to the pals for advice. Everything is read-only. It can't watch while the Pixel Pals box itself is down. If your Unraid version has no API or the key is rejected, the watcher still tells you whether the server answers at all.
+
+## Plex: `/plex` and "What should we watch tonight?"
+
+Set `PLEX_URL` (for example `http://10.200.1.X:32400`) and `PLEX_TOKEN` in the stack's environment variables. To find the token: in Plex's web app open any item → ⋯ → *Get Info* → *View XML*, and copy the `X-Plex-Token=` value from the address bar. Then:
+
+- `/plex <title>` looks a title up in your library (`/plex recent` lists what was added lately).
+- `/watch` (or `/watch something cozy`, or Ctrl+K → *What should we watch tonight?*) gives the pals your recently added titles and has them debate and recommend one or two **from that list only**. If nothing fits they say what you could request with `@seerr`.
+
+Nuvio is a player app with no server or API of its own, so there is nothing for Pixel Pals to connect to there; it just plays what you choose.

@@ -16,6 +16,7 @@ import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
+import { plexMarkdown, shapePlex, watchTopic } from "@/lib/plex";
 import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch, nextWatch, problemsOf, shapeContainers, shapeDisks, shapeUptime, statusMarkdown } from "@/lib/unraid";
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
@@ -571,5 +572,52 @@ describe("unraid watcher state machine", () => {
     expect(parseSlash("/server")).toEqual({ ok: true, action: { type: "server" } });
     expect(parseSlash("/diagnose")).toEqual({ ok: true, action: { type: "diagnose" } });
     expect(parseSlash("/whatswrong")).toEqual({ ok: true, action: { type: "diagnose" } });
+  });
+});
+
+describe("plex", () => {
+  const recent = { MediaContainer: { Metadata: [
+    { type: "movie", title: "Dune", year: 2021, audienceRating: 8.04, summary: "  Spice.  ", Genre: [{ tag: "Sci-Fi" }, { tag: "Adventure" }] },
+    { type: "episode", title: "Pilot", grandparentTitle: "Severance", year: 2022 },
+    { type: "episode", title: "Half Loop", grandparentTitle: "Severance" },
+    { type: "season", title: "Season 2", parentTitle: "Andor" },
+    { type: "show", title: "Ted Lasso", year: 2020, rating: 8.6 },
+    { type: "album", title: "Some Album" },
+    { type: "movie" },
+  ] } };
+  it("shapes recently added: episodes and seasons become their show, duplicates merge, other types are skipped", () => {
+    const items = shapePlex(recent);
+    expect(items.map((i) => i.title)).toEqual(["Dune", "Severance", "Andor", "Ted Lasso"]);
+    expect(items[0]).toEqual({ title: "Dune", kind: "movie", year: 2021, rating: 8, genres: ["Sci-Fi", "Adventure"], summary: "Spice." });
+    expect(items[1]?.kind).toBe("show");
+    expect(items[1]?.year).toBe(undefined);
+  });
+  it("shapes grouped search results", () => {
+    const search = { MediaContainer: { Hub: [{ type: "movie", Metadata: [{ type: "movie", title: "Dune", year: 2021 }] }, { type: "show", Metadata: [{ type: "show", title: "Dune: Prophecy", year: 2024 }] }, { type: "actor", Metadata: [{ type: "person", title: "Zendaya" }] }] } };
+    expect(shapePlex(search).map((i) => i.title)).toEqual(["Dune", "Dune: Prophecy"]);
+  });
+  it("copes with junk and honours the limit", () => {
+    expect(shapePlex(null)).toEqual([]);
+    expect(shapePlex({ MediaContainer: {} })).toEqual([]);
+    expect(shapePlex(recent, 2).length).toBe(2);
+  });
+  it("writes markdown and a watch topic", () => {
+    const items = shapePlex(recent);
+    expect(plexMarkdown("dune", items)).toContain("**Dune** (Movie · 2021 · ★ 8 · Sci-Fi/Adventure)");
+    expect(plexMarkdown("zzz", [])).toContain("@seerr zzz");
+    const topic = watchTopic("something cozy", items);
+    expect(topic).toContain("something cozy");
+    expect(topic).toContain("Only suggest titles from the list");
+    expect(topic).toContain("- Ted Lasso (2020) — show");
+    expect(watchTopic("", items)).toContain("haven't decided");
+    const short = watchTopic("", items, 60);
+    expect(short).toContain("- Dune");
+    expect(short.includes("Ted Lasso")).toBe(false);
+  });
+  it("has /plex and /watch commands", () => {
+    expect(parseSlash("/plex Dune")).toEqual({ ok: true, action: { type: "plex", query: "Dune" } });
+    expect(parseSlash("/plex")).toEqual({ ok: true, action: { type: "plex", query: "recent" } });
+    expect(parseSlash("/watch cozy comedy")).toEqual({ ok: true, action: { type: "watch", mood: "cozy comedy" } });
+    expect(parseSlash("/watch")).toEqual({ ok: true, action: { type: "watch", mood: "" } });
   });
 });

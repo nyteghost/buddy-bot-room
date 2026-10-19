@@ -29,6 +29,8 @@ export type SlashAction =
   | { type: "log" }
   | { type: "library"; query: string }
   | { type: "roll"; expr: string }
+  | { type: "plex"; query: string }
+  | { type: "watch"; mood: string }
   | { type: "server" }
   | { type: "diagnose" }
   | { type: "dm"; sub: "start" | "end" | "status" | "character" | "fact" | "unfact"; text: string; n?: number };
@@ -83,6 +85,8 @@ export const slashCommands = [
   { name: "tasks", usage: "/tasks", description: "Open notes, memories and to-dos" },
   { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
+  { name: "watch", usage: "/watch [mood]", description: "What should we watch tonight? The pals pick from your Plex library" },
+  { name: "plex", usage: "/plex <title|recent>", description: "Look in your Plex library (needs PLEX_URL)" },
   { name: "server", usage: "/server", description: "Check your Unraid server now" },
   { name: "diagnose", usage: "/diagnose", description: "What's wrong with my server? The pals look at Unraid and advise" },
   { name: "dm", usage: "/dm start <premise>", description: "Dungeon Master mode: start, end, status, character, fact" },
@@ -165,6 +169,10 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "search", query: rawArg } } : fail("What should I search for? /search best 4k projector");
     case "research":
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
+    case "plex":
+      return { ok: true, action: { type: "plex", query: rawArg || "recent" } };
+    case "watch": case "tonight":
+      return { ok: true, action: { type: "watch", mood: rawArg } };
     case "server": case "unraid":
       return { ok: true, action: { type: "server" } };
     case "diagnose": case "whatswrong":

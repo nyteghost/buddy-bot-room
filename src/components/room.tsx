@@ -128,6 +128,7 @@ import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact
 import { parseDice, rollDice, secureRng } from "@/lib/dice";
 import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/lib/unraid";
 import { UnraidBanner } from "./unraid-banner";
+import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
 import { addEntry, addTodo, clearDone, getWorkbench, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
@@ -565,6 +566,8 @@ export function Room() {
       case "tasks": setNotesOpen(true); return;
       case "log": setLogOpen(true); return;
       case "library": void library(action.query, command); return;
+      case "plex": void plex(action.query, command, null); return;
+      case "watch": void plex("", command, action.mood); return;
       case "server": void serverCheck(command, false); return;
       case "diagnose": void serverCheck(command, true); return;
       case "roll": {
@@ -640,6 +643,19 @@ export function Room() {
       return say(command, "I couldn't reach the library service.");
     }
   }
+  /** /plex looks things up; /watch hands the recently-added list to the pals to pick from. */
+  async function plex(query: string, command: string, mood: string | null) {
+    try {
+      const res = await fetch(`/api/plex?${mood !== null ? "mode=pool" : `q=${encodeURIComponent(query)}`}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return say(command, json.error ?? "The Plex lookup failed.");
+      const items = (json.items ?? []) as PlexItem[];
+      if (mood !== null) return items.length ? void start(undefined, watchTopic(mood, items)) : say(command, "Plex has nothing recently added to pick from.");
+      return say(command, plexMarkdown(query, items));
+    } catch {
+      return say(command, "I couldn't reach the Plex service.");
+    }
+  }
   /** /server shows Unraid's health; /diagnose also hands it to the pals to reason about. */
   async function serverCheck(command: string, discuss: boolean) {
     try {
@@ -711,6 +727,7 @@ export function Room() {
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
+    { id: "watch", group: "Chat", label: "What should we watch tonight?", keywords: "plex movie show tv", run: () => void plex("", "/watch", "") },
     { id: "srv", group: "Chat", label: "Check my Unraid server", keywords: "server health status", run: () => void serverCheck("/server", false) },
     { id: "srv-why", group: "Chat", label: "What's wrong with my server? (pals diagnose)", keywords: "unraid diagnose", run: () => void serverCheck("/diagnose", true) },
     { id: "log", group: "Help", label: "Debug log (copy for Claude)", hint: "Ctrl+Shift+L", keywords: "bug error report", run: () => setLogOpen(true) },
