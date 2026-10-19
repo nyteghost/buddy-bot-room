@@ -124,6 +124,8 @@ import { docContext, retrieve } from "@/lib/rag";
 import { getNotes } from "@/lib/agent-notes";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
+import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign, type DmRole } from "@/lib/campaign";
+import { parseDice, rollDice, secureRng } from "@/lib/dice";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
 import { addEntry, addTodo, clearDone, getWorkbench, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
@@ -363,14 +365,19 @@ export function Room() {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
         : agents.filter((a) => enabled.includes(a.id));
-      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean }[] = [];
-      for (let r = 1; r <= (direct ? 1 : rounds); r++)
-        for (const agent of seated) turns.push({ agent, round: r, verdict: false });
-      const lead = seated[0];
-      if ((mode === "roundtable" || mode === "solve") && seated.length > 1 && lead)
-        turns.push({ agent: lead, round: rounds, verdict: true });
+      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean; dmRole?: DmRole }[] = [];
+      // Dungeon Master mode: the first seated pal narrates, the rest react as the party, one pass per action.
+      const campaign = getCampaign();
+      if (campaign.active) seated.forEach((agent, i) => turns.push({ agent, round: 1, verdict: false, dmRole: i === 0 ? "dm" : "party" }));
+      else {
+        for (let r = 1; r <= (direct ? 1 : rounds); r++)
+          for (const agent of seated) turns.push({ agent, round: r, verdict: false });
+        const lead = seated[0];
+        if ((mode === "roundtable" || mode === "solve") && seated.length > 1 && lead)
+          turns.push({ agent: lead, round: rounds, verdict: true });
+      }
       {
-        for (const [turnIndex, { agent, round: currentRound, verdict }] of turns.entries()) {
+        for (const [turnIndex, { agent, round: currentRound, verdict, dmRole }] of turns.entries()) {
           setRound(currentRound);
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
@@ -385,7 +392,9 @@ export function Room() {
             hellraiser: turnMode === "hellraiser",
             horror: turnMode === "horror",
             characterMode: turnMode,
-            mode: direct ? ("direct" as Mode) : mode,
+            // In a campaign every pal needs to see the whole table, even in one-on-one.
+            mode: dmRole ? ("roundtable" as Mode) : direct ? ("direct" as Mode) : mode,
+            campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current,
             memoryContext: promptContext(getWorkbench()),
             contextChars: engine.kind === "local" || engine.kind === "ollama" ? 6000 : 12000,
@@ -427,6 +436,7 @@ export function Room() {
                   assistant: assistantRef.current,
                   round: currentRound,
                   ...(verdict ? { verdict: true } : {}),
+                  ...(dmRole ? { dm: dmRole } : {}),
                   elapsed: (performance.now() - began) / 1000,
                 },
               };
@@ -553,6 +563,36 @@ export function Room() {
       case "tasks": setNotesOpen(true); return;
       case "log": setLogOpen(true); return;
       case "library": void library(action.query, command); return;
+      case "roll": {
+        const spec = parseDice(action.expr);
+        if (!spec.ok) return say(command, spec.error);
+        const roll = rollDice(spec, secureRng());
+        updateCampaign((c) => addRoll(c, roll.text));
+        if (roll.nat20) celebrate();
+        return say(command, roll.text);
+      }
+      case "dm": {
+        const c = getCampaign();
+        switch (action.sub) {
+          case "start":
+            updateCampaign(() => startCampaign(action.text));
+            return say(command, `**Campaign started.** The first pal is your Dungeon Master and the rest are your party. Describe your character with \`/dm character …\`, then just tell them what you do. Roll with \`/roll d20\`. End it any time with \`/dm end\`.`);
+          case "end":
+            updateCampaign(endCampaign);
+            return say(command, c.active ? "Campaign paused. Normal discussions are back. Your facts and character are kept." : "There's no campaign running.");
+          case "character":
+            updateCampaign((x) => setCharacter(x, action.text));
+            return say(command, `Your character: ${action.text}`);
+          case "fact":
+            updateCampaign((x) => addFact(x, action.text));
+            return say(command, `Saved. The Dungeon Master won't forget: ${action.text}`);
+          case "unfact":
+            updateCampaign((x) => removeFact(x, action.n ?? 0));
+            return say(command, "Removed that fact (if the number existed).");
+          default:
+            return say(command, statusText(c));
+        }
+      }
       case "compare": setCompareQuestion(action.question); setCompareOpen(true); return;
       case "search": void webSearch(action.query, command, false); return;
       case "research": void webSearch(action.query, command, true); return;
@@ -641,6 +681,7 @@ export function Room() {
     { id: "win-tools", group: "Windows", label: "Toggle Work tools", run: () => setToolsOpen((v) => !v) },
     { id: "win-rec", group: "Windows", label: "Toggle Recorder", run: () => setRecorderOpen((v) => !v) },
     { id: "win-notes", group: "Windows", label: "Open Notes, tasks, documents & pal instructions", keywords: "memories todos files", run: () => setNotesOpen(true) },
+    { id: "win-dm", group: "Windows", label: "Dungeon Master (campaign)", keywords: "dnd rpg adventure dice", run: () => setNotesOpen(true) },
     { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
     { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
@@ -1082,7 +1123,11 @@ export function Room() {
                           <span>
                             {!a
                               ? "THE TOPIC"
-                              : m.metadata?.verdict
+                              : m.metadata?.dm === "dm"
+                                ? "DUNGEON MASTER"
+                                : m.metadata?.dm === "party"
+                                  ? "PARTY"
+                                  : m.metadata?.verdict
                                 ? "THE VERDICT"
                                 : `ROUND ${m.metadata?.round ?? 1}`}
                           </span>

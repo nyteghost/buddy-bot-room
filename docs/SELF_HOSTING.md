@@ -70,3 +70,7 @@ The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Docke
 - **Debug log:** sidebar → *Debug log* (or `/log`, or Ctrl+Shift+L) → *Copy report*, then paste it to Claude. It contains the app version, your engine settings (never keys), recent server events and browser errors, with API keys and passwords stripped. The same server events are in the container's logs in Portainer.
 - **Jellyfin (`/library <title>` or `/library recent`):** set `JELLYFIN_URL` and `JELLYFIN_API_KEY` (and optionally `JELLYFIN_PUBLIC_URL` for clickable links). Create the key in Jellyfin → Dashboard → API Keys.
 - **Backup:** Ctrl+K → *Export settings* / *Import settings*. Exports leave API keys out unless you pick the "including API keys" option.
+
+## Dungeon Master mode
+
+`/dm start <premise>` begins a campaign: the first pal in the room narrates, the others are your party, and you just say what you do. `/roll d20`, `/roll 2d6+3` and `/roll d20 adv` roll real dice (a natural 20 throws confetti) and the DM sees your recent rolls. `/dm character <text>` and `/dm fact <text>` keep details the story must not forget; `/dm status` shows them and `/dm end` goes back to normal discussions. The same controls are in the Notes & tasks window.

@@ -16,6 +16,8 @@ import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
+import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
+import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
 const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
 
@@ -353,5 +355,122 @@ describe("server chat store validation", () => {
     expect(validRow({ ...row, id: "short" })).toBe(false);
     expect(validRow({ ...row, messages: "no" })).toBe(false);
     expect(validRow(null)).toBe(false);
+  });
+});
+
+describe("dice", () => {
+  const seq = (...n: number[]) => { let i = 0; return () => n[i++ % n.length] ?? 0; };
+  it("parses common forms", () => {
+    expect(parseDice("d20")).toEqual({ ok: true, count: 1, sides: 20, mod: 0, mode: "normal" });
+    expect(parseDice("2d6+3")).toEqual({ ok: true, count: 2, sides: 6, mod: 3, mode: "normal" });
+    expect(parseDice(" 4D8 - 1 ")).toEqual({ ok: true, count: 4, sides: 8, mod: -1, mode: "normal" });
+    expect(parseDice("d20 adv")).toMatchObject({ ok: true, mode: "adv" });
+    expect(parseDice("d20+5 disadvantage")).toMatchObject({ ok: true, mode: "dis", mod: 5 });
+  });
+  it("rejects nonsense and absurd sizes", () => {
+    for (const bad of ["", "hello", "d", "2d", "0d6", "d1", "d1001", `${MAX_DICE + 1}d6`, "2d6 adv", "d20+", "-d6"]) expect(parseDice(bad)).toMatchObject({ ok: false });
+  });
+  it("rolls within range and adds the modifier", () => {
+    const spec = parseDice("2d6+3");
+    if (!spec.ok) throw new Error("parse");
+    const r = rollDice(spec, seq(0, 0.999));
+    expect(r.rolls).toEqual([1, 6]);
+    expect(r.total).toBe(10);
+    expect(r.text).toContain("**10**");
+  });
+  it("never rolls outside 1..sides, even for rng values at the edges", () => {
+    const spec = parseDice("100d20");
+    if (!spec.ok) throw new Error("parse");
+    const r = rollDice(spec, seq(0, 0.9999999999, 0.5));
+    expect(r.rolls.every((x) => x >= 1 && x <= 20)).toBe(true);
+  });
+  it("advantage keeps the high roll, disadvantage the low, and flags naturals", () => {
+    const adv = parseDice("d20 adv"); const dis = parseDice("d20 dis");
+    if (!adv.ok || !dis.ok) throw new Error("parse");
+    const a = rollDice(adv, seq(0.1, 0.99));
+    expect(a.rolls).toEqual([3, 20]);
+    expect(a.kept).toEqual([20]);
+    expect(a.nat20).toBe(true);
+    const d = rollDice(dis, seq(0.99, 0));
+    expect(d.kept).toEqual([1]);
+    expect(d.nat1).toBe(true);
+    expect(d.text).toContain("natural 1");
+  });
+  it("is roughly fair", () => {
+    const spec = parseDice("d6");
+    if (!spec.ok) throw new Error("parse");
+    const counts = [0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < 6000; i++) counts[rollDice(spec, Math.random).rolls[0]! - 1]!++;
+    expect(counts.every((c) => c > 800 && c < 1200)).toBe(true);
+  });
+});
+
+describe("campaign", () => {
+  it("starts with a title from the premise", () => {
+    const c = startCampaign("  a haunted lighthouse   on a stormy coast ");
+    expect(c.active).toBe(true);
+    expect(c.premise).toBe("a haunted lighthouse on a stormy coast");
+    expect(startCampaign("x".repeat(100)).title.length).toBe(48);
+  });
+  it("keeps facts unique, capped and removable by number", () => {
+    let c = startCampaign("p");
+    c = addFact(addFact(c, "The keeper vanished"), "the KEEPER vanished");
+    expect(c.facts.length).toBe(1);
+    for (let i = 0; i < MAX_FACTS + 5; i++) c = addFact(c, "fact " + i);
+    expect(c.facts.length).toBe(MAX_FACTS);
+    expect(removeFact(c, 0)).toBe(c);
+    expect(removeFact(c, 1).facts.length).toBe(MAX_FACTS - 1);
+  });
+  it("keeps only the latest rolls and strips bold marks", () => {
+    let c = startCampaign("p");
+    for (let i = 0; i < MAX_ROLLS + 3; i++) c = addRoll(c, `🎲 d20 = **${i}**`);
+    expect(c.rolls.length).toBe(MAX_ROLLS);
+    expect(c.rolls[MAX_ROLLS - 1]?.includes("**")).toBe(false);
+  });
+  it("builds prompt context only while active, and caps it", () => {
+    expect(campaignContext(emptyCampaign)).toBe("");
+    let c = setCharacter(startCampaign("a haunted lighthouse"), "a nervous halfling");
+    c = addFact(c, "The keeper vanished");
+    c = addRoll(c, "🎲 d20 → [14] = 14");
+    const ctx = campaignContext(c);
+    expect(ctx).toContain("haunted lighthouse");
+    expect(ctx).toContain("nervous halfling");
+    expect(ctx).toContain("keeper vanished");
+    expect(ctx).toContain("= 14");
+    expect(campaignContext(endCampaign(c))).toBe("");
+    expect(campaignContext({ ...c, premise: "z".repeat(300), facts: Array.from({ length: 30 }, (_, i) => "f".repeat(190) + i) }, 500).length).toBeLessThan(501);
+  });
+  it("describes status", () => {
+    expect(statusText(emptyCampaign)).toContain("/dm start");
+    expect(statusText(startCampaign("p"))).toContain("in progress");
+  });
+  it("loads junk safely", () => {
+    expect(parseCampaign(null)).toEqual(emptyCampaign);
+    expect(parseCampaign({ active: "yes", facts: [1, "ok"], rolls: "no" })).toEqual({ ...emptyCampaign, facts: ["ok"] });
+  });
+  it("gives different instructions to the DM and the party", () => {
+    expect(isDmRole("dm") && isDmRole("party") && !isDmRole("x")).toBe(true);
+    expect(dmTask("dm")).toContain("Dungeon Master");
+    expect(dmTask("dm")).toContain("never roll for the player");
+    expect(dmTask("party")).toContain("companion");
+    expect(dmTask("party")).toContain("Do not narrate outcomes");
+  });
+});
+
+describe("dm and roll commands", () => {
+  it("parses /roll", () => {
+    expect(parseSlash("/roll 2d6+3")).toEqual({ ok: true, action: { type: "roll", expr: "2d6+3" } });
+    expect(parseSlash("/roll")).toEqual({ ok: true, action: { type: "roll", expr: "d20" } });
+    expect(parseSlash("/roll banana")).toMatchObject({ ok: false });
+  });
+  it("parses /dm subcommands with original case", () => {
+    expect(parseSlash("/dm start A Haunted Lighthouse")).toEqual({ ok: true, action: { type: "dm", sub: "start", text: "A Haunted Lighthouse" } });
+    expect(parseSlash("/dm end")).toEqual({ ok: true, action: { type: "dm", sub: "end", text: "" } });
+    expect(parseSlash("/dm")).toEqual({ ok: true, action: { type: "dm", sub: "status", text: "" } });
+    expect(parseSlash("/dm character Mira the Bold")).toEqual({ ok: true, action: { type: "dm", sub: "character", text: "Mira the Bold" } });
+    expect(parseSlash("/dm forget 2")).toEqual({ ok: true, action: { type: "dm", sub: "unfact", text: "", n: 2 } });
+  });
+  it("rejects missing arguments", () => {
+    for (const bad of ["/dm start", "/dm character", "/dm fact", "/dm forget", "/dm forget x", "/dm dance"]) expect(parseSlash(bad)).toMatchObject({ ok: false });
   });
 });

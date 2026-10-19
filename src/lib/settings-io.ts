@@ -13,6 +13,7 @@ export const BACKUP_KEYS = [
   "pixel-pals-compare-v1",
   "pixel-pals-saved-discussions-v1",
   "pixel-pals-docs-v1",
+  "pixel-pals-campaign-v1",
   "pixel-pals-workspace-v1",
 ] as const;
 const SECRET_FIELDS = ["groqKey", "geminiKey", "openrouterKey", "nvidiaKey"];

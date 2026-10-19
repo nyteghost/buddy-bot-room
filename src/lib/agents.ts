@@ -199,6 +199,8 @@ export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
   verdict?: boolean;
+  /** Dungeon Master mode: who spoke this turn. */
+  dm?: "dm" | "party";
   elapsed?: number;
   characterMode?: CharacterMode;
   assistant?: boolean;

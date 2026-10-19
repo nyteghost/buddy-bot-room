@@ -1,5 +1,6 @@
 import type { Mode } from "./agents";
 import type { CharacterMode } from "./hellraiser";
+import { parseDice } from "./dice";
 
 /** Room controls you can type instead of click. Pure parsing only — the Room runs the action. */
 export type ThemeId = Exclude<CharacterMode, "assistant">;
@@ -26,7 +27,9 @@ export type SlashAction =
   | { type: "research"; query: string }
   | { type: "compare"; question: string }
   | { type: "log" }
-  | { type: "library"; query: string };
+  | { type: "library"; query: string }
+  | { type: "roll"; expr: string }
+  | { type: "dm"; sub: "start" | "end" | "status" | "character" | "fact" | "unfact"; text: string; n?: number };
 export type SlashResult = { ok: true; action: SlashAction } | { ok: false; error: string };
 
 export const MIN_ROUNDS = 1;
@@ -78,6 +81,8 @@ export const slashCommands = [
   { name: "tasks", usage: "/tasks", description: "Open notes, memories and to-dos" },
   { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
+  { name: "dm", usage: "/dm start <premise>", description: "Dungeon Master mode: start, end, status, character, fact" },
+  { name: "roll", usage: "/roll <2d6+3|d20 adv>", description: "Roll dice" },
   { name: "library", usage: "/library <title|recent>", description: "Look in your Jellyfin library (needs JELLYFIN_URL)" },
   { name: "log", usage: "/log", description: "Open the debug log to copy for a bug report" },
   { name: "compare", usage: "/compare <question>", description: "Blind side-by-side model test" },
@@ -156,6 +161,29 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "search", query: rawArg } } : fail("What should I search for? /search best 4k projector");
     case "research":
       return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
+    case "roll": case "r": case "dice": {
+      const expr = rawArg || "d20";
+      const d = parseDice(expr);
+      return d.ok ? { ok: true, action: { type: "roll", expr } } : fail(d.error);
+    }
+    case "dm": case "campaign": {
+      const [sub = "", ...rest] = rawArg.split(/\s+/);
+      const text = rest.join(" ").trim();
+      const s = sub.toLowerCase();
+      if (s === "start" || s === "new" || s === "begin")
+        return text ? { ok: true, action: { type: "dm", sub: "start", text } } : fail("Give the adventure a premise: /dm start a haunted lighthouse on a stormy coast.");
+      if (s === "end" || s === "stop" || s === "pause") return { ok: true, action: { type: "dm", sub: "end", text: "" } };
+      if (s === "status" || s === "") return { ok: true, action: { type: "dm", sub: "status", text: "" } };
+      if (s === "character" || s === "char" || s === "hero")
+        return text ? { ok: true, action: { type: "dm", sub: "character", text } } : fail("Describe your character: /dm character a nervous halfling locksmith.");
+      if (s === "fact" || s === "lore" || s === "note")
+        return text ? { ok: true, action: { type: "dm", sub: "fact", text } } : fail("Tell me the fact: /dm fact the lighthouse keeper vanished three nights ago.");
+      if (s === "unfact" || s === "forget") {
+        const n = Number(text);
+        return Number.isInteger(n) && n >= 1 ? { ok: true, action: { type: "dm", sub: "unfact", text: "", n } } : fail("Use /dm forget <number> (see /dm status).");
+      }
+      return fail("Use /dm start <premise>, /dm end, /dm status, /dm character <text>, /dm fact <text> or /dm forget <number>.");
+    }
     case "library": case "lib": case "jellyfin":
       return { ok: true, action: { type: "library", query: rawArg || "recent" } };
     case "log": case "debug":
