@@ -15,6 +15,13 @@ export function traktConfig(env: Record<string, string | undefined> = process.en
   return { clientId, user, list: isSlug(list) ? list : "watchlist", token: (env["TRAKT_ACCESS_TOKEN"] ?? "").trim() };
 }
 
+/** Shared by /api/trakt and the note sync: one authenticated GET against Trakt. */
+export function traktGet(cfg: { clientId: string; token: string }, path: string): Promise<Response> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": cfg.clientId };
+  if (cfg.token) headers["Authorization"] = `Bearer ${cfg.token}`;
+  return fetch(`${API}${path}`, { headers, signal: AbortSignal.timeout(10000) });
+}
+
 export async function handleTrakt(request: Request) {
   const cfg = traktConfig();
   if (!cfg) return Response.json({ error: "Trakt isn't set up. Add TRAKT_CLIENT_ID and TRAKT_USER (and optionally TRAKT_LIST) to the environment and restart." }, { status: 503 });

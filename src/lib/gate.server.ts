@@ -5,7 +5,7 @@
  */
 import { readCookie, safeEqual } from "./cookies";
 import { accountsEnabled } from "./accounts";
-import { authPage, currentUser, handleAccounts } from "./accounts.server";
+import { authPage, currentUser, handleAccounts, tokenUser } from "./accounts.server";
 
 const COOKIE = "buddy_auth";
 const MAX_FAILS = 8;
@@ -53,6 +53,8 @@ export async function gate(
     const handled = await handleAccounts(request, now);
     if (handled) return handled;
     if (await currentUser(request, now)) return null;
+    // The iPhone Shortcut has no cookie: it sends an access token, accepted for the note sync only.
+    if (url.pathname === "/api/notes-sync" && (await tokenUser(request))) return null;
     if (url.pathname.startsWith("/api/")) return Response.json({ error: "Sign in required." }, { status: 401 });
     return authPage();
   }

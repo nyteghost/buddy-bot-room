@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiNotesSyncRouteImport } from './routes/api.notes-sync'
 import { Route as ApiAccountsRouteImport } from './routes/api.accounts'
 import { Route as ApiAccountLocalRouteImport } from './routes/api.account-local'
 import { Route as ApiTraktRouteImport } from './routes/api.trakt'
@@ -48,6 +49,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotesSyncRoute = ApiNotesSyncRouteImport.update({
+  id: '/api/notes-sync',
+  path: '/api/notes-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAccountsRoute = ApiAccountsRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/accounts': typeof ApiAccountsRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/trakt': typeof ApiTraktRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/accounts': typeof ApiAccountsRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/trakt': typeof ApiTraktRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/accounts': typeof ApiAccountsRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/trakt': typeof ApiTraktRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/notes-sync'
     | '/api/accounts'
     | '/api/account-local'
     | '/api/trakt'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/notes-sync'
     | '/api/accounts'
     | '/api/account-local'
     | '/api/trakt'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/notes-sync'
     | '/api/accounts'
     | '/api/account-local'
     | '/api/trakt'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiNotesSyncRoute: typeof ApiNotesSyncRoute
   ApiAccountsRoute: typeof ApiAccountsRoute
   ApiAccountLocalRoute: typeof ApiAccountLocalRoute
   ApiTraktRoute: typeof ApiTraktRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notes-sync': {
+      id: '/api/notes-sync'
+      path: '/api/notes-sync'
+      fullPath: '/api/notes-sync'
+      preLoaderRoute: typeof ApiNotesSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/accounts': {
@@ -341,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiNotesSyncRoute: ApiNotesSyncRoute,
   ApiAccountsRoute: ApiAccountsRoute,
   ApiAccountLocalRoute: ApiAccountLocalRoute,
   ApiTraktRoute: ApiTraktRoute,

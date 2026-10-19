@@ -1,5 +1,5 @@
 /** Built-in accounts for the self-hosted build: validation, password hashing and signed sessions. Pure (Web Crypto only). */
-export type StoredUser = { username: string; salt: string; hash: string; iter: number; owner: boolean; created: string };
+export type StoredUser = { username: string; salt: string; hash: string; iter: number; owner: boolean; created: string; tokenHash?: string };
 export type PublicUser = { username: string; owner: boolean };
 
 export const SESSION_COOKIE = "buddy_session";
@@ -60,6 +60,12 @@ export async function readSession(value: string, secret: string, now = Date.now(
     return typeof p["u"] === "string" && typeof p["x"] === "number" && p["x"] * 1000 >= now ? p["u"] : null;
   } catch { return null; }
 }
+
+/** Shortcut access tokens are 256 random bits, so a plain SHA-256 is enough to store (the token itself is shown once). */
+export async function hashToken(token: string): Promise<string> {
+  return toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", enc(`pixel-pals-token:${token}`))));
+}
+export const newToken = (): string => `pp_${randomHex(32)}`;
 
 export const toPublic = (u: StoredUser): PublicUser => ({ username: u.username, owner: u.owner });
 

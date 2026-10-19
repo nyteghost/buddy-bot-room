@@ -17,7 +17,8 @@ import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
 import { parseSlash } from "@/lib/slash-commands";
 import { accountFileName, normalizeLocalSettings } from "@/lib/local-account";
-import { accountsEnabled, checkPassword, checkUsername, hashPassword, readSession, signSession, verifyPassword } from "@/lib/accounts";
+import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
+import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
 import { traktConfig } from "@/lib/trakt.server";
 import { plexMarkdown, shapePlex, watchTopic } from "@/lib/plex";
@@ -719,5 +720,98 @@ describe("accounts", () => {
     expect(a).toBe(await accountFileName(" nyte "));
     expect(a).toMatch(/^[0-9a-f]{32}\.json$/);
     expect(a === (await accountFileName("other"))).toBe(false);
+  });
+});
+
+describe("note sync (Trakt wins, read-only)", () => {
+  const list = [
+    { title: "Dune", year: 2021, kind: "movie" as const, id: 1 },
+    { title: "Severance", year: 2022, kind: "show" as const, id: 2 },
+    { title: "Heat", year: 1995, kind: "movie" as const, id: 3 },
+    { title: "Andor", year: 2022, kind: "show" as const, id: 4 },
+  ];
+  const watchedMovies = [{ title: "Heat", year: 1995, kind: "movie" as const, id: 3 }, { title: "Dune", year: 1984, kind: "movie" as const, id: 9 }];
+  const watchedShows = [{ title: "Severance", year: 2022, kind: "show" as const, id: 2 }];
+  const pool = buildPool(list, watchedMovies, watchedShows);
+  const run = (note: string, searched = new Map<string, any[]>(), skip = 0) => { const lines = parseNote(note, skip); return { lines, results: decide(lines, pool, searched) }; };
+
+  it("normalizes titles", () => {
+    expect(norm("The Dark Knight")).toBe("dark knight");
+    expect(norm("Amélie")).toBe("amelie");
+    expect(norm("Fast & Furious!")).toBe("fast and furious");
+  });
+  it("parses bullets, checkboxes, marks, years and headings", () => {
+    const l = parseNote("Movies to watch:\n- Dune (2021)\n[x] Heat\n✓ Andor ▶\n3. The Batman\n\n" + "x".repeat(100));
+    expect(l.map((x) => x.item)).toEqual([false, true, true, true, true, false, false]);
+    expect(l[1]).toMatchObject({ title: "Dune", year: 2021, marked: false });
+    expect(l[2]).toMatchObject({ title: "Heat", marked: true, box: true });
+    expect(l[3]).toMatchObject({ title: "Andor", marked: true, started: true });
+    expect(l[4]).toMatchObject({ title: "The Batman", bullet: "3. " });
+    expect(parseNote("First line\nDune", 1).map((x) => x.item)).toEqual([false, true]);
+  });
+  it("marks movies Trakt says you watched, keeping the bullet", () => {
+    const { results } = run("- Heat\n[ ] Heat (1995)\nHeat");
+    expect(results.map((r) => r.status)).toEqual(["watched", "watched", "watched"]);
+    expect(results.map((r) => r.newRaw)).toEqual(["- ✓ Heat", "[x] Heat (1995)", "✓ Heat"]);
+  });
+  it("is stable: syncing an already-synced note changes nothing", () => {
+    const first = run("- Heat\n- Severance\n- Dune (2021)").results.map((r) => r.newRaw).join("\n");
+    const second = run(first).results;
+    expect(second.map((r) => r.newRaw).join("\n")).toBe(first);
+    expect(second.map((r) => r.status)).toEqual(["already", "started", "ontrakt"]);
+  });
+  it("labels started shows with ▶ and never marks them finished", () => {
+    const r = run("Severance").results[0]!;
+    expect(r.status).toBe("started");
+    expect(r.newRaw).toBe("Severance ▶");
+  });
+  it("prefers the list item when a title is ambiguous, and asks for the year otherwise", () => {
+    expect(run("Dune").results[0]?.status).toBe("ontrakt");
+    expect(run("Dune").results[0]?.match?.year).toBe(2021);
+    const p2 = buildPool([], [{ title: "Dune", year: 1984, kind: "movie", id: 9 }, { title: "Dune", year: 2021, kind: "movie", id: 1 }], []);
+    const r = decide(parseNote("Dune"), p2, new Map())[0]!;
+    expect(r.status).toBe("ambiguous");
+    expect(r.options?.length).toBe(2);
+    expect(decide(parseNote("Dune (1984)"), p2, new Map())[0]?.status).toBe("watched");
+  });
+  it("keeps a ✓ you typed that Trakt doesn't confirm, and flags it", () => {
+    const r = run("✓ Andor").results[0]!;
+    expect(r.status).toBe("conflict");
+    expect(r.newRaw).toBe("✓ Andor");
+  });
+  it("asks Trakt search only about lines it can't place, then classifies", () => {
+    const lines = parseNote("Heat\nThe Batman\nZzzz Unknown\nOppenheimer");
+    expect(needsSearch(lines, pool).map((l) => l.title)).toEqual(["The Batman", "Zzzz Unknown", "Oppenheimer"]);
+    const searched = new Map([
+      [searchKey({ title: "The Batman" }), [{ title: "The Batman", year: 2022, kind: "movie" as const, id: 50 }]],
+      [searchKey({ title: "Oppenheimer" }), [{ title: "Oppenheimer", year: 2023, kind: "movie" as const, id: 60 }, { title: "Oppenheimer", year: 1980, kind: "show" as const, id: 61 }]],
+    ]);
+    const r = decide(lines, pool, searched);
+    expect(r.map((x) => x.status)).toEqual(["watched", "found", "nomatch", "ambiguous"]);
+  });
+  it("lists Trakt-list items missing from the note, and writes a report", () => {
+    const lines = parseNote("Dune\nHeat");
+    const results = decide(lines, pool, new Map());
+    const missing = missingFromNote(lines, pool);
+    expect(missing.map((m) => m.title)).toEqual(["Severance", "Andor"]);
+    const report = noteReport(results, missing, { date: "2026-10-19", list: "watchlist", historyOk: true });
+    expect(report).toContain("Synced with Trakt on 2026-10-19");
+    expect(report).toContain("✓ Newly marked watched:\n• Heat (1995)");
+    expect(report).toContain("On your Trakt list but not in the note:");
+    expect(noteReport([], [], { date: "d", list: "l", historyOk: false })).toContain("Couldn't read your Trakt watch history");
+    expect(counts(results).watched).toBe(1);
+    expect(noteReport(decide(parseNote("- Zzz Nothing"), pool, new Map()), [], { date: "d", list: "l", historyOk: true })).toContain("• Zzz Nothing");
+  });
+  it("shapes history and search results", () => {
+    expect(shapeHistory([{ plays: 2, movie: { title: "Heat", year: 1995, ids: { trakt: 3 } } }, { movie: {} }], "movie")).toEqual([{ title: "Heat", kind: "movie", year: 1995, id: 3 }]);
+    expect(shapeSearch([{ type: "show", score: 9, show: { title: "Andor", year: 2022, ids: { trakt: 4 } } }, { type: "person" }])).toEqual([{ title: "Andor", kind: "show", year: 2022, id: 4 }]);
+    expect(shapeSearch(null)).toEqual([]);
+  });
+  it("makes access tokens that are random, prefixed and stored only hashed", async () => {
+    const a = newToken();
+    expect(a).toMatch(/^pp_[0-9a-f]{64}$/);
+    expect(a === newToken()).toBe(false);
+    expect(await hashToken(a)).not.toContain(a);
+    expect(await hashToken(a)).toBe(await hashToken(a));
   });
 });

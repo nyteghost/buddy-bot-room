@@ -1,6 +1,6 @@
 import { readCookie, safeEqual } from "./cookies";
 import {
-  SESSION_COOKIE, SESSION_SECONDS, checkPassword, checkUsername, hashPassword, normalizeUsername, randomHex,
+  SESSION_COOKIE, SESSION_SECONDS, checkPassword, hashToken, newToken, checkUsername, hashPassword, normalizeUsername, randomHex,
   readSession, signSession, toPublic, verifyPassword, type PublicUser, type StoredUser,
 } from "./accounts";
 import { logServer } from "./server-log.server";
@@ -75,6 +75,15 @@ export async function currentUser(request: Request, now = Date.now()): Promise<P
 }
 
 const ENTITIES: Record<string, string> = { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" };
+/** A user identified by "Authorization: Bearer <access token>" (used by the iPhone Shortcut). */
+export async function tokenUser(request: Request): Promise<PublicUser | null> {
+  const m = /^Bearer\s+(pp_[0-9a-f]{64})$/.exec(request.headers.get("authorization")?.trim() ?? "");
+  if (!m?.[1]) return null;
+  const hash = await hashToken(m[1]);
+  const user = (await readUsers()).find((u) => u.tokenHash && safeEqual(u.tokenHash, hash));
+  return user ? toPublic(user) : null;
+}
+
 const esc = (s: string): string => s.replace(/[<>&"']/g, (c) => ENTITIES[c] ?? "");
 function page(kind: "signin" | "setup", message = "", needsCode = false): Response {
   const note = message ? `<p class="err">${esc(message)}</p>` : "";
@@ -178,10 +187,24 @@ export async function handleAccountsApi(request: Request): Promise<Response> {
   try {
     if (request.method === "GET") {
       const users = (await readUsers()).filter((u) => me.owner || normalizeUsername(u.username) === normalizeUsername(me.username));
-      return json({ me, users: users.map((u) => ({ ...toPublic(u), created: u.created })) });
+      return json({ me, hasToken: !!(await readUsers()).find((u) => normalizeUsername(u.username) === normalizeUsername(me.username))?.tokenHash, users: users.map((u) => ({ ...toPublic(u), created: u.created })) });
     }
     const url = new URL(request.url);
     const body = request.method === "DELETE" ? {} : ((await request.json().catch(() => ({}))) as Record<string, unknown>);
+    if (request.method === "POST" && body["action"] === "token") {
+      const token = newToken();
+      const tokenHash = await hashToken(token);
+      const ok = await locked(async () => {
+        const users = await readUsers();
+        const i = users.findIndex((u) => normalizeUsername(u.username) === normalizeUsername(me.username));
+        const user = users[i];
+        if (!user) return false;
+        users[i] = { ...user, tokenHash };
+        await writeUsers(users);
+        return true;
+      });
+      return ok ? json({ token }) : json({ error: "No such account." }, 404);
+    }
     if (request.method === "POST") {
       if (!me.owner) return json({ error: "Only the owner can add accounts." }, 403);
       const name = typeof body["username"] === "string" ? body["username"].trim() : "";
@@ -216,6 +239,18 @@ export async function handleAccountsApi(request: Request): Promise<Response> {
       });
       if (result === "missing") return json({ error: "No such account." }, 404);
       if (result === "wrong") return json({ error: "Your current password isn't right." }, 403);
+      return json({ ok: true });
+    }
+    if (request.method === "DELETE" && url.searchParams.get("token") === "1") {
+      await locked(async () => {
+        const users = await readUsers();
+        const i = users.findIndex((u) => normalizeUsername(u.username) === normalizeUsername(me.username));
+        const user = users[i];
+        if (!user) return;
+        const { tokenHash: _gone, ...rest } = user;
+        users[i] = rest;
+        await writeUsers(users);
+      });
       return json({ ok: true });
     }
     if (request.method === "DELETE") {

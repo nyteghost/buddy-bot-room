@@ -108,6 +108,30 @@ Pixel Pals reads your Trakt lists straight from Trakt's API (no Plex involved) a
 
 Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
 
+## Sync an iPhone Note with Trakt
+
+Pixel Pals can compare a Note (one title per line) with your Trakt list and watch history. It is **read-only on Trakt**; Trakt wins:
+
+- A movie Trakt says you've watched gets a **✓** (`- Heat` becomes `- ✓ Heat`; `[ ] Heat` becomes `[x] Heat`).
+- A show you've started gets **▶**. Shows are never marked finished automatically.
+- A ✓ you typed that Trakt doesn't confirm is kept and flagged. Pixel Pals never removes your marks.
+- It also tells you which titles are on Trakt but not on your list, which it couldn't find, which are ambiguous (write `Dune (2021)`), and which Trakt-list items aren't in the note.
+
+Needs the Trakt setup above (`TRAKT_CLIENT_ID`, `TRAKT_USER`, a public list or history) and accounts on. Your iPhone must be able to reach Pixel Pals (Tailscale on, same address you use in Safari).
+
+**One-time setup:** top bar → people icon → *iPhone Shortcut access token* → **Create token** and copy it (it's shown once).
+
+**The Shortcut** (Shortcuts app → +):
+1. **Find Notes** where *Name* is your note's title (for example `Watch list`), limit 1.
+2. **Get Details of Notes** → *Body*.
+3. **Get Contents of URL**: URL `https://<your-address>/api/notes-sync?format=report&skip=1`, *Method* POST, *Headers* `Authorization` = `Bearer <your token>` and `Content-Type` = `text/plain`, *Request Body* = File, choose the Body text from step 2. (`skip=1` ignores the first line, which is usually the note's title; drop it if your Body doesn't include the title.)
+4. **Show Result** (or **Append to Note** to add the report to the bottom of the note).
+
+Variations: use `format=note` instead of `format=report` to get the whole note back with ✓/▶ added, then **Create Note** from it (Shortcuts can append to a note but can't rewrite one in place, so this makes a new, updated copy and leaves your original alone). Add `&list=<trakt list name>` to use a list other than `TRAKT_LIST`. To run it daily: Shortcuts → *Automation* → *Time of Day* → run this Shortcut.
+
+The same address also answers `format=json` (`note`, `report`, `counts`). Check it from the command line with:
+`curl -X POST --data-binary @note.txt -H "Authorization: Bearer <token>" -H "Content-Type: text/plain" "https://<your-address>/api/notes-sync?format=report"`.
+
 ## Plex: `/plex` and "What should we watch tonight?"
 
 Set `PLEX_URL` (for example `http://10.200.1.X:32400`) and `PLEX_TOKEN` in the stack's environment variables. To find the token: in Plex's web app open any item → ⋯ → *Get Info* → *View XML*, and copy the `X-Plex-Token=` value from the address bar. Then:

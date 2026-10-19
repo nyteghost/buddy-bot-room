@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Trash2, UserPlus, Users } from "lucide-react";
+import { Copy, KeyRound, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Row = { username: string; owner: boolean; created: string };
-type Data = { me: { username: string; owner: boolean }; users: Row[] };
+type Data = { me: { username: string; owner: boolean }; hasToken?: boolean; users: Row[] };
 
 async function call(method: string, body?: unknown, query = ""): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -24,11 +24,12 @@ export function AccountsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const [pw, setPw] = useState("");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
+  const [token, setToken] = useState("");
 
   const load = useCallback(() => {
     fetch("/api/accounts").then((r) => r.json()).then((j) => setData(j as Data)).catch(() => setNote("Couldn't load accounts."));
   }, []);
-  useEffect(() => { if (open) { setNote(""); load(); } }, [open, load]);
+  useEffect(() => { if (open) { setNote(""); setToken(""); load(); } }, [open, load]);
 
   async function run(p: Promise<{ ok: boolean; error?: string }>, done: string, after?: () => void) {
     const r = await p;
@@ -49,6 +50,25 @@ export function AccountsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <input type="password" placeholder="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
           <input type="password" placeholder="New password (8+ characters)" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
           <Button variant="outline" size="sm" onClick={() => run(call("PUT", { current, password: next }), "Password changed.", () => { setCurrent(""); setNext(""); })}><KeyRound /> Change password</Button>
+        </div>
+
+        <div className="accounts-block">
+          <strong>iPhone Shortcut access token</strong>
+          <span className="debug-note">Lets an Apple Shortcut sync a Note with Trakt without signing in. It's shown once; creating a new one replaces the old.</span>
+          {token && (
+            <>
+              <input readOnly value={token} aria-label="Access token" onFocus={(e) => e.currentTarget.select()} />
+              <Button variant="outline" size="sm" onClick={() => { void navigator.clipboard.writeText(token).then(() => setNote("Token copied."), () => setNote("Select the token and press Ctrl+C.")); }}><Copy /> Copy token</Button>
+            </>
+          )}
+          <span className="accounts-actions">
+            <Button variant="outline" size="sm" onClick={async () => {
+              const r = await fetch("/api/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "token" }) });
+              const j = (await r.json().catch(() => ({}))) as { token?: string; error?: string };
+              if (j.token) { setToken(j.token); setNote("Copy it now. You won't see it again."); load(); } else setNote(j.error ?? "Couldn't create a token.");
+            }}><Smartphone /> {data?.hasToken ? "Replace token" : "Create token"}</Button>
+            {data?.hasToken && <Button variant="ghost" size="sm" onClick={() => run(call("DELETE", undefined, "?token=1"), "Token removed.", () => setToken(""))}><Trash2 /> Remove</Button>}
+          </span>
         </div>
 
         {data?.me.owner && (
