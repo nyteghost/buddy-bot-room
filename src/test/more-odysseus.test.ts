@@ -25,7 +25,7 @@ describe("new slash commands", () => {
   });
   it("suggests the new commands", () => {
     expect(slashSuggestions("/rem").map((s) => s.insert)).toEqual(["/remember "]);
-    expect(slashSuggestions("/se").map((s) => s.insert)).toEqual(["/search "]);
+    expect(slashSuggestions("/sea").map((s) => s.insert)).toEqual(["/search "]);
   });
 });
 
