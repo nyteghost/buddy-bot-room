@@ -21,6 +21,8 @@ import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
 import { capPerOwner, visibleTo } from "@/lib/store.server";
 import { accountsEnabled, checkPassword, checkUsername, hashPassword, hashToken, newToken, readSession, signSession, verifyPassword } from "@/lib/accounts";
+import { sharedText } from "@/lib/share-prefill";
+import { PUBLIC_FILES } from "@/lib/gate.server";
 import { buildBrief, dailyPicks, unraidLine } from "@/lib/brief";
 import { ageText, isDue, parseHm, validZone, zonedParts } from "@/lib/schedule";
 import { backupName, insideData, isBackupName, pruneList } from "@/lib/backup";
@@ -957,5 +959,23 @@ describe("morning brief", () => {
     expect(parseSlash("/brief")).toEqual({ ok: true, action: { type: "brief", send: false } });
     expect(parseSlash("/brief send")).toEqual({ ok: true, action: { type: "brief", send: true } });
     expect(parseSlash("/backup now")).toEqual({ ok: true, action: { type: "backup", now: true } });
+  });
+});
+
+describe("share-sheet prefill and public app files", () => {
+  it("builds the text from the address", () => {
+    expect(sharedText("?q=hello%20world")).toBe("hello world");
+    expect(sharedText("?title=Dune&q=Is%20it%20good%3F&url=https%3A%2F%2Fexample.com%2Fdune")).toBe("Dune\nIs it good?\nhttps://example.com/dune");
+    expect(sharedText("?q=See%20https%3A%2F%2Fx.com&url=https%3A%2F%2Fx.com")).toBe("See https://x.com");
+    expect(sharedText("")).toBe("");
+    expect(sharedText("?other=1")).toBe("");
+    expect(sharedText("?q=" + "a".repeat(5000)).length).toBe(2000);
+  });
+  it("lets the manifest and icons through the sign-in, and nothing else", async () => {
+    expect(PUBLIC_FILES.has("/manifest.webmanifest")).toBe(true);
+    expect(PUBLIC_FILES.has("/api/chat")).toBe(false);
+    expect((await gate(new Request("http://x/manifest.webmanifest"), "pw"))).toBe(null);
+    expect((await gate(new Request("http://x/apple-touch-icon.png"), "pw"))).toBe(null);
+    expect((await gate(new Request("http://x/"), "pw"))?.status).toBe(401);
   });
 });

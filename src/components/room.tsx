@@ -129,6 +129,7 @@ import { parseDice, rollDice, secureRng } from "@/lib/dice";
 import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/lib/unraid";
 import { UnraidBanner } from "./unraid-banner";
 import { nextTopic, traktListsMarkdown, traktMarkdown, type TraktItem, type TraktList } from "@/lib/trakt";
+import { sharedText } from "@/lib/share-prefill";
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
@@ -188,6 +189,13 @@ export function Room() {
   const mentionTarget = resolveMention(topic, characterMode);
   const tooFew = !direct && !mentionTarget && enabled.length < 2;
   const topicDraft = topic;
+  // Shared into Pixel Pals from the iPhone share sheet (a Shortcut opening /?q=...): put it in the box, don't send it.
+  useEffect(() => {
+    const text = sharedText(window.location.search);
+    if (!text) return;
+    setTopic((t) => t || text);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
   const directMode = direct;
   const partnerChoice = partner;
   const [desktopApp, setDesktopApp] = useState(false);

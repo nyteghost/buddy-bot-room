@@ -111,6 +111,12 @@ With Plex set up too, each unwatched item is marked **📺 in Plex** or **not in
 
 Commands: `/trakt lists` shows your lists and their short names, `/trakt <list>` shows one, `/next [list:name] [mood]` has the pals choose from it (movies you've already watched are skipped when your history is public).
 
+## Install on your iPhone (home-screen app)
+
+Open Pixel Pals in Safari at your HTTPS address, tap **Share → Add to Home Screen**. It opens full-screen with its own icon, like an app. (Android Chrome: menu → *Install app*.) Needs the HTTPS address; sign-in cookies last 30 days.
+
+**Send things to Pixel Pals from the share sheet** with a Shortcut: Shortcuts → + → *Add to Share Sheet*, accept *Text* and *URLs*; add **URL Encode** (input: *Shortcut Input*), then **Open URLs** with `https://<your-address>/?q=` followed by the encoded text. Whatever you share lands in the message box, ready to send; nothing is sent automatically. Note that iOS opens that link in Safari, not in the installed home-screen app (Apple's share-target support for web apps is Android-only), and that you need to be signed in already.
+
 ## Morning brief
 
 Set `BRIEF_TIME` (for example `08:00`, in `BUDDY_TZ`) and `NTFY_URL` and Pixel Pals pushes one short message to your phone each morning: whether Unraid is healthy, the last backup, **tonight's pick** from your Trakt list (preferring what's already in Plex, with two alternatives) and what's new in Plex. Each part appears only if that service is set up. The pick is a plain daily choice from your list, not an AI opinion, so it works without any API keys. Type `/brief` in the chat to preview it, or `/brief send` to push it to your phone right now.

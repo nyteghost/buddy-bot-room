@@ -32,6 +32,9 @@ button{background:#7c6cf0;border:0;cursor:pointer}.err{color:#ff8a8a;margin:0}</
   );
 }
 
+/** Icons and the app manifest are public: the browser fetches them without cookies when installing the app. */
+export const PUBLIC_FILES = new Set(["/manifest.webmanifest", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/favicon.svg", "/robots.txt"]);
+
 export function isGateOn(password: string | undefined): password is string {
   return typeof password === "string" && password.length > 0;
 }
@@ -47,7 +50,7 @@ export async function gate(
   accounts: boolean = accountsEnabled(typeof process !== "undefined" ? process.env : {}),
 ): Promise<Response | null> {
   const url = new URL(request.url);
-  if (url.pathname === "/__health") return null;
+  if (url.pathname === "/__health" || PUBLIC_FILES.has(url.pathname)) return null;
   if (accounts) {
     // Built-in accounts: sign in (or create the first account) instead of the shared password.
     const handled = await handleAccounts(request, now);
