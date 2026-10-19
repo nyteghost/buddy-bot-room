@@ -65,6 +65,13 @@ export function fitLabel(fit: Fit, onGpu: boolean): string {
   return "too big for this machine";
 }
 
+/** Plain-language reading of a speed test: tokens per second and how much of the model sits on the GPU. */
+export function describeBench(tokensPerSec: number, gpuPercent: number | null): string {
+  const speed = tokensPerSec >= 30 ? "very fast" : tokensPerSec >= 15 ? "fast" : tokensPerSec >= 6 ? "usable" : "slow";
+  const where = gpuPercent === null ? "" : gpuPercent >= 95 ? " Entirely on the GPU." : gpuPercent > 0 ? ` About ${gpuPercent}% on the GPU, the rest on the CPU (this is what slows it down).` : " Running on the CPU only.";
+  return `${tokensPerSec} tokens/second (${speed}).${where}`;
+}
+
 export type RouteHint = { mode?: string; text?: string; agentId?: string };
 export type LocalModels = { localChat: string; localCode: string; localReasoning: string; localFast: string; localAuto: boolean; localPals?: Record<string, string> };
 

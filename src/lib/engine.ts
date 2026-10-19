@@ -8,7 +8,7 @@ export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 80
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 /** Claude is a PAID provider, so it is never part of the free rotation unless the user opts in. */
 export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server" | "custom"; apiKey: string; model?: string; maxTokens?: number; baseUrl?: string };
-export type ClaudeMode = "off" | "share" | "only";
+export type ClaudeMode = "off" | "share" | "only" | "fallback";
 export const CLAUDE_MODELS = [
   { id: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)", price: "$0.10 in / $0.50 out per 1M tokens" },
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5", price: "$2 in / $10 out per 1M tokens" },
@@ -38,6 +38,11 @@ export type EngineSettings = {
   /** Tick this if the provider charges money; shows a warning. */
   customPaid: boolean;
   customMode: ClaudeMode;
+  /** Monthly spend cap in USD for paid providers (estimated). 0 = no cap. */
+  spendCapUsd: number;
+  /** What your custom provider costs per million tokens, for the spend estimate. */
+  customPriceIn: number;
+  customPriceOut: number;
   anthropicKey: string;
   claudeMode: ClaudeMode;
   claudeModel: string;
@@ -66,6 +71,9 @@ const fallback: EngineSettings = {
   customModel: "",
   customPaid: false,
   customMode: "off",
+  spendCapUsd: 0,
+  customPriceIn: 0,
+  customPriceOut: 0,
   anthropicKey: "",
   claudeMode: "off",
   claudeModel: DEFAULT_CLAUDE_MODEL,
@@ -122,24 +130,41 @@ export function availableProviders(s: EngineSettings): { kind: FreeProvider; api
 }
 
 /** Spread pals across all entered keys so each provider's free limit is shared out. */
-export function claudeProvider(s: EngineSettings): TurnProvider | undefined {
+export function claudeProvider(s: EngineSettings, modes: ClaudeMode[] = ["share", "only"]): TurnProvider | undefined {
   const apiKey = (s.anthropicKey ?? "").trim();
-  if (!apiKey || (s.claudeMode !== "share" && s.claudeMode !== "only")) return undefined;
+  if (!apiKey || !modes.includes(s.claudeMode)) return undefined;
   return { kind: "anthropic", apiKey, model: CLAUDE_MODELS.some((m) => m.id === s.claudeModel) ? s.claudeModel : DEFAULT_CLAUDE_MODEL };
 }
 
 /** Everything that may answer a turn: the free keys, plus Claude only if the user switched it on. */
-export function customProvider(s: EngineSettings): TurnProvider | undefined {
-  if ((s.customMode !== "share" && s.customMode !== "only") || !s.customBaseUrl.trim() || !s.customModel.trim()) return undefined;
+export function customProvider(s: EngineSettings, modes: ClaudeMode[] = ["share", "only"]): TurnProvider | undefined {
+  if (!modes.includes(s.customMode) || !s.customBaseUrl.trim() || !s.customModel.trim()) return undefined;
   return { kind: "custom", apiKey: s.customKey.trim(), model: s.customModel.trim(), baseUrl: s.customBaseUrl.trim() };
 }
 
-export function turnProviders(s: EngineSettings): TurnProvider[] {
-  const claude = claudeProvider(s);
-  const custom = customProvider(s);
+/** Paid providers are left out once the monthly cap is reached (blockPaid). */
+export function turnProviders(s: EngineSettings, blockPaid = false): TurnProvider[] {
+  const claude = blockPaid ? undefined : claudeProvider(s);
+  const custom = blockPaid && s.customPaid ? undefined : customProvider(s);
   if (claude && s.claudeMode === "only") return [claude];
   if (custom && s.customMode === "only") return [custom];
-  return [...availableProviders(s), ...(claude ? [claude] : []), ...(custom ? [custom] : [])];
+  const free = availableProviders(s);
+  return [...free, ...(claude ? [claude] : []), ...(custom ? [custom] : [])];
+}
+
+/** Providers set to "only when others fail". Tried after everything in the normal rotation has errored. */
+export function fallbackProviders(s: EngineSettings, blockPaid = false): TurnProvider[] {
+  const claude = blockPaid ? undefined : claudeProvider(s, ["fallback"]);
+  const custom = blockPaid && s.customPaid ? undefined : customProvider(s, ["fallback"]);
+  return [claude, custom].filter((p): p is TurnProvider => !!p);
+}
+
+/** What to try, in order, when `failed` errored before producing text. */
+export function chainAfter(s: EngineSettings, failed: TurnProvider, blockPaid = false): TurnProvider[] {
+  if (failed.kind === "ollama-server") return [];
+  const rotation = turnProviders(s, blockPaid).filter((p) => p.kind !== failed.kind || p.baseUrl !== failed.baseUrl);
+  const fallback = fallbackProviders(s, blockPaid).filter((p) => p.kind !== failed.kind);
+  return [...rotation, ...fallback];
 }
 
 /** The model on the Ollama inside the stack, chosen per task when routing is on. */
@@ -147,9 +172,9 @@ export function localServerProvider(s: EngineSettings, hint: RouteHint = {}): Tu
   return { kind: "ollama-server", apiKey: "", model: pickModel(s, hint), maxTokens: replyTokens[s.replyLength] };
 }
 
-export function providerForTurn(s: EngineSettings, turnIndex: number, hint: RouteHint = {}): TurnProvider | undefined {
+export function providerForTurn(s: EngineSettings, turnIndex: number, hint: RouteHint = {}, blockPaid = false): TurnProvider | undefined {
   if (s.kind === "local-server") return localServerProvider(s, hint);
-  const list = turnProviders(s);
+  const list = turnProviders(s, blockPaid);
   return list.length ? list[turnIndex % list.length] : undefined;
 }
 

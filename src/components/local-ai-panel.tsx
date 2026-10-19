@@ -5,7 +5,7 @@ import { setEngine, useEngine } from "@/lib/engine";
 import { describeHardware, modelBudgetGb, type Hardware } from "@/lib/hardware";
 import { agents } from "@/lib/agents";
 import { newSuggestions, type FeedModel } from "@/lib/model-feed";
-import { CATALOG, TASKS, fitFor, fitLabel, recommend, type TaskKey } from "@/lib/model-catalog";
+import { describeBench, CATALOG, TASKS, fitFor, fitLabel, recommend, type TaskKey } from "@/lib/model-catalog";
 
 type Status = {
   configured: boolean;
@@ -76,6 +76,20 @@ export function LocalAiPanel() {
     const j = (await res.json().catch(() => ({}))) as { feed?: Status["feed"]; error?: string };
     setNote(j.feed?.error ? `Couldn't update the list: ${j.feed.error}` : j.error ?? "Model list updated.");
     load();
+  }
+
+  async function bench(model: string) {
+    setBusy((b) => ({ ...b, [`bench:${model}`]: "Testing…" }));
+    try {
+      const res = await fetch("/api/ollama", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "bench", model }) });
+      const j = (await res.json()) as { tokensPerSec?: number; loadSeconds?: number; gpuPercent?: number | null; error?: string };
+      setNote(j.error ?? `${model}: ${describeBench(j.tokensPerSec ?? 0, j.gpuPercent ?? null)}${j.loadSeconds ? ` (first load took ${j.loadSeconds}s)` : ""}`);
+    } catch {
+      setNote("The speed test failed.");
+    } finally {
+      setBusy((b) => { const n = { ...b }; delete n[`bench:${model}`]; return n; });
+      load();
+    }
   }
 
   async function remove(model: string) {
@@ -176,7 +190,10 @@ export function LocalAiPanel() {
             {installed.map((m) => (
               <div key={m.name} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
                 <span>{m.name} <span className="text-xs text-muted-foreground">{m.gb} GB</span></span>
+                <span className="flex gap-1">
+                <Button size="sm" variant="outline" className="h-11 sm:h-8" disabled={!!busy[`bench:${m.name}`]} onClick={() => void bench(m.name)}>{busy[`bench:${m.name}`] ?? "Speed test"}</Button>
                 <Button size="sm" variant="ghost" className="h-11 sm:h-8" aria-label={`Remove ${m.name}`} onClick={() => void remove(m.name)}><Trash2 className="size-4" /></Button>
+                </span>
               </div>
             ))}
           </div>

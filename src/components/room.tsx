@@ -95,7 +95,9 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { providerForTurn, replyTokens, useEngine } from "@/lib/engine";
+import { chainAfter, freeModels, providerForTurn, replyTokens, useEngine } from "@/lib/engine";
+import { estimateTokens } from "@/lib/usage";
+import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
@@ -502,7 +504,28 @@ export function Room() {
             }
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
-          const provider = providerForTurn(engine, turnIndex, { agentId: agent.id, mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" });
+          const blockPaid = isOverCap(engine.spendCapUsd, { inPerM: engine.customPriceIn, outPerM: engine.customPriceOut });
+          const provider = providerForTurn(engine, turnIndex, { agentId: agent.id, mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
+          // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
+          const runChain = async (first: NonNullable<typeof provider>) => {
+            const chain = [first, ...chainAfter(engine, first, blockPaid)];
+            let lastError: unknown;
+            for (const p of chain) {
+              try {
+                await consume(await runCloud(p));
+                const outText = answer ? messageText(answer) : "";
+                const inChars = Math.min(transcript.reduce((n, m) => n + messageText(m).length, 0), requestBody.contextChars) + 2000;
+                recordUsage({ kind: p.kind, model: p.model ?? (p.kind in freeModels ? freeModels[p.kind as keyof typeof freeModels] : p.kind), inTok: estimateTokens(inChars), outTok: estimateTokens(outText.length) });
+                return;
+              } catch (err) {
+                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
+                answer = undefined;
+                lastError = err;
+                logClient("warn", `${p.kind} failed, trying the next provider`, err);
+              }
+            }
+            throw lastError;
+          };
           const runOllama = async () =>
             consume(
               await ollamaTurn(
@@ -517,7 +540,7 @@ export function Room() {
             if (!provider) await runOllama();
             else {
               try {
-                await consume(await runCloud(provider));
+                await runChain(provider);
               } catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
@@ -526,7 +549,7 @@ export function Room() {
             }
           } else if (engine.kind === "local-server") {
             if (!provider) throw new Error("Local AI isn't available.");
-            await consume(await runCloud(provider));
+            await runChain(provider);
           } else if (engine.kind === "ollama") {
             await consume(
               await ollamaTurn(
@@ -539,18 +562,18 @@ export function Room() {
           } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
             await consume(await runLocal());
           } else if (!provider) {
-            throw new Error("Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
+            throw new Error(blockPaid ? "Your monthly spend cap is reached and no free provider is set up. Raise the cap in AI engine settings, add a free key, or choose In-browser." : "Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
           } else if (engine.kind === "auto") {
             // Auto: free keys are far faster; the in-browser model takes over when a key hits its limit.
             try {
-              await consume(await runCloud(provider));
+              await runChain(provider);
             } catch (err) {
               if (controller.signal.aborted || !hasWebGPU() || (answer && messageText(answer).trim())) throw err;
               answer = undefined;
               await consume(await runLocal());
             }
           } else {
-            await consume(await runCloud(provider));
+            await runChain(provider);
           }
           if (answer && messageText(answer).trim()) {
             transcript = [...transcript, answer];

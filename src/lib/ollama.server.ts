@@ -53,6 +53,20 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
       return json({ error: "Couldn't reach Ollama." }, 502);
     }
   }
+  if (body.action === "bench") {
+    try {
+      const res = await ollama("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: body.model, prompt: "Write three sentences about the ocean.", stream: false, options: { num_predict: 80 } }), timeout: 180_000 });
+      if (!res.ok) return json({ error: `Ollama couldn't run ${body.model} (${res.status}). Is it downloaded?` }, 502);
+      const r = (await res.json()) as { eval_count?: number; eval_duration?: number; load_duration?: number };
+      const ps = await ollama("/api/ps").then((p) => (p.ok ? (p.json() as Promise<{ models?: { name: string; size_vram?: number; size?: number }[] }>) : null)).catch(() => null);
+      const loaded = ps?.models?.find((m) => m.name === body.model || m.name === `${body.model}:latest`);
+      const tps = r.eval_count && r.eval_duration ? Math.round((r.eval_count / (r.eval_duration / 1e9)) * 10) / 10 : 0;
+      const share = loaded && loaded.size ? Math.round(((loaded.size_vram ?? 0) / loaded.size) * 100) : null;
+      return json({ tokensPerSec: tps, loadSeconds: Math.round(((r.load_duration ?? 0) / 1e9) * 10) / 10, gpuPercent: share });
+    } catch {
+      return json({ error: "The speed test timed out or Ollama couldn't be reached." }, 502);
+    }
+  }
   if (body.action === "delete") {
     try {
       const res = await ollama("/api/delete", { method: "DELETE", body: JSON.stringify({ model: body.model }), headers: { "content-type": "application/json" } });

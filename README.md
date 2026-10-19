@@ -176,6 +176,12 @@ Claude is the one **paid** option. It is billed to your own Anthropic account, s
 
 Compare models only uses the free keys, so it never spends Claude credit.
 
+### Fallback, spend cap and speed test
+
+- **Fallback chain:** if a provider errors or hits its rate limit before writing anything, the turn is retried on your next free key automatically. Claude and a custom provider each have an **Only when my free keys fail** option, so paid usage only happens when the free ones can't answer.
+- **Usage and spend:** the engine settings show an estimate of replies, tokens and cost this month per provider (estimated at about 4 characters per token, kept in the browser; the provider's own dashboard is the real bill). Set a **monthly cap** and paid providers are skipped once the estimate reaches it; free keys keep working. For a paid custom provider, enter its price per million tokens so the estimate works.
+- **Speed test:** in the Local AI panel each installed model has a **Speed test** button. It reports tokens per second and how much of the model is on the GPU, so you can see whether a model fits your VRAM.
+
 ### Setting up Ollama
 
 **Portainer stack (Local AI, recommended):** Ollama is included in `docker-compose.portainer.yml`, and Pixel Pals talks to it from the server, so there is no address to type and no HTTPS problem. Choose the engine **Local AI (this server)** in the engine settings. The panel there:

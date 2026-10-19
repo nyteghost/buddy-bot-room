@@ -27,6 +27,7 @@ import { localModelChoices } from "@/lib/gpu-tier";
 import { FreeKeysWizard } from "@/components/free-keys-wizard";
 import { LocalAiPanel } from "@/components/local-ai-panel";
 import { CUSTOM_PRESETS } from "@/lib/custom-provider";
+import { UsagePanel } from "@/components/usage-panel";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
@@ -216,6 +217,7 @@ export function EngineSettingsDialog() {
                 >
                   <option value="off">Off (never charged)</option>
                   <option value="share">Share turns with my free keys (some replies are paid)</option>
+                  <option value="fallback">Only when my free keys fail (paid when used)</option>
                   <option value="only">Use only Claude (every reply is paid)</option>
                 </select>
               </label>
@@ -235,6 +237,7 @@ export function EngineSettingsDialog() {
               {engine.claudeMode !== "off" && engine.anthropicKey.trim() && <p className="text-amber-600">Claude is ON: replies it writes are billed to your Anthropic account.</p>}
             </div>
             <CustomProviderBox />
+            <UsagePanel />
             <p className="text-sm text-muted-foreground">
               Keys are saved only in this browser (and encrypted in your account if signed in).
             </p>
@@ -339,6 +342,7 @@ function CustomProviderBox() {
           <select className="rounded-md border bg-background px-2 py-2" value={engine.customMode} onChange={(e) => setEngine({ customMode: e.target.value as ClaudeMode })}>
             <option value="off">Off</option>
             <option value="share">Share turns with my other keys</option>
+            <option value="fallback">Only when my other keys fail</option>
             <option value="only">Use only this provider</option>
           </select>
         </label>

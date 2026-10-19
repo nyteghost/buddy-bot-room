@@ -13,11 +13,12 @@ import { planAdd } from "@/lib/documents";
 import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
 import { notesSyncUrl, shareSheetUrl, bearerHeader, isSecure, notesSteps, shareSteps } from "@/lib/iphone-setup";
 import { parseNvidiaSmi, modelBudgetGb, describeHardware } from "@/lib/hardware";
-import { CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
+import { describeBench, CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
 import { parseLibraryPage, parsePulls, sizeToGb, feedToCatalog, newSuggestions } from "@/lib/model-feed";
 import { parseProviderReadme, keyPageFor, isSupported } from "@/lib/provider-feed";
 import { validateCustomUrl, isCustomModel, CUSTOM_PRESETS } from "@/lib/custom-provider";
-import { customProvider, providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
+import { estimateTokens, costUsd, summarize, overCap, trim, monthKey, fmtUsd } from "@/lib/usage";
+import { chainAfter, fallbackProviders, customProvider, providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
 import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
@@ -43,7 +44,7 @@ import { buildStatus, diagnoseTopic, eventText, FAILS_BEFORE_DOWN, initialWatch,
 import { parseDice, rollDice, MAX_DICE } from "@/lib/dice";
 import { addFact, addRoll, campaignContext, dmTask, emptyCampaign, endCampaign, isDmRole, parseCampaign, removeFact, setCharacter, startCampaign, statusText, MAX_FACTS, MAX_ROLLS } from "@/lib/campaign";
 
-const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, localPals: {} as Record<string, string>, customName: "", customBaseUrl: "", customKey: "", customModel: "", customPaid: false, customMode: "off" as const, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
+const engineBase = { kind: "ollama" as const, groqKey: "gsk_" + "a".repeat(30), geminiKey: "", openrouterKey: "", nvidiaKey: "", localChat: "qwen2.5:7b", localCode: "", localReasoning: "", localFast: "", localAuto: true, localPals: {} as Record<string, string>, customName: "", customBaseUrl: "", customKey: "", customModel: "", customPaid: false, customMode: "off" as const, spendCapUsd: 0, customPriceIn: 0, customPriceOut: 0, anthropicKey: "", claudeMode: "off" as const, claudeModel: "claude-haiku-5-5", ollamaUrl: "http://x:11434/v1", ollamaModel: "qwen3:8b", replyLength: "short" as const };
 
 describe("context trimming", () => {
   const msgs = (n: number, len: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: "x".repeat(len) }));
@@ -1281,5 +1282,65 @@ describe("Custom OpenAI-compatible provider", () => {
   it("needs a base URL and a model", () => {
     expect(customProvider({ ...base, customMode: "only", customModel: "" })).toBeUndefined();
     expect(customProvider({ ...base, customMode: "only", customBaseUrl: " " })).toBeUndefined();
+  });
+});
+
+describe("fallback chain and spend tracking", () => {
+  const base = { ...engineBase, kind: "cloud" as const, groqKey: "g", geminiKey: "m", anthropicKey: "sk-ant-" + "x".repeat(30) };
+  const groq = { kind: "groq" as const, apiKey: "g" };
+  it("tries the other free keys first, then paid fallback providers", () => {
+    const s = { ...base, claudeMode: "fallback" as const };
+    expect(chainAfter(s, groq).map((p) => p.kind)).toEqual(["gemini", "anthropic"]);
+    expect(fallbackProviders(s).map((p) => p.kind)).toEqual(["anthropic"]);
+  });
+  it("never uses a fallback provider in the normal rotation", () => {
+    expect(turnProviders({ ...base, claudeMode: "fallback" as const }).map((p) => p.kind)).toEqual(["groq", "gemini"]);
+  });
+  it("drops paid providers when over the cap, but keeps free ones and a free custom provider", () => {
+    const s = { ...base, claudeMode: "share" as const, customMode: "share" as const, customBaseUrl: "https://x.example/v1", customModel: "m", customPaid: false };
+    expect(turnProviders(s, true).map((p) => p.kind)).toEqual(["groq", "gemini", "custom"]);
+    expect(turnProviders({ ...s, customPaid: true }, true).map((p) => p.kind)).toEqual(["groq", "gemini"]);
+    expect(fallbackProviders({ ...base, claudeMode: "fallback" as const }, true)).toEqual([]);
+  });
+  it("falls back to the free keys when Claude-only is over the cap", () => {
+    expect(turnProviders({ ...base, claudeMode: "only" as const }, true).map((p) => p.kind)).toEqual(["groq", "gemini"]);
+  });
+  it("does not chain the local server", () => {
+    expect(chainAfter(base, { kind: "ollama-server", apiKey: "" })).toEqual([]);
+  });
+  it("estimates tokens and Claude cost", () => {
+    expect(estimateTokens(400)).toBe(100);
+    const e = { t: Date.UTC(2026, 9, 5), kind: "anthropic", model: "claude-haiku-5-5", inTok: 1_000_000, outTok: 1_000_000 };
+    expect(costUsd(e)).toBeCloseTo(0.6, 5);
+    expect(costUsd({ ...e, kind: "groq" })).toBe(0);
+    expect(costUsd({ ...e, kind: "custom", model: "m" }, { inPerM: 1, outPerM: 2 })).toBeCloseTo(3, 5);
+  });
+  it("sums this month only and applies the cap", () => {
+    const now = new Date(Date.UTC(2026, 9, 20));
+    const entries = [
+      { t: Date.UTC(2026, 9, 5), kind: "anthropic", model: "claude-sonnet-5-5", inTok: 1_000_000, outTok: 0 },
+      { t: Date.UTC(2026, 8, 5), kind: "anthropic", model: "claude-sonnet-5-5", inTok: 9_000_000, outTok: 0 },
+      { t: Date.UTC(2026, 9, 6), kind: "groq", model: "g", inTok: 10, outTok: 10 },
+    ];
+    const sum = summarize(entries, now);
+    expect(sum.usd).toBeCloseTo(2, 5);
+    expect(sum.rows.map((r) => r.kind)).toEqual(["anthropic", "groq"]);
+    expect(overCap(entries, now, 2)).toBe(true);
+    expect(overCap(entries, now, 2.01)).toBe(false);
+    expect(overCap(entries, now, 0)).toBe(false);
+    expect(monthKey(now)).toBe("2026-10");
+    expect(fmtUsd(0.004)).toBe("<$0.01");
+    expect(fmtUsd(1.5)).toBe("$1.50");
+    expect(trim(entries, now).length).toBe(3);
+  });
+});
+
+describe("speed test wording", () => {
+  it("explains speed and GPU share", () => {
+    expect(describeBench(42, 100)).toBe("42 tokens/second (very fast). Entirely on the GPU.");
+    expect(describeBench(4, 40)).toContain("slow");
+    expect(describeBench(4, 40)).toContain("40% on the GPU");
+    expect(describeBench(8, 0)).toContain("CPU only");
+    expect(describeBench(20, null)).toBe("20 tokens/second (fast).");
   });
 });
