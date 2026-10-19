@@ -141,6 +141,14 @@ Open **Free keys** (or *AI engine*) in the top bar. Pick one engine or let **Aut
 
 Keys are sent with each request and never stored in plain text server-side. On the Docker build, with accounts on, your keys sync to your account on the server (the `buddy-data` volume, not encrypted) so every device has them.
 
+### Get free keys (guided)
+
+In **Free keys** (engine settings) the **Get free keys** panel walks you through it. Pixel Pals can't create the keys for you, because each provider requires you to sign in on their site. For each provider:
+
+1. Tap **Open key page** and create a key there.
+2. Copy it, come back, and either paste it into **Paste a key here** or tap **Add from clipboard**. The provider is recognised from the key's prefix (`gsk_` Groq, `AIza` Gemini, `sk-or-` OpenRouter, `nvapi-` NVIDIA) and saved in the right slot.
+3. It is tested automatically (one free "list models" request from the server). Tap **Test** any time to re-check. A green tick means the key works.
+
 ### Setting up Ollama
 
 ```sh

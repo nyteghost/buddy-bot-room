@@ -10,6 +10,7 @@ import { matchShortcut } from "@/lib/shortcuts";
 import { friendlyError } from "@/lib/friendly-error";
 import { chunkText, docContext, isReadableDoc, retrieve, tokenize } from "@/lib/rag";
 import { planAdd } from "@/lib/documents";
+import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
 import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
@@ -1022,5 +1023,25 @@ describe("read aloud", () => {
     expect(parseSlash("/voice")).toEqual({ ok: true, action: { type: "voice", mode: "toggle" } });
     expect(parseSlash("/voice on")).toEqual({ ok: true, action: { type: "voice", mode: "on" } });
     expect(parseSlash("/voice off")).toEqual({ ok: true, action: { type: "voice", mode: "off" } });
+  });
+});
+
+describe("free key helper", () => {
+  it("recognises each provider from a pasted key", () => {
+    expect(detectProvider("gsk_" + "a".repeat(40))?.id).toBe("groq");
+    expect(detectProvider("AIza" + "b".repeat(35))?.id).toBe("gemini");
+    expect(detectProvider("sk-or-v1-" + "c".repeat(30))?.id).toBe("openrouter");
+    expect(detectProvider("nvapi-" + "d".repeat(30))?.id).toBe("nvidia");
+  });
+  it("cleans quotes, spaces and Bearer prefixes", () => {
+    expect(cleanKey('  "gsk_abc"  ')).toBe("gsk_abc");
+    expect(cleanKey("Bearer nvapi-xyz")).toBe("nvapi-xyz");
+  });
+  it("ignores things that are not keys", () => {
+    expect(detectProvider("hello world")).toBeNull();
+    expect(detectProvider("gsk_short")).toBeNull();
+  });
+  it("counts the keys that are filled in", () => {
+    expect(keyCount({ groqKey: "x", geminiKey: " ", openrouterKey: "", nvidiaKey: "y" })).toBe(2);
   });
 });

@@ -24,6 +24,7 @@ import {
 } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
 import { localModelChoices } from "@/lib/gpu-tier";
+import { FreeKeysWizard } from "@/components/free-keys-wizard";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
@@ -161,6 +162,7 @@ export function EngineSettingsDialog() {
         )}
         {(engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3">
+            <FreeKeysWizard />
             <KeyField
               label="Groq (GPT-OSS 120B)"
               value={engine.groqKey}
