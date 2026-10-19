@@ -22,6 +22,13 @@ A multi-model AI chat room where a cast of pixel-art characters discuss whatever
 - **Ollama** — your local or remote (Tailscale / Cloudflare Tunnel) server.
 - **Auto** — tries free keys first, then falls back to WebGPU or Ollama.
 
+### Quality-of-life (inspired by Odysseus)
+- **Slash commands** — `/help`, `/mode`, `/rounds`, `/theme`, `/assistant`, `/clear`, `/stop`, `/export`, `/record`, `/confetti`, with a Tab-complete menu.
+- **↑ / ↓ prompt recall** — shell-style history in the composer; never hijacks a draft you're typing.
+- **Hidden thinking** — `<think>…</think>` from reasoning models (qwen3, deepseek-r1…) is filtered out live, and they get a bigger token budget so answers aren't cut off.
+- **Emoji shortcodes** — `:fire:` becomes 🔥 in replies (code blocks untouched).
+- **Confetti** when a Problem-solving discussion reaches its verdict.
+
 ### Saved discussions
 - Multiple chats with auto-save and a slide-out history.
 - Optional Google sign-in syncs chats, theme and engine settings across devices. Signed out, everything stays in the browser.

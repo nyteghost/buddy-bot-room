@@ -1,5 +1,6 @@
 import type { UIMessageChunk } from "ai";
 import { freeModels } from "./engine";
+import { createThinkFilter, maxTokensFor, stripThinking } from "./think-filter";
 
 type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;
 let enginePromise: Promise<Engine> | null = null;
@@ -149,7 +150,7 @@ export async function ollamaTurn(
   if (isTauri()) {
     // The desktop window loads the https site, so browser fetch to http://localhost is blocked.
     // Ask the native side instead and emit the reply as one stream.
-    const text = await tauriOllamaChat(prompt, server);
+    const text = stripThinking(await tauriOllamaChat(prompt, server));
     signal.throwIfAborted();
     return new ReadableStream<UIMessageChunk>({
       start(controller) {
@@ -171,7 +172,7 @@ export async function ollamaTurn(
       body: JSON.stringify({
         model: server.model,
         stream: true,
-        max_tokens: 400,
+        max_tokens: maxTokensFor(server.model),
         messages: [{ role: "system", content: prompt.system }, ...prompt.messages],
       }),
     });
@@ -195,6 +196,11 @@ export async function ollamaTurn(
       controller.enqueue({ type: "start", messageMetadata: metadata });
       controller.enqueue({ type: "text-start", id: "t" });
       let buffer = "";
+      const thinkFilter = createThinkFilter();
+      const send = (raw: string) => {
+        const visible = thinkFilter.push(raw);
+        if (visible) controller.enqueue({ type: "text-delta", id: "t", delta: visible });
+      };
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -207,12 +213,14 @@ export async function ollamaTurn(
             if (!data || data === "[DONE]" || !line.startsWith("data:")) continue;
             try {
               const delta = JSON.parse(data).choices?.[0]?.delta?.content;
-              if (delta) controller.enqueue({ type: "text-delta", id: "t", delta });
+              if (delta) send(delta);
             } catch {
               /* partial line */
             }
           }
         }
+        const rest = thinkFilter.flush();
+        if (rest) controller.enqueue({ type: "text-delta", id: "t", delta: rest });
         controller.enqueue({ type: "text-end", id: "t" });
         controller.enqueue({ type: "finish" });
         controller.close();
@@ -246,12 +254,16 @@ export async function localTurn(
     async start(controller) {
       controller.enqueue({ type: "start", messageMetadata: metadata });
       controller.enqueue({ type: "text-start", id: "t" });
+      const thinkFilter = createThinkFilter();
       try {
         for await (const chunk of chunks) {
           if (signal.aborted) break;
           const delta = chunk.choices[0]?.delta?.content;
-          if (delta) controller.enqueue({ type: "text-delta", id: "t", delta });
+          const visible = delta ? thinkFilter.push(delta) : "";
+          if (visible) controller.enqueue({ type: "text-delta", id: "t", delta: visible });
         }
+        const rest = thinkFilter.flush();
+        if (rest) controller.enqueue({ type: "text-delta", id: "t", delta: rest });
         controller.enqueue({ type: "text-end", id: "t" });
         controller.enqueue({ type: "finish" });
         controller.close();

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import {
   ArrowUpRight,
@@ -99,6 +99,10 @@ import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
 import { priceReply } from "@/lib/work-tools";
 import { cn } from "@/lib/utils";
+import { parseSlash, slashSuggestions, helpText, type SlashAction } from "@/lib/slash-commands";
+import { freshRecall, promptHistory, recallStep, type RecallState } from "@/lib/prompt-recall";
+import { replaceEmojiShortcodes } from "@/lib/emoji-shortcodes";
+import { celebrate } from "@/lib/confetti";
 
 const storageKey = "pixel-pals-conversation-v1";
 const suggestions = [
@@ -202,6 +206,7 @@ export function Room() {
   const [replayId, setReplayId] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const runLock = useRef(false);
+  const recall = useRef<RecallState>(freshRecall);
 
   useEffect(() => {
     try {
@@ -248,6 +253,14 @@ export function Room() {
     const direct = ask || mentioned ? true : directMode;
     const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
+    const slash = ask ? null : parseSlash(topic);
+    if (slash) {
+      setTopic("");
+      recall.current = freshRecall;
+      if (slash.ok) runSlash(slash.action, topic.trim());
+      else say(topic.trim(), slash.error);
+      return;
+    }
     const assistantToggle = ask ? null : assistantCommand(topic);
     if (assistantToggle !== null) {
       setAssistantMode(assistantToggle);
@@ -420,6 +433,7 @@ export function Room() {
             throw new Error("This agent returned no answer. The discussion has stopped.");
         }
       }
+      if (mode === "solve" && !direct && !controller.signal.aborted) celebrate();
     } catch (err) {
       if (!controller.signal.aborted)
         setError(err instanceof Error ? err.message : "The discussion could not continue.");
@@ -432,6 +446,48 @@ export function Room() {
     }
   }
   startRef.current = start;
+  /** Posts a local (no-AI) exchange: the command you typed and Echo's answer. */
+  function say(command: string, reply: string) {
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: command }] },
+      { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: "echo", characterMode: modeRef.current }, parts: [{ type: "text", text: reply }] },
+    ]);
+    setConversationOpen(true);
+  }
+  function runSlash(action: SlashAction, command: string) {
+    switch (action.type) {
+      case "help": return say(command, helpText());
+      case "clear": setMessages([]); setRound(0); setError(""); return;
+      case "stop": stop(); return;
+      case "export": exportChat(); return say(command, "Chat downloaded as Markdown.");
+      case "record": setRecorderOpen(true); return say(command, "Recorder is open — press Record, then Stop.");
+      case "confetti": celebrate(); return;
+      case "mode": setMode(action.mode); return say(command, `Conversation mode: ${action.mode === "direct" ? "one-on-one" : action.mode}.`);
+      case "rounds": setRounds(action.rounds); return say(command, `Pals will debate for ${action.rounds} round${action.rounds === 1 ? "" : "s"}.`);
+      case "theme": setCharacterMode(action.theme); return say(command, `Theme switched to ${action.theme}.`);
+      case "assistant": setAssistantMode(action.on); return say(command, `Assistant Mode ${action.on ? "on" : "off"}.`);
+    }
+  }
+  function onComposerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
+    if (e.key === "Tab" && suggestions_.length) {
+      e.preventDefault();
+      setTopic(suggestions_[0].insert);
+      return;
+    }
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const step = recallStep(
+      recall.current,
+      e.key,
+      e.currentTarget.value,
+      promptHistory(messages.filter((m) => m.role === "user").map(messageText)),
+    );
+    if (!step) return;
+    e.preventDefault();
+    recall.current = step.state;
+    setTopic(step.value);
+  }
   function exportChat() {
     const text = messages
       .map(
@@ -446,6 +502,7 @@ export function Room() {
     link.click();
     URL.revokeObjectURL(url);
   }
+  const suggestions_ = slashSuggestions(topic);
   const activeAgent = agents.find((a) => a.id === speaking);
   const lastMessage = messages[messages.length - 1];
   const liveText =
@@ -819,7 +876,7 @@ export function Room() {
                           {m.parts.map((part, i) =>
                             part.type === "text" ? (
                               <div key={i}>
-                                <MessageResponse>{part.text}</MessageResponse>
+                                <MessageResponse>{m.role === "assistant" ? replaceEmojiShortcodes(part.text) : part.text}</MessageResponse>
                                 {m.role === "assistant" && (m.metadata?.assistant ?? (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant")) && !running && <LinuxActions text={part.text} canRun={desktopApp} />}
                               </div>
                             ) : part.type === "reasoning" ? (
@@ -935,13 +992,29 @@ export function Room() {
 
               <span className="muted-label">YOU SET THE TOPIC</span>
             </div>
+            {suggestions_.length > 0 && (
+              <ul className="slash-menu" role="listbox" aria-label="Slash commands">
+                {suggestions_.slice(0, 6).map((item, i) => (
+                  <li key={item.insert} role="option" aria-selected={i === 0}>
+                    <button type="button" onClick={() => { setTopic(item.insert); inputRef.current?.focus(); }}>
+                      <code>{item.label}</code>
+                      {item.description && <span>{item.description}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <PromptInput onSubmit={() => start()} className="topic-composer">
               <PromptInputTextarea
                 ref={inputRef}
                 aria-label="Discussion topic"
                 placeholder="Give your pals something to talk about…"
                 value={topic}
-                onChange={(e) => setTopic(e.target.value)}
+                onChange={(e) => {
+                  recall.current = freshRecall;
+                  setTopic(e.target.value);
+                }}
+                onKeyDown={onComposerKeyDown}
                 className="min-h-12"
                 disabled={running}
               />
@@ -956,7 +1029,7 @@ export function Room() {
                   disabled={
                     !running &&
                     (!topic.trim() ||
-                      (!characterModeCommand(topic) && tooFew) ||
+                      (!characterModeCommand(topic) && !topic.trim().startsWith("/") && tooFew) ||
                       !ready)
                   }
                 />

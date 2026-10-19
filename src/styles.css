@@ -1717,3 +1717,26 @@ h1 {
   .modular-workspace .conversation-subhead { padding: 9px 12px; }
   .modular-workspace .chat-content { padding: 12px; }
 }
+
+/* Slash-command autocomplete above the composer */
+.slash-menu {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+}
+.slash-menu button {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: left;
+}
+.slash-menu li[aria-selected="true"] button, .slash-menu button:hover { background: var(--muted); }
+.slash-menu code { color: var(--primary); }
+.slash-menu span { color: var(--muted-foreground); }
