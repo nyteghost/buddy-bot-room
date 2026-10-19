@@ -10,7 +10,9 @@ import { selfHostedPlugin } from "./vite-self-hosted";
 
 // Build version: 1.0.<commit count> (+short hash), stamped automatically on every build.
 function git(cmd: string) { try { return execSync(`git ${cmd}`, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return ""; } }
-const BUILD_VERSION = `1.0.${git("rev-list --count HEAD") || "0"}`;
+// Portainer clones shallowly, so the commit count would be wrong there; show "1.0.x" instead of a misleading number.
+const SHALLOW = git("rev-parse --is-shallow-repository") === "true";
+const BUILD_VERSION = `1.0.${SHALLOW ? "x" : git("rev-list --count HEAD") || "0"}`;
 const BUILD_COMMIT = git("rev-parse --short HEAD") || "local";
 const BUILD_DATE = new Date().toISOString().slice(0, 10);
 

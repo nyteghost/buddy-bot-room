@@ -8,6 +8,8 @@
 #                   BUDDY_TARGET=prod docker compose up -d --build
 FROM oven/bun:1 AS base
 WORKDIR /app
+# git lets the build stamp the real version and commit on the sidebar label.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/* && git config --global --add safe.directory /app
 COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 COPY . .
