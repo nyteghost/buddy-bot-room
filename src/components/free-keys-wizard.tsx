@@ -3,6 +3,7 @@ import { ClipboardPaste, ExternalLink, CheckCircle2, XCircle, Loader2 } from "lu
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setEngine, useEngine } from "@/lib/engine";
+import { isSupported, keyPageFor, type FeedProvider } from "@/lib/provider-feed";
 import { KEY_PROVIDERS, cleanKey, detectProvider, keyCount, type KeyProvider } from "@/lib/key-providers";
 
 type Status = { state: "testing" } | { state: "ok" | "bad"; message: string };
@@ -15,6 +16,73 @@ async function testKey(provider: KeyProvider, key: string): Promise<Status> {
   } catch {
     return { state: "bad", message: "Couldn't reach the Pixel Pals server." };
   }
+}
+
+type Feed = { fetchedAt: string; providers: FeedProvider[]; error?: string } | null;
+
+/** The community list of free and trial-credit LLM APIs, refreshed daily by the server. */
+function MoreProviders() {
+  const [feed, setFeed] = useState<Feed>(null);
+  const [enabled, setEnabled] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function load(refresh = false) {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/providers", refresh ? { method: "POST" } : undefined);
+      const j = (await res.json()) as { enabled?: boolean; feed?: Feed; error?: string };
+      setEnabled(j.enabled !== false);
+      setFeed(j.feed ?? null);
+    } catch { /* leave as is */ }
+    setLoaded(true);
+    setBusy(false);
+  }
+  const groups: { title: string; kind: FeedProvider["kind"] }[] = [
+    { title: "Free tiers", kind: "free" },
+    { title: "Trial credits (free to start, then paid)", kind: "trial" },
+  ];
+  return (
+    <details className="rounded-md border px-3 py-2" onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !loaded) void load(); }}>
+      <summary className="cursor-pointer font-medium">More free providers (community list)</summary>
+      <div className="mt-2 grid gap-2">
+        <p className="text-xs text-muted-foreground">
+          A community-maintained list of free LLM APIs, refreshed about once a day. Pixel Pals can use the ones marked <b>works here</b>; the others are listed so you can see what exists. Limits change often and the list isn't checked by Pixel Pals, so read each provider's terms before signing up.
+        </p>
+        {!enabled && <p className="text-xs text-muted-foreground">Updates are turned off on this server (PROVIDER_FEED=0).</p>}
+        {enabled && !loaded && <p className="text-xs text-muted-foreground">Loading…</p>}
+        {feed?.error && <p className="text-xs text-destructive">Last update failed: {feed.error}</p>}
+        {loaded && enabled && !feed?.providers.length && !feed?.error && <p className="text-xs text-muted-foreground">Nothing yet. The server fetches the list shortly after it starts.</p>}
+        {groups.map((g) => {
+          const items = (feed?.providers ?? []).filter((p) => p.kind === g.kind);
+          if (!items.length) return null;
+          return (
+            <div key={g.kind} className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.title}</span>
+              {items.map((p) => {
+                const link = keyPageFor(p);
+                return (
+                  <div key={`${g.kind}-${p.name}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="font-medium">{p.name}{isSupported(p.name) && <span className="ml-2 rounded bg-green-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-green-500">works here</span>}</div>
+                      {p.summary && <div className="text-xs text-muted-foreground">{p.summary}</div>}
+                    </div>
+                    <Button asChild size="sm" variant="outline" className="h-11 sm:h-8">
+                      <a href={link.url} target="_blank" rel="noreferrer">{link.isKeyPage ? "Open key page" : "Open site"} <ExternalLink className="size-3" /></a>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">{feed?.fetchedAt ? `Updated ${new Date(feed.fetchedAt).toLocaleDateString()}` : ""}</span>
+          {enabled && <Button size="sm" variant="ghost" className="h-11 sm:h-8" disabled={busy} onClick={() => void load(true)}>{busy ? "Checking…" : "Check now"}</Button>}
+        </div>
+      </div>
+    </details>
+  );
 }
 
 /** Per-provider key pages, paste-to-detect, and a Test button. Keys are saved through the normal engine settings. */
@@ -92,6 +160,7 @@ export function FreeKeysWizard() {
           );
         })}
       </div>
+      <MoreProviders />
     </div>
   );
 }

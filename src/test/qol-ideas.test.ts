@@ -15,6 +15,7 @@ import { notesSyncUrl, shareSheetUrl, bearerHeader, isSecure, notesSteps, shareS
 import { parseNvidiaSmi, modelBudgetGb, describeHardware } from "@/lib/hardware";
 import { CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
 import { parseLibraryPage, parsePulls, sizeToGb, feedToCatalog, newSuggestions } from "@/lib/model-feed";
+import { parseProviderReadme, keyPageFor, isSupported } from "@/lib/provider-feed";
 import { providerForTurn, turnProviders, claudeProvider } from "@/lib/engine";
 import { parseNotes, setNote } from "@/lib/agent-notes";
 import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
@@ -1213,5 +1214,38 @@ describe("Ollama library feed", () => {
     expect(ids).not.toContain("alpha-coder:14b");
     expect(ids).not.toContain("deep-think:8b");
     expect(out.every((o) => o.fit !== "no")).toBe(true);
+  });
+});
+
+describe("Free provider list", () => {
+  const md = [
+    "# Free LLM API resources", "intro", "## Free Providers", "",
+    "### [OpenRouter](https://openrouter.ai)", "<a id=x></a>", "", "**Limits:**", "", "- [Some Model](https://openrouter.ai/m:free)", "",
+    "### [Mistral (La Plateforme)](https://console.mistral.ai/)", "**Limits:** 1 request/second, 500,000 tokens/minute", "",
+    "### [Tiny Co](https://tiny.example)", "**Limits:**", "| a | b |", "Free for **20 requests/day**", "",
+    "## Providers with trial credits", "", "### [Fireworks](https://fireworks.ai)", "**Credits:** $1 for new accounts", "**Models:** lots", "",
+    "## About", "### [Not A Provider](https://nope.example)", "**Limits:** none",
+  ].join("\n");
+  it("reads free and trial providers with their limits", () => {
+    const list = parseProviderReadme(md);
+    expect(list.map((p) => p.name)).toEqual(["OpenRouter", "Mistral (La Plateforme)", "Tiny Co", "Fireworks"]);
+    expect(list[0]?.kind).toBe("free");
+    expect(list[0]?.summary).toBe("Some Model");
+    expect(list[1]?.summary).toBe("1 request/second, 500,000 tokens/minute");
+    expect(list[2]?.summary).toBe("Free for 20 requests/day");
+    expect(list[3]).toMatchObject({ kind: "trial", summary: "$1 for new accounts" });
+  });
+  it("ignores sections that are not provider lists and unknown layouts", () => {
+    expect(parseProviderReadme("## About\n### [X](https://x.example)")).toEqual([]);
+    expect(parseProviderReadme("nothing")).toEqual([]);
+  });
+  it("links known providers to their key page and others to their site", () => {
+    expect(keyPageFor({ name: "OpenRouter", site: "https://openrouter.ai" })).toEqual({ url: "https://openrouter.ai/keys", isKeyPage: true });
+    expect(keyPageFor({ name: "Tiny Co", site: "https://tiny.example" })).toEqual({ url: "https://tiny.example", isKeyPage: false });
+  });
+  it("marks the providers Pixel Pals can already use", () => {
+    expect(isSupported("Groq")).toBe(true);
+    expect(isSupported("Google AI Studio")).toBe(true);
+    expect(isSupported("Cerebras")).toBe(false);
   });
 });

@@ -156,6 +156,10 @@ In **Free keys** (engine settings) the **Get free keys** panel walks you through
 2. Copy it, come back, and either paste it into **Paste a key here** or tap **Add from clipboard**. The provider is recognised from the key's prefix (`gsk_` Groq, `AIza` Gemini, `sk-or-` OpenRouter, `nvapi-` NVIDIA) and saved in the right slot.
 3. It is tested automatically (one free "list models" request from the server). Tap **Test** any time to re-check. A green tick means the key works.
 
+### More free providers (community list)
+
+Under **Get free keys → More free providers** the server shows a list of free-tier and trial-credit LLM APIs with their limits and a link to each one's key page (or its website when I don't have a key-page link). It reads the community-maintained list at github.com/cheahjs/free-llm-api-resources once a day (and on **Check now**), so new providers show up without an update. The list isn't checked by Pixel Pals; limits and terms change, so read them before signing up. Providers Pixel Pals can already use are marked **works here**; the rest are listed for reference. Set `PROVIDER_FEED=0` to never fetch it.
+
 ### Claude (paid)
 
 Claude is the one **paid** option. It is billed to your own Anthropic account, separately from any Claude subscription. In the engine settings, the amber **Claude (Anthropic) — paid service** box has:
@@ -501,6 +505,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `OLLAMA_MODELS` | `qwen2.5:7b` | Models downloaded on first start |
 | `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
 | `OLLAMA_PORT` | `11434` | Published Ollama port |
+| `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 
