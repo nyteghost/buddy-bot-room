@@ -10,7 +10,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { availableProviders, setEngine, useEngine, type EngineKind } from "@/lib/engine";
+import { availableProviders, setEngine, useEngine, type EngineKind, type ReplyLength } from "@/lib/engine";
+import { useOllamaModels } from "@/lib/ollama-models";
 import {
   chosenLocalModel,
   detectBestModel,
@@ -33,6 +34,7 @@ const options: { kind: EngineKind; label: string; note: string }[] = [
 
 export function EngineSettingsDialog() {
   const engine = useEngine();
+  const installedModels = useOllamaModels(engine.ollamaUrl, engine.kind === "ollama" || engine.kind === "auto-ollama");
   const [progress, setProgress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const count = availableProviders(engine).length;
@@ -101,9 +103,34 @@ export function EngineSettingsDialog() {
               <span className="font-medium">Model name</span>
               <Input
                 aria-label="Local server model"
+                list="ollama-installed-models"
                 value={engine.ollamaModel}
                 onChange={(e) => setEngine({ ollamaModel: e.target.value })}
               />
+              <datalist id="ollama-installed-models">
+                {installedModels.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              <span className="text-xs text-muted-foreground">
+                {installedModels.length
+                  ? `${installedModels.length} installed model${installedModels.length === 1 ? "" : "s"} found — pick one from the list.`
+                  : "Couldn't list installed models. Check the URL and that Ollama is running."}
+              </span>
+            </label>
+            <label className="grid gap-1">
+              <span className="font-medium">Reply length</span>
+              <select
+                aria-label="Local reply length"
+                className="h-9 rounded-md border border-input bg-background px-2"
+                value={engine.replyLength}
+                onChange={(e) => setEngine({ replyLength: e.target.value as ReplyLength })}
+              >
+                <option value="short">Short (fast, ~400 tokens)</option>
+                <option value="medium">Medium (~800 tokens)</option>
+                <option value="long">Long (~1500 tokens)</option>
+              </select>
+              <span className="text-xs text-muted-foreground">Thinking models like qwen3 and deepseek-r1 always get at least 1500.</span>
             </label>
             <p className="text-muted-foreground">
               In a terminal run <code>ollama pull {engine.ollamaModel}</code>, then start it with{" "}

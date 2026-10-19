@@ -143,7 +143,7 @@ export async function tauriOllamaTags(url: string): Promise<string[]> {
 /** Streams one turn from a local OpenAI-compatible server (Ollama, llama.cpp, vLLM). */
 export async function ollamaTurn(
   prompt: { system: string; messages: { role: "user" | "assistant"; content: string }[] },
-  server: { url: string; model: string },
+  server: { url: string; model: string; maxTokens?: number },
   metadata: Record<string, unknown>,
   signal: AbortSignal,
 ): Promise<ReadableStream<UIMessageChunk>> {
@@ -172,7 +172,7 @@ export async function ollamaTurn(
       body: JSON.stringify({
         model: server.model,
         stream: true,
-        max_tokens: maxTokensFor(server.model),
+        max_tokens: Math.max(server.maxTokens ?? 0, maxTokensFor(server.model)),
         messages: [{ role: "system", content: prompt.system }, ...prompt.messages],
       }),
     });

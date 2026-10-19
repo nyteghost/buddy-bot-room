@@ -27,11 +27,11 @@ export function recallStep(
   if (key === "ArrowUp") {
     if (!stepping && value !== "") return null; // a draft in progress: leave the caret alone
     const index = stepping ? Math.min(state.index + 1, history.length - 1) : 0;
-    return { state: { index, draft: stepping ? state.draft : value }, value: history[index] };
+    return { state: { index, draft: stepping ? state.draft : value }, value: history[index] ?? "" };
   }
   if (!stepping) return null;
   const index = state.index - 1;
   return index < 0
     ? { state: freshRecall, value: state.draft }
-    : { state: { index, draft: state.draft }, value: history[index] };
+    : { state: { index, draft: state.draft }, value: history[index] ?? "" };
 }

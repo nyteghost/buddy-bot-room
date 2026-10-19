@@ -13,7 +13,18 @@ export type SlashAction =
   | { type: "mode"; mode: Mode }
   | { type: "rounds"; rounds: number }
   | { type: "theme"; theme: ThemeId }
-  | { type: "assistant"; on: boolean };
+  | { type: "assistant"; on: boolean }
+  | { type: "remember"; text: string }
+  | { type: "forget"; target: number | "all" }
+  | { type: "memories" }
+  | { type: "note"; text: string }
+  | { type: "todo"; text: string }
+  | { type: "done"; n: number }
+  | { type: "clearDone" }
+  | { type: "tasks" }
+  | { type: "search"; query: string }
+  | { type: "research"; query: string }
+  | { type: "compare"; question: string };
 export type SlashResult = { ok: true; action: SlashAction } | { ok: false; error: string };
 
 export const MIN_ROUNDS = 1;
@@ -56,6 +67,16 @@ export const slashCommands = [
   { name: "export", usage: "/export", description: "Download this chat as Markdown" },
   { name: "record", usage: "/record", description: "Open the recorder" },
   { name: "confetti", usage: "/confetti", description: "Celebrate something" },
+  { name: "remember", usage: "/remember <fact>", description: "Pals will remember this in every chat" },
+  { name: "memories", usage: "/memories", description: "Show what the pals remember" },
+  { name: "forget", usage: "/forget <number|all>", description: "Remove a memory" },
+  { name: "note", usage: "/note <text>", description: "Save a quick note" },
+  { name: "todo", usage: "/todo <task>", description: "Add a to-do (or /todo clear)" },
+  { name: "done", usage: "/done <number>", description: "Tick a to-do off" },
+  { name: "tasks", usage: "/tasks", description: "Open notes, memories and to-dos" },
+  { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
+  { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
+  { name: "compare", usage: "/compare <question>", description: "Blind side-by-side model test" },
 ] as const;
 
 const slug = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
@@ -65,8 +86,9 @@ export function parseSlash(input: string): SlashResult | null {
   const text = input.trim();
   const match = text.match(/^\/([^\s]*)\s*([\s\S]*)$/);
   if (!match) return null;
-  const name = match[1].toLowerCase();
-  const arg = match[2].trim().toLowerCase();
+  const name = (match[1] ?? "").toLowerCase();
+  const rawArg = (match[2] ?? "").trim();
+  const arg = rawArg.toLowerCase();
   if (!name || /[/.]/.test(name)) return null;
   const fail = (error: string): SlashResult => ({ ok: false, error });
   switch (name) {
@@ -101,6 +123,37 @@ export function parseSlash(input: string): SlashResult | null {
       if (arg === "off") return { ok: true, action: { type: "assistant", on: false } };
       return fail("Use /assistant on or /assistant off.");
     }
+    case "remember": case "mem":
+      return rawArg ? { ok: true, action: { type: "remember", text: rawArg } } : fail("Tell me what to remember: /remember I run Unraid.");
+    case "memories": case "memory":
+      return { ok: true, action: { type: "memories" } };
+    case "forget": {
+      if (arg === "all") return { ok: true, action: { type: "forget", target: "all" } };
+      const n = Number(arg);
+      return arg !== "" && Number.isInteger(n) && n >= 1
+        ? { ok: true, action: { type: "forget", target: n } }
+        : fail("Use /forget <number> (see /memories) or /forget all.");
+    }
+    case "note":
+      return rawArg ? { ok: true, action: { type: "note", text: rawArg } } : fail("Write the note after the command: /note call the venue.");
+    case "todo": case "task": {
+      if (arg === "clear") return { ok: true, action: { type: "clearDone" } };
+      return rawArg ? { ok: true, action: { type: "todo", text: rawArg } } : fail("Add the task after the command: /todo order cable.");
+    }
+    case "done": {
+      const n = Number(arg);
+      return arg !== "" && Number.isInteger(n) && n >= 1
+        ? { ok: true, action: { type: "done", n } }
+        : fail("Use /done <number> — the number shown next to the to-do.");
+    }
+    case "tasks": case "notes": case "todos":
+      return { ok: true, action: { type: "tasks" } };
+    case "search":
+      return rawArg ? { ok: true, action: { type: "search", query: rawArg } } : fail("What should I search for? /search best 4k projector");
+    case "research":
+      return rawArg ? { ok: true, action: { type: "research", query: rawArg } } : fail("What should the pals research? /research is a 4090 worth it");
+    case "compare":
+      return { ok: true, action: { type: "compare", question: rawArg } };
     default:
       return fail(`Unknown command /${name}. Type /help to see what's available.`);
   }

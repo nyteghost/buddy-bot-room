@@ -23,6 +23,9 @@ export default defineConfig({
   // change React's module URL while an open preview still uses the old renderer.
   // Reject old optimizer hashes instead of serving new code under stale URLs.
   vite: {
+    // Self-hosting only (the Dockerfile sets this): accept any Host header so the dev server works
+    // behind a reverse proxy or a LAN hostname. Unset on Lovable, so its config is untouched.
+    ...(process.env["BUDDY_ALLOW_ALL_HOSTS"] === "1" ? { server: { allowedHosts: true as const } } : {}),
     define: {
       __APP_VERSION__: JSON.stringify(BUILD_VERSION),
       __APP_COMMIT__: JSON.stringify(BUILD_COMMIT),

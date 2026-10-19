@@ -5,7 +5,11 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Copy,
   Download,
+  ListTodo,
+  Pencil,
+  Scale,
   MessageSquare,
   Mic,
   LayoutGrid,
@@ -83,7 +87,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { providerForTurn, useEngine } from "@/lib/engine";
+import { providerForTurn, replyTokens, useEngine } from "@/lib/engine";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
@@ -103,6 +107,12 @@ import { parseSlash, slashSuggestions, helpText, type SlashAction } from "@/lib/
 import { freshRecall, promptHistory, recallStep, type RecallState } from "@/lib/prompt-recall";
 import { replaceEmojiShortcodes } from "@/lib/emoji-shortcodes";
 import { celebrate } from "@/lib/confetti";
+import { CompareDialog } from "./compare-dialog";
+import { SeerrDialog } from "./seerr-dialog";
+import { NotesPanel } from "./notes-panel";
+import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
+import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
+import { addEntry, addTodo, clearDone, getWorkbench, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
 
 const storageKey = "pixel-pals-conversation-v1";
 const suggestions = [
@@ -184,6 +194,10 @@ export function Room() {
   const [roomOpen, setRoomOpen] = useState(true);
   const [conversationOpen, setConversationOpen] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareQuestion, setCompareQuestion] = useState("");
+  const [seerrQuery, setSeerrQuery] = useState<SeerrQuery | null>(null);
   const [sidebarCompact, setSidebarCompact] = useState(false);
   const [resetVersion, setResetVersion] = useState(0);
   const [historyRequest, setHistoryRequest] = useState(0);
@@ -243,17 +257,23 @@ export function Room() {
     replayRef.current?.abort();
   };
 
-  async function start(ask?: { partner: AgentId; text: string }) {
+  async function start(ask?: { partner: AgentId; text: string }, override?: string) {
     if (runLock.current) return;
     setConversationOpen(true);
     replayRef.current?.abort();
     setReplayId(null);
-    const topic = ask?.text ?? topicDraft;
-    const mentioned = ask ? null : resolveMention(topic, modeRef.current);
+    const topic = ask?.text ?? override ?? topicDraft;
+    const mentioned = ask || override ? null : resolveMention(topic, modeRef.current);
     const direct = ask || mentioned ? true : directMode;
     const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
-    const slash = ask ? null : parseSlash(topic);
+    const seerr = ask || override ? null : parseSeerr(topic);
+    if (seerr) {
+      setTopic("");
+      setSeerrQuery(seerr);
+      return;
+    }
+    const slash = ask || override ? null : parseSlash(topic);
     if (slash) {
       setTopic("");
       recall.current = freshRecall;
@@ -337,6 +357,7 @@ export function Room() {
             characterMode: turnMode,
             mode: direct ? ("direct" as Mode) : mode,
             assistant: assistantRef.current,
+            memoryContext: promptContext(getWorkbench()),
             linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
           };
           const fetchPrompt = async () => {
@@ -384,7 +405,7 @@ export function Room() {
             consume(
               await ollamaTurn(
                 await fetchPrompt(),
-                { url: engine.ollamaUrl, model: engine.ollamaModel },
+                { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
                 { agentId: agent.id, round: currentRound },
                 controller.signal,
               ),
@@ -405,7 +426,7 @@ export function Room() {
             await consume(
               await ollamaTurn(
                 await fetchPrompt(),
-                { url: engine.ollamaUrl, model: engine.ollamaModel },
+                { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
                 { agentId: agent.id, round: currentRound },
                 controller.signal,
               ),
@@ -467,13 +488,64 @@ export function Room() {
       case "rounds": setRounds(action.rounds); return say(command, `Pals will debate for ${action.rounds} round${action.rounds === 1 ? "" : "s"}.`);
       case "theme": setCharacterMode(action.theme); return say(command, `Theme switched to ${action.theme}.`);
       case "assistant": setAssistantMode(action.on); return say(command, `Assistant Mode ${action.on ? "on" : "off"}.`);
+      case "remember":
+        updateWorkbench((w) => ({ ...w, memories: addEntry(w.memories, action.text) }));
+        return say(command, `Got it — every pal will remember: “${action.text}”.`);
+      case "memories":
+        return say(command, listText("The pals remember:", getWorkbench().memories, "Nothing remembered yet. Try `/remember I run Unraid with a 3080`."));
+      case "forget": {
+        const before = getWorkbench().memories.length;
+        updateWorkbench((w) => ({ ...w, memories: action.target === "all" ? [] : removeAt(w.memories, action.target) }));
+        const removed = before - getWorkbench().memories.length;
+        return say(command, removed ? `Forgotten (${removed}).` : "There's no memory with that number. Use /memories to see them.");
+      }
+      case "note":
+        updateWorkbench((w) => ({ ...w, notes: addEntry(w.notes, action.text) }));
+        return say(command, "Note saved.");
+      case "todo":
+        updateWorkbench((w) => ({ ...w, todos: addTodo(w.todos, action.text) }));
+        return say(command, `Added to your to-dos: ${action.text}`);
+      case "done": {
+        const todos = getWorkbench().todos;
+        if (action.n < 1 || action.n > todos.length) return say(command, "There's no to-do with that number.");
+        updateWorkbench((w) => ({ ...w, todos: toggleTodo(w.todos, action.n) }));
+        return say(command, listText("Your to-dos:", getWorkbench().todos, ""));
+      }
+      case "clearDone":
+        updateWorkbench((w) => ({ ...w, todos: clearDone(w.todos) }));
+        return say(command, "Cleared the finished to-dos.");
+      case "tasks": setNotesOpen(true); return;
+      case "compare": setCompareQuestion(action.question); setCompareOpen(true); return;
+      case "search": void webSearch(action.query, command, false); return;
+      case "research": void webSearch(action.query, command, true); return;
     }
+  }
+  /** /search shows the results; /research hands them to the pals as the discussion topic. */
+  async function webSearch(query: string, command: string, discuss: boolean) {
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return say(command, json.error ?? "The search failed.");
+      const hits: SearchHit[] = json.hits ?? [];
+      if (discuss && hits.length) return void start(undefined, researchTopic(query, hits));
+      return say(command, hitsMarkdown(query, hits));
+    } catch {
+      return say(command, "I couldn't reach the search service.");
+    }
+  }
+  /** Put a message you sent back in the box and rewind the chat to just before it. */
+  function editAndRetry(id: string) {
+    const index = messages.findIndex((m) => m.id === id);
+    if (index < 0 || running) return;
+    setTopic(messageText(messages[index]));
+    setMessages(messages.slice(0, index));
+    inputRef.current?.focus();
   }
   function onComposerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || e.nativeEvent.isComposing) return;
     if (e.key === "Tab" && suggestions_.length) {
       e.preventDefault();
-      setTopic(suggestions_[0].insert);
+      setTopic(suggestions_[0]?.insert ?? topic);
       return;
     }
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
@@ -579,6 +651,8 @@ export function Room() {
           </Dialog>
         </div>
       </header>
+      <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} initialQuestion={compareQuestion} />
+      <SeerrDialog query={seerrQuery} onClose={() => setSeerrQuery(null)} onRequested={(summary) => say(`@seerr ${seerrQuery?.title ?? ""}${seerrQuery?.is4k ? " 4k" : ""}`.trim(), summary)} />
       <div className="workspace-frame">
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
@@ -586,9 +660,11 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Notes, memories and to-dos" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes &amp; tasks</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
           <div className="sidebar-divider" />
           <Button variant="ghost" className="sidebar-item" title="Saved chats" disabled={running} onClick={() => { setConversationOpen(true); setHistoryRequest((value) => value + 1); }}><History /><span>Saved chats</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
@@ -887,6 +963,19 @@ export function Room() {
                             ) : null,
                           )}
                         </MessageContent>
+                        {!running && (
+                          <div className="message-actions">
+                            {m.role === "assistant" ? (
+                              <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
+                                <Copy size={13} />
+                              </MessageAction>
+                            ) : (
+                              <MessageAction tooltip="Edit and resend" label="Edit and resend" onClick={() => editAndRetry(m.id)}>
+                                <Pencil size={13} />
+                              </MessageAction>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </Message>
                   );
@@ -938,7 +1027,10 @@ export function Room() {
             <WorkspaceWindow id="recorder" title="Echo’s recorder" icon={<Mic className="size-4" />} open={recorderOpen} onClose={() => setRecorderOpen(false)} resetVersion={resetVersion}>
               <MicRecorder onClose={() => setRecorderOpen(false)} />
             </WorkspaceWindow>
-            {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
+            <WorkspaceWindow id="notes" title="Notes & tasks" icon={<ListTodo className="size-4" />} open={notesOpen} onClose={() => setNotesOpen(false)} resetVersion={resetVersion}>
+              <NotesPanel />
+            </WorkspaceWindow>
+            {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && !notesOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
           </main>
           <section className="workspace-composer" aria-label="Message composer">
           <div className="mode-row">

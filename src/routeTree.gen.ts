@@ -12,6 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
+import { Route as ApiSearchRouteImport } from './routes/api.search'
+import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiSearchRouteImport } from './routes/api.search'
+import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
 import { Route as ApiTranscribeRouteImport } from './routes/api.transcribe'
 import { Route as ApiOauthGoogleReturnRouteImport } from './routes/api/oauth/google/return'
 
@@ -30,6 +34,16 @@ const ApiSpeechRoute = ApiSpeechRouteImport.update({
   path: '/api/speech',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchRoute = ApiSearchRouteImport.update({
+  id: '/api/search',
+  path: '/api/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSeerrRoute = ApiSeerrRouteImport.update({
+  id: '/api/seerr',
+  path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
@@ -45,6 +59,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/search': typeof ApiSearchRoute
+  '/api/seerr': typeof ApiSeerrRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
@@ -52,6 +68,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/search': typeof ApiSearchRoute
+  '/api/seerr': typeof ApiSeerrRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
@@ -60,6 +78,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
+  '/api/search': typeof ApiSearchRoute
+  '/api/seerr': typeof ApiSeerrRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
@@ -69,6 +89,8 @@ export interface FileRouteTypes {
     | '/'
     | '/api/chat'
     | '/api/speech'
+    | '/api/search'
+    | '/api/seerr'
     | '/api/transcribe'
     | '/api/oauth/google/return'
   fileRoutesByTo: FileRoutesByTo
@@ -76,6 +98,8 @@ export interface FileRouteTypes {
     | '/'
     | '/api/chat'
     | '/api/speech'
+    | '/api/search'
+    | '/api/seerr'
     | '/api/transcribe'
     | '/api/oauth/google/return'
   id:
@@ -83,6 +107,8 @@ export interface FileRouteTypes {
     | '/'
     | '/api/chat'
     | '/api/speech'
+    | '/api/search'
+    | '/api/seerr'
     | '/api/transcribe'
     | '/api/oauth/google/return'
   fileRoutesById: FileRoutesById
@@ -91,6 +117,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
+  ApiSearchRoute: typeof ApiSearchRoute
+  ApiSeerrRoute: typeof ApiSeerrRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiOauthGoogleReturnRoute: typeof ApiOauthGoogleReturnRoute
 }
@@ -118,6 +146,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSpeechRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search': {
+      id: '/api/search'
+      path: '/api/search'
+      fullPath: '/api/search'
+      preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/seerr': {
+      id: '/api/seerr'
+      path: '/api/seerr'
+      fullPath: '/api/seerr'
+      preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -139,6 +181,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSpeechRoute: ApiSpeechRoute,
+  ApiSearchRoute: ApiSearchRoute,
+  ApiSeerrRoute: ApiSeerrRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiOauthGoogleReturnRoute: ApiOauthGoogleReturnRoute,
 }

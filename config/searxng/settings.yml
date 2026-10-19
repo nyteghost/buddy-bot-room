@@ -1,0 +1,9 @@
+# Minimal SearXNG settings for Pixel Pals: the app asks for JSON results, which must be enabled.
+use_default_settings: true
+server:
+  secret_key: "change-me-before-exposing-this"
+  limiter: false
+search:
+  formats:
+    - html
+    - json

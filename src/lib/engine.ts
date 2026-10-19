@@ -2,6 +2,8 @@ import { useSyncExternalStore } from "react";
 
 /** Which brain powers the pals. All options are free: "cloud" shares every entered free key, "local" runs in the browser. */
 export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama";
+export type ReplyLength = "short" | "medium" | "long";
+export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 800, long: 1500 };
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 export type EngineSettings = {
   kind: EngineKind;
@@ -11,6 +13,8 @@ export type EngineSettings = {
   nvidiaKey: string;
   ollamaUrl: string;
   ollamaModel: string;
+  /** How long local-model replies may run: short (default), medium or long. */
+  replyLength: ReplyLength;
 };
 
 const key = "pixel-pals-engine-v1";
@@ -22,6 +26,7 @@ const fallback: EngineSettings = {
   nvidiaKey: "",
   ollamaUrl: "http://localhost:11434/v1",
   ollamaModel: "qwen2.5:7b",
+  replyLength: "short",
 };
 const listeners = new Set<() => void>();
 let cache: EngineSettings | null = null;

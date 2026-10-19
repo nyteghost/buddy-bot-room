@@ -45,3 +45,4 @@
 - [x] Record button in the top bar next to Work tools
 - [x] Move CONVERSATION MODE switch above "What's on your mind?"
 - [x] Odysseus-inspired quality-of-life: slash commands + autocomplete, ↑/↓ prompt recall, hidden <think> blocks with reasoning-model token budget, emoji shortcodes, confetti on solved problems
+- [x] More Odysseus ideas: blind model Compare, pal memory, notes/to-dos window, SearXNG web search (/search, /research), @seerr requests, Ollama model dropdown + reply length, copy / edit-and-resend, Docker self-hosting

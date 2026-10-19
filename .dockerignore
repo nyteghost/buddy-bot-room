@@ -1,0 +1,11 @@
+node_modules
+.git
+.output
+.vinxi
+.nitro
+.tanstack
+dist
+dist-ssr
+*.log
+*.local
+src-tauri/target

@@ -28,6 +28,13 @@ A multi-model AI chat room where a cast of pixel-art characters discuss whatever
 - **Hidden thinking** — `<think>…</think>` from reasoning models (qwen3, deepseek-r1…) is filtered out live, and they get a bigger token budget so answers aren't cut off.
 - **Emoji shortcodes** — `:fire:` becomes 🔥 in replies (code blocks untouched).
 - **Confetti** when a Problem-solving discussion reaches its verdict.
+- **Compare models** — `/compare` (or the sidebar button) sends one question to 2–3 of your engines/Ollama models with the names hidden; you vote, then see who wrote what. A win/loss scoreboard is kept in your browser.
+- **Pal memory** — `/remember <fact>`, `/memories`, `/forget <n|all>`. Every pal sees what you asked them to remember.
+- **Notes & to-dos** — `/note`, `/todo`, `/done <n>`, `/tasks`, plus a *Notes & tasks* window. Open to-dos are shared with the pals.
+- **Web search** — `/search <query>` shows results; `/research <question>` hands them to the pals to discuss (needs a SearXNG, see [self-hosting](docs/SELF_HOSTING.md)).
+- **@seerr** — `@seerr Dune Part Two 4k` looks the title up in Seerr and asks you to confirm before requesting (needs `SEERR_URL` / `SEERR_API_KEY` on the server).
+- **Local-model polish** — installed Ollama models appear in a dropdown, with a reply-length setting; copy a reply or edit-and-resend your own message.
+- **Self-hosting** — `docker compose up -d --build`, see [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
 
 ### Saved discussions
 - Multiple chats with auto-save and a slide-out history.
