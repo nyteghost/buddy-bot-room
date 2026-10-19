@@ -31,6 +31,7 @@ import {
   RefreshCw,
   Volume2,
   VolumeX,
+  Ellipsis,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -184,6 +185,21 @@ export function Room() {
 
   const [topic, setTopic] = useState("");
   const [recorderOpen, setRecorderOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Phones: swipe right from the left edge opens saved chats.
+  useEffect(() => {
+    let sx = 0, sy = 0, edge = false;
+    const down = (e: TouchEvent) => { const t = e.touches[0]; if (!t) return; sx = t.clientX; sy = t.clientY; edge = t.clientX < 28; };
+    const up = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      if (!edge || !t || window.innerWidth > 760) return;
+      if (t.clientX - sx > 80 && Math.abs(t.clientY - sy) < 50) { setConversationOpen(true); setHistoryRequest((v) => v + 1); }
+      edge = false;
+    };
+    window.addEventListener("touchstart", down, { passive: true });
+    window.addEventListener("touchend", up, { passive: true });
+    return () => { window.removeEventListener("touchstart", down); window.removeEventListener("touchend", up); };
+  }, []);
   const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
   const [partner, setPartner] = useState<AgentId>("claude");
@@ -890,7 +906,11 @@ export function Room() {
             <span className="brand-chat"> / chat</span>
           </span>
         </a>
-        <div className="header-right">
+        <Button variant="ghost" size="icon" className="header-menu-btn" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Ellipsis /></Button>
+        <div
+          className={cn("header-right", menuOpen && "header-open")}
+          onClick={(e) => { const el = e.target as HTMLElement; if (el.closest("button") && !el.closest("[role=combobox],[role=switch],.header-menu-btn")) setMenuOpen(false); }}
+        >
           <span className="lab-badge">
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
@@ -952,8 +972,16 @@ export function Room() {
               </DialogHeader>
             </DialogContent>
           </Dialog>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
         </div>
       </header>
+      <button type="button" className="mobile-strip" onClick={() => setRoomOpen((v) => !v)}>
+        <span className={cn("status-dot", running && "pulse-dot")} />
+        {running && activeAgent ? `${agentName(activeAgent.id, hell, horror, characterMode)} ${bubbleText ? "is talking…" : "is thinking…"}` : "Pals are ready"}
+        <span className="mobile-strip-hint">tap for the room</span>
+      </button>
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void importSettings(e.target.files?.[0]); e.target.value = ""; }} />
