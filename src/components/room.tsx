@@ -93,6 +93,8 @@ import {
   ALL_MODES,
   type RoomMessage,
 } from "@/lib/agents";
+import { listLocalOrServer } from "@/lib/chat-store";
+import type { SavedDiscussion } from "@/lib/saved-discussions";
 import { SavedDiscussions } from "./saved-discussions";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
@@ -169,6 +171,8 @@ import { setVoiceSettings, speakItems, stopSpeaking, useSpeakingId, useVoice, vo
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
+import { RoomLive } from "@/components/room-live";
+import { awardXp } from "@/lib/progress-store";
 import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
 import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
@@ -379,6 +383,7 @@ export function Room() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
   function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
     setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
@@ -769,6 +774,7 @@ export function Room() {
             throw new Error("This agent returned no answer. The discussion has stopped.");
         }
       }
+      if (!controller.signal.aborted) awardXp(Math.min(10, turns.length));
       if (mode === "solve" && !direct && !controller.signal.aborted) celebrate();
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -1179,7 +1185,16 @@ export function Room() {
     say("/restore", `Restored ${result.restored.length} sections. Reloading…`);
     setTimeout(() => window.location.reload(), 900);
   }
+  // Recent saved chats show up in the command palette (loaded when it opens).
+  const [recentChats, setRecentChats] = useState<SavedDiscussion[]>([]);
+  useEffect(() => {
+    if (!paletteOpen) return;
+    let stop = false;
+    void listLocalOrServer().then((rows) => { if (!stop) setRecentChats([...rows].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12)); }).catch(() => undefined);
+    return () => { stop = true; };
+  }, [paletteOpen]);
   const palette: PaletteAction[] = [
+    ...recentChats.map((row): PaletteAction => ({ id: `chat-open-${row.id}`, group: "Saved chats", label: `${modeLabel[row.mode as Mode] ?? row.mode}: ${row.title.slice(0, 60)}`, keywords: "open saved chat history", run: () => { showMode(row.mode); setMode(row.mode); window.setTimeout(() => window.dispatchEvent(new CustomEvent("pixelpals:open-chat", { detail: row })), 50); } })),
     { id: "win-room", group: "Windows", label: "Toggle Pixel room", run: () => setRoomOpen((v) => !v) },
     { id: "win-tools", group: "Windows", label: "Toggle Work tools", run: () => setToolsOpen((v) => !v) },
     { id: "win-rec", group: "Windows", label: "Toggle Recorder", run: () => setRecorderOpen((v) => !v) },
@@ -1752,6 +1767,7 @@ export function Room() {
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}
+            <RoomLive active={roomOpen} running={running} theme={characterMode} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />
@@ -1771,6 +1787,7 @@ export function Room() {
                   `scene-pal-${i}`,
                   !enabled.includes(a.id) && "pal-away",
                   speaking === a.id && "is-speaking",
+                  !running && chatter === a.id && "is-chatting",
                   running && speaking && speaking !== a.id && enabled.includes(a.id) && "is-listening",
                 )}
               >

@@ -40,6 +40,19 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
   const lastSaved = useRef("");
 
   useEffect(() => { setId(localStorage.getItem(activeKey) ?? undefined); }, []);
+  // The command palette can open a saved chat: same as clicking it in the list.
+  useEffect(() => {
+    const onOpenChat = (e: Event) => {
+      const row = (e as CustomEvent<SavedDiscussion>).detail;
+      if (!row || row.mode !== mode || running) return;
+      const mine = row.mine !== false;
+      pick(mine ? row.id : undefined);
+      lastSaved.current = mine ? `${row.id}:${row.messages.length}:${row.messages[row.messages.length - 1]?.id}:${row.theme}:${row.mode}` : "";
+      onOpen(row.messages, row.theme, row.mode);
+    };
+    window.addEventListener("pixelpals:open-chat", onOpenChat);
+    return () => window.removeEventListener("pixelpals:open-chat", onOpenChat);
+  });
   function pick(next: string | undefined) {
     setId(next);
     if (next) localStorage.setItem(activeKey, next); else localStorage.removeItem(activeKey);

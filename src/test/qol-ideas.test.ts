@@ -2319,3 +2319,44 @@ describe("pals see your real day", () => {
     expect(tasksText([{ text: "Pay rent", done: false }, { text: "Old", done: true }])).toBe("Open tasks (1):\n- Pay rent");
   });
 });
+
+import { ambientLines, needsAttention, phaseOf, skyOf, whenText } from "@/lib/live-room";
+import { award, levelFraction, levelOf, seasonal, syncDone, unlocked, emptyProgress } from "@/lib/progress";
+
+describe("living room", () => {
+  it("knows the time of day and the sky", () => {
+    expect([2, 6, 12, 18, 22].map(phaseOf)).toEqual(["night", "dawn", "day", "dusk", "night"]);
+    expect([0, 3, 63, 73, 95, 45].map(skyOf)).toEqual(["clear", "cloud", "rain", "snow", "storm", "fog"]);
+  });
+  it("writes one short line per area it has data for", () => {
+    const lines = ambientLines({ tasks: 2, unread: 3, newest: "Invoice due", next: { title: "Load-in", when: "today 3:30 PM" }, server: "disk 2 is hot", weather: { text: "Rain", icon: "x", temp: "54°F", sky: "rain" } });
+    expect(lines.map((l) => l.agent)).toEqual(["nova", "sage", "byte", "rune", "echo"]);
+    expect(lines[0]!.text).toBe("3 unread. Newest: Invoice due");
+    expect(lines[3]!.text).toBe("Heads up: disk 2 is hot");
+    expect(ambientLines({ tasks: 0 }).map((l) => l.text)).toEqual(["All tasks done. Nice."]);
+    expect(needsAttention({ tasks: 0, unread: 2, server: "x" })).toEqual({ mail: true, server: true });
+  });
+  it("says when things happen", () => {
+    const now = Date.UTC(2026, 9, 20, 16, 0);
+    expect(whenText(now + 3600_000, now, "UTC")).toBe("today 5:00 PM");
+    expect(whenText(now + 86400_000, now, "UTC")).toBe("tomorrow 4:00 PM");
+    expect(whenText(now + 86400_000 * 3, now, "UTC", true)).toBe("Fri");
+  });
+  it("levels up, keeps streaks and does not pay twice", () => {
+    expect([0, 24, 25, 100, 225].map(levelOf)).toEqual([1, 1, 2, 3, 4]);
+    expect(levelFraction(0)).toBe(0);
+    expect(unlocked(3).map((d) => d.icon)).toEqual(["🪴", "🕯️"]);
+    const a = award(emptyProgress, 5, "2026-10-20");
+    expect(a).toEqual({ xp: 5, streak: 1, lastDay: "2026-10-20", doneSeen: 0 });
+    expect(award(a, 5, "2026-10-20").streak).toBe(1);
+    expect(award(a, 5, "2026-10-21").streak).toBe(2);
+    expect(award(a, 5, "2026-10-25").streak).toBe(1);
+    expect(syncDone(emptyProgress, 7, "2026-10-20").xp).toBe(0); // old tasks don't pay out
+    const b = syncDone(a, 2, "2026-10-20");
+    expect(b.xp).toBe(25);
+    expect(syncDone(b, 2, "2026-10-20")).toBe(b);
+    expect(syncDone(b, 1, "2026-10-20").xp).toBe(25);
+    expect(seasonal(9)).toEqual(["🎃", "🦇"]);
+    expect(seasonal(4)).toEqual([]);
+  });
+});
