@@ -39,6 +39,7 @@ export type SlashAction =
   | { type: "backup"; now: boolean; op?: "list" | "restore"; name?: string; confirm?: boolean }
   | { type: "brief"; send: boolean }
   | { type: "review"; send: boolean }
+  | { type: "update" }
   | { type: "prompt"; op: "list" | "save" | "remove" | "use"; name: string; text: string }
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
@@ -127,6 +128,7 @@ export const slashCommands = [
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
   { name: "voice", usage: "/voice [on|off]", description: "Read replies aloud (your browser's own voices)" },
   { name: "prompt", usage: "/prompt [name] | save <name> = <text> | remove <name>", description: "Saved prompts: fill the message box with a ready-made starting point" },
+  { name: "update", usage: "/update", description: "Check whether a newer version is available and how to install it (owner only)" },
   { name: "review", usage: "/review [send]", description: "Your week ahead: calendar, reminders, mail and picks (owner only)" },
   { name: "brief", usage: "/brief [send]", description: "Today's morning brief (add send to push it to your phone)" },
   { name: "backup", usage: "/backup [now | list | restore N]", description: "Backup status, back up now, list backups or restore one (owner)" },
@@ -281,6 +283,8 @@ export function parseSlash(input: string): SlashResult | null {
       const p = parsePromptArgs(rawArg);
       return "error" in p ? fail(p.error) : { ok: true, action: { type: "prompt", ...p } };
     }
+    case "update": case "updates": case "version":
+      return { ok: true, action: { type: "update" } };
     case "review": case "week": case "weekly":
       return { ok: true, action: { type: "review", send: arg === "send" } };
     case "brief": case "morning":

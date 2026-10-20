@@ -270,6 +270,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/brief [send]` | Morning brief preview · push it now |
 | `/backup [now]` | Backup status · back up now (owner) |
 | `/backup list` · `/backup restore N` | List backups · restore one, with a safety copy and a confirm step (owner, [7.14](#714-setup-search-capture-and-more)) |
+| `/update` | Check for a newer version and how to install it (owner) |
 | `/review [send]` | Your week ahead: calendar, reminders, mail, picks ([7.14](#714-setup-search-capture-and-more)) |
 | `/setup` · `/search` · `/hide` | Setup checklist with connection tests · search everything · blur secrets for screenshots ([7.14](#714-setup-search-capture-and-more)) |
 | `/voice [on\|off]` | Read replies aloud |
@@ -520,6 +521,7 @@ I tested the date and time reading, the reminders logic, the brief and the `.ics
 - **Branching:** use **Branch from here** on any message to continue from that point as a separate saved chat.
 - **Backups:** `/backup list` and `/backup restore 2` (or a name). It first saves what's there as `pre-restore-<time>` in the backup folder, asks you to confirm, then copies the backup over your data. Files that exist now but not in the backup are left alone. Restart the container afterwards if anything looks stale.
 - **Phones:** the bottom tab bar now scrolls sideways so every window has a button. I couldn't check the layout on a real phone here, so tell me what looks off.
+- **Update available:** a blue bar appears at the top (owner only) when GitHub has a newer version than the one running, with **What's new** (the change list) and **Dismiss** (hides that version only). `/update` checks right now. If `NTFY_URL` or Telegram is set, your phone is told once per new version. It compares this build's commit with the repository's `main`; to install, use Portainer → your stack → **Pull and redeploy**. A build with no commit stamp (shown as `local` in the sidebar) can't be compared. `UPDATE_CHECK=0` turns it off.
 - **CI:** `.github/workflows/ci.yml` runs the tests and a build on every push to GitHub, so a broken change is flagged before you redeploy.
 
 I tested the logic of all of this with automated tests. I could not run it against real Plex, Seerr, Telegram, ntfy, IMAP or Tailscale, or look at the windows in a browser, so treat the first run as a shakedown.
@@ -677,6 +679,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `UNRAID_CHECK_SECONDS` | `60` | How often it checks |
 | `NTFY_URL` | | Phone push address |
 | `BRIEF_TIME` | empty (off) | Morning brief time, `HH:MM` |
+| `UPDATE_CHECK` | on | `0` turns off the "update available" bar and phone alert ([7.14](#714-setup-search-capture-and-more)) |
 | `REVIEW_DAY` / `REVIEW_TIME` | empty (off) | Weekly review: day (`sun`) and time (`18:00`) ([7.14](#714-setup-search-capture-and-more)) |
 | `BUDDY_BACKUP_PATH` | volume `buddy-backups` | Host folder for backups |
 | `BUDDY_BACKUP_TIME` | `03:30` | Nightly backup time |

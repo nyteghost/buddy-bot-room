@@ -2002,3 +2002,11 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .workspace-sidebar .sidebar-item { flex: 0 0 56px; scroll-snap-align: start; }
   .workspace-window .secret, .workspace-window code { overflow-wrap: anywhere; }
 }
+
+/* Update available bar */
+.update-banner { flex-shrink: 0; padding: 7px 16px; font-size: 13px; background: #1e3a8a; color: #fff; }
+.update-banner-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; }
+.update-banner-actions { display: flex; gap: 6px; }
+.update-banner-details { padding-top: 6px; }
+.update-banner-details ul { margin: 0 0 6px; padding-left: 18px; list-style: disc; }
+.update-banner-details p { margin: 0; opacity: .9; }

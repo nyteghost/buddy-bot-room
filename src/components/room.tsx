@@ -108,6 +108,7 @@ import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engin
 import { OllamaMascot } from "./ollama-mascot";
 import { LinuxActions } from "./linux-actions";
 import { UpdatePopup } from "./update-popup";
+import { UpdateBanner } from "./update-banner";
 import { linuxContext } from "@/lib/linux";
 import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
@@ -845,6 +846,16 @@ export function Room() {
         return say(command, next ? "Voice is on: I'll read each discussion's replies aloud when it finishes, in a different voice per pal. Use the speaker button on any reply to hear just that one. (iPhone: sound plays only after you've tapped something on the page.)" : "Voice is off.");
       }
       case "brief": void briefCmd(command, action.send); return;
+      case "update": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/update", { method: "POST" });
+            const json = (await res.json()) as { text?: string; error?: string; enabled?: boolean };
+            say(command, json.enabled === false ? "Update checks are turned off (UPDATE_CHECK=0)." : json.text ?? json.error ?? "No answer.");
+          } catch { say(command, "I couldn't reach the server."); }
+        })();
+        return;
+      }
       case "review": void briefCmd(command, action.send, "/api/weekly"); return;
       case "backup": void backupCmd(command, action.now, action.op ? { op: action.op, name: action.name ?? "", confirm: !!action.confirm } : undefined); return;
       case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
@@ -1221,6 +1232,7 @@ export function Room() {
         {running && activeAgent ? `${agentName(activeAgent.id, hell, horror, characterMode)} ${bubbleText ? "is talking…" : "is thinking…"}` : "Pals are ready"}
         <span className="mobile-strip-hint">tap for the room</span>
       </button>
+      {!desktopApp && <UpdateBanner />}
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void importSettings(e.target.files?.[0]); e.target.value = ""; }} />

@@ -18,6 +18,7 @@ import { pickReason, watchQueue } from "@/lib/pick-reason";
 import { addPalMemory, promptContext, removePalMemory, type Workbench } from "@/lib/workbench";
 import { BUILT_IN_PROMPTS, addPrompt, findPrompt, parsePromptArgs, promptList } from "@/lib/prompts";
 import { backupListText, pickBackup } from "@/lib/backup";
+import { isKnownBuild, parseCompare, updateText } from "@/lib/update";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1947,5 +1948,29 @@ describe("backup restore helpers", () => {
     expect(parseSlash("/backup restore latest confirm")).toEqual({ ok: true, action: { type: "backup", now: false, op: "restore", name: "latest", confirm: true } });
     expect(parseSlash("/backup list")).toEqual({ ok: true, action: { type: "backup", now: false, op: "list" } });
     expect(parseSlash("/backup now")).toEqual({ ok: true, action: { type: "backup", now: true } });
+  });
+});
+
+describe("update available", () => {
+  const compare = { status: "ahead", ahead_by: 2, commits: [{ sha: "aaaaaaa111", commit: { message: "First change\n\nbody" } }, { sha: "bbbbbbb222", commit: { message: "Second change" } }] };
+  it("reads GitHub's compare answer", () => {
+    const u = parseCompare(compare, "1234567")!;
+    expect(u.behind).toBe(2);
+    expect(u.latest).toBe("bbbbbbb");
+    expect(u.changes).toEqual(["Second change", "First change"]);
+    expect(updateText(u)).toContain("Update available: 2 new changes");
+    expect(updateText(u)).toContain("Pull and redeploy");
+  });
+  it("says up to date, and rejects nonsense", () => {
+    const same = parseCompare({ status: "identical", ahead_by: 0, commits: [] }, "1234567")!;
+    expect(same.behind).toBe(0);
+    expect(updateText(same)).toContain("up to date");
+    expect(parseCompare(null, "x")).toBeNull();
+    expect(parseCompare({ message: "Not Found" }, "x")).toBeNull();
+  });
+  it("only compares builds with a commit stamp", () => {
+    expect(isKnownBuild("84af8a4")).toBe(true);
+    expect(isKnownBuild("local")).toBe(false);
+    expect(parseSlash("/update")).toEqual({ ok: true, action: { type: "update" } });
   });
 });
