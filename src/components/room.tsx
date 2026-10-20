@@ -1166,21 +1166,7 @@ export function Room() {
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
           <EngineSettingsDialog />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="engine-trigger"
-            aria-pressed={recorderOpen}
-            onClick={() => setRecorderOpen((open) => !open)}
-          >
-            <Mic className="size-4" /> Record
-          </Button>
-          {canSpeak && (
-            <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={voice.auto} title={voice.auto ? "Replies are read aloud. Click to turn off." : "Read replies aloud"} onClick={() => { if (voice.auto) stopSpeaking(); setVoiceSettings({ auto: !voice.auto }); }}>
-              {voice.auto ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Voice
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench className="size-4" /> Work tools</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={setupOpen} title="Setup: what's connected, with connection tests" onClick={() => setSetupOpen((value) => !value)}><Settings2 className="size-4" /> Setup</Button>
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
             value={characterMode}
@@ -1250,7 +1236,6 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes and memories" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Search chats, notes, tasks and reminders" aria-pressed={searchOpen} onClick={() => setSearchOpen((value) => !value)}><Search /><span>Search</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Setup: what's connected, with connection tests" aria-pressed={setupOpen} onClick={() => setSetupOpen((value) => !value)}><Settings2 /><span>Setup</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
