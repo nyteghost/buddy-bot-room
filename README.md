@@ -275,6 +275,10 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/appearance light\|dark\|auto` · `small\|normal\|large` | Colour scheme and text size |
 | `/schedule add 08:00 <question>` | Scheduled tasks sent to your phone; also `list`, `run N`, `remove N` (owner only, [8.3](#83-scheduled-tasks)) |
 | `/calendar` · `/mail` | Open the Calendar / Mail window ([7.12](#712-calendar-and-mail-windows)) |
+| `/today` · `/tasks` | Open the Today overview / the Tasks and reminders window ([7.13](#713-today-tasks-weather-and-events)) |
+| `/weather` | Current weather and the next few days ([7.13](#713-today-tasks-weather-and-events)) |
+| `/remind in 30m call mom` | One-time reminder pushed to your phone; also `list`, `remove N` (owner only) |
+| `/event friday 3pm dentist` | Makes a calendar event: `.ics` download plus Google and Outlook "add" links |
 | `/web [on\|off]` | Automatic web lookup: when a question needs current facts (latest, price, news, a question with a `?`), the pals search your SearXNG first and cite the links. Off by default |
 | `/status` | One-shot health check: Local AI, search, Plex, Seerr, Jellyfin, Unraid, Trakt, ntfy and backups. Shows names and problems only, never addresses or keys |
 | `/log` | Debug log |
@@ -490,6 +494,16 @@ Microsoft 365 work mail can be added with `/m365 connect` instead. Results are c
 
 ---
 
+### 7.13 Today, Tasks, weather and events
+
+- **Today** window (`/today`): weather, your calendar for today, unread mail count, open tasks and one Trakt pick, each with a short setup hint if it isn't connected yet.
+- **Tasks** window (`/tasks`): your to-do list (the same list as Notes & tasks, kept in this browser) and **reminders** (kept on the server, pushed to your phone by ntfy or Telegram when due). Reminders understand plain English: `/remind in 30m call mom`, `/remind tomorrow 9am pay rent`, `/remind friday at 3pm submit report`. Needs `BUDDY_DATA_DIR`, plus `NTFY_URL` or Telegram to reach your phone. Owner only.
+- **Weather** (`/weather`): from Open-Meteo, which needs no key. Set `WEATHER_LOCATION="Atlanta, GA"` (or `WEATHER_LAT` and `WEATHER_LON`), and `WEATHER_UNITS=metric` for Celsius. The morning brief now also carries the weather, today's calendar, unread mail and today's reminders when those are set up.
+- **Draft a reply** (Mail window): pick a message, type what you want to say, and Echo writes the reply for you to copy into your own mail app. Echo only sees the sender, subject and your notes, never the message, and nothing is sent.
+- **`/event friday 3pm dentist for 1h`**: gives you a `.ics` file (opens in Apple, Outlook, Google and most calendar apps) and one-tap "Add to Google Calendar" / "Add to Outlook" links. Pixel Pals can't add the event directly because that needs permission to change your calendar, which it deliberately never asks for. Dates like `oct 25` make an all-day event.
+
+I tested the date and time reading, the reminders logic, the brief and the `.ics` output with automated tests. I could not test Open-Meteo, ntfy delivery or the new windows in a real browser here.
+
 ## 8. Automatic jobs
 
 These run on the server at times in `BUDDY_TZ` (default `America/New_York`).
@@ -655,6 +669,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 | `TRAKT_CLIENT_SECRET` | empty | Only for `/trakt connect` (write access) |
+| `WEATHER_LOCATION` / `WEATHER_LAT` / `WEATHER_LON` | empty | Where you are, for `/weather` and the brief ([7.13](#713-today-tasks-weather-and-events)) |
+| `WEATHER_UNITS` | `imperial` | `metric` for °C and km/h |
 | `CALENDAR_ICS_URLS` | empty | Private .ics links for the Calendar window ([7.12](#712-calendar-and-mail-windows)) |
 | `IMAP_HOST` / `IMAP_USER` / `IMAP_PASS` | empty | Unread mail for the Mail window (app password) |
 | `M365_CLIENT_ID` / `M365_TENANT` | empty / `organizations` | Microsoft 365 read-only ([7.11](#711-microsoft-365-work-read-only)) |

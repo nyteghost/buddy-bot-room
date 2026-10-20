@@ -12,6 +12,14 @@ export type BriefInput = {
   picks?: TraktItem[];
   /** Recently added to Plex. */
   recent?: string[];
+  /** One line, e.g. from weatherLine. */
+  weather?: string;
+  /** Today's calendar lines ("09:30 Standup"). */
+  events?: string[];
+  /** Unread mail: count and the first few subjects. */
+  mail?: { count: number; top: string[] };
+  /** Open to-dos / reminders for today. */
+  tasks?: string[];
 };
 
 function hash(s: string): number {
@@ -45,6 +53,11 @@ export function unraidLine(s: UnraidStatus | null | undefined): string {
 export function buildBrief(input: BriefInput): { title: string; body: string } {
   const when = new Date(`${input.day}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
   const lines: string[] = [];
+  if (input.weather) lines.push(input.weather);
+  if (input.events) lines.push("", input.events.length ? `Today: ${input.events.slice(0, 5).join(" · ")}${input.events.length > 5 ? ` (+${input.events.length - 5} more)` : ""}` : "Nothing on your calendar today.");
+  if (input.mail) lines.push(input.mail.count ? `Unread mail: ${input.mail.count}${input.mail.top.length ? ` — ${input.mail.top.slice(0, 3).join("; ")}` : ""}` : "No unread mail.");
+  if (input.tasks?.length) lines.push(`To do: ${input.tasks.slice(0, 5).join("; ")}`);
+  if (lines.length) lines.push("");
   const u = unraidLine(input.unraid);
   if (u) lines.push(u);
   if (input.backup) lines.push(input.backup);
@@ -54,6 +67,7 @@ export function buildBrief(input: BriefInput): { title: string; body: string } {
     if (rest.length) lines.push(`Or: ${rest.map(label).join(", ")}`);
   }
   if (input.recent?.length) lines.push("", `New in Plex: ${input.recent.slice(0, 5).join(", ")}`);
+  while (lines[0] === "") lines.shift();
   if (!lines.length) lines.push("Nothing to report. Set up Unraid, Trakt or Plex to fill this in.");
   return { title: `Good morning — ${when}`, body: lines.join("\n") };
 }

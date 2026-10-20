@@ -1,11 +1,15 @@
 import { backupConfig, backupText } from "./backup.server";
 import { buildBrief, dailyPicks } from "./brief";
+import { calendarData, mailData } from "./inbox.server";
 import { handlePlex } from "./plex.server";
+import { remindersOnDay } from "./reminders.server";
 import { parseHm, validZone, zonedParts } from "./schedule";
 import { logServer } from "./server-log.server";
 import { handleTrakt } from "./trakt.server";
 import type { TraktItem } from "./trakt";
 import { unraidSnapshot } from "./unraid.server";
+import { getWeather, weatherConfigured } from "./weather.server";
+import { weatherLine } from "./weather";
 
 /** Morning brief: one short message each day (health, backup, tonight's pick, what's new in Plex). Needs BRIEF_TIME; sends through NTFY_URL. */
 export type BriefConfig = { time: string; tz: string; ntfy: string };
@@ -31,6 +35,15 @@ export async function makeBrief(now = new Date()): Promise<{ title: string; body
     handleTrakt(internal("/api/trakt?plex=1")).then(json).catch(() => null),
     handlePlex(internal("/api/plex?q=recent")).then(json).catch(() => null),
   ]);
+  const [weather, cal, mail, reminders] = await Promise.all([
+    weatherConfigured() ? getWeather().catch(() => null) : null,
+    calendarData(1).catch(() => null),
+    mailData().catch(() => null),
+    remindersOnDay(day).catch(() => [] as string[]),
+  ]);
+  const clock = (ms: number) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(ms));
+  const dayKey = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
+  const events = cal?.configured ? cal.items.filter((e) => dayKey(e.start) === day || (e.start <= now.getTime() && e.end > now.getTime())).map((e) => `${e.allDay ? "all day" : clock(e.start)} ${e.title}`) : undefined;
   const bc = backupConfig();
   const backupLine = bc ? (await backupText(bc)).split("\n")[0] : undefined;
   const items = (trakt?.["items"] as TraktItem[] | undefined) ?? [];
@@ -41,6 +54,10 @@ export async function makeBrief(now = new Date()): Promise<{ title: string; body
     ...(backupLine ? { backup: backupLine } : {}),
     picks: dailyPicks(items, day),
     recent,
+    ...(weather && "weather" in weather ? { weather: weatherLine(weather.weather) } : {}),
+    ...(events ? { events } : {}),
+    ...(mail?.configured ? { mail: { count: mail.items.length, top: mail.items.map((m) => m.subject) } } : {}),
+    ...(reminders.length ? { tasks: reminders } : {}),
   });
 }
 

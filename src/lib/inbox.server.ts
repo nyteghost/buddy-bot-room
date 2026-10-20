@@ -30,12 +30,20 @@ async function owner(request: Request): Promise<Response | null> {
   return user?.owner ? null : Response.json({ error: "Only the owner account can open Mail and Calendar." }, { status: 403 });
 }
 
+export type CalendarData = { tz: string; configured: boolean; feeds: number; m365: boolean; items: CalItem[]; errors: string[] };
+export type MailData = { configured: boolean; imap: boolean; m365: boolean; items: { from: string; subject: string; date: string; source: string }[]; errors: string[] };
+
 export async function handleCalendar(request: Request): Promise<Response> {
   const denied = await owner(request);
   if (denied) return denied;
-  const days = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get("days")) || 7));
-  const hit = cache.get(`cal|${days}`);
-  if (hit) return Response.json(hit);
+  return Response.json(await calendarData(Number(new URL(request.url).searchParams.get("days"))));
+}
+
+/** Calendar data without the request/owner check, for the owner's own morning brief. */
+export async function calendarData(daysIn: number): Promise<CalendarData> {
+  const days = Math.min(30, Math.max(1, daysIn || 7));
+  const hit = cache.get(`cal|${days}`) as CalendarData | undefined;
+  if (hit) return hit;
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const from = start.getTime() - 3600_000;
   const to = from + days * 86400_000;
@@ -54,17 +62,21 @@ export async function handleCalendar(request: Request): Promise<Response> {
   let m365 = false;
   try { const r = await m365Range(from, to); if (r) { m365 = true; for (const e of r) items.push({ ...e, source: "Microsoft 365" }); } } catch { errors.push("Microsoft 365: couldn't read the calendar"); }
   items.sort((a, b) => a.start - b.start);
-  const body = { tz: tz(), configured: feeds.length > 0 || m365, feeds: feeds.length, m365, items: items.slice(0, 300), errors };
+  const body: CalendarData = { tz: tz(), configured: feeds.length > 0 || m365, feeds: feeds.length, m365, items: items.slice(0, 300), errors };
   cache.set(`cal|${days}`, body);
-  return Response.json(body);
+  return body;
 }
 
 export async function handleMail(request: Request): Promise<Response> {
   const denied = await owner(request);
   if (denied) return denied;
-  const hit = cache.get("mail");
-  if (hit) return Response.json(hit);
-  const items: { from: string; subject: string; date: string; source: string }[] = [];
+  return Response.json(await mailData());
+}
+
+export async function mailData(): Promise<MailData> {
+  const hit = cache.get("mail") as MailData | undefined;
+  if (hit) return hit;
+  const items: MailData["items"] = [];
   const errors: string[] = [];
   const cfg = imapConfig();
   if (cfg) {
@@ -74,7 +86,7 @@ export async function handleMail(request: Request): Promise<Response> {
   let m365 = false;
   try { const r = await m365UnreadMail(); if (r) { m365 = true; for (const m of r) items.push({ ...m, source: "Microsoft 365" }); } } catch { errors.push("Microsoft 365: couldn't read mail"); }
   items.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  const body = { configured: !!cfg || m365, imap: !!cfg, m365, items: items.slice(0, 25), errors };
+  const body: MailData = { configured: !!cfg || m365, imap: !!cfg, m365, items: items.slice(0, 25), errors };
   cache.set("mail", body);
-  return Response.json(body);
+  return body;
 }

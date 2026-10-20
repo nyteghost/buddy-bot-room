@@ -24,7 +24,7 @@ async function writeSchedules(list: Schedule[]): Promise<void> {
   await f.rename(`${file()}.tmp`, file());
 }
 
-async function push(title: string, body: string): Promise<void> {
+export async function pushNotice(title: string, body: string): Promise<void> {
   const sent = await telegramSend(`${title}\n\n${body}`);
   const ntfy = (process.env["NTFY_URL"] ?? "").trim();
   if (ntfy.startsWith("http")) {
@@ -43,7 +43,7 @@ export async function runSchedule(id: string, now = new Date()): Promise<string>
     const fresh = await readSchedules();
     await writeSchedules(fresh.map((x) => (x.id === id ? { ...x, last: today(now, tz()), lastResult: text.slice(0, 600) } : x)));
   });
-  await push(`Pixel Pals: ${s.prompt.slice(0, 40)}`, r.ok ? `${text}\n\n— ${r.via}` : text);
+  await pushNotice(`Pixel Pals: ${s.prompt.slice(0, 40)}`, r.ok ? `${text}\n\n— ${r.via}` : text);
   return text;
 }
 

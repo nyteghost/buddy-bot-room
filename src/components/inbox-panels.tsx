@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { PenLine, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { replyPrompt } from "@/lib/mail-reply";
 
 type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
 type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; items: CalItem[]; errors: string[]; error?: string };
 type MailItem = { from: string; subject: string; date: string; source: string };
 type MailData = { configured: boolean; imap: boolean; m365: boolean; items: MailItem[]; errors: string[]; error?: string };
 
-function useFeed<T extends { error?: string }>(url: string, open: boolean) {
+export function useFeed<T extends { error?: string }>(url: string, open: boolean) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState("");
@@ -30,22 +31,22 @@ function useFeed<T extends { error?: string }>(url: string, open: boolean) {
   return { data, loading, failed, reload: load };
 }
 
-const Setup = ({ children }: { children: React.ReactNode }) => <div className="grid gap-2 rounded-md border p-3 text-sm text-muted-foreground">{children}</div>;
-const Header = ({ title, loading, onReload }: { title: string; loading: boolean; onReload: () => void }) => (
+export const Setup = ({ children }: { children: React.ReactNode }) => <div className="grid gap-2 rounded-md border p-3 text-sm text-muted-foreground">{children}</div>;
+export const Header = ({ title, loading, onReload }: { title: string; loading: boolean; onReload: () => void }) => (
   <div className="flex items-center justify-between gap-2">
     <span className="font-medium">{title}</span>
     <Button size="sm" variant="ghost" className="h-8" onClick={onReload} disabled={loading} aria-label="Refresh"><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /></Button>
   </div>
 );
 
-function dayLabel(ms: number, tz: string): string {
+export function dayLabel(ms: number, tz: string): string {
   const day = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(t);
   const today = Date.now();
   if (day(ms) === day(today)) return "Today";
   if (day(ms) === day(today + 86400000)) return "Tomorrow";
   return new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: "long", month: "short", day: "numeric" }).format(ms);
 }
-const clock = (ms: number, tz: string) => new Intl.DateTimeFormat(undefined, { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(ms);
+export const clock = (ms: number, tz: string) => new Intl.DateTimeFormat(undefined, { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(ms);
 
 export function CalendarPanel({ open }: { open: boolean }) {
   const { data, loading, failed, reload } = useFeed<CalData>("/api/calendar?days=7", open);
@@ -90,6 +91,13 @@ export function CalendarPanel({ open }: { open: boolean }) {
 
 export function MailPanel({ open }: { open: boolean }) {
   const { data, loading, failed, reload } = useFeed<MailData>("/api/mail", open);
+  const [drafting, setDrafting] = useState<number | null>(null);
+  const [intent, setIntent] = useState("");
+  const draft = (m: MailItem) => {
+    window.dispatchEvent(new CustomEvent("pixelpals:ask", { detail: { partner: "echo", text: replyPrompt(m.from, m.subject, intent) } }));
+    setDrafting(null);
+    setIntent("");
+  };
   return (
     <div className="grid gap-3 p-3 text-sm">
       <Header title="Unread" loading={loading} onReload={() => void reload()} />
@@ -107,6 +115,15 @@ export function MailPanel({ open }: { open: boolean }) {
         <div key={`${m.subject}-${i}`} className="grid gap-0.5 rounded-md border px-3 py-2">
           <span className="truncate font-medium">{m.subject}</span>
           <span className="truncate text-xs text-muted-foreground">{m.from}{data.imap && data.m365 ? ` · ${m.source}` : ""}{m.date && !Number.isNaN(Date.parse(m.date)) ? ` · ${new Date(m.date).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span>
+          {drafting === i ? (
+            <div className="mt-1 grid gap-2">
+              <textarea className="min-h-16 w-full rounded-md border bg-background px-2 py-1 text-sm" placeholder="What do you want to say? A few words is enough, like “yes Thursday works, ask for the invoice”." value={intent} maxLength={400} onChange={(e) => setIntent(e.target.value)} autoFocus />
+              <span className="text-xs text-muted-foreground">Echo sees only the sender, the subject and what you type here, never the message itself. You copy the draft into your own mail app; nothing is sent.</span>
+              <div className="flex gap-2"><Button size="sm" onClick={() => draft(m)}>Draft with Echo</Button><Button size="sm" variant="ghost" onClick={() => setDrafting(null)}>Cancel</Button></div>
+            </div>
+          ) : (
+            <Button size="sm" variant="ghost" className="mt-1 h-7 justify-start px-1 text-xs" onClick={() => { setDrafting(i); setIntent(""); }}><PenLine className="size-3" /> Draft a reply</Button>
+          )}
         </div>
       ))}
       {data?.errors.map((e) => <p key={e} className="text-xs text-destructive">{e}</p>)}

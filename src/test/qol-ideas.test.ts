@@ -7,6 +7,11 @@ import { eventsText, mailText, parseM365, shapeEvents, shapeMail, summaryPrompt 
 import { appearanceFromWords, formatAppearance, parseAppearance, resolveScheme } from "@/lib/appearance";
 import { eventsInRange } from "@/lib/ics";
 import { decodeMimeWords, imapQuote, parseFetchHeaders, parseSearch, senderName } from "@/lib/imap";
+import { describeCode, shapeWeather, weatherLine, weatherText } from "@/lib/weather";
+import { fromWall, parseWhen, takeDuration, wallOf } from "@/lib/when";
+import { addReminder, dueReminders, parseRemindArgs, parseReminders, removeReminder, reminderList } from "@/lib/reminders";
+import { replyPrompt } from "@/lib/mail-reply";
+import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
 import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, MAX_SCHEDULES } from "@/lib/schedules";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
@@ -1605,5 +1610,135 @@ describe("IMAP header reading", () => {
   it("quotes credentials safely", () => {
     expect(imapQuote('pa"ss\\w')).toBe('"pa\\"ss\\\\w"');
     expect(imapQuote("bad\r\nline")).toBeNull();
+  });
+});
+
+const NY = "America/New_York";
+const NOW = Date.UTC(2026, 9, 20, 18, 0); // Tue 20 Oct 2026, 2:00pm in New York
+const local = (ms: number) => { const w = wallOf(ms, NY); return `${w.y}-${String(w.mo).padStart(2, "0")}-${String(w.d).padStart(2, "0")} ${String(w.h).padStart(2, "0")}:${String(w.mi).padStart(2, "0")}`; };
+
+describe("weather", () => {
+  const raw = { current: { temperature_2m: 54.4, apparent_temperature: 51.2, weather_code: 61, wind_speed_10m: 8.6 }, daily: { time: ["2026-10-20", "2026-10-21"], temperature_2m_max: [58, 60], temperature_2m_min: [47, 45], weather_code: [61, 0], precipitation_probability_max: [70, 5] } };
+  it("shapes the forecast and writes readable lines", () => {
+    const w = shapeWeather(raw, "Atlanta, Georgia", "imperial")!;
+    expect(w.now.temp).toBe(54);
+    expect(w.days.length).toBe(2);
+    expect(weatherLine(w)).toBe("Rain, 54°F (feels 51°F). Today 58°/47°, 70% chance of rain.");
+    expect(weatherText(w)).toContain("Tomorrow");
+    expect(describeCode(95).text).toBe("Thunderstorms");
+  });
+  it("rejects nonsense", () => {
+    expect(shapeWeather(null, "x", "metric")).toBeNull();
+    expect(shapeWeather({ current: {} }, "x", "metric")).toBeNull();
+  });
+});
+
+describe("plain-English dates and times", () => {
+  it("round-trips wall clock time across daylight saving", () => {
+    expect(local(fromWall(2026, 10, 20, 15, 30, NY))).toBe("2026-10-20 15:30");
+    expect(local(fromWall(2026, 11, 2, 9, 0, NY))).toBe("2026-11-02 09:00");
+    expect(new Date(fromWall(2026, 11, 2, 9, 0, NY)).toISOString()).toBe("2026-11-02T14:00:00.000Z");
+  });
+  it("reads relative times", () => {
+    const w = parseWhen("in 30m call mom", NOW, NY)!;
+    expect(w.at).toBe(NOW + 30 * 60_000);
+    expect(w.rest).toBe("call mom");
+    expect(parseWhen("in 2 hours stretch", NOW, NY)!.at).toBe(NOW + 2 * 3_600_000);
+  });
+  it("reads days and clock times", () => {
+    expect(local(parseWhen("tomorrow 9am pay rent", NOW, NY)!.at)).toBe("2026-10-21 09:00");
+    expect(local(parseWhen("friday at 3pm submit report", NOW, NY)!.at)).toBe("2026-10-23 15:00");
+    expect(local(parseWhen("at 15:00 stand up", NOW, NY)!.at)).toBe("2026-10-20 15:00");
+    expect(local(parseWhen("at 9 gym", NOW, NY)!.at)).toBe("2026-10-21 09:00"); // already past today
+    expect(local(parseWhen("oct 25 mom's birthday", NOW, NY)!.at)).toBe("2026-10-25 09:00");
+    expect(local(parseWhen("jan 5 renew passport", NOW, NY)!.at)).toBe("2027-01-05 09:00");
+    expect(local(parseWhen("2026-12-01 14:30 meeting", NOW, NY)!.at)).toBe("2026-12-01 14:30");
+    expect(parseWhen("tuesday standup", NOW, NY)!.hasTime).toBe(false);
+    expect(local(parseWhen("tuesday standup", NOW, NY)!.at)).toBe("2026-10-27 09:00");
+  });
+  it("keeps the title and finds nothing in plain text", () => {
+    expect(parseWhen("tomorrow 9am pay rent", NOW, NY)!.rest).toBe("pay rent");
+    expect(parseWhen("water the plants", NOW, NY)).toBeNull();
+  });
+  it("reads durations", () => {
+    expect(takeDuration("lunch for 90m")).toEqual({ minutes: 90, rest: "lunch" });
+    expect(takeDuration("dentist 1.5h")!.minutes).toBe(90);
+    expect(takeDuration("call at 3pm")).toBeNull();
+    expect(takeDuration("in 30m call")).toBeNull();
+  });
+});
+
+describe("reminders", () => {
+  it("parses a request and refuses bad ones", () => {
+    const r = parseRemindArgs("tomorrow 9am pay rent", NOW, NY);
+    expect("at" in r && r.text).toBe("pay rent");
+    expect("error" in parseRemindArgs("pay rent", NOW, NY)).toBe(true);
+    expect("error" in parseRemindArgs("in 30m", NOW, NY)).toBe(true);
+  });
+  it("adds, finds due and removes", () => {
+    let list = parseReminders([{ id: "a", at: NOW + 1000, text: "later" }, { id: "b", at: NOW - 5, text: "now" }, { bad: true }]);
+    expect(list.length).toBe(2);
+    expect(dueReminders(list, NOW).map((r) => r.id)).toEqual(["b"]);
+    const added = addReminder(list, NOW + 500, "mid", "c");
+    expect(added.ok && added.list.map((r) => r.id)).toEqual(["b", "c", "a"]);
+    if (added.ok) list = added.list;
+    expect(removeReminder(list, "2").removed?.id).toBe("c");
+    expect(removeReminder(list, "zzz").removed).toBeUndefined();
+    expect(reminderList([], NY)).toContain("No reminders");
+  });
+});
+
+describe("calendar events from chat", () => {
+  it("builds a timed event with a default hour", () => {
+    const e = parseEventArgs("friday 3pm dentist", NOW, NY);
+    expect("title" in e && e.title).toBe("dentist");
+    if ("title" in e) { expect(e.end - e.start).toBe(3_600_000); expect(e.allDay).toBe(false); }
+  });
+  it("takes a duration and all-day dates", () => {
+    const e = parseEventArgs("tomorrow 10:30 lunch with Sam for 90m", NOW, NY);
+    if ("title" in e) { expect(e.title).toBe("lunch with Sam"); expect(e.end - e.start).toBe(90 * 60_000); }
+    const d = parseEventArgs("oct 25 mom's birthday", NOW, NY);
+    if ("title" in d) { expect(d.allDay).toBe(true); expect(d.title).toBe("mom's birthday"); }
+    expect("error" in parseEventArgs("dentist", NOW, NY)).toBe(true);
+    expect("error" in parseEventArgs("friday 3pm", NOW, NY)).toBe(true);
+  });
+  it("makes an .ics file and add links", () => {
+    const e = { title: "Lunch, with Sam", start: Date.UTC(2026, 9, 21, 14, 30), end: Date.UTC(2026, 9, 21, 16, 0), allDay: false };
+    const ics = buildIcs(e, "u1", NOW, NY);
+    expect(ics).toContain("DTSTART:20261021T143000Z");
+    expect(ics).toContain("SUMMARY:Lunch\\, with Sam");
+    expect(ics).toContain("BEGIN:VEVENT");
+    const l = eventLinks(e, NY);
+    expect(l.google).toContain("dates=20261021T143000Z%2F20261021T160000Z");
+    expect(l.outlook).toContain("subject=Lunch%2C+with+Sam");
+    const allDay = buildIcs({ title: "B", start: fromWall(2026, 10, 25, 0, 0, NY), end: fromWall(2026, 10, 26, 0, 0, NY), allDay: true }, "u2", NOW, NY);
+    expect(allDay).toContain("DTSTART;VALUE=DATE:20261025");
+  });
+  it("checks the download query", () => {
+    const e = { title: "X", start: 1000, end: 4600000, allDay: false };
+    expect(parseIcsQuery(new URLSearchParams(icsQuery(e)))).toEqual(e);
+    expect(parseIcsQuery(new URLSearchParams("title=&start=1&end=2"))).toBeNull();
+    expect(parseIcsQuery(new URLSearchParams("title=a&start=5&end=2"))).toBeNull();
+  });
+});
+
+describe("morning brief extras", () => {
+  it("adds weather, calendar, mail and reminders at the top", () => {
+    const b = buildBrief({ day: "2026-10-20", weather: "Rain, 54°F.", events: ["09:30 Standup", "14:00 Dentist"], mail: { count: 3, top: ["Invoice", "Hello"] }, tasks: ["9:00 AM pay rent"] }).body;
+    expect(b).toContain("Rain, 54°F.");
+    expect(b).toContain("Today: 09:30 Standup · 14:00 Dentist");
+    expect(b).toContain("Unread mail: 3 — Invoice; Hello");
+    expect(b).toContain("To do: 9:00 AM pay rent");
+    expect(buildBrief({ day: "2026-10-20", events: [], mail: { count: 0, top: [] } }).body).toContain("Nothing on your calendar today.");
+  });
+});
+
+describe("mail reply drafting", () => {
+  it("builds a prompt from the sender, subject and the user's own words only", () => {
+    const p = replyPrompt("Ann Lee", "Re: Thursday\nlunch", "yes Thursday works");
+    expect(p).toContain('"Ann Lee"');
+    expect(p).toContain('"Re: Thursday lunch"');
+    expect(p).toContain("yes Thursday works");
+    expect(replyPrompt("x", "y", "")).toContain("acknowledgement");
   });
 });

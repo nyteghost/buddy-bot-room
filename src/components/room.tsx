@@ -36,6 +36,8 @@ import {
   Minimize2,
   Mail,
   CalendarDays,
+  CheckSquare,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -132,7 +134,11 @@ import { allChunks, getDocs } from "@/lib/documents";
 import { docContext } from "@/lib/rag";
 import { appearanceFromWords } from "@/lib/appearance";
 import { getAppearance, setAppearance, useAppearance } from "@/lib/appearance-store";
+import { weatherText, type Weather } from "@/lib/weather";
+import { eventLinks, icsQuery, parseEventArgs } from "@/lib/events";
+import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
+import { TasksPanel, TodayPanel } from "@/components/day-panels";
 import { MicButton } from "@/components/mic-button";
 import { smartRetrieve } from "@/lib/smart-docs";
 import { wantsWeb, webContext } from "@/lib/web-context";
@@ -289,6 +295,8 @@ export function Room() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
+  const [todayOpen, setTodayOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -708,8 +716,35 @@ export function Room() {
         return say(command, `Appearance: ${next.scheme} colours, ${next.size} text.${next.scheme !== "dark" ? " (Light applies to the Normal theme; other themes keep their own palettes.)" : ""}`);
       }
       case "panel": {
-        if (action.panel === "calendar") setCalendarOpen(true); else setMailOpen(true);
+        if (action.panel === "calendar") setCalendarOpen(true); else if (action.panel === "mail") setMailOpen(true); else if (action.panel === "today") setTodayOpen(true); else setTasksOpen(true);
         return say(command, action.panel === "calendar" ? "Calendar is open in the workspace." : "Mail is open in the workspace.");
+      }
+      case "remind": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: action.op, text: action.text }) });
+            const json = (await res.json()) as { text?: string; error?: string };
+            say(command, json.text ?? json.error ?? "Nothing came back.");
+          } catch { say(command, "I couldn't reach the server."); }
+        })();
+        return;
+      }
+      case "event": {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        const ev = parseEventArgs(action.text, Date.now(), tz);
+        if ("error" in ev) return say(command, ev.error);
+        const links = eventLinks(ev, tz);
+        return say(command, `**${ev.title}** — ${whenLabel(ev.start, tz, !ev.allDay)}${ev.allDay ? " (all day)" : ""}\n\n[Download .ics](/api/ics?${icsQuery(ev)}) (opens in Apple, Outlook, Google and most calendar apps) · [Add to Google Calendar](${links.google}) · [Add to Outlook](${links.outlook})\n\nI can't write to your calendar directly, since that needs sign-in permissions I don't ask for, so you finish it with one tap.`);
+      }
+      case "weather": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/weather");
+            const json = (await res.json()) as { weather?: Weather; error?: string };
+            say(command, json.weather ? weatherText(json.weather) : json.error ?? "No weather available.");
+          } catch { say(command, "I couldn't reach the server."); }
+        })();
+        return;
       }
       case "status": {
         void (async () => {
@@ -927,10 +962,12 @@ export function Room() {
     { id: "win-tools", group: "Windows", label: "Toggle Work tools", run: () => setToolsOpen((v) => !v) },
     { id: "win-rec", group: "Windows", label: "Toggle Recorder", run: () => setRecorderOpen((v) => !v) },
     { id: "win-notes", group: "Windows", label: "Open Notes, tasks, documents & pal instructions", keywords: "memories todos files", run: () => setNotesOpen(true) },
+    { id: "win-today", group: "Windows", label: "Open Today (weather, calendar, mail, tasks)", keywords: "morning overview agenda day", run: () => setTodayOpen(true) },
+    { id: "win-tasks", group: "Windows", label: "Open Tasks and reminders", keywords: "todo to-do remind reminder checklist", run: () => setTasksOpen(true) },
     { id: "win-calendar", group: "Windows", label: "Open Calendar (next 7 days)", keywords: "schedule events agenda ics google outlook", run: () => setCalendarOpen(true) },
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
     { id: "win-dm", group: "Windows", label: "Dungeon Master (campaign)", keywords: "dnd rpg adventure dice", run: () => setNotesOpen(true) },
-    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setCalendarOpen(false); setMailOpen(false); } },
+    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
     { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
     { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: regenerate },
@@ -1101,7 +1138,7 @@ export function Room() {
           </Dialog>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
-          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setCalendarOpen(false); setMailOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
         </div>
       </header>
       <button type="button" className="mobile-strip" onClick={() => setRoomOpen((v) => !v)}>
@@ -1123,13 +1160,15 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes, memories and to-dos" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes &amp; tasks</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Copy a bug report for Claude" onClick={() => setLogOpen(true)}><Bug /><span>Debug log</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
           <div className="sidebar-divider" />
           <Button variant="ghost" className="sidebar-item" title="Saved chats" disabled={running} onClick={() => { setConversationOpen(true); setHistoryRequest((value) => value + 1); }}><History /><span>Saved chats</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setCalendarOpen(false); setMailOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
@@ -1514,13 +1553,19 @@ export function Room() {
             <WorkspaceWindow id="notes" title="Notes & tasks" icon={<ListTodo className="size-4" />} open={notesOpen} onClose={() => setNotesOpen(false)} resetVersion={resetVersion}>
               <NotesPanel />
             </WorkspaceWindow>
+            <WorkspaceWindow id="today" title="Today" icon={<Sun className="size-4" />} open={todayOpen} onClose={() => setTodayOpen(false)} resetVersion={resetVersion}>
+              <TodayPanel open={todayOpen} />
+            </WorkspaceWindow>
+            <WorkspaceWindow id="tasks" title="Tasks & reminders" icon={<CheckSquare className="size-4" />} open={tasksOpen} onClose={() => setTasksOpen(false)} resetVersion={resetVersion}>
+              <TasksPanel open={tasksOpen} />
+            </WorkspaceWindow>
             <WorkspaceWindow id="calendar" title="Calendar" icon={<CalendarDays className="size-4" />} open={calendarOpen} onClose={() => setCalendarOpen(false)} resetVersion={resetVersion}>
               <CalendarPanel open={calendarOpen} />
             </WorkspaceWindow>
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />
             </WorkspaceWindow>
-            {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && !notesOpen && !calendarOpen && !mailOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
+            {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && !notesOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
           </main>
           <section className="workspace-composer" aria-label="Message composer">
             <button type="button" className="focus-options-btn" aria-expanded={focusOptions} onClick={() => setFocusOptions((v) => !v)}>{focusOptions ? "Hide options" : "Options"}</button>

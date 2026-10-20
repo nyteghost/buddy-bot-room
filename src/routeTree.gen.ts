@@ -14,6 +14,9 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiIcsRouteImport } from './routes/api.ics'
+import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
+import { Route as ApiWeatherRouteImport } from './routes/api.weather'
 import { Route as ApiMailRouteImport } from './routes/api.mail'
 import { Route as ApiCalendarRouteImport } from './routes/api.calendar'
 import { Route as ApiM365RouteImport } from './routes/api.m365'
@@ -62,6 +65,21 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIcsRoute = ApiIcsRouteImport.update({
+  id: '/api/ics',
+  path: '/api/ics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRemindersRoute = ApiRemindersRouteImport.update({
+  id: '/api/reminders',
+  path: '/api/reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWeatherRoute = ApiWeatherRouteImport.update({
+  id: '/api/weather',
+  path: '/api/weather',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMailRoute = ApiMailRouteImport.update({
@@ -191,6 +209,9 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/ics': typeof ApiIcsRoute
+  '/api/reminders': typeof ApiRemindersRoute
+  '/api/weather': typeof ApiWeatherRoute
   '/api/mail': typeof ApiMailRoute
   '/api/calendar': typeof ApiCalendarRoute
   '/api/m365': typeof ApiM365Route
@@ -222,6 +243,9 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/ics': typeof ApiIcsRoute
+  '/api/reminders': typeof ApiRemindersRoute
+  '/api/weather': typeof ApiWeatherRoute
   '/api/mail': typeof ApiMailRoute
   '/api/calendar': typeof ApiCalendarRoute
   '/api/m365': typeof ApiM365Route
@@ -254,6 +278,9 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/ics': typeof ApiIcsRoute
+  '/api/reminders': typeof ApiRemindersRoute
+  '/api/weather': typeof ApiWeatherRoute
   '/api/mail': typeof ApiMailRoute
   '/api/calendar': typeof ApiCalendarRoute
   '/api/m365': typeof ApiM365Route
@@ -287,6 +314,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/ics'
+    | '/api/reminders'
+    | '/api/weather'
     | '/api/mail'
     | '/api/calendar'
     | '/api/m365'
@@ -318,6 +348,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/ics'
+    | '/api/reminders'
+    | '/api/weather'
     | '/api/mail'
     | '/api/calendar'
     | '/api/m365'
@@ -349,6 +382,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/ics'
+    | '/api/reminders'
+    | '/api/weather'
     | '/api/mail'
     | '/api/calendar'
     | '/api/m365'
@@ -381,6 +417,9 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiIcsRoute: typeof ApiIcsRoute
+  ApiRemindersRoute: typeof ApiRemindersRoute
+  ApiWeatherRoute: typeof ApiWeatherRoute
   ApiMailRoute: typeof ApiMailRoute
   ApiCalendarRoute: typeof ApiCalendarRoute
   ApiM365Route: typeof ApiM365Route
@@ -442,6 +481,27 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ics': {
+      id: '/api/ics'
+      path: '/api/ics'
+      fullPath: '/api/ics'
+      preLoaderRoute: typeof ApiIcsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reminders': {
+      id: '/api/reminders'
+      path: '/api/reminders'
+      fullPath: '/api/reminders'
+      preLoaderRoute: typeof ApiRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/weather': {
+      id: '/api/weather'
+      path: '/api/weather'
+      fullPath: '/api/weather'
+      preLoaderRoute: typeof ApiWeatherRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mail': {
@@ -621,6 +681,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiIcsRoute: ApiIcsRoute,
+  ApiRemindersRoute: ApiRemindersRoute,
+  ApiWeatherRoute: ApiWeatherRoute,
   ApiMailRoute: ApiMailRoute,
   ApiCalendarRoute: ApiCalendarRoute,
   ApiM365Route: ApiM365Route,

@@ -5,6 +5,7 @@ import { logServer } from "./server-log.server";
 import { startFeedTimer } from "./model-feed.server";
 import { startProviderTimer } from "./provider-feed.server";
 import { ollamaBase } from "./ollama.server";
+import { tickReminders } from "./reminders.server";
 import { tickSchedules } from "./schedules.server";
 import { startTelegram } from "./telegram.server";
 
@@ -41,6 +42,7 @@ async function tick(s: S): Promise<void> {
     await runBackup(cfg, now);
   }
   await tickSchedules(now).catch(() => undefined);
+  await tickReminders(now.getTime()).catch(() => undefined);
   const brief = briefConfig();
   if (brief && isDue(now, brief.tz, brief.time, s.lastBriefDay)) {
     s.lastBriefDay = zonedParts(now, brief.tz).day;

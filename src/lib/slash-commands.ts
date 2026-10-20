@@ -40,7 +40,10 @@ export type SlashAction =
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
   | { type: "status" }
-  | { type: "panel"; panel: "calendar" | "mail" }
+  | { type: "weather" }
+  | { type: "remind"; op: "list" | "add" | "remove"; text: string }
+  | { type: "event"; text: string }
+  | { type: "panel"; panel: "calendar" | "mail" | "today" | "tasks" }
   | { type: "appearance"; words: string }
   | { type: "m365"; op: string }
   | { type: "schedule"; op: "list" | "add" | "remove" | "run"; text: string }
@@ -107,6 +110,11 @@ export const slashCommands = [
   { name: "appearance", usage: "/appearance light|dark|auto · small|normal|large", description: "Colour scheme (light applies to the Normal theme) and text size" },
   { name: "calendar", usage: "/calendar", description: "Open the Calendar window (next 7 days)" },
   { name: "mail", usage: "/mail", description: "Open the Mail window (unread subjects)" },
+  { name: "today", usage: "/today", description: "Weather, calendar, unread mail, tasks and a watch pick in one window" },
+  { name: "tasks", usage: "/tasks", description: "Open your to-dos and reminders" },
+  { name: "remind", usage: "/remind in 30m call mom | tomorrow 9am pay rent | list | remove N", description: "One-time reminder pushed to your phone (owner only; needs NTFY_URL or Telegram)" },
+  { name: "event", usage: "/event friday 3pm dentist [for 1h]", description: "Make a calendar event: download an .ics file or add it to Google or Outlook" },
+  { name: "weather", usage: "/weather", description: "Current weather and the next few days (set WEATHER_LOCATION on the server)" },
   { name: "status", usage: "/status", description: "Check that Local AI, search, Plex, Seerr, Jellyfin, Unraid and backups are all working" },
   { name: "web", usage: "/web [on|off]", description: "Let the pals search the web on their own when a question needs current facts" },
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
@@ -214,8 +222,25 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "appearance", words: rawArg } } : fail("Try /appearance light, /appearance dark, /appearance auto, or /appearance large.");
     case "calendar": case "agenda":
       return { ok: true, action: { type: "panel", panel: "calendar" } };
+    case "today": case "day":
+      return { ok: true, action: { type: "panel", panel: "today" } };
+    case "tasks": case "todo": case "todos":
+      return { ok: true, action: { type: "panel", panel: "tasks" } };
     case "mail": case "inbox":
       return { ok: true, action: { type: "panel", panel: "mail" } };
+    case "remind": case "reminder": case "reminders": {
+      const first = (rawArg.split(/\s+/)[0] ?? "").toLowerCase();
+      if (!rawArg || first === "list") return { ok: true, action: { type: "remind", op: "list", text: "" } };
+      if (first === "remove" || first === "rm" || first === "delete") {
+        const which = rawArg.split(/\s+/)[1] ?? "";
+        return which ? { ok: true, action: { type: "remind", op: "remove", text: which } } : fail("Which one? /remind remove 1");
+      }
+      return { ok: true, action: { type: "remind", op: "add", text: rawArg } };
+    }
+    case "event": case "cal":
+      return rawArg ? { ok: true, action: { type: "event", text: rawArg } } : fail("Use: /event friday 3pm dentist, or /event tomorrow 10:30 lunch with Sam for 90m");
+    case "weather": case "forecast":
+      return { ok: true, action: { type: "weather" } };
     case "status": case "health":
       return { ok: true, action: { type: "status" } };
     case "web": case "autosearch":
