@@ -4,6 +4,7 @@ import { addEntry, addTodo, clearDone, listText, promptContext, removeAt, toggle
 import { BLIND_LABELS, buildContestants, leaderboard, recordVote, shuffled } from "@/lib/compare";
 import { hitsMarkdown, researchTopic, shapeResults } from "@/lib/search";
 import { parseSeerr, shapeSeerr, statusOf } from "@/lib/seerr";
+import { palEngineLabel, type EngineSettings } from "@/lib/engine";
 
 describe("new slash commands", () => {
   it("keeps the original case of text arguments", () => {
@@ -143,5 +144,22 @@ describe("seerr", () => {
     expect(out.map((r) => r.title)).toEqual(["Dune", "The Bear"]);
     expect(out[0]).toMatchObject({ year: "2021", status: "available", status4k: "none" });
     expect(out[1]).toMatchObject({ mediaType: "tv", status4k: "requested" });
+  });
+});
+
+describe("which AI each pal uses", () => {
+  const base = { kind: "auto", groqKey: "", geminiKey: "", openrouterKey: "", nvidiaKey: "", anthropicKey: "", claudeMode: "off", customMode: "off", customBaseUrl: "", customModel: "", ollamaModel: "qwen2.5:7b" } as unknown as EngineSettings;
+  it("rotates pals across the keys that are set", () => {
+    const s = { ...base, groqKey: "g", geminiKey: "k" } as EngineSettings;
+    expect(palEngineLabel(s, 0)).toBe("Groq · gpt-oss-120b");
+    expect(palEngineLabel(s, 1)).toBe("Gemini · gemini-2.5-flash");
+    expect(palEngineLabel(s, 2)).toBe("Groq · gpt-oss-120b");
+  });
+  it("describes the other engines", () => {
+    expect(palEngineLabel({ ...base, kind: "local" } as EngineSettings, 0)).toBe("In-browser model");
+    expect(palEngineLabel({ ...base, kind: "ollama" } as EngineSettings, 3)).toBe("Ollama · qwen2.5:7b");
+    expect(palEngineLabel({ ...base, kind: "local-server" } as EngineSettings, 3)).toBe("Ollama on your server");
+    expect(palEngineLabel({ ...base, kind: "auto-ollama" } as EngineSettings, 0)).toBe("Ollama");
+    expect(palEngineLabel(base, 0)).toBe("In-browser model");
   });
 });

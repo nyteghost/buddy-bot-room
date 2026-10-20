@@ -1,5 +1,5 @@
 /**
- * Settings you can change inside the app (Setup window) instead of in Portainer.
+ * Settings you can change inside the app (Settings window) instead of in Portainer.
  * Pure helpers and the field list; the file handling is in settings.server.ts.
  *
  * Rule: a value set as a real environment variable wins and is shown as "set in Portainer";

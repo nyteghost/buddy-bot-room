@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-setup-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -257,7 +257,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/record` | Open the recorder |
 | `/confetti` | Celebrate |
 | `/remember <fact>` · `/memories` · `/forget <n\|all>` | Pal memory. Add `@name` to tell only one pal: `/remember @byte I use Arch`, `/forget @byte 1` |
-| `/prompt [name]` | Saved prompts that fill the message box; `/prompt save <name> = <text>`, `/prompt remove <name>`. Also in Ctrl+K ([7.14](#714-setup-search-capture-and-more)) |
+| `/prompt [name]` | Saved prompts that fill the message box; `/prompt save <name> = <text>`, `/prompt remove <name>`. Also in Ctrl+K ([7.14](#714-settings-search-capture-and-more)) |
 | `/note <text>` · `/todo <task>` · `/done <n>` · `/tasks` | Notes and to-dos |
 | `/search <query>` · `/research <question>` | Web search · search then discuss |
 | `/plex <title\|recent>` · `/watch [mood]` | Plex lookup · "what should we watch tonight" |
@@ -269,10 +269,10 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/server` · `/diagnose` | Unraid status · pals look at it and advise |
 | `/brief [send]` | Morning brief preview · push it now |
 | `/backup [now]` | Backup status · back up now (owner) |
-| `/backup list` · `/backup restore N` | List backups · restore one, with a safety copy and a confirm step (owner, [7.14](#714-setup-search-capture-and-more)) |
+| `/backup list` · `/backup restore N` | List backups · restore one, with a safety copy and a confirm step (owner, [7.14](#714-settings-search-capture-and-more)) |
 | `/update` | Check for a newer version and how to install it (owner) |
-| `/review [send]` | Your week ahead: calendar, reminders, mail, picks ([7.14](#714-setup-search-capture-and-more)) |
-| `/setup` · `/find` · `/hide` | Setup checklist with connection tests · search everything · blur secrets for screenshots ([7.14](#714-setup-search-capture-and-more)) |
+| `/review [send]` | Your week ahead: calendar, reminders, mail, picks ([7.14](#714-settings-search-capture-and-more)) |
+| `/setup` · `/find` · `/hide` | Settings: connect things and test them · search everything · blur secrets for screenshots ([7.14](#714-settings-search-capture-and-more)) |
 | `/voice [on\|off]` | Read replies aloud |
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
@@ -294,7 +294,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 
 ## 7. Connecting other things
 
-Every integration is **optional**. **Most can be set up inside the app:** open **Setup** (sidebar or `/setup`), press **Set up** or **Edit** on a card, fill in the details and **Save**. It takes effect right away, with no redeploy. Values are saved in your data folder; keys and passwords go in a separate file that is write-only (the app never shows them back) and is left out of backups. A value set as an environment variable (Portainer → stack → *Environment variables*, or `.env.local`) wins and shows as locked in the app, so remove it there if you want to manage it in the app. Only things the stack needs before the app starts stay in Portainer: `COMPOSE_PROFILES`, `TS_AUTHKEY`/`TS_HOSTNAME`, `RADICALE_PASSWORD`/`RADICALE_USER`, `OLLAMA_RUNTIME` and the other Ollama/Whisper container settings, `BUDDY_PASSWORD`, accounts and the data and backup folders. API keys are only ever read by the server, never sent to the browser.
+Every integration is **optional**. **Most can be set up inside the app:** open **Settings** (top menu or `/setup`), press **Set up** or **Edit** on a card, fill in the details and **Save**. It takes effect right away, with no redeploy. Values are saved in your data folder; keys and passwords go in a separate file that is write-only (the app never shows them back) and is left out of backups. A value set as an environment variable (Portainer → stack → *Environment variables*, or `.env.local`) wins and shows as locked in the app, so remove it there if you want to manage it in the app. Only things the stack needs before the app starts stay in Portainer: `COMPOSE_PROFILES`, `TS_AUTHKEY`/`TS_HOSTNAME`, `RADICALE_PASSWORD`/`RADICALE_USER`, `OLLAMA_RUNTIME` and the other Ollama/Whisper container settings, `BUDDY_PASSWORD`, accounts and the data and backup folders. API keys are only ever read by the server, never sent to the browser.
 
 ### 7.1 Web search (SearXNG)
 
@@ -483,18 +483,18 @@ Two windows in the left **Workspace** sidebar (also `/calendar`, `/mail` and the
 - **Google Calendar:** Settings → your calendar → *Integrate calendar* → **Secret address in iCal format**.
 - **iCloud:** Calendar → share → *Public Calendar* → copy the link (it is public to anyone with the link).
 - **Outlook.com:** Settings → Calendar → *Shared calendars* → publish → copy the **ICS** link.
-- **Cozi:** Settings → *Shared Cozi Calendars* → switch the person (or *All*) to *Shared* → *View or send Cozi URL* → *Copy Cozi URL*. Paste it into *Setup → Calendar feeds*. It is read-only: Cozi events show here, but you can't edit Cozi from Pixel Pals. (`webcal://` links work too.)
+- **Cozi:** Settings → *Shared Cozi Calendars* → switch the person (or *All*) to *Shared* → *View or send Cozi URL* → *Copy Cozi URL*. Paste it into *Settings → Calendar feeds*. It is read-only: Cozi events show here, but you can't edit Cozi from Pixel Pals. (`webcal://` links work too.)
 
-Paste the links into *Setup → Calendar feeds* (or `CALENDAR_ICS_URLS`, comma separated, up to 6). Repeating events, all-day events, time zones and cancelled events are handled. Treat these links like passwords: anyone with one can read that calendar. If you connected Microsoft 365 ([7.11](#711-microsoft-365-work-read-only)) its events appear too, labelled by source.
+Paste the links into *Settings → Calendar feeds* (or `CALENDAR_ICS_URLS`, comma separated, up to 6). Repeating events, all-day events, time zones and cancelled events are handled. Treat these links like passwords: anyone with one can read that calendar. If you connected Microsoft 365 ([7.11](#711-microsoft-365-work-read-only)) its events appear too, labelled by source.
 
-**Mail** (owner only) connects to Gmail, iCloud, Outlook.com, Fastmail or any IMAP mailbox and lets you **read, reply, write and send, move and delete** mail. Open **Setup → Mail**, press **Fill in for Gmail**, enter your address and an **app password**, **Save**, then **Test** (it checks reading and sending).
+**Mail** (owner only) connects to Gmail, iCloud, Outlook.com, Fastmail or any IMAP mailbox and lets you **read, reply, write and send, move and delete** mail. Open **Settings → Mail**, press **Fill in for Gmail**, enter your address and an **app password**, **Save**, then **Test** (it checks reading and sending).
 
 - **Gmail app password:** turn on 2-Step Verification for your Google account, then create a 16-character app password at `myaccount.google.com/apppasswords`. Your normal password won't work. Google Workspace accounts may need the admin to allow app passwords.
 - **Reading:** pick a folder, search it, filter to unread, open a message. Bodies are shown as **plain text** (HTML is turned into text, images and remote content are never loaded, attachments are listed by name and not downloaded, and only the first 300 KB of a message is fetched). Opening a message marks it read; *Mark unread* undoes that.
 - **Delete** moves the message to Trash (recoverable). Inside Trash or Spam it deletes for good. **Move** puts it in any folder on the account.
 - **Send and Reply:** plain text only, no attachments. Nothing is sent until you press **Send** and then confirm. Recipients are checked, header lines can't be injected, and there is a limit of 20 sends per hour. Gmail keeps a copy in Sent by itself; other providers may not.
 - **Echo drafts:** *Get a draft from Echo* gives Echo only the sender, the subject and the few words you type, never the message itself.
-- **Variables** (all editable in Setup, no redeploy): `IMAP_HOST` (`imap.gmail.com`, `imap.mail.me.com`, `outlook.office365.com`, `imap.fastmail.com`), `IMAP_USER` (your full address), `IMAP_PASS` (the app password), optional `IMAP_PORT` (993), `SMTP_HOST` (guessed from the IMAP name, e.g. `smtp.gmail.com`), `SMTP_PORT` (465, or 587 with STARTTLS) and `MAIL_FROM_NAME`.
+- **Variables** (all editable in Settings, no redeploy): `IMAP_HOST` (`imap.gmail.com`, `imap.mail.me.com`, `outlook.office365.com`, `imap.fastmail.com`), `IMAP_USER` (your full address), `IMAP_PASS` (the app password), optional `IMAP_PORT` (993), `SMTP_HOST` (guessed from the IMAP name, e.g. `smtp.gmail.com`), `SMTP_PORT` (465, or 587 with STARTTLS) and `MAIL_FROM_NAME`.
 - Everything runs on your server over encrypted connections; the app password is stored write-only and is left out of backups. If the mail server doesn't offer encryption on port 587, Pixel Pals refuses to send the password.
 - I tested it end to end against a stand-in IMAP and SMTP server that behaves like Gmail (list, search, read, move, delete, send, refusals). I could not run it against a real Gmail account, so the first connection is a shakedown.
 
@@ -512,9 +512,9 @@ Microsoft 365 work mail can be added with `/m365 connect` instead. Results are c
 
 I tested the date and time reading, the reminders logic, the brief and the `.ics` output with automated tests. I could not test Open-Meteo, ntfy delivery or the new windows in a real browser here.
 
-### 7.14 Setup, search, capture and more
+### 7.14 Settings, search, capture and more
 
-- **Setup window** (`/setup`, owner only): every integration with a green check when it's set up, the variable to set when it isn't, and a **Test** button that tries the connection (Plex, Seerr, Ollama, Trakt, ntfy, Telegram, Whisper, weather, calendar feeds, IMAP). Each card also opens its **settings** so you can fill them in here instead of Portainer (see section 7). Addresses and keys never leave the server. The same window has **Hide secrets** (`/hide`), which blurs share links and server addresses on this device so you can screenshot safely; click into a blurred field to read it.
+- **Settings window** (`/setup`, owner only): every integration with a green check when it's set up, the variable to set when it isn't, and a **Test** button that tries the connection (Plex, Seerr, Ollama, Trakt, ntfy, Telegram, Whisper, weather, calendar feeds, IMAP). Each card also opens its **settings** so you can fill them in here instead of Portainer (see section 7). Addresses and keys never leave the server. The same window has **Hide secrets** (`/hide`), which blurs share links and server addresses on this device so you can screenshot safely; click into a blurred field to read it.
 - **Search** (`/find`, or the Search window): one box over your saved chats, notes, tasks, memories and reminders. Every word you type has to appear; clicking a chat opens it.
 - **Quick capture:** message your Telegram bot `note: gate code is 1234`, `todo: call dentist`, `remember: I run Unraid` or `remind me in 1h stretch` and it is saved instead of answered. Notes, tasks and memories appear in the app the next time it's open (checked every minute); reminders are scheduled straight away. From an iPhone share sheet, build a Shortcut with **Get Contents of URL**: `POST` to `https://<your-address>/api/capture`, header `Authorization: Bearer <your Shortcut token>` (the same token as [7.8](#78-iphone-notes--trakt-sync)), JSON body `{"op":"add","text":"<Shortcut Input>"}`. Needs `BUDDY_DATA_DIR`; owner only.
 - **Repeating reminders and snooze:** `/remind every monday 9am send report`, `/remind every day 8pm take pills`, `/remind every weekday 7am gym` (also weekly and monthly). When one arrives on your phone, reply `snooze 30m` (or `snooze tomorrow`) to the Telegram bot to be reminded again; in the Tasks window use **+1h**. `/remind snooze 2 1h` snoozes reminder number 2.
@@ -543,7 +543,7 @@ Tasks and reminders can sync **both ways** with the iPhone **Reminders** app. Pi
 2. Make it reachable from your phone over Tailscale (never put it on the open internet):
    - **Tailscale sidecar** (section 3, option 4): already done. The sidecar also serves Radicale at `https://<TS_HOSTNAME>.<your-tailnet>.ts.net:5233`.
    - **Tailscale on the host:** run `sudo tailscale serve --bg --https=5233 http://localhost:5232`. Radicale is published on the host's `127.0.0.1:5232` only (change with `RADICALE_PORT`). Your address is then `https://<host>.<your-tailnet>.ts.net:5233`.
-3. Open **Setup** in Pixel Pals and press **Test** next to *Tasks & reminders sync*. It should say Connected.
+3. Open **Settings** in Pixel Pals and press **Test** next to *Tasks & reminders sync*. It should say Connected.
 4. On the iPhone, with Tailscale connected: **Settings → Calendar → Accounts → Add Account → Other → Add CalDAV Account** (on newer iOS: Settings → Apps → Reminders → Accounts). Server: your Tailscale host name, User: `pixelpals` (or your `RADICALE_USER`), Password: your `RADICALE_PASSWORD`. If it can't find the account, open *Advanced* and set SSL on, port `5233`, and Account URL `https://<host>:5233/pixelpals/`. Make sure **Reminders** is switched on for the account. The two lists then appear in the Reminders app.
 
 **Good to know**
@@ -687,7 +687,7 @@ All run in the browser. Files never leave your device.
 
 ## 14. Configuration reference
 
-These are the environment variable names. **Everything marked *(app)* can also be set in the Setup window** (Plex, Seerr, Jellyfin, Trakt, Unraid, ntfy, Telegram, weather, calendar feeds, IMAP, Microsoft 365, brief and review times, backup time and count, time zone, update check). The environment value wins if both are set.
+These are the environment variable names. **Everything marked *(app)* can also be set in the Settings window** (Plex, Seerr, Jellyfin, Trakt, Unraid, ntfy, Telegram, weather, calendar feeds, IMAP, Microsoft 365, brief and review times, backup time and count, time zone, update check). The environment value wins if both are set.
 
 Set in Portainer's environment variables or in `.env.local`. Anything left empty is simply off.
 
@@ -710,8 +710,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `BRIEF_TIME` | empty (off) | Morning brief time, `HH:MM` |
 | `RADICALE_PASSWORD` / `RADICALE_USER` | empty / `pixelpals` | Turns on the iPhone Reminders sync; also add `radicale` to `COMPOSE_PROFILES` ([7.15](#715-iphone-reminders-sync-radicale)) |
 | `RADICALE_URL` / `RADICALE_PORT` | `http://radicale:5232` / `5232` | Only if your calendar server is elsewhere / the host port it is published on |
-| `UPDATE_CHECK` | on | `0` turns off the "update available" bar and phone alert ([7.14](#714-setup-search-capture-and-more)) |
-| `REVIEW_DAY` / `REVIEW_TIME` | empty (off) | Weekly review: day (`sun`) and time (`18:00`) ([7.14](#714-setup-search-capture-and-more)) |
+| `UPDATE_CHECK` | on | `0` turns off the "update available" bar and phone alert ([7.14](#714-settings-search-capture-and-more)) |
+| `REVIEW_DAY` / `REVIEW_TIME` | empty (off) | Weekly review: day (`sun`) and time (`18:00`) ([7.14](#714-settings-search-capture-and-more)) |
 | `BUDDY_BACKUP_PATH` | volume `buddy-backups` | Host folder for backups |
 | `BUDDY_BACKUP_TIME` | `03:30` | Nightly backup time |
 | `BUDDY_BACKUP_KEEP` | `14` | Copies to keep |

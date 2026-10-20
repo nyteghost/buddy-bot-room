@@ -101,7 +101,7 @@ export function MailPanel({ open }: { open: boolean }) {
           <span>No mailbox is connected yet. Connect <b>Gmail</b> (or any IMAP mail) and you can read, reply, send, move and delete mail here.</span>
           <ol className="list-decimal pl-5">
             <li>Turn on 2-Step Verification for your Google account, then create an <b>app password</b> at <code>myaccount.google.com/apppasswords</code> (your normal password won't work).</li>
-            <li>Open <b>Setup → Mail</b> (top menu), press <b>Fill in for Gmail</b>, enter your address and the app password, and <b>Save</b>.</li>
+            <li>Open <b>Settings → Mail</b> (top menu), press <b>Fill in for Gmail</b>, enter your address and the app password, and <b>Save</b>.</li>
             <li>Press <b>Test</b>. It checks both reading and sending.</li>
           </ol>
           <span>Other mail: <code>imap.mail.me.com</code> (iCloud), <code>outlook.office365.com</code>, <code>imap.fastmail.com</code>. A work Microsoft 365 mailbox (read-only unread subjects) can be added with <code>/m365 connect</code>.</span>

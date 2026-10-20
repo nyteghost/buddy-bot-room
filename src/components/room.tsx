@@ -101,7 +101,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { chainAfter, freeModels, providerForTurn, replyTokens, useEngine } from "@/lib/engine";
+import { chainAfter, freeModels, palEngineLabel, providerForTurn, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
@@ -569,7 +569,7 @@ export function Room() {
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
           const blockPaid = isOverCap(engine.spendCapUsd, { inPerM: engine.customPriceIn, outPerM: engine.customPriceOut });
-          const provider = providerForTurn(engine, turnIndex, { agentId: agent.id, mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
+          const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
             const chain = [first, ...chainAfter(engine, first, blockPaid)];
@@ -1050,7 +1050,7 @@ export function Room() {
     { id: "win-notes", group: "Windows", label: "Open Notes, memories, documents & pal instructions", keywords: "memories todos files", run: () => setNotesOpen(true) },
     { id: "win-search", group: "Windows", label: "Search everything (chats, notes, tasks)", keywords: "find look up history", run: () => setSearchOpen(true) },
     ...[...BUILT_IN_PROMPTS, ...savedPrompts].map((p: SavedPrompt) => ({ id: `prompt-${p.id}`, group: "Prompts", label: `Prompt: ${p.name}`, keywords: p.text.slice(0, 80), run: () => { setTopic(p.text); inputRef.current?.focus(); } })),
-    { id: "win-setup", group: "Windows", label: "Open Setup (what is connected, test connections)", keywords: "settings integrations status connect test env", run: () => setSetupOpen(true) },
+    { id: "win-setup", group: "Windows", label: "Open Settings (connect things, test connections)", keywords: "settings integrations status connect test env", run: () => setSetupOpen(true) },
     { id: "win-hide", group: "Windows", label: "Hide or show secrets (for screenshots)", keywords: "privacy blur mask secrets token screenshot", run: () => setHideSecrets(!getHideSecrets()) },
     { id: "win-today", group: "Windows", label: "Open Today (weather, calendar, mail, tasks)", keywords: "morning overview agenda day", run: () => setTodayOpen(true) },
     { id: "win-tasks", group: "Windows", label: "Open Tasks and reminders", keywords: "todo to-do remind reminder checklist", run: () => setTasksOpen(true) },
@@ -1174,7 +1174,7 @@ export function Room() {
               {voice.auto ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Voice
             </Button>
           )}
-          <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={setupOpen} title="Setup: what's connected, with connection tests" onClick={() => setSetupOpen((value) => !value)}><Settings2 className="size-4" /> Setup</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={setupOpen} title="Settings: connect things and test them" onClick={() => setSetupOpen((value) => !value)}><Settings2 className="size-4" /> Settings</Button>
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
             value={characterMode}
@@ -1644,7 +1644,7 @@ export function Room() {
             <WorkspaceWindow id="search" title="Search" icon={<Search className="size-4" />} open={searchOpen} onClose={() => setSearchOpen(false)} resetVersion={resetVersion}>
               <SearchPanel open={searchOpen} onOpenChat={(row) => { setMessages(row.messages); setCharacterMode(row.theme); setMode(row.mode); setRound(0); setError(""); setConversationOpen(true); }} />
             </WorkspaceWindow>
-            <WorkspaceWindow id="setup" title="Setup" icon={<Settings2 className="size-4" />} open={setupOpen} onClose={() => setSetupOpen(false)} resetVersion={resetVersion}>
+            <WorkspaceWindow id="setup" title="Settings" icon={<Settings2 className="size-4" />} open={setupOpen} onClose={() => setSetupOpen(false)} resetVersion={resetVersion}>
               <SetupPanel open={setupOpen} />
             </WorkspaceWindow>
             <WorkspaceWindow id="today" title="Today" icon={<Sun className="size-4" />} open={todayOpen} onClose={() => setTodayOpen(false)} resetVersion={resetVersion}>
@@ -1790,7 +1790,7 @@ export function Room() {
                 >
                   {agents.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {agentName(a.id, hell, horror, characterMode)}
+                      {agentName(a.id, hell, horror, characterMode)} ({palEngineLabel(engine, agents.findIndex((x) => x.id === a.id))})
                     </option>
                   ))}
                 </select>

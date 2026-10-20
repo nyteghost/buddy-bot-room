@@ -7,7 +7,7 @@ import { logServer } from "./server-log.server";
 import { smtpCheck, smtpConfig, smtpSend, type SmtpConfig, type SmtpTlsOverrides } from "./smtp.server";
 
 /**
- * The mailbox: read, send, move and delete over IMAP and SMTP with the account from Setup. Owner only.
+ * The mailbox: read, send, move and delete over IMAP and SMTP with the account from Settings. Owner only.
  * Folder names are only ever taken from the server's own LIST, so a request can't smuggle in commands.
  * Message bodies are shown as text (never HTML), and nothing is downloaded beyond the first 300 KB of one message.
  */
@@ -131,7 +131,7 @@ export async function sendMail(cfg: SmtpConfig, input: SendInput, now = Date.now
   return { to: [...to, ...cc] };
 }
 
-/** Used by the Setup test: signs in to SMTP without sending anything. */
+/** Used by the Settings test: signs in to SMTP without sending anything. */
 export async function mailSendReady(): Promise<{ ok: boolean; note: string }> {
   const cfg = smtpConfig();
   if (!cfg) return { ok: false, note: "Sending needs your mail address as the username (and an SMTP server if it isn't the usual imap→smtp name)." };
@@ -147,7 +147,7 @@ export async function handleMailbox(request: Request): Promise<Response> {
   const user = await currentUser(request);
   if (!user?.owner) return fail("Only the owner account can use the mailbox.", 403);
   const cfg = imapConfig();
-  if (!cfg) return fail("No mail account is set up yet. Open Setup → Mail.", 409);
+  if (!cfg) return fail("No mail account is set up yet. Open Settings → Mail.", 409);
   try {
     if (request.method === "GET") {
       const u = new URL(request.url);

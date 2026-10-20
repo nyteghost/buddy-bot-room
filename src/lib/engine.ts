@@ -188,6 +188,21 @@ export function providerForTurn(s: EngineSettings, turnIndex: number, hint: Rout
   return list.length ? list[turnIndex % list.length] : undefined;
 }
 
+const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", custom: "Custom" };
+const shortModel = (m: string): string => (m.split("/").pop() ?? m).slice(0, 40);
+
+/** Which AI answers for the pal at this position in the roster, in words: "Groq · gpt-oss-120b", "Ollama · qwen2.5:7b". Same rotation the chat uses. */
+export function palEngineLabel(s: EngineSettings, rosterIndex: number): string {
+  if (s.kind === "local") return "In-browser model";
+  if (s.kind === "ollama") return `Ollama · ${s.ollamaModel}`;
+  if (s.kind === "local-server") return "Ollama on your server";
+  const list = turnProviders(s);
+  const p = list.length ? list[Math.max(0, rosterIndex) % list.length] : undefined;
+  if (!p) return s.kind === "auto-ollama" ? "Ollama" : "In-browser model";
+  const model = p.model ?? (p.kind === "groq" || p.kind === "gemini" || p.kind === "openrouter" || p.kind === "nvidia" ? freeModels[p.kind] : "");
+  return `${providerNames[p.kind]}${model ? ` · ${shortModel(model)}` : ""}`;
+}
+
 export const freeModels = {
   groq: "openai/gpt-oss-120b",
   gemini: "gemini-2.5-flash",

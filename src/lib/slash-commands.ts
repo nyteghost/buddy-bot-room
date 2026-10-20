@@ -116,7 +116,7 @@ export const slashCommands = [
   { name: "calendar", usage: "/calendar", description: "Open the Calendar window (next 7 days)" },
   { name: "mail", usage: "/mail", description: "Open the Mail window (unread subjects)" },
   { name: "find", usage: "/find", description: "Search your saved chats, notes, tasks, memories and reminders" },
-  { name: "setup", usage: "/setup", description: "See what is connected and test each connection (owner only)" },
+  { name: "setup", usage: "/setup", description: "Open Settings: connect things and test each connection (owner only)" },
   { name: "hide", usage: "/hide [on|off]", description: "Blur links and addresses on this device so screenshots are safe" },
   { name: "today", usage: "/today", description: "Weather, calendar, unread mail, tasks and a watch pick in one window" },
   { name: "remind", usage: "/remind in 30m call mom | every monday 9am send report | list | snooze N 30m | remove N", description: "One-time reminder pushed to your phone (owner only; needs NTFY_URL or Telegram)" },
