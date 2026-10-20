@@ -15,6 +15,8 @@ import { messageText, searchDocs } from "@/lib/find";
 import { addCapture, mergeCaptures, parseCapture, parseCaptures } from "@/lib/capture";
 import { buildWeekly, reviewDay } from "@/lib/weekly";
 import { pickReason, watchQueue } from "@/lib/pick-reason";
+import { addPalMemory, promptContext, removePalMemory, type Workbench } from "@/lib/workbench";
+import { BUILT_IN_PROMPTS, addPrompt, findPrompt, parsePromptArgs, promptList } from "@/lib/prompts";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1876,5 +1878,48 @@ describe("watch queue", () => {
     expect(q[1]!.reason).toContain("request it");
     expect(watchQueue(items, 1).length).toBe(1);
     expect(watchQueue([])).toEqual([]);
+  });
+});
+
+describe("per-pal memory", () => {
+  it("keeps private memories out of other pals' context", () => {
+    let w: Workbench = { memories: [{ id: "1", text: "runs Unraid", at: 1 }], notes: [], todos: [] };
+    w = addPalMemory(w, "byte", "uses Arch");
+    expect(promptContext(w, 1500, "byte")).toContain("uses Arch");
+    expect(promptContext(w, 1500, "byte")).toContain("runs Unraid");
+    expect(promptContext(w, 1500, "nova")).not.toContain("uses Arch");
+    expect(promptContext(w)).not.toContain("uses Arch");
+    expect(removePalMemory(w, "byte", 1).pal).toEqual({});
+    expect(removePalMemory(w, "byte", 5).pal?.["byte"]?.length).toBe(1);
+  });
+  it("parses /remember @pal and /forget @pal", () => {
+    const r = parseSlash("/remember @byte I use Arch");
+    expect(r).toEqual({ ok: true, action: { type: "remember", text: "I use Arch", pal: "byte" } });
+    expect(parseSlash("/remember I run Unraid")).toEqual({ ok: true, action: { type: "remember", text: "I run Unraid" } });
+    expect(parseSlash("/forget @byte 2")).toEqual({ ok: true, action: { type: "forget", target: 2, pal: "byte" } });
+    expect(parseSlash("/forget all")).toEqual({ ok: true, action: { type: "forget", target: "all" } });
+  });
+});
+
+describe("saved prompts", () => {
+  it("parses commands", () => {
+    expect(parsePromptArgs("")).toEqual({ op: "list", name: "", text: "" });
+    expect(parsePromptArgs("save Weekly Notes = Summarize my notes:")).toEqual({ op: "save", name: "Weekly Notes", text: "Summarize my notes:" });
+    expect(parsePromptArgs("remove foo")).toEqual({ op: "remove", name: "foo", text: "" });
+    expect(parsePromptArgs("summarize the meeting")).toEqual({ op: "use", name: "summarize", text: "the meeting" });
+    expect("error" in parsePromptArgs("save nothing")).toBe(true);
+  });
+  it("saves, finds by prefix and protects built-ins", () => {
+    const a = addPrompt([], "Weekly Notes", "Summarize:", "id1");
+    expect(a.ok && a.list[0]!.name).toBe("weekly-notes");
+    expect(addPrompt([], "summarize", "x", "i").ok).toBe(false);
+    expect(addPrompt([], "", "x", "i").ok).toBe(false);
+    if (a.ok) {
+      const all = [...BUILT_IN_PROMPTS, ...a.list];
+      expect(findPrompt(all, "sum")?.name).toBe("summarize");
+      expect(findPrompt(all, "weekly")?.name).toBe("weekly-notes");
+      expect(findPrompt(all, "p")).toBeUndefined(); // plan-week and pros-cons both start with p
+      expect(promptList(a.list)).toContain("weekly-notes");
+    }
   });
 });

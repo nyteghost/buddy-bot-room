@@ -1,6 +1,7 @@
-import type { Mode } from "./agents";
+import { resolveMention, type AgentId, type Mode } from "./agents";
 import type { CharacterMode } from "./hellraiser";
 import { parseDice } from "./dice";
+import { parsePromptArgs } from "./prompts";
 import { parseWrite } from "./trakt-write";
 
 /** Room controls you can type instead of click. Pure parsing only — the Room runs the action. */
@@ -16,8 +17,8 @@ export type SlashAction =
   | { type: "rounds"; rounds: number }
   | { type: "theme"; theme: ThemeId }
   | { type: "assistant"; on: boolean }
-  | { type: "remember"; text: string }
-  | { type: "forget"; target: number | "all" }
+  | { type: "remember"; text: string; pal?: AgentId }
+  | { type: "forget"; target: number | "all"; pal?: AgentId }
   | { type: "memories" }
   | { type: "note"; text: string }
   | { type: "todo"; text: string }
@@ -38,6 +39,7 @@ export type SlashAction =
   | { type: "backup"; now: boolean }
   | { type: "brief"; send: boolean }
   | { type: "review"; send: boolean }
+  | { type: "prompt"; op: "list" | "save" | "remove" | "use"; name: string; text: string }
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
   | { type: "status" }
@@ -96,9 +98,9 @@ export const slashCommands = [
   { name: "export", usage: "/export", description: "Download this chat as Markdown" },
   { name: "record", usage: "/record", description: "Open the recorder" },
   { name: "confetti", usage: "/confetti", description: "Celebrate something" },
-  { name: "remember", usage: "/remember <fact>", description: "Pals will remember this in every chat" },
+  { name: "remember", usage: "/remember <fact>", description: "Pals will remember this in every chat (add @name to tell only one pal)" },
   { name: "memories", usage: "/memories", description: "Show what the pals remember" },
-  { name: "forget", usage: "/forget <number|all>", description: "Remove a memory" },
+  { name: "forget", usage: "/forget [@pal] <number|all>", description: "Remove a memory" },
   { name: "note", usage: "/note <text>", description: "Save a quick note" },
   { name: "todo", usage: "/todo <task>", description: "Add a to-do (or /todo clear)" },
   { name: "done", usage: "/done <number>", description: "Tick a to-do off" },
@@ -124,6 +126,7 @@ export const slashCommands = [
   { name: "web", usage: "/web [on|off]", description: "Let the pals search the web on their own when a question needs current facts" },
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
   { name: "voice", usage: "/voice [on|off]", description: "Read replies aloud (your browser's own voices)" },
+  { name: "prompt", usage: "/prompt [name] | save <name> = <text> | remove <name>", description: "Saved prompts: fill the message box with a ready-made starting point" },
   { name: "review", usage: "/review [send]", description: "Your week ahead: calendar, reminders, mail and picks (owner only)" },
   { name: "brief", usage: "/brief [send]", description: "Today's morning brief (add send to push it to your phone)" },
   { name: "backup", usage: "/backup [now]", description: "Show the nightly backup status, or back up now (owner)" },
@@ -183,16 +186,25 @@ export function parseSlash(input: string): SlashResult | null {
       if (arg === "off") return { ok: true, action: { type: "assistant", on: false } };
       return fail("Use /assistant on or /assistant off.");
     }
-    case "remember": case "mem":
-      return rawArg ? { ok: true, action: { type: "remember", text: rawArg } } : fail("Tell me what to remember: /remember I run Unraid.");
+    case "remember": case "mem": {
+      const pal = /^@/.test(rawArg) ? resolveMention(rawArg) : null;
+      if (pal) {
+        const text = rawArg.replace(/^@[\w&-]+\s*/, "").trim();
+        return text ? { ok: true, action: { type: "remember", text, pal } } : fail("What should that pal remember? /remember @byte I use Arch.");
+      }
+      return rawArg ? { ok: true, action: { type: "remember", text: rawArg } } : fail("Tell me what to remember: /remember I run Unraid. Add @name to tell only one pal: /remember @byte I use Arch.");
+    }
     case "memories": case "memory":
       return { ok: true, action: { type: "memories" } };
     case "forget": {
-      if (arg === "all") return { ok: true, action: { type: "forget", target: "all" } };
-      const n = Number(arg);
-      return arg !== "" && Number.isInteger(n) && n >= 1
-        ? { ok: true, action: { type: "forget", target: n } }
-        : fail("Use /forget <number> (see /memories) or /forget all.");
+      const pal = /^@/.test(rawArg) ? resolveMention(rawArg) : null;
+      const which = pal ? rawArg.replace(/^@[\w&-]+\s*/, "").trim().toLowerCase() : arg;
+      const withPal = <T extends object>(a: T) => (pal ? { ...a, pal } : a);
+      if (which === "all") return { ok: true, action: withPal({ type: "forget" as const, target: "all" as const }) };
+      const n = Number(which);
+      return which !== "" && Number.isInteger(n) && n >= 1
+        ? { ok: true, action: withPal({ type: "forget" as const, target: n }) }
+        : fail("Use /forget <number> (see /memories) or /forget all. For one pal: /forget @byte 2.");
     }
     case "note":
       return rawArg ? { ok: true, action: { type: "note", text: rawArg } } : fail("Write the note after the command: /note call the venue.");
@@ -265,6 +277,10 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "focus", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
     case "voice": case "speak":
       return { ok: true, action: { type: "voice", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
+    case "prompt": case "prompts": case "template": {
+      const p = parsePromptArgs(rawArg);
+      return "error" in p ? fail(p.error) : { ok: true, action: { type: "prompt", ...p } };
+    }
     case "review": case "week": case "weekly":
       return { ok: true, action: { type: "review", send: arg === "send" } };
     case "brief": case "morning":

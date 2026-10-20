@@ -7,7 +7,8 @@ import { useSyncExternalStore } from "react";
  */
 export type Entry = { id: string; text: string; at: number };
 export type Todo = Entry & { done: boolean };
-export type Workbench = { memories: Entry[]; notes: Entry[]; todos: Todo[] };
+/** `pal` holds memories only one pal sees, keyed by agent id. */
+export type Workbench = { memories: Entry[]; notes: Entry[]; todos: Todo[]; pal?: Record<string, Entry[]> | undefined };
 
 export const MAX_TEXT = 400;
 export const MAX_ITEMS = 100;
@@ -38,10 +39,24 @@ export function toggleTodo(list: Todo[], n: number): Todo[] {
 }
 export const clearDone = (list: Todo[]): Todo[] => list.filter((t) => !t.done);
 
-/** The text handed to the pals so they can use it. Capped so it can't swamp small models. */
-export function promptContext(w: Workbench, maxChars = 1500): string {
+/** Memories private to one pal ("/remember @byte I use Arch"). Other pals never see them. */
+export function addPalMemory(w: Workbench, pal: string, text: string, at = Date.now()): Workbench {
+  return { ...w, pal: { ...(w.pal ?? {}), [pal]: addEntry(w.pal?.[pal] ?? [], text, at) } };
+}
+export function removePalMemory(w: Workbench, pal: string, target: number | "all"): Workbench {
+  const list = w.pal?.[pal] ?? [];
+  const next = target === "all" ? [] : removeAt(list, target);
+  const rest = { ...(w.pal ?? {}) };
+  if (next.length) rest[pal] = next; else delete rest[pal];
+  return { ...w, pal: rest };
+}
+
+/** The text handed to the pals so they can use it. Capped so it can't swamp small models. Pass the speaking pal to include what only it knows. */
+export function promptContext(w: Workbench, maxChars = 1500, pal?: string): string {
   const parts: string[] = [];
   if (w.memories.length) parts.push("Remembered about the human:\n" + w.memories.map((m) => `- ${m.text}`).join("\n"));
+  const mine = pal ? w.pal?.[pal] ?? [] : [];
+  if (mine.length) parts.push("Remembered just for you (the other pals don't know this):\n" + mine.map((m) => `- ${m.text}`).join("\n"));
   const open = w.todos.filter((t) => !t.done);
   if (open.length) parts.push("The human's open to-dos:\n" + open.map((t) => `- ${t.text}`).join("\n"));
   const text = parts.join("\n\n");
@@ -61,12 +76,15 @@ let cache: Workbench | null = null;
 function valid(list: unknown): list is Entry[] {
   return Array.isArray(list) && list.every((e) => e && typeof e.id === "string" && typeof e.text === "string");
 }
+function validPal(v: unknown): v is Record<string, Entry[]> {
+  return !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v as Record<string, unknown>).every(valid);
+}
 function read(): Workbench {
   if (cache) return cache;
   try {
     const parsed = JSON.parse(localStorage.getItem(key) ?? "null");
     cache = parsed && valid(parsed.memories) && valid(parsed.notes) && valid(parsed.todos)
-      ? { memories: parsed.memories, notes: parsed.notes, todos: parsed.todos }
+      ? { memories: parsed.memories, notes: parsed.notes, todos: parsed.todos, ...(validPal(parsed.pal) ? { pal: parsed.pal } : {}) }
       : emptyWorkbench;
   } catch {
     cache = emptyWorkbench;

@@ -141,6 +141,8 @@ import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
 import { SetupPanel } from "@/components/setup-panel";
+import { BUILT_IN_PROMPTS, addPrompt, findPrompt, promptList, type SavedPrompt } from "@/lib/prompts";
+import { getPrompts, setPrompts, usePrompts } from "@/lib/prompts-store";
 import { mergeCaptures, type Capture } from "@/lib/capture";
 import { SearchPanel } from "@/components/search-panel";
 import { setHideSecrets, getHideSecrets, useHideSecrets } from "@/lib/privacy-store";
@@ -161,7 +163,7 @@ import { setVoiceSettings, speakItems, stopSpeaking, useSpeakingId, useVoice, vo
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
-import { addEntry, addTodo, clearDone, getWorkbench, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
+import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
 
 const storageKey = "pixel-pals-conversation-v1";
 const suggestions = [
@@ -277,6 +279,7 @@ export function Room() {
   const voice = useVoice();
   useAppearance();
   useHideSecrets();
+  const savedPrompts = usePrompts();
   useEffect(() => {
     // Things you sent from your phone (Telegram, share sheet) are waiting on the server; fold them into notes and tasks.
     const collect = async () => {
@@ -512,7 +515,7 @@ export function Room() {
             mode: dmRole ? ("roundtable" as Mode) : direct ? ("direct" as Mode) : mode,
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current,
-            memoryContext: promptContext(getWorkbench()),
+            memoryContext: promptContext(getWorkbench(), 1500, agent.id),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             docContext: docText,
@@ -676,15 +679,50 @@ export function Room() {
       case "theme": setCharacterMode(action.theme); return say(command, `Theme switched to ${action.theme}.`);
       case "assistant": setAssistantMode(action.on); return say(command, `Assistant Mode ${action.on ? "on" : "off"}.`);
       case "remember":
+        if (action.pal) {
+          updateWorkbench((w) => addPalMemory(w, action.pal as string, action.text));
+          return say(command, `Got it — only ${agentName(action.pal, false, false, modeRef.current)} will remember: “${action.text}”.`);
+        }
         updateWorkbench((w) => ({ ...w, memories: addEntry(w.memories, action.text) }));
         return say(command, `Got it — every pal will remember: “${action.text}”.`);
-      case "memories":
-        return say(command, listText("The pals remember:", getWorkbench().memories, "Nothing remembered yet. Try `/remember I run Unraid with a 3080`."));
+      case "memories": {
+        const w = getWorkbench();
+        const shared = listText("The pals remember:", w.memories, "Nothing remembered for everyone yet. Try `/remember I run Unraid with a 3080`.");
+        const mine = Object.entries(w.pal ?? {}).filter(([, l]) => l.length).map(([id, l]) => listText(`Only ${agentName(id as AgentId, false, false, modeRef.current)} knows (/forget @${id} N):`, l, ""));
+        return say(command, [shared, ...mine].join("\n\n"));
+      }
       case "forget": {
+        if (action.pal) {
+          const before = getWorkbench().pal?.[action.pal]?.length ?? 0;
+          updateWorkbench((w) => removePalMemory(w, action.pal as string, action.target));
+          const gone = before - (getWorkbench().pal?.[action.pal]?.length ?? 0);
+          return say(command, gone ? `Forgotten (${gone}).` : `${agentName(action.pal, false, false, modeRef.current)} has no memory with that number. /memories shows them.`);
+        }
         const before = getWorkbench().memories.length;
         updateWorkbench((w) => ({ ...w, memories: action.target === "all" ? [] : removeAt(w.memories, action.target) }));
         const removed = before - getWorkbench().memories.length;
         return say(command, removed ? `Forgotten (${removed}).` : "There's no memory with that number. Use /memories to see them.");
+      }
+      case "prompt": {
+        const saved = getPrompts();
+        if (action.op === "list") return say(command, promptList(saved));
+        if (action.op === "save") {
+          const r = addPrompt(saved, action.name, action.text, crypto.randomUUID().slice(0, 8));
+          if (!r.ok) return say(command, r.error);
+          setPrompts(r.list);
+          return say(command, `Saved. Use it any time with /prompt ${findPrompt(r.list, action.name)?.name ?? action.name}.`);
+        }
+        if (action.op === "remove") {
+          const hit = saved.find((p) => p.name === findPrompt(saved, action.name)?.name);
+          if (!hit) return say(command, BUILT_IN_PROMPTS.some((b) => findPrompt([b], action.name)) ? "Built-in prompts can't be removed." : "No saved prompt with that name. /prompt shows them.");
+          setPrompts(saved.filter((p) => p !== hit));
+          return say(command, `Removed “${hit.name}”.`);
+        }
+        const hit = findPrompt([...BUILT_IN_PROMPTS, ...saved], action.name);
+        if (!hit) return say(command, `No prompt called “${action.name}”. /prompt lists them.`);
+        setTopic(`${hit.text}${action.text}`);
+        inputRef.current?.focus();
+        return;
       }
       case "note":
         updateWorkbench((w) => ({ ...w, notes: addEntry(w.notes, action.text) }));
@@ -996,6 +1034,7 @@ export function Room() {
     { id: "win-rec", group: "Windows", label: "Toggle Recorder", run: () => setRecorderOpen((v) => !v) },
     { id: "win-notes", group: "Windows", label: "Open Notes, tasks, documents & pal instructions", keywords: "memories todos files", run: () => setNotesOpen(true) },
     { id: "win-search", group: "Windows", label: "Search everything (chats, notes, tasks)", keywords: "find look up history", run: () => setSearchOpen(true) },
+    ...[...BUILT_IN_PROMPTS, ...savedPrompts].map((p: SavedPrompt) => ({ id: `prompt-${p.id}`, group: "Prompts", label: `Prompt: ${p.name}`, keywords: p.text.slice(0, 80), run: () => { setTopic(p.text); inputRef.current?.focus(); } })),
     { id: "win-setup", group: "Windows", label: "Open Setup (what is connected, test connections)", keywords: "settings integrations status connect test env", run: () => setSetupOpen(true) },
     { id: "win-hide", group: "Windows", label: "Hide or show secrets (for screenshots)", keywords: "privacy blur mask secrets token screenshot", run: () => setHideSecrets(!getHideSecrets()) },
     { id: "win-today", group: "Windows", label: "Open Today (weather, calendar, mail, tasks)", keywords: "morning overview agenda day", run: () => setTodayOpen(true) },
