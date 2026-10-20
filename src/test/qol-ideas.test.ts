@@ -2562,6 +2562,12 @@ describe("playtest watch", () => {
     expect(l[0]?.title).toBe("Some Game Playtest");
     expect(l[0]?.url).toBe("https://store.steampowered.com/app/123/Some_Game/");
   });
+  it("takes the first line of a card as the title and ignores the home link", () => {
+    const html = `<a href="/"><span>Explore</span></a><a href="/clerks-and-quirks"><div><div>Clerks and Quirks</div><div>Run a magical shop where appliances are alive</div></div></a><a href="/about">About</a>`;
+    const l = pLinks(html, "https://playtester.io", "");
+    expect(pKeep(l, "", "about").map((x) => x.title)).toEqual(["Clerks and Quirks"]);
+    expect(pKeep([{ title: "About", url: "u" }, { title: "Learn more about X", url: "v" }, { title: "About a game", url: "w" }], "", "about, learn more").map((x) => x.url)).toEqual(["w"]);
+  });
   it("filters by words", () => {
     const f = [{ title: "Closed BETA signup", url: "https://a/1" }, { title: "Sale 50%", url: "https://a/2" }];
     expect(pKeep(f, "beta, playtest").length).toBe(1);

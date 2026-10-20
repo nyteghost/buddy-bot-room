@@ -17,7 +17,7 @@ export function PlaytestsPanel() {
   const [note, setNote] = useState("");
   const [only, setOnly] = useState("");
   const [showSources, setShowSources] = useState(false);
-  const [form, setForm] = useState({ name: "", url: "", kind: "rss", keywords: "" });
+  const [form, setForm] = useState({ name: "", url: "", kind: "rss", keywords: "", skip: "" });
 
   const apply = useCallback((r: Reply, ok = "") => { if (r.error) { setNote(r.error); return; } setData(r); setNote(ok); }, []);
   const run = useCallback(async (body: object, ok = "") => { setBusy(true); apply(await call(body), ok); setBusy(false); }, [apply]);
@@ -52,7 +52,7 @@ export function PlaytestsPanel() {
             return (
               <div key={s.id} className="flex items-start justify-between gap-2 text-xs">
                 <div className="min-w-0">
-                  <a className="font-medium text-primary underline" href={s.url} target="_blank" rel="noreferrer">{s.name}</a> <span className="text-muted-foreground">· {s.kind === "rss" ? "feed" : "web page"}{s.keywords ? ` · words: ${s.keywords}` : ""}</span>
+                  <a className="font-medium text-primary underline" href={s.url} target="_blank" rel="noreferrer">{s.name}</a> <span className="text-muted-foreground">· {s.kind === "rss" ? "feed" : "web page"}{s.keywords ? ` · words: ${s.keywords}` : ""}{s.skip ? ` · skips: ${s.skip}` : ""}</span>
                   <div className={st && !st.ok ? "text-destructive" : "text-muted-foreground"}>{!st ? "Not checked yet" : st.ok ? `${st.count} listing${st.count === 1 ? "" : "s"} read ${ago(st.at)}` : `${st.error ?? "Failed"} (${ago(st.at)})`}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -67,9 +67,10 @@ export function PlaytestsPanel() {
             <select className="rounded-md border border-border bg-background px-2 text-sm" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} aria-label="Source type"><option value="rss">Feed (RSS/Atom, like a subreddit .rss)</option><option value="page">Web page (links on it)</option></select>
             <Input className="sm:col-span-2" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://… (for Reddit add /new/.rss to the subreddit)" aria-label="Source address" />
             <Input className="sm:col-span-2" value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} placeholder="Only keep titles with these words (optional): beta, playtest, alpha" aria-label="Keywords" />
+            <Input className="sm:col-span-2" value={form.skip} onChange={(e) => setForm({ ...form, skip: e.target.value })} placeholder="Skip titles starting with (optional): sponsored, giveaway" aria-label="Skip titles" />
             <div className="flex gap-2 sm:col-span-2">
-              <Button size="sm" disabled={busy || !form.url.trim()} onClick={async () => { await run({ op: "addSource", source: form }, "Added. Its first check sets a baseline, so only later listings count as new."); setForm({ name: "", url: "", kind: "rss", keywords: "" }); }}><Plus className="size-4" /> Add source</Button>
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => run({ op: "resetSources" }, "Back to the starting sources.")}>Reset to starting sources</Button>
+              <Button size="sm" disabled={busy || !form.url.trim()} onClick={async () => { await run({ op: "addSource", source: form }, "Added. Its first check sets a baseline, so only later listings count as new."); setForm({ name: "", url: "", kind: "rss", keywords: "", skip: "" }); }}><Plus className="size-4" /> Add source</Button>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => run({ op: "resetSources" }, "Back to the starting sources. Checking them again as a fresh baseline.")}>Reset to starting sources</Button>
             </div>
           </div>
         </div>

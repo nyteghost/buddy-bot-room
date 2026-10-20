@@ -10,6 +10,8 @@ export type Source = {
   url: string;
   /** Only keep listings whose title has one of these words (comma separated). Empty keeps everything. */
   keywords?: string | undefined;
+  /** Drop listings whose title equals any of these, or starts with one that has several words (comma separated), like menu links. */
+  skip?: string | undefined;
   /** Pages only: keep only links whose address contains this text, like "/app/". */
   match?: string | undefined;
   enabled: boolean;
@@ -24,8 +26,8 @@ export const MAX_ITEMS = 300;
 export const DEFAULT_SOURCES: Source[] = [
   { id: "reddit-betatests", name: "Reddit r/BetaTests", kind: "rss", url: "https://www.reddit.com/r/BetaTests/new/.rss", enabled: true },
   { id: "reddit-playtesting", name: "Reddit r/playtesting", kind: "rss", url: "https://www.reddit.com/r/playtesting/new/.rss", enabled: true },
-  { id: "playtester", name: "Playtester.io", kind: "page", url: "https://playtester.io", enabled: true },
-  { id: "steam-playtest", name: "Steam: playtest search", kind: "page", url: "https://store.steampowered.com/search/?term=playtest&ndl=1", match: "/app/", enabled: true },
+  { id: "playtester", name: "Playtester.io", kind: "page", url: "https://playtester.io", skip: "explore, categories, about, privacy policy, terms of service, learn more, contact", enabled: true },
+  { id: "steam-playtest", name: "Steam: playtest search", kind: "page", url: "https://store.steampowered.com/search/?term=playtest&ndl=1", match: "/app/", keywords: "playtest, beta, demo, alpha", skip: "fantasy grounds", enabled: true },
 ];
 
 const clean = (s: unknown, max = 200): string => (typeof s === "string" ? s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
@@ -58,27 +60,36 @@ export function parseFeed(xml: string): Found[] {
   return out;
 }
 
-/** Links on a web page with their visible text. Only server-rendered pages show anything here. */
+/** Links on a web page with their visible text (the first line of it). Only server-rendered pages show anything here. */
 export function parseLinks(html: string, base: string, match = ""): Found[] {
   const out: Found[] = [];
   const seen = new Set<string>();
+  let home = "";
+  try { const b = new URL(base); home = `${b.origin}/`; } catch { /* no base */ }
   for (const m of html.slice(0, 1_500_000).matchAll(/<a\b[^>]*?\bhref=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
     let url: string;
     try { url = new URL(m[1]!.replace(/&amp;/g, "&"), base).toString(); } catch { continue; }
-    if (!/^https?:\/\//i.test(url)) continue;
+    if (!/^https?:\/\//i.test(url) || url === home || url === base) continue;
     if (match && !url.includes(match)) continue;
     const spans = [...m[2]!.matchAll(/<span[^>]*class=["'][^"']*title[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi)].map((x) => x[1]!);
-    const title = clean(decode(spans[0] ?? m[2]!), 160);
-    if (title.length < 4 || seen.has(url)) continue;
+    const inner = spans[0] ?? m[2]!.replace(/<\/(div|p|h[1-6]|li|section|article)>|<br\s*\/?>/gi, "\n");
+    const lines = decode(inner.replace(/<(?!\/?[a-z])/gi, "&lt;")).split(/\n+/).map((l) => clean(l, 160)).filter((l) => l.length >= 4);
+    const title = lines[0] ?? "";
+    if (!title || seen.has(url)) continue;
     seen.add(url);
     out.push({ title, url: url.slice(0, 500) });
   }
   return out;
 }
 
-export function keepByWords(found: Found[], keywords: string | undefined): Found[] {
-  const words = (keywords ?? "").toLowerCase().split(/[,\n]/).map((w) => w.trim()).filter(Boolean);
-  return words.length ? found.filter((f) => words.some((w) => f.title.toLowerCase().includes(w))) : found;
+export function keepByWords(found: Found[], keywords: string | undefined, skip?: string | undefined): Found[] {
+  const split = (t: string | undefined) => (t ?? "").toLowerCase().split(/[,\n]/).map((w) => w.trim()).filter(Boolean);
+  const words = split(keywords), drop = split(skip);
+  return found.filter((f) => {
+    const t = f.title.toLowerCase();
+    if (drop.some((d) => t === d || (d.includes(" ") && t.startsWith(`${d} `)))) return false;
+    return !words.length || words.some((w) => t.includes(w));
+  });
 }
 
 /**
@@ -106,7 +117,7 @@ export function cleanSources(raw: unknown): Source[] {
     if (!name || !/^https?:\/\//i.test(url)) continue;
     out.push({
       id: clean(o["id"], 40) || listingId(url), name, kind: o["kind"] === "rss" ? "rss" : "page", url,
-      keywords: clean(o["keywords"], 200) || undefined, match: clean(o["match"], 100) || undefined, enabled: o["enabled"] !== false,
+      keywords: clean(o["keywords"], 200) || undefined, skip: clean(o["skip"], 200) || undefined, match: clean(o["match"], 100) || undefined, enabled: o["enabled"] !== false,
     });
   }
   return out;

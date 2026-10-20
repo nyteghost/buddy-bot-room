@@ -31,6 +31,7 @@ async function save(s: Store): Promise<void> {
 
 async function read(src: Source): Promise<{ found: Found[] } | { error: string }> {
   let url = src.url;
+  let retried = false;
   for (let hop = 0; hop < 4; hop++) {
     const safe = safeProductUrl(url);
     if (!safe) return { error: "That isn't a public web address." };
@@ -43,6 +44,7 @@ async function read(src: Source): Promise<{ found: Found[] } | { error: string }
       try { url = new URL(loc, safe).toString(); } catch { return { error: "Bad redirect." }; }
       continue;
     }
+    if ((res.status === 403 || res.status === 429) && !retried) { retried = true; hop--; await new Promise((r) => setTimeout(r, 4000)); continue; }
     if (res.status === 403 || res.status === 429) return { error: "The site blocked the automatic check." };
     if (!res.ok) return { error: `The site answered ${res.status}.` };
     const reader = res.body?.getReader();
@@ -54,7 +56,7 @@ async function read(src: Source): Promise<{ found: Found[] } | { error: string }
     const text = Buffer.concat(chunks).toString("utf8");
     const raw = src.kind === "rss" ? parseFeed(text) : parseLinks(text, safe, src.match ?? "");
     if (!raw.length) return { error: src.kind === "rss" ? "No entries found in that feed." : "No listings found. The page may load them with JavaScript, which can't be read." };
-    return { found: keepByWords(raw, src.keywords) };
+    return { found: keepByWords(raw, src.keywords, src.skip) };
   }
   return { error: "Too many redirects." };
 }
@@ -68,7 +70,10 @@ export async function runCheck(): Promise<number> {
     const s = await load();
     const now = new Date().toISOString();
     const added: import("./playtests").Listing[] = [];
+    let first = true;
     for (const src of s.sources.filter((x) => x.enabled)) {
+      if (!first) await new Promise((r) => setTimeout(r, 1500));
+      first = false;
       const r = await read(src);
       if ("error" in r) { s.status[src.id] = { at: now, ok: false, count: s.status[src.id]?.count ?? 0, error: r.error }; continue; }
       const baseline = !s.status[src.id]?.ok && !s.items.some((i) => i.source === src.id);
@@ -116,7 +121,7 @@ export async function handlePlaytests(request: Request): Promise<Response> {
       const url = safeProductUrl(x["url"]);
       if (!url) return Response.json({ error: "Type a public web address (https://…)." }, { status: 400 });
       if (s.sources.length >= MAX_SOURCES) return Response.json({ error: `That's the most sources I'll watch (${MAX_SOURCES}).` }, { status: 400 });
-      const made = cleanSources([{ name: x["name"] || new URL(url).hostname, kind: x["kind"], url, keywords: x["keywords"], match: x["match"], enabled: true }])[0];
+      const made = cleanSources([{ name: x["name"] || new URL(url).hostname, kind: x["kind"], url, keywords: x["keywords"], skip: x["skip"], match: x["match"], enabled: true }])[0];
       if (!made) return Response.json({ error: "Give the source a name." }, { status: 400 });
       made.id = listingId(url + Date.now());
       s.sources.push(made);
@@ -126,7 +131,7 @@ export async function handlePlaytests(request: Request): Promise<Response> {
     }
     case "removeSource": { s.sources = s.sources.filter((x) => x.id !== body.id); s.items = s.items.filter((i) => i.source !== body.id); delete s.status[String(body.id)]; await touched(); break; }
     case "toggleSource": { const x = s.sources.find((y) => y.id === body.id); if (x) x.enabled = body.enabled !== false; await touched(); break; }
-    case "resetSources": { s.sources = DEFAULT_SOURCES.map((x) => ({ ...x })); await touched(); break; }
+    case "resetSources": { s.sources = DEFAULT_SOURCES.map((x) => ({ ...x })); s.items = []; s.status = {}; s.lastRun = ""; await touched(); void runCheck(); break; }
   }
   return Response.json(reply(s));
 }
