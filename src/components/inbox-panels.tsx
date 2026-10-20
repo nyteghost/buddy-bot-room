@@ -104,7 +104,7 @@ export function CalendarPanel({ open }: { open: boolean }) {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h3>
           {items.map((e, i) => (
             <div key={`${e.start}-${i}`} className="flex gap-3 rounded-md border px-3 py-2">
-              <span className="w-20 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : `${clock(e.start, tz)}`}</span>
+              <span className="w-20 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : <>{clock(e.start, tz)}{e.end > e.start && <span className="block">to {clock(e.end, tz)}</span>}</>}</span>
               <span className="min-w-0"><span className="block truncate">{e.title}</span>{(e.location || data?.items.some((x) => x.source !== e.source)) && <span className="block truncate text-xs text-muted-foreground">{[e.location, e.source].filter(Boolean).join(" · ")}</span>}</span>
             </div>
           ))}
