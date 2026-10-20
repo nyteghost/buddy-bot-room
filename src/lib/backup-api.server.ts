@@ -14,7 +14,7 @@ export async function handleBackup(request: Request) {
   if (body.op === "list" || body.op === "restore") {
     if (!cfg) return Response.json({ ok: false, text: await backupText(null) });
     const all = await listBackupNames(cfg);
-    if (body.op === "list") return Response.json({ ok: true, text: backupListText(all, await backupAges(cfg, all)) });
+    if (body.op === "list") { const ages = await backupAges(cfg, all); return Response.json({ ok: true, text: backupListText(all, ages), names: all.slice(-12).reverse(), ages }); }
     const name = pickBackup(all, String(body.name ?? ""));
     if (!name) return Response.json({ ok: false, text: "No backup matches that. /backup list shows them." });
     if (body.confirm !== true) return Response.json({ ok: false, text: `This will copy ${name} over your current data (accounts, saved chats, settings). Your current data is saved first as pre-restore-<time>, but anyone signed in may need to sign in again.\n\nTo go ahead, type: /backup restore ${name} confirm` });

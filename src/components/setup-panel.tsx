@@ -1,3 +1,4 @@
+import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, Circle, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -55,10 +56,34 @@ export function SetupPanel({ open }: { open: boolean }) {
       setResults((r) => ({ ...r, [id]: out }));
     } catch { setResults((r) => ({ ...r, [id]: { ok: false, note: "Couldn't reach the server." } })); }
   };
+  const [checking, setChecking] = useState(false);
+  const [health, setHealth] = useState("");
+  /** Tests every integration that is set up and says which ones need attention. */
+  const checkAll = async () => {
+    if (!items) return;
+    const targets = items.filter((i) => i.configured && i.testable);
+    setChecking(true); setHealth("");
+    setResults((r) => ({ ...r, ...Object.fromEntries(targets.map((t) => [t.id, "running" as const])) }));
+    const out = await Promise.all(targets.map(async (t) => {
+      try {
+        const res = await fetch("/api/setup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: t.id }) });
+        return [t, (await res.json()) as SetupTest] as const;
+      } catch { return [t, { ok: false, note: "Couldn't reach the server." }] as const; }
+    }));
+    setResults((r) => ({ ...r, ...Object.fromEntries(out.map(([t, v]) => [t.id, v])) }));
+    const bad = out.filter(([, v]) => !v.ok).map(([t]) => t.name);
+    const notSet = items.filter((i) => !i.configured).length;
+    setHealth(targets.length === 0 ? "Nothing is set up yet." : bad.length ? `⚠ ${out.length - bad.length} of ${out.length} working. Needs attention: ${bad.join(", ")}.` : `✅ All ${out.length} connected integrations are working.${notSet ? ` (${notSet} more aren't set up.)` : ""}`);
+    setChecking(false);
+  };
   return (
     <div className="grid gap-3 p-3 text-sm">
       {error && <p className="text-destructive">{error}</p>}
       {items && <p className="font-medium">{setupSummary(items)}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={checking || !items} onClick={() => void checkAll()}>{checking ? <Loader2 className="size-3 animate-spin" /> : null} Is everything connected?</Button>
+        {health && <span className="text-xs">{health}</span>}
+      </div>
       <label className="flex items-center gap-2 rounded-md border px-3 py-2">
         <input type="checkbox" checked={hide} onChange={(e) => setHideSecrets(e.target.checked)} />
         <span>Hide secrets on this device <span className="text-xs text-muted-foreground">(blurs links and addresses so screenshots are safe)</span></span>
@@ -127,6 +152,8 @@ export function SetupPanel({ open }: { open: boolean }) {
           </div>
         );
       })}
+      <SchedulesSection open={open} />
+      <BackupSection open={open} />
       <p className="text-xs text-muted-foreground">Settings you save here are kept on the server and take effect right away. A value set in Portainer wins and is locked here. Keys and passwords are write-only and are left out of backups. Things the stack itself needs (COMPOSE_PROFILES, Tailscale, the Radicale password, the Ollama runtime) stay in Portainer.</p>
     </div>
   );

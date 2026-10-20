@@ -64,6 +64,7 @@ export async function handleSchedules(request: Request): Promise<Response> {
   const body = (await request.json().catch(() => ({}))) as { op?: string; text?: string };
   const text = typeof body.text === "string" ? body.text.slice(0, 700) : "";
   const list = await readSchedules();
+  if (body.op === "data") return Response.json({ schedules: list, tz: tz() });
   if (body.op === "add") {
     const p = parseScheduleArgs(text);
     if ("error" in p) return Response.json({ text: p.error });
