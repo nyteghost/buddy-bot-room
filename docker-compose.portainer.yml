@@ -2,7 +2,7 @@
 # Settings come from the stack's "Environment variables" panel (no .env.local file needed):
 #   SEERR_URL, SEERR_API_KEY, SEARXNG_URL, BUDDY_PORT, BUDDY_PASSWORD,
 #   JELLYFIN_URL, JELLYFIN_API_KEY, JELLYFIN_PUBLIC_URL,
-#   PLEX_URL, PLEX_TOKEN, BUDDY_ACCOUNTS, TRAKT_CLIENT_ID, TRAKT_USER, TRAKT_LIST, TRAKT_ACCESS_TOKEN, TRAKT_CLIENT_SECRET, UNRAID_URL, UNRAID_API_KEY, UNRAID_CHECK_SECONDS, NTFY_URL, BUDDY_TZ, BRIEF_TIME, BUDDY_BACKUP_PATH, BUDDY_BACKUP_TIME, BUDDY_BACKUP_KEEP, OLLAMA_PORT, OLLAMA_MODELS, OLLAMA_RUNTIME, LOCAL_VRAM_GB, MODEL_FEED, PROVIDER_FEED, ALLOW_PRIVATE_CUSTOM, COMPOSE_PROFILES, WHISPER_URL, WHISPER_MODEL, WHISPER_IMAGE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, M365_CLIENT_ID, M365_TENANT  (all optional)
+#   PLEX_URL, PLEX_TOKEN, BUDDY_ACCOUNTS, TRAKT_CLIENT_ID, TRAKT_USER, TRAKT_LIST, TRAKT_ACCESS_TOKEN, TRAKT_CLIENT_SECRET, UNRAID_URL, UNRAID_API_KEY, UNRAID_CHECK_SECONDS, NTFY_URL, BUDDY_TZ, BRIEF_TIME, BUDDY_BACKUP_PATH, BUDDY_BACKUP_TIME, BUDDY_BACKUP_KEEP, OLLAMA_PORT, OLLAMA_MODELS, OLLAMA_RUNTIME, LOCAL_VRAM_GB, MODEL_FEED, PROVIDER_FEED, ALLOW_PRIVATE_CUSTOM, COMPOSE_PROFILES, TS_AUTHKEY, TS_HOSTNAME, WHISPER_URL, WHISPER_MODEL, WHISPER_IMAGE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, M365_CLIENT_ID, M365_TENANT  (all optional)
 # Ollama is included in this stack. It starts on CPU; for an NVIDIA GPU set OLLAMA_RUNTIME=nvidia (needs the NVIDIA Container Toolkit on the host).
 # In Pixel Pals choose the engine "Local AI (this server)": it talks to this Ollama itself, so there is nothing to type and no HTTPS problem.
 services:
@@ -107,7 +107,37 @@ services:
     volumes:
       - whisper-models:/home/ubuntu/.cache/huggingface/hub
 
+  # Optional private HTTPS link to Pixel Pals from your phone/laptop anywhere, with no open ports and no Caddy.
+  # Turn on with COMPOSE_PROFILES=tailscale (or voice,tailscale) and set TS_AUTHKEY (a reusable key from the Tailscale admin console).
+  # It appears as https://<TS_HOSTNAME>.<your-tailnet>.ts.net. Needs HTTPS enabled in your Tailscale DNS settings.
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: buddy-tailscale
+    profiles: ["tailscale"]
+    restart: unless-stopped
+    hostname: ${TS_HOSTNAME:-pixelpals}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_HOSTNAME:-pixelpals}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    configs:
+      - source: tailscale-serve
+        target: /config/serve.json
+    depends_on:
+      - buddy-bot
+
+configs:
+  # Same as config/tailscale/serve.json in the repository: send HTTPS on your tailnet to Pixel Pals.
+  tailscale-serve:
+    content: |
+      {"TCP":{"443":{"HTTPS":true}},"Web":{"$${TS_CERT_DOMAIN}:443":{"Handlers":{"/":{"Proxy":"http://buddy-bot:8090"}}}}}
+
 volumes:
+  tailscale-state:
   whisper-models:
   buddy-backups:
   buddy-data:

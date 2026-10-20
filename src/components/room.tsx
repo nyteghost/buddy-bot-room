@@ -128,6 +128,8 @@ import { matchShortcut, shortcutList } from "@/lib/shortcuts";
 import { friendlyError } from "@/lib/friendly-error";
 import { allChunks, getDocs } from "@/lib/documents";
 import { docContext } from "@/lib/rag";
+import { appearanceFromWords } from "@/lib/appearance";
+import { getAppearance, setAppearance, useAppearance } from "@/lib/appearance-store";
 import { MicButton } from "@/components/mic-button";
 import { smartRetrieve } from "@/lib/smart-docs";
 import { wantsWeb, webContext } from "@/lib/web-context";
@@ -254,6 +256,7 @@ export function Room() {
   const [running, setRunning] = useState(false);
   // Read replies aloud (opt-in, browser speech): after each discussion finishes, each new reply in its pal's voice.
   const voice = useVoice();
+  useAppearance();
   const speakingMessage = useSpeakingId();
   const [canSpeak, setCanSpeak] = useState(false);
   useEffect(() => { setCanSpeak(voiceSupported()); }, []);
@@ -693,6 +696,12 @@ export function Room() {
         })();
         return;
       }
+      case "appearance": {
+        const next = appearanceFromWords(action.words, getAppearance());
+        if (!next) return say(command, "Use light, dark or auto for the colours, and small, normal or large for the text size, for example /appearance light large.");
+        setAppearance(next);
+        return say(command, `Appearance: ${next.scheme} colours, ${next.size} text.${next.scheme !== "dark" ? " (Light applies to the Normal theme; other themes keep their own palettes.)" : ""}`);
+      }
       case "status": {
         void (async () => {
           try {
@@ -922,6 +931,10 @@ export function Room() {
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
+    { id: "appearance-light", group: "View", label: "Appearance: light colours", keywords: "light mode bright theme", run: () => runSlash({ type: "appearance", words: "light" }, "/appearance light") },
+    { id: "appearance-dark", group: "View", label: "Appearance: dark colours", keywords: "dark mode", run: () => runSlash({ type: "appearance", words: "dark" }, "/appearance dark") },
+    { id: "appearance-large", group: "View", label: "Text size: larger", keywords: "font zoom bigger accessibility", run: () => runSlash({ type: "appearance", words: "large" }, "/appearance large") },
+    { id: "appearance-normal", group: "View", label: "Text size: normal", keywords: "font zoom reset", run: () => runSlash({ type: "appearance", words: "normal" }, "/appearance normal") },
     { id: "web-lookup", group: "Chat", label: autoSearch.get() ? "Turn off automatic web lookup" : "Turn on automatic web lookup", keywords: "search internet current facts", run: () => runSlash({ type: "web", mode: "toggle" }, "/web") },
     { id: "status", group: "Chat", label: "Check services (status)", keywords: "health ollama plex unraid", run: () => runSlash({ type: "status" }, "/status") },
     { id: "focus", group: "View", label: focusMode ? "Leave focus mode" : "Focus mode (just the chat)", hint: "Ctrl+Shift+F", keywords: "calm minimal distraction fullscreen expand chat", run: () => runSlash({ type: "focus", mode: "toggle" }, "/focus") },

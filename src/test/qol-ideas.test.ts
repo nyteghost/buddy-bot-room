@@ -4,6 +4,7 @@ import { wantsWeb, webContext } from "@/lib/web-context";
 import { bestMatch, parseWrite, pollSeconds, syncBody } from "@/lib/trakt-write";
 import { agents, agentPersona, agentName, resolveMention } from "@/lib/agents";
 import { eventsText, mailText, parseM365, shapeEvents, shapeMail, summaryPrompt } from "@/lib/m365";
+import { appearanceFromWords, formatAppearance, parseAppearance, resolveScheme } from "@/lib/appearance";
 import { servicesReport } from "@/lib/status";
 import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, MAX_SCHEDULES } from "@/lib/schedules";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
@@ -1488,5 +1489,26 @@ describe("Microsoft 365 (read-only)", () => {
     expect(shapeEvents(null)).toEqual([]);
     expect(eventsText([])).toContain("Nothing");
     expect(summaryPrompt(ev, mail)).toContain("Standup");
+  });
+});
+
+describe("appearance", () => {
+  it("round-trips and falls back safely", () => {
+    expect(parseAppearance("light:large")).toEqual({ scheme: "light", size: "large" });
+    expect(parseAppearance("nonsense")).toEqual({ scheme: "dark", size: "normal" });
+    expect(parseAppearance(null)).toEqual({ scheme: "dark", size: "normal" });
+    expect(formatAppearance({ scheme: "auto", size: "small" })).toBe("auto:small");
+  });
+  it("reads typed words", () => {
+    const cur = { scheme: "dark" as const, size: "normal" as const };
+    expect(appearanceFromWords("light", cur)).toEqual({ scheme: "light", size: "normal" });
+    expect(appearanceFromWords("large, auto", cur)).toEqual({ scheme: "auto", size: "large" });
+    expect(appearanceFromWords("purple", cur)).toBeNull();
+    expect(appearanceFromWords("", cur)).toBeNull();
+  });
+  it("auto follows the device", () => {
+    expect(resolveScheme("auto", true)).toBe("light");
+    expect(resolveScheme("auto", false)).toBe("dark");
+    expect(resolveScheme("dark", true)).toBe("dark");
   });
 });

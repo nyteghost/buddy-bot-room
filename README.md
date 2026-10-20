@@ -101,6 +101,7 @@ Your data lives in the `buddy-data` volume and survives updates.
    sudo tailscale serve --bg --https=443 http://localhost:8090
    ```
    Then use `https://<machine>.<your-tailnet>.ts.net` on every device. Browsers only allow notifications and some PWA features on HTTPS or localhost.
+4. **Tailscale inside the stack (no host setup, no open ports).** In Portainer add `COMPOSE_PROFILES=tailscale` and `TS_AUTHKEY` (a reusable auth key from the Tailscale admin console, *Settings → Keys*), optionally `TS_HOSTNAME` (default `pixelpals`), and redeploy. The `tailscale` container joins your tailnet and serves Pixel Pals at `https://pixelpals.<your-tailnet>.ts.net`. HTTPS must be enabled once in the Tailscale admin console (*DNS → HTTPS Certificates*). This replaces a Caddy/reverse-proxy setup for private use; the page is reachable only from devices on your tailnet. The serve rules are inline in the compose file (the same JSON is in `config/tailscale/serve.json`), which needs Docker Compose 2.23 or newer. Combine with voice using `COMPOSE_PROFILES=voice,tailscale`.
 
 ---
 
@@ -124,6 +125,12 @@ Your data lives in the `buddy-data` volume and survives updates.
 - **Presets and settings export/import:** Ctrl+K → *Export settings* / *Import settings*. Exports leave API keys out unless you choose "including API keys".
 
 ---
+
+### Appearance (light colours and text size)
+
+`/appearance light`, `/appearance dark` or `/appearance auto` (follow your device), and `/appearance small`, `normal` or `large` for the text size. Both are also in the command palette (Ctrl+K). They apply per device and sync with your account.
+
+The light scheme is for the **Normal** theme; the themed casts (Hellraiser, Matrix and so on) keep their own palettes, and the pixel-room scene stays dark on purpose. Text size scales the whole page with browser zoom, so very large sizes can make the phone layout cramped.
 
 ### Focus mode (calm, chat-only view)
 
@@ -241,6 +248,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
 | `/focus [on\|off]` | Focus mode: calm, chat-only view |
+| `/appearance light\|dark\|auto` · `small\|normal\|large` | Colour scheme and text size |
 | `/schedule add 08:00 <question>` | Scheduled tasks sent to your phone; also `list`, `run N`, `remove N` (owner only, [8.3](#83-scheduled-tasks)) |
 | `/web [on\|off]` | Automatic web lookup: when a question needs current facts (latest, price, news, a question with a `?`), the pals search your SearXNG first and cite the links. Off by default |
 | `/status` | One-shot health check: Local AI, search, Plex, Seerr, Jellyfin, Unraid, Trakt, ntfy and backups. Shows names and problems only, never addresses or keys |
@@ -600,7 +608,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 | `TRAKT_CLIENT_SECRET` | empty | Only for `/trakt connect` (write access) |
 | `M365_CLIENT_ID` / `M365_TENANT` | empty / `organizations` | Microsoft 365 read-only ([7.11](#711-microsoft-365-work-read-only)) |
-| `COMPOSE_PROFILES` | empty | `voice` starts the Whisper dictation container |
+| `COMPOSE_PROFILES` | empty | `voice` starts the Whisper dictation container; `tailscale` starts the Tailscale sidecar (comma-separate to use both) |
+| `TS_AUTHKEY` / `TS_HOSTNAME` | empty / `pixelpals` | Tailscale sidecar ([section 3](#3-first-run-accounts-and-https)) |
 | `WHISPER_URL` | `http://whisper:8000` | Speech server for the microphone button |
 | `WHISPER_MODEL` / `WHISPER_IMAGE` | small model / CPU image | What the Whisper container runs |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | empty | Telegram bot ([8.4](#84-telegram-bot)) |
