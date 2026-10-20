@@ -105,7 +105,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { chainAfter, freeModels, palEngineLabel, providerForTurn, replyTokens, useEngine } from "@/lib/engine";
+import { chainAfter, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
@@ -727,7 +727,17 @@ export function Room() {
                 controller.signal,
               ),
             );
-          if (engine.kind === "auto-ollama") {
+          // Your own mail, calendar and tasks are only ever read by your own Ollama: free API tokens aren't spent on them and the details never go to a cloud AI.
+          const keepLocal = !!requestBody.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server";
+          if (keepLocal) {
+            try {
+              if (engine.kind === "auto-ollama") await runOllama();
+              else await runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }));
+            } catch (err) {
+              if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
+              throw new Error("Your own AI (Ollama) isn't reachable, so I didn't send your mail, calendar or task details to a cloud AI. Check Local AI in Settings, or ask without @mail, @calendar or @tasks.");
+            }
+          } else if (engine.kind === "auto-ollama") {
             // Free keys first; local Ollama takes over when no key is set or a key fails before any text.
             if (!provider) await runOllama();
             else {

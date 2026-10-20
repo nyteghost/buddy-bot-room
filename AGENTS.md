@@ -48,6 +48,7 @@
 
 - Conversation modes (roundtable, broadcast, direct, solve, debate) each have their own window, chat (`chats[mode]`), draft and message box in room.tsx (`renderModeWindow`); `mode` is the window you are working in, `startIn(mode, …)` runs one at a time (`runLock`). Roles, debate sides and judge turns are sent to /api/chat as `role`, `side`, `verdict`, `summary`; the server owns the prompts.
 - Living room (room-live.tsx, live-room.ts, progress.ts, progress-store.ts): the scene shows real weather, mail count, next calendar item, open tasks and server health from the existing owner-only endpoints (polled every 5 minutes while the room is open, anything unavailable is left out). Pal chatter is template text from that data, never an AI call. XP/level/streak live in the browser only; finishing tasks pays 10 XP (old finished tasks never pay out). Everything is read-only and clicking an object only opens its window.
+- Real data for the pals (day-context.ts: calendar, unread mail subjects, open tasks, sent as `realData` only when the message asks for it) is answered by the user's own Ollama only (room.tsx `keepLocal`): server Ollama for cloud/auto engines, browser Ollama for auto-ollama; it never falls back to a cloud provider, and fails with a clear message if Ollama is unreachable.
 
 ## Local AI (server-side Ollama)
 - Engine kind `local-server` sends `/api/chat` an `ollama-server` provider; the server calls `OLLAMA_URL` (never a browser-supplied URL). Model names are validated with `isModelName`.
