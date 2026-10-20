@@ -133,7 +133,7 @@ function waitForOAuthCompletion(popup: Window) {
 }
 
 /** Button that connects Google Calendar once, then pushes every shift with one click. */
-function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void }) {
+function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownload }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void; onDownload: () => void }) {
   const session = useSession();
   const start = useServerFn(startCalendarConnect);
   const complete = useServerFn(completeCalendarConnect);
@@ -146,7 +146,15 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus }: { shift
     if (!session) return;
     status().then((r) => setReady(r.connected)).catch(() => setReady(false));
   }, [session, status]);
-  if (!session) return null;
+  // Not signed in to the hosted app (for example on your own server): download one calendar file and open Google Calendar's import page.
+  // Each event has a fixed id, so importing the file again updates the same events instead of making copies.
+  if (!session) return (
+    <Button size="sm" variant="secondary" disabled={!shifts.length} onClick={() => {
+      onDownload();
+      window.open("https://calendar.google.com/calendar/u/0/r/settings/export", "_blank", "noopener");
+      onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Importing again later updates the same events.");
+    }}><CalendarPlus className="size-4" /> Add all to Google Calendar</Button>
+  );
 
   // The popup must open synchronously inside the click, before any await, or browsers block it.
   async function connect(popup: Window): Promise<boolean> {
@@ -272,7 +280,7 @@ function ShiftsTab() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={ics} disabled={!shifts.length}><Download className="size-4" /> Download all (.ics)</Button>
-            <AddAllToCalendar shifts={shifts} title={title.trim() || "Mark Work"} remove={removed} onPushed={() => setRemoved([])} onStatus={setStatus} />
+            <AddAllToCalendar onDownload={() => void ics()} shifts={shifts} title={title.trim() || "Mark Work"} remove={removed} onPushed={() => setRemoved([])} onStatus={setStatus} />
             <Button size="sm" variant="outline" onClick={add}>Add a shift</Button>
           </div>
           {removed.length > 0 && <p className="text-xs text-muted-foreground">{removed.length} removed shift{removed.length === 1 ? "" : "s"} will also be deleted from Google Calendar the next time you press “Add or update”.</p>}
