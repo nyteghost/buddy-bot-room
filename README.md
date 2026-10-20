@@ -812,3 +812,4 @@ Built with [Lovable](https://lovable.dev) · edit in the [Lovable editor](https:
 
 ### Google Calendar for shifts (self-hosted)
 Settings → Google Calendar takes a Client ID and secret from your own Google Cloud project (OAuth client type "Web application", scope `calendar.events`, app published "In production" so the key doesn't expire after 7 days). Add the redirect URI `https://<your-https-address>/api/google/callback`. Then Work tools → My shifts → **Connect Google Calendar** once; after that **Add or update in Google Calendar** pushes with fixed event ids (no copies). The refresh token is kept in `google-token.json` in the data volume and is left out of backups. Without the keys, the `.ics` download still works.
+Once connected, the Calendar window also shows your primary Google calendar (with a Connect / Disconnect control at its top), and Today and the brief include those events. Events that also arrive through a calendar feed are listed once.

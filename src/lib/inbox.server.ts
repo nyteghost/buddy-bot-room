@@ -1,6 +1,7 @@
 import { currentUser } from "./accounts.server";
 import { eventsInRange } from "./ics";
 import { fetchUnread, imapConfig } from "./imap.server";
+import { googleRange, gcalStatus } from "./gcal.server";
 import { m365Range, m365UnreadMail } from "./m365.server";
 import { validZone } from "./schedule";
 import { logServer } from "./server-log.server";
@@ -32,7 +33,7 @@ async function owner(request: Request): Promise<Response | null> {
   return user?.owner ? null : Response.json({ error: "Only the owner account can open Mail and Calendar." }, { status: 403 });
 }
 
-export type CalendarData = { tz: string; configured: boolean; feeds: number; m365: boolean; items: CalItem[]; errors: string[] };
+export type CalendarData = { tz: string; configured: boolean; feeds: number; m365: boolean; google: { configured: boolean; connected: boolean }; items: CalItem[]; errors: string[] };
 export type MailData = { configured: boolean; imap: boolean; m365: boolean; items: { from: string; subject: string; date: string; source: string }[]; errors: string[] };
 
 export async function handleCalendar(request: Request): Promise<Response> {
@@ -63,8 +64,14 @@ export async function calendarData(daysIn: number): Promise<CalendarData> {
   }));
   let m365 = false;
   try { const r = await m365Range(from, to); if (r) { m365 = true; for (const e of r) items.push({ ...e, source: "Microsoft 365" }); } } catch { errors.push("Microsoft 365: couldn't read the calendar"); }
+  const google = await gcalStatus();
+  try { const r = await googleRange(from, to); if (r) for (const e of r) items.push({ ...e, source: "Google Calendar" }); } catch (e) { errors.push(`Google Calendar: ${e instanceof Error ? e.message.slice(0, 80) : "couldn't read the calendar"}`); }
   items.sort((a, b) => a.start - b.start);
-  const body: CalendarData = { tz: tz(), configured: feeds.length > 0 || m365, feeds: feeds.length, m365, items: items.slice(0, 300), errors };
+  // A calendar that is both a feed and the connected Google account would list each event twice.
+  const seen = new Set<string>();
+  const unique = items.filter((e) => { const k = `${e.title.toLowerCase()}|${e.start}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  items.length = 0; items.push(...unique);
+  const body: CalendarData = { tz: tz(), configured: feeds.length > 0 || m365 || google.connected, google, feeds: feeds.length, m365, items: items.slice(0, 300), errors };
   cache.set(`cal|${days}`, body);
   return body;
 }

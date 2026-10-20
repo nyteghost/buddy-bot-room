@@ -64,6 +64,26 @@ async function owner(request: Request): Promise<Response | null> {
   return user?.owner ? null : Response.json({ error: "Only the owner account can use Google Calendar here." }, { status: 403 });
 }
 
+export const gcalStatus = async (): Promise<{ configured: boolean; connected: boolean }> => ({ configured: !!cfg(), connected: !!cfg() && !!(await readRefresh()) });
+
+/** Events from the primary Google calendar between two instants (epoch ms), or null when Google isn't connected. Throws a short message on failure. */
+export async function googleRange(from: number, to: number): Promise<{ title: string; start: number; end: number; allDay: boolean; location: string }[] | null> {
+  if (!cfg() || !(await readRefresh())) return null;
+  const t = await accessToken();
+  if ("error" in t) throw new Error(t.error);
+  const q = new URLSearchParams({ timeMin: new Date(from).toISOString(), timeMax: new Date(to).toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "100", fields: "items(summary,location,status,start,end)" });
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${q}`, { headers: { authorization: `Bearer ${t.token}` }, signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) throw new Error(explainGoogle(res.status, await res.text()));
+  const json = (await res.json()) as { items?: { summary?: string; location?: string; status?: string; start?: { date?: string; dateTime?: string }; end?: { date?: string; dateTime?: string } }[] };
+  return (json.items ?? []).filter((e) => e.status !== "cancelled").flatMap((e) => {
+    const allDay = !e.start?.dateTime;
+    // All-day events carry plain dates; read them at UTC midnight like the calendar feeds do.
+    const start = Date.parse(e.start?.dateTime ?? (e.start?.date ? `${e.start.date}T00:00:00Z` : ""));
+    const end = Date.parse(e.end?.dateTime ?? (e.end?.date ? `${e.end.date}T00:00:00Z` : ""));
+    return Number.isFinite(start) && Number.isFinite(end) ? [{ title: clean(e.summary || "(no title)", 120), start, end, allDay, location: clean(e.location, 80) }] : [];
+  });
+}
+
 export const gcalReady = async (): Promise<boolean> => !!cfg() && !!(await readRefresh());
 
 /** POST { op: "status" | "push" | "disconnect" }. */
@@ -72,7 +92,7 @@ export async function handleGoogle(request: Request): Promise<Response> {
   if (denied) return denied;
   if (!dir()) return Response.json({ configured: false, connected: false, error: "Needs BUDDY_DATA_DIR (the data volume)." });
   const body = (await request.json().catch(() => ({}))) as { op?: string; shifts?: ShiftInput[]; title?: string; remove?: string[] };
-  if (body.op === "disconnect") { await forget(); return Response.json({ ok: true }); }
+  if (body.op === "disconnect") { await forget(); (await import(/* @vite-ignore */ "./inbox" + ".server")).clearMailCache(); return Response.json({ ok: true }); }
   if (body.op === "push") return push(body);
   return Response.json({ configured: !!cfg(), connected: !!(await readRefresh()) });
 }
@@ -134,6 +154,7 @@ export async function handleGoogleCallback(request: Request): Promise<Response> 
   const t = parseTokenResponse(r.json);
   if (!t?.refresh) return page("Google didn't give a long-lived key", "Remove Pixel Pals at myaccount.google.com/permissions and connect again.");
   await saveRefresh(t.refresh);
+  (await import(/* @vite-ignore */ "./inbox" + ".server")).clearMailCache();
   access = { token: t.access, exp: Date.now() + t.expiresIn * 1000 };
   return page("Google Calendar is connected", "You can close this tab and go back to Pixel Pals.", true);
 }

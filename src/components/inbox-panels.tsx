@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Mailbox } from "@/components/mailbox";
 
 type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
-type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; items: CalItem[]; errors: string[]; error?: string };
+type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean }; items: CalItem[]; errors: string[]; error?: string };
 type MailItem = { from: string; subject: string; date: string; source: string };
 type MailData = { configured: boolean; imap: boolean; m365: boolean; items: MailItem[]; errors: string[]; error?: string };
 
@@ -57,10 +57,36 @@ export function CalendarPanel({ open }: { open: boolean }) {
     const key = dayLabel(e.start, tz);
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    const done = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.pixelpals === "google-connected") { setNote(""); void reload(); } };
+    window.addEventListener("message", done);
+    return () => window.removeEventListener("message", done);
+  }, [reload]);
+  const connect = () => {
+    if (!window.open(`/api/google/start?origin=${encodeURIComponent(location.origin)}`, "pixelpals-google", "width=520,height=700")) setNote("Popup blocked. Allow popups for this site and try again.");
+    else setNote("Approve access in the popup. This window updates when you're done.");
+  };
+  const disconnect = async () => { await fetch("/api/google", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "disconnect" }) }).catch(() => null); void reload(); };
   return (
     <div className="grid gap-3 p-3 text-sm">
       <Header title="Next 7 days" loading={loading} onReload={() => void reload()} />
       {failed && <p className="text-destructive">{failed}</p>}
+      {data?.google && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+          {data.google.connected ? (
+            <>
+              <span className="text-xs text-muted-foreground">Google Calendar is connected: your events show here, and shifts can be pushed from Work tools.</span>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void disconnect()}>Disconnect</Button>
+            </>
+          ) : data.google.configured ? (
+            <Button size="sm" variant="outline" onClick={connect}>Connect Google Calendar</Button>
+          ) : (
+            <span className="text-xs text-muted-foreground">To connect Google Calendar, enter the Google client ID and secret in Settings → Google Calendar first.</span>
+          )}
+          {note && <span className="text-xs text-muted-foreground">{note}</span>}
+        </div>
+      )}
       {data && !data.configured && (
         <Setup>
           <span>No calendar is connected yet. The easiest way is a private <b>.ics link</b> (read-only, no sign-in):</span>
