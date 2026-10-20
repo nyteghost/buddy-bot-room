@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { handleSpeech } from "@/lib/speech.server";
 
+/** Cloud character voices were a Lovable-only feature. Pals use the free browser voice instead. */
 export const Route = createFileRoute("/api/speech")({
-  server: { handlers: { POST: ({ request }) => handleSpeech(request) } },
+  server: { handlers: { POST: () => Response.json({ error: "Cloud voices aren't set up here. The browser voice is used instead." }, { status: 501 }) } },
 });

@@ -1,11 +1,7 @@
 import { convertToModelMessages, streamText, validateUIMessages, type ModelMessage } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createLovableAiGatewayRunIdFetch } from "./ai/run-id.server";
 import { agents, agentName, agentPersona, contextForMode, contextForPartner, models, messageText, type RoomMessage } from "./agents";
-import { createResponsesCall } from "./ai/responses.server";
-import { createLovableAiGatewayProvider } from "./ai/gateway-helpers.server";
-import { getLovableAiGatewayRunId, withLovableAiGatewayRunIdHeader } from "./ai/run-id.server";
 import { isAbortError, logStreamError } from "./ai/stream-errors.server";
 import { isCharacterMode } from "./hellraiser";
 import { NEUTRAL_SYSTEM } from "./compare";

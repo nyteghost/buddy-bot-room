@@ -7,7 +7,7 @@ Goal: edit this app with Claude and build it with a plain Vite config, without L
 | 1 | Delete code nothing imports (`lib/lovable-error-reporting.ts`) | none | done |
 | 2 | Drop the Lovable Cloud Google sign-in in `account-button.tsx` and `integrations/lovable/index.ts` (self-hosted already uses its own sign-in) | low | done |
 | 3 | Drop `integrations/lovable/appUserConnector.ts` and the Lovable-connector calendar paths (`calendar.functions.ts`, `api/oauth/google/return.ts`, popup in `work-tools.tsx`); the self-hosted Google Calendar flow replaces them | medium | done |
-| 4 | Drop the Lovable AI gateway helpers (`lib/ai/*`, used by `chat.server.ts`) and `LOVABLE_API_KEY` speech/transcribe paths | medium | todo |
+| 4 | Drop the Lovable AI gateway helpers (`lib/ai/*`, used by `chat.server.ts`) and `LOVABLE_API_KEY` speech/transcribe paths | medium | done |
 | 5 | Replace `@lovable.dev/vite-tanstack-config` in `vite.config.ts` with the plain plugins it wraps | highest | todo |
 | 6 | Remove the `.lovable/` folder, Lovable lines in README/AGENTS.md, and the npm packages | low | todo |
 
