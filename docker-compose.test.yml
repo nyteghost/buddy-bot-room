@@ -1,0 +1,13 @@
+# Throwaway test of the build on port 8091 (nothing shared with the real stack). Delete the stack when done.
+services:
+  buddy-bot-test:
+    build:
+      context: .
+      target: dev
+    image: buddy-bot-room:test
+    pull_policy: build
+    container_name: buddy-bot-test
+    ports:
+      - "8091:8090"
+    environment:
+      BUDDY_TZ: America/New_York
