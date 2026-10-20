@@ -2424,3 +2424,21 @@ describe("service account key file", () => {
     expect(gFile(JSON.stringify({ type: "service_account", client_email: "me@gmail.com", private_key: key }))).toBe(null);
   });
 });
+
+import { groupItems as sGroups, INTEGRATIONS as sAll, SETUP_GROUPS as sSpec, type SetupItem as SItem } from "@/lib/setup";
+describe("settings groups", () => {
+  const items: SItem[] = sAll.map((i, n) => ({ ...i, configured: n % 2 === 0 }));
+  it("places every integration in exactly one group", () => {
+    const listed = sSpec.flatMap((g) => g.ids);
+    expect(listed.length).toBe(new Set(listed).size);
+    for (const i of sAll) expect(listed.includes(i.id)).toBe(true);
+    expect(sGroups(items).flatMap((g) => g.items).length).toBe(items.length);
+  });
+  it("counts what is set up and keeps unknown cards under More", () => {
+    const extra: SItem[] = [...items, { id: "newthing", name: "New", what: "x", env: "X", testable: false, configured: true }];
+    const g = sGroups(extra);
+    expect(g[g.length - 1]?.id).toBe("more");
+    expect(g[0]?.id).toBe("basics");
+    expect(g.find((x) => x.id === "basics")?.on).toBe(g.find((x) => x.id === "basics")?.items.filter((i) => i.configured).length);
+  });
+});

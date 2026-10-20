@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, Circle, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { setupSummary, type SetupItem, type SetupTest } from "@/lib/setup";
+import { groupItems, setupSummary, type SetupItem, type SetupTest } from "@/lib/setup";
 import { setHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import type { SettingState } from "@/lib/settings";
 
@@ -16,6 +16,7 @@ export function SetupPanel({ open }: { open: boolean }) {
   const hide = useHideSecrets();
   const [fields, setFields] = useState<SettingState[]>([]);
   const [openId, setOpenId] = useState("");
+  const [openGroups, setOpenGroups] = useState<string[]>(["basics"]);
   const [drafts, setDrafts] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState("");
   const [saveNote, setSaveNote] = useState<Record<string, string>>({});
@@ -77,19 +78,7 @@ export function SetupPanel({ open }: { open: boolean }) {
     setHealth(targets.length === 0 ? "Nothing is set up yet." : bad.length ? `⚠ ${out.length - bad.length} of ${out.length} working. Needs attention: ${bad.join(", ")}.` : `✅ All ${out.length} connected integrations are working.${notSet ? ` (${notSet} more aren't set up.)` : ""}`);
     setChecking(false);
   };
-  return (
-    <div className="grid gap-3 p-3 text-sm">
-      {error && <p className="text-destructive">{error}</p>}
-      {items && <p className="font-medium">{setupSummary(items)}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" disabled={checking || !items} onClick={() => void checkAll()}>{checking ? <Loader2 className="size-3 animate-spin" /> : null} Is everything connected?</Button>
-        {health && <span className="text-xs">{health}</span>}
-      </div>
-      <label className="flex items-center gap-2 rounded-md border px-3 py-2">
-        <input type="checkbox" checked={hide} onChange={(e) => setHideSecrets(e.target.checked)} />
-        <span>Hide secrets on this device <span className="text-xs text-muted-foreground">(blurs links and addresses so screenshots are safe)</span></span>
-      </label>
-      {items?.map((i) => {
+  const renderItem = (i: SetupItem) => {
         const r = results[i.id];
         const mine = fields.filter((f) => f.group === i.id);
         const isOpen = openId === i.id;
@@ -170,9 +159,40 @@ export function SetupPanel({ open }: { open: boolean }) {
             {r && r !== "running" && <span className={r.ok ? "text-xs text-green-600 dark:text-green-400" : "text-xs text-destructive"}>{r.ok ? "✅" : "⚠"} {r.note}</span>}
           </div>
         );
+  };
+  return (
+    <div className="grid gap-3 p-3 text-sm">
+      {error && <p className="text-destructive">{error}</p>}
+      {items && <p className="font-medium">{setupSummary(items)}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={checking || !items} onClick={() => void checkAll()}>{checking ? <Loader2 className="size-3 animate-spin" /> : null} Is everything connected?</Button>
+        {health && <span className="text-xs">{health}</span>}
+      </div>
+      <label className="flex items-center gap-2 rounded-md border px-3 py-2">
+        <input type="checkbox" checked={hide} onChange={(e) => setHideSecrets(e.target.checked)} />
+        <span>Hide secrets on this device <span className="text-xs text-muted-foreground">(blurs links and addresses so screenshots are safe)</span></span>
+      </label>
+      {items && groupItems(items).map((g) => {
+        const expanded = openGroups.includes(g.id);
+        return (
+          <section key={g.id} className="rounded-md border">
+            <button type="button" aria-expanded={expanded} className="flex w-full items-center gap-2 px-3 py-2 text-left" onClick={() => setOpenGroups((list) => (list.includes(g.id) ? list.filter((x) => x !== g.id) : [...list, g.id]))}>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{g.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">{g.blurb}</span>
+              </span>
+              {g.items.length > 0 && <span className={`shrink-0 text-xs ${g.on === g.items.length ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>{g.on} of {g.items.length} set up</span>}
+              <ChevronDown className={`size-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+            </button>
+            {expanded && (
+              <div className="grid gap-2 border-t p-2">
+                {g.items.map(renderItem)}
+                {g.id === "maintenance" && <><BackupSection open={open} /><SchedulesSection open={open} /></>}
+              </div>
+            )}
+          </section>
+        );
       })}
-      <SchedulesSection open={open} />
-      <BackupSection open={open} />
       <p className="text-xs text-muted-foreground">Settings you save here are kept on the server and take effect right away. A value set in Portainer wins and is locked here. Keys and passwords are write-only and are left out of backups. Things the stack itself needs (COMPOSE_PROFILES, Tailscale, the Radicale password, the Ollama runtime) stay in Portainer.</p>
     </div>
   );

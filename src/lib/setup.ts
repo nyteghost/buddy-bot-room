@@ -32,3 +32,25 @@ export function setupSummary(items: SetupItem[]): string {
   const next = items.find((i) => !i.configured);
   return `${on} of ${items.length} set up.${next ? ` Next: ${next.name} (${next.env}).` : " Everything is set up."}`;
 }
+
+/** The Settings window groups its cards under these headings, in this order. Anything not listed lands in "More" so nothing can go missing. */
+export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: string[] }[] = [
+  { id: "basics", name: "Basics", blurb: "Time zone, your local AI, search and dictation", ids: ["general", "ollama", "searxng", "whisper"] },
+  { id: "calendar-mail", name: "Calendar & mail", blurb: "Calendar feeds, Google Calendar, email", ids: ["calendar", "gcal", "imap", "m365"] },
+  { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "telegram", "brief", "caldav"] },
+  { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
+  { id: "home", name: "Home & server", blurb: "Weather and your Unraid server", ids: ["weather", "unraid"] },
+  { id: "maintenance", name: "Backups & schedules", blurb: "Daily backups and scheduled tasks", ids: ["backup"] },
+];
+
+export type SetupGroupView = { id: string; name: string; blurb: string; items: SetupItem[]; on: number };
+export function groupItems(items: SetupItem[]): SetupGroupView[] {
+  const used = new Set<string>();
+  const groups: SetupGroupView[] = SETUP_GROUPS.map((g) => {
+    const mine = g.ids.flatMap((id) => { const it = items.find((i) => i.id === id); if (it) used.add(id); return it ? [it] : []; });
+    return { id: g.id, name: g.name, blurb: g.blurb, items: mine, on: mine.filter((i) => i.configured).length };
+  });
+  const rest = items.filter((i) => !used.has(i.id));
+  if (rest.length) groups.push({ id: "more", name: "More", blurb: "Everything else", items: rest, on: rest.filter((i) => i.configured).length });
+  return groups.filter((g) => g.items.length || g.id === "maintenance");
+}
