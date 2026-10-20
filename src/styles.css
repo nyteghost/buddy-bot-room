@@ -1994,3 +1994,11 @@ html[data-scheme="light"]:not(.hellraiser):not(.horror):not(.matrix):not(.finalf
 /* Hide secrets: anything with .secret is blurred until you focus it (tap or click into it). */
 html[data-hide-secrets="1"] .secret { filter: blur(7px); transition: filter 0.15s; }
 html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:focus-within { filter: none; }
+
+/* Phone: with many windows the bottom tab bar scrolls sideways instead of squeezing every icon off-screen. */
+@media (max-width: 700px) {
+  .workspace-sidebar, .sidebar-collapsed .workspace-sidebar { overflow-x: auto; overflow-y: hidden; justify-content: flex-start; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+  .workspace-sidebar::-webkit-scrollbar { display: none; }
+  .workspace-sidebar .sidebar-item { flex: 0 0 56px; scroll-snap-align: start; }
+  .workspace-window .secret, .workspace-window code { overflow-wrap: anywhere; }
+}

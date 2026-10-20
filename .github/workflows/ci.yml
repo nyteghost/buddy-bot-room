@@ -1,0 +1,19 @@
+name: CI
+
+# Runs the tests and a production build on every push and pull request, so a broken change shows up before you redeploy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Tests
+        run: bun run test
+      - name: Build
+        run: bun run build

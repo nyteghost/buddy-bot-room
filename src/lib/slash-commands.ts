@@ -36,7 +36,7 @@ export type SlashAction =
   | { type: "trakt"; list: string }
   | { type: "trakt-write"; op: string; text: string }
   | { type: "request"; title: string }
-  | { type: "backup"; now: boolean }
+  | { type: "backup"; now: boolean; op?: "list" | "restore"; name?: string; confirm?: boolean }
   | { type: "brief"; send: boolean }
   | { type: "review"; send: boolean }
   | { type: "prompt"; op: "list" | "save" | "remove" | "use"; name: string; text: string }
@@ -129,7 +129,7 @@ export const slashCommands = [
   { name: "prompt", usage: "/prompt [name] | save <name> = <text> | remove <name>", description: "Saved prompts: fill the message box with a ready-made starting point" },
   { name: "review", usage: "/review [send]", description: "Your week ahead: calendar, reminders, mail and picks (owner only)" },
   { name: "brief", usage: "/brief [send]", description: "Today's morning brief (add send to push it to your phone)" },
-  { name: "backup", usage: "/backup [now]", description: "Show the nightly backup status, or back up now (owner)" },
+  { name: "backup", usage: "/backup [now | list | restore N]", description: "Backup status, back up now, list backups or restore one (owner)" },
   { name: "request", usage: "/request <title> [4k]", description: "Request a title through Seerr (same as @seerr)" },
   { name: "trakt", usage: "/trakt [lists|<list>|connect|status|add <title>|watched <title>|remove <title>]", description: "Show your Trakt lists, or add/mark titles once connected" },
   { name: "plex", usage: "/plex <title|recent>", description: "Look in your Plex library (needs PLEX_URL)" },
@@ -285,8 +285,16 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "review", send: arg === "send" } };
     case "brief": case "morning":
       return { ok: true, action: { type: "brief", send: arg === "send" } };
-    case "backup":
+    case "backup": {
+      const [sub = "", ...more] = rawArg.split(/\s+/);
+      if (sub.toLowerCase() === "list") return { ok: true, action: { type: "backup", now: false, op: "list" } };
+      if (sub.toLowerCase() === "restore") {
+        const confirm = more[more.length - 1]?.toLowerCase() === "confirm";
+        const name = (confirm ? more.slice(0, -1) : more).join(" ");
+        return { ok: true, action: { type: "backup", now: false, op: "restore", name, confirm } };
+      }
       return { ok: true, action: { type: "backup", now: arg === "now" } };
+    }
     case "request":
       return rawArg ? { ok: true, action: { type: "request", title: rawArg } } : fail("Which title? /request Dune Part Two");
     case "trakt": {

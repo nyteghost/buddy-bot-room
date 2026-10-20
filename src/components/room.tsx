@@ -846,7 +846,7 @@ export function Room() {
       }
       case "brief": void briefCmd(command, action.send); return;
       case "review": void briefCmd(command, action.send, "/api/weekly"); return;
-      case "backup": void backupCmd(command, action.now); return;
+      case "backup": void backupCmd(command, action.now, action.op ? { op: action.op, name: action.name ?? "", confirm: !!action.confirm } : undefined); return;
       case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
       case "trakt": void trakt(action.list, command, null); return;
       case "next": void trakt(action.list, command, action.mood); return;
@@ -965,9 +965,9 @@ export function Room() {
     }
   }
   /** /backup shows the nightly backup status; /backup now makes one. */
-  async function backupCmd(command: string, now: boolean) {
+  async function backupCmd(command: string, now: boolean, extra?: { op: string; name: string; confirm: boolean }) {
     try {
-      const res = await fetch("/api/backup", { method: now ? "POST" : "GET" });
+      const res = await fetch("/api/backup", extra ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(extra) } : { method: now ? "POST" : "GET" });
       const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
       return say(command, json.text ?? json.error ?? "The backup check failed.");
     } catch {

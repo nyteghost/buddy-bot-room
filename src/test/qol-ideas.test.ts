@@ -17,6 +17,7 @@ import { buildWeekly, reviewDay } from "@/lib/weekly";
 import { pickReason, watchQueue } from "@/lib/pick-reason";
 import { addPalMemory, promptContext, removePalMemory, type Workbench } from "@/lib/workbench";
 import { BUILT_IN_PROMPTS, addPrompt, findPrompt, parsePromptArgs, promptList } from "@/lib/prompts";
+import { backupListText, pickBackup } from "@/lib/backup";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1921,5 +1922,30 @@ describe("saved prompts", () => {
       expect(findPrompt(all, "p")).toBeUndefined(); // plan-week and pros-cons both start with p
       expect(promptList(a.list)).toContain("weekly-notes");
     }
+  });
+});
+
+describe("backup restore helpers", () => {
+  const names = ["pixelpals-2026-10-18-0330", "pixelpals-2026-10-20-0330", "pixelpals-2026-10-19-0330", "pre-restore-2026-10-20-1000", "junk"];
+  it("picks by position, name or latest, and ignores other folders", () => {
+    expect(pickBackup(names, "")).toBe("pixelpals-2026-10-20-0330");
+    expect(pickBackup(names, "latest")).toBe("pixelpals-2026-10-20-0330");
+    expect(pickBackup(names, "2")).toBe("pixelpals-2026-10-19-0330");
+    expect(pickBackup(names, "pixelpals-2026-10-18-0330")).toBe("pixelpals-2026-10-18-0330");
+    expect(pickBackup(names, "pre-restore-2026-10-20-1000")).toBeUndefined();
+    expect(pickBackup(names, "../etc")).toBeUndefined();
+    expect(pickBackup(names, "9")).toBeUndefined();
+  });
+  it("lists newest first", () => {
+    const t = backupListText(names, { "pixelpals-2026-10-20-0330": "2h ago" });
+    expect(t).toContain("1. pixelpals-2026-10-20-0330 (2h ago)");
+    expect(t).not.toContain("junk");
+    expect(backupListText([])).toContain("No backups yet");
+  });
+  it("parses /backup restore", () => {
+    expect(parseSlash("/backup restore 2")).toEqual({ ok: true, action: { type: "backup", now: false, op: "restore", name: "2", confirm: false } });
+    expect(parseSlash("/backup restore latest confirm")).toEqual({ ok: true, action: { type: "backup", now: false, op: "restore", name: "latest", confirm: true } });
+    expect(parseSlash("/backup list")).toEqual({ ok: true, action: { type: "backup", now: false, op: "list" } });
+    expect(parseSlash("/backup now")).toEqual({ ok: true, action: { type: "backup", now: true } });
   });
 });

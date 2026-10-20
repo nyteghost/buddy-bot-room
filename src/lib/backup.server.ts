@@ -81,3 +81,38 @@ export async function backupAgeMs(cfg: BackupConfig): Promise<number | null> {
   if (!newest) return null;
   try { return Date.now() - (await (await fs()).stat(`${cfg.dir}/${newest}`)).mtimeMs; } catch { return null; }
 }
+
+export async function listBackupNames(cfg: BackupConfig): Promise<string[]> {
+  return names(cfg.dir);
+}
+
+/** Per-backup age text for the list. */
+export async function backupAges(cfg: BackupConfig, list: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const n of list) { try { out[n] = ageText(Date.now() - (await (await fs()).stat(`${cfg.dir}/${n}`)).mtimeMs); } catch { /* skip */ } }
+  return out;
+}
+
+/**
+ * Put a backup back. First saves what's there now as pre-restore-<time> (never pruned), then copies the backup over the data folder.
+ * Files that exist now but not in the backup are left alone. Only names that really exist in the backup folder are accepted.
+ */
+export async function restoreBackup(cfg: BackupConfig, name: string, now = new Date()): Promise<{ ok: boolean; text: string }> {
+  const s = state();
+  if (s.running) return { ok: false, text: "A backup or restore is already running." };
+  if (!isBackupName(name) || !(await names(cfg.dir)).includes(name)) return { ok: false, text: "That backup doesn't exist. /backup list shows them." };
+  s.running = true;
+  try {
+    const f = await fs();
+    const safety = `pre-restore-${zonedParts(now, cfg.tz).stamp}`;
+    await f.cp(cfg.dataDir, `${cfg.dir}/${safety}`, { recursive: true, filter: (src: string) => !src.endsWith(".tmp") });
+    await f.cp(`${cfg.dir}/${name}`, cfg.dataDir, { recursive: true, force: true });
+    logServer("warn", `Restored backup ${name} (previous data saved as ${safety})`);
+    return { ok: true, text: `Restored ${name}. What was there before is saved as ${safety} in the backup folder. Sign out and back in, and restart the container if anything looks stale.` };
+  } catch (error) {
+    logServer("error", "Restore failed", error);
+    return { ok: false, text: `Restore failed: ${error instanceof Error ? error.message.slice(0, 160) : "error"}` };
+  } finally {
+    s.running = false;
+  }
+}

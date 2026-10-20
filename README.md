@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-setup-search-capture-and-more)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -256,7 +256,8 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/clear` · `/stop` · `/export` | New chat · stop · download as Markdown |
 | `/record` | Open the recorder |
 | `/confetti` | Celebrate |
-| `/remember <fact>` · `/memories` · `/forget <n\|all>` | Pal memory |
+| `/remember <fact>` · `/memories` · `/forget <n\|all>` | Pal memory. Add `@name` to tell only one pal: `/remember @byte I use Arch`, `/forget @byte 1` |
+| `/prompt [name]` | Saved prompts that fill the message box; `/prompt save <name> = <text>`, `/prompt remove <name>`. Also in Ctrl+K ([7.14](#714-setup-search-capture-and-more)) |
 | `/note <text>` · `/todo <task>` · `/done <n>` · `/tasks` | Notes and to-dos |
 | `/search <query>` · `/research <question>` | Web search · search then discuss |
 | `/plex <title\|recent>` · `/watch [mood]` | Plex lookup · "what should we watch tonight" |
@@ -268,6 +269,9 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/server` · `/diagnose` | Unraid status · pals look at it and advise |
 | `/brief [send]` | Morning brief preview · push it now |
 | `/backup [now]` | Backup status · back up now (owner) |
+| `/backup list` · `/backup restore N` | List backups · restore one, with a safety copy and a confirm step (owner, [7.14](#714-setup-search-capture-and-more)) |
+| `/review [send]` | Your week ahead: calendar, reminders, mail, picks ([7.14](#714-setup-search-capture-and-more)) |
+| `/setup` · `/search` · `/hide` | Setup checklist with connection tests · search everything · blur secrets for screenshots ([7.14](#714-setup-search-capture-and-more)) |
 | `/voice [on\|off]` | Read replies aloud |
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
@@ -504,6 +508,22 @@ Microsoft 365 work mail can be added with `/m365 connect` instead. Results are c
 
 I tested the date and time reading, the reminders logic, the brief and the `.ics` output with automated tests. I could not test Open-Meteo, ntfy delivery or the new windows in a real browser here.
 
+### 7.14 Setup, search, capture and more
+
+- **Setup window** (`/setup`, owner only): every integration with a green check when it's set up, the variable to set when it isn't, and a **Test** button that tries the connection (Plex, Seerr, Ollama, Trakt, ntfy, Telegram, Whisper, weather, calendar feeds, IMAP). Addresses and keys never leave the server. The same window has **Hide secrets** (`/hide`), which blurs share links and server addresses on this device so you can screenshot safely; click into a blurred field to read it.
+- **Search** (`/search`): one box over your saved chats, notes, tasks, memories and reminders. Every word you type has to appear; clicking a chat opens it.
+- **Quick capture:** message your Telegram bot `note: gate code is 1234`, `todo: call dentist`, `remember: I run Unraid` or `remind me in 1h stretch` and it is saved instead of answered. Notes, tasks and memories appear in the app the next time it's open (checked every minute); reminders are scheduled straight away. From an iPhone share sheet, build a Shortcut with **Get Contents of URL**: `POST` to `https://<your-address>/api/capture`, header `Authorization: Bearer <your Shortcut token>` (the same token as [7.8](#78-iphone-notes--trakt-sync)), JSON body `{"op":"add","text":"<Shortcut Input>"}`. Needs `BUDDY_DATA_DIR`; owner only.
+- **Repeating reminders and snooze:** `/remind every monday 9am send report`, `/remind every day 8pm take pills`, `/remind every weekday 7am gym` (also weekly and monthly). When one arrives on your phone, reply `snooze 30m` (or `snooze tomorrow`) to the Telegram bot to be reminded again; in the Tasks window use **+1h**. `/remind snooze 2 1h` snoozes reminder number 2.
+- **Weekly review:** `/review` previews your week ahead (calendar by day, reminders, unread mail, a few Trakt picks); `/review send` pushes it. Set `REVIEW_DAY` (for example `sun`) and `REVIEW_TIME` (for example `18:00`) to get it automatically, through the same ntfy/Telegram as the morning brief.
+- **Watch queue:** the Today window lists your unwatched Trakt items, ones already in Plex first, each with a one-line reason, and a **Request** button (opens the Seerr request dialog) for ones not in Plex yet.
+- **Per-pal memory and saved prompts:** `/remember @byte I use Arch` is known only to Byte; `/memories` shows everything. Built-in prompts (summarize, reply, plan-week, explain, pros-cons, debug) and your own appear in `/prompt` and Ctrl+K and fill the message box.
+- **Branching:** use **Branch from here** on any message to continue from that point as a separate saved chat.
+- **Backups:** `/backup list` and `/backup restore 2` (or a name). It first saves what's there as `pre-restore-<time>` in the backup folder, asks you to confirm, then copies the backup over your data. Files that exist now but not in the backup are left alone. Restart the container afterwards if anything looks stale.
+- **Phones:** the bottom tab bar now scrolls sideways so every window has a button. I couldn't check the layout on a real phone here, so tell me what looks off.
+- **CI:** `.github/workflows/ci.yml` runs the tests and a build on every push to GitHub, so a broken change is flagged before you redeploy.
+
+I tested the logic of all of this with automated tests. I could not run it against real Plex, Seerr, Telegram, ntfy, IMAP or Tailscale, or look at the windows in a browser, so treat the first run as a shakedown.
+
 ## 8. Automatic jobs
 
 These run on the server at times in `BUDDY_TZ` (default `America/New_York`).
@@ -657,6 +677,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `UNRAID_CHECK_SECONDS` | `60` | How often it checks |
 | `NTFY_URL` | | Phone push address |
 | `BRIEF_TIME` | empty (off) | Morning brief time, `HH:MM` |
+| `REVIEW_DAY` / `REVIEW_TIME` | empty (off) | Weekly review: day (`sun`) and time (`18:00`) ([7.14](#714-setup-search-capture-and-more)) |
 | `BUDDY_BACKUP_PATH` | volume `buddy-backups` | Host folder for backups |
 | `BUDDY_BACKUP_TIME` | `03:30` | Nightly backup time |
 | `BUDDY_BACKUP_KEEP` | `14` | Copies to keep |

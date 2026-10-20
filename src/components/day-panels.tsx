@@ -65,7 +65,7 @@ export function TasksPanel({ open }: { open: boolean }) {
         {note && <p className="text-xs text-muted-foreground">{note}</p>}
         {reminders.map((r) => (
           <div key={r.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
-            <span className="w-28 shrink-0 text-xs text-muted-foreground">{whenLabel(r.at, tz)}</span>
+            <span className="w-24 shrink-0 text-xs text-muted-foreground sm:w-28">{whenLabel(r.at, tz)}</span>
             <span className="min-w-0 flex-1 truncate">{r.text}{r.repeat ? <span className="text-xs text-muted-foreground"> · {r.repeat === "weekdays" ? "every weekday" : r.repeat}</span> : null}</span>
             <Button size="sm" variant="ghost" className="h-7 px-1 text-xs" title="Snooze 1 hour" onClick={() => void remindCall("snooze", `${r.id} 1h`).then((x) => { if (x.items) setReminders(x.items); })}>+1h</Button>
             <Button size="sm" variant="ghost" className="h-7 px-1" aria-label="Remove reminder" onClick={() => void remindCall("remove", r.id).then((x) => { if (x.items) setReminders(x.items); })}><Trash2 className="size-3.5" /></Button>
