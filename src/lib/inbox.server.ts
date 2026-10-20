@@ -20,7 +20,9 @@ function icsUrls(): { name: string; url: string }[] {
   return (process.env["CALENDAR_ICS_URLS"] ?? "").split(/[\s,]+/).map((u) => u.trim()).filter(Boolean).slice(0, 6).flatMap((u, i) => {
     try {
       const url = new URL(u.replace(/^webcal:/i, "https:"));
-      return url.protocol === "https:" || url.protocol === "http:" ? [{ name: `Calendar ${i + 1}`, url: url.toString() }] : [];
+      const host = url.hostname.toLowerCase();
+      const label = /(^|\.)cozi\.com$/.test(host) ? "Cozi" : /(^|\.)google\.com$/.test(host) ? "Google Calendar" : /icloud\.com$/.test(host) ? "iCloud" : /(outlook|office365|live)\./.test(host) ? "Outlook" : `Calendar ${i + 1}`;
+      return url.protocol === "https:" || url.protocol === "http:" ? [{ name: label, url: url.toString() }] : [];
     } catch { return []; }
   });
 }
@@ -66,6 +68,9 @@ export async function calendarData(daysIn: number): Promise<CalendarData> {
   cache.set(`cal|${days}`, body);
   return body;
 }
+
+/** After the mailbox changes (read, moved, deleted, sent) the unread summary must be re-read. */
+export const clearMailCache = (): void => cache.clear();
 
 export async function handleMail(request: Request): Promise<Response> {
   const denied = await owner(request);

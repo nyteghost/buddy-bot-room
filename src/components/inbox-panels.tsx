@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { PenLine, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { replyPrompt } from "@/lib/mail-reply";
+import { Mailbox } from "@/components/mailbox";
 
 type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
 type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; items: CalItem[]; errors: string[]; error?: string };
@@ -91,41 +91,34 @@ export function CalendarPanel({ open }: { open: boolean }) {
 
 export function MailPanel({ open }: { open: boolean }) {
   const { data, loading, failed, reload } = useFeed<MailData>("/api/mail", open);
-  const [drafting, setDrafting] = useState<number | null>(null);
-  const [intent, setIntent] = useState("");
-  const draft = (m: MailItem) => {
-    window.dispatchEvent(new CustomEvent("pixelpals:ask", { detail: { partner: "echo", text: replyPrompt(m.from, m.subject, intent) } }));
-    setDrafting(null);
-    setIntent("");
-  };
+  const m365Items = (data?.items ?? []).filter((m) => m.source === "Microsoft 365");
   return (
     <div className="grid gap-3 p-3 text-sm">
-      <Header title="Unread" loading={loading} onReload={() => void reload()} />
       {failed && <p className="text-destructive">{failed}</p>}
+      {data?.imap && <Mailbox open={open} />}
       {data && !data.configured && (
         <Setup>
-          <span>No mailbox is connected yet. Pixel Pals can show <b>unread subjects only</b>: it never downloads message bodies, marks anything read, sends, deletes or moves mail.</span>
-          <span>Set these on the stack and redeploy (use an <b>app password</b>, not your normal password, for Gmail, iCloud, Outlook.com and Fastmail):</span>
-          <code className="block whitespace-pre-wrap">IMAP_HOST=imap.gmail.com{"\n"}IMAP_USER=you@gmail.com{"\n"}IMAP_PASS=your-app-password</code>
-          <span>Common hosts: <code>imap.gmail.com</code>, <code>imap.mail.me.com</code>, <code>outlook.office365.com</code>, <code>imap.fastmail.com</code>. A work Microsoft 365 mailbox can be added with <code>/m365 connect</code>.</span>
+          <span>No mailbox is connected yet. Connect <b>Gmail</b> (or any IMAP mail) and you can read, reply, send, move and delete mail here.</span>
+          <ol className="list-decimal pl-5">
+            <li>Turn on 2-Step Verification for your Google account, then create an <b>app password</b> at <code>myaccount.google.com/apppasswords</code> (your normal password won't work).</li>
+            <li>Open <b>Setup → Mail</b> (top menu), press <b>Fill in for Gmail</b>, enter your address and the app password, and <b>Save</b>.</li>
+            <li>Press <b>Test</b>. It checks both reading and sending.</li>
+          </ol>
+          <span>Other mail: <code>imap.mail.me.com</code> (iCloud), <code>outlook.office365.com</code>, <code>imap.fastmail.com</code>. A work Microsoft 365 mailbox (read-only unread subjects) can be added with <code>/m365 connect</code>.</span>
         </Setup>
       )}
-      {data?.configured && !data.items.length && !failed && <p className="text-muted-foreground">No unread mail. 🎉</p>}
-      {data?.items.map((m, i) => (
-        <div key={`${m.subject}-${i}`} className="grid gap-0.5 rounded-md border px-3 py-2">
-          <span className="truncate font-medium">{m.subject}</span>
-          <span className="truncate text-xs text-muted-foreground">{m.from}{data.imap && data.m365 ? ` · ${m.source}` : ""}{m.date && !Number.isNaN(Date.parse(m.date)) ? ` · ${new Date(m.date).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}</span>
-          {drafting === i ? (
-            <div className="mt-1 grid gap-2">
-              <textarea className="min-h-16 w-full rounded-md border bg-background px-2 py-1 text-sm" placeholder="What do you want to say? A few words is enough, like “yes Thursday works, ask for the invoice”." value={intent} maxLength={400} onChange={(e) => setIntent(e.target.value)} autoFocus />
-              <span className="text-xs text-muted-foreground">Echo sees only the sender, the subject and what you type here, never the message itself. You copy the draft into your own mail app; nothing is sent.</span>
-              <div className="flex gap-2"><Button size="sm" onClick={() => draft(m)}>Draft with Echo</Button><Button size="sm" variant="ghost" onClick={() => setDrafting(null)}>Cancel</Button></div>
+      {data?.m365 && (
+        <section className="grid gap-1">
+          <Header title={data.imap ? "Microsoft 365 unread (read-only)" : "Unread"} loading={loading} onReload={() => void reload()} />
+          {!m365Items.length && <p className="text-muted-foreground">No unread mail. 🎉</p>}
+          {m365Items.map((m, i) => (
+            <div key={`${m.subject}-${i}`} className="grid gap-0.5 rounded-md border px-3 py-2">
+              <span className="truncate font-medium">{m.subject}</span>
+              <span className="truncate text-xs text-muted-foreground">{m.from}{m.date && !Number.isNaN(Date.parse(m.date)) ? ` · ${new Date(m.date).toLocaleString()}` : ""}</span>
             </div>
-          ) : (
-            <Button size="sm" variant="ghost" className="mt-1 h-7 justify-start px-1 text-xs" onClick={() => { setDrafting(i); setIntent(""); }}><PenLine className="size-3" /> Draft a reply</Button>
-          )}
-        </div>
-      ))}
+          ))}
+        </section>
+      )}
       {data?.errors.map((e) => <p key={e} className="text-xs text-destructive">{e}</p>)}
     </div>
   );

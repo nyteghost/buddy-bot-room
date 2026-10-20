@@ -10,6 +10,7 @@ export class TtlCache<V> {
     if (now - hit.at > this.ttlMs) { this.map.delete(key); return undefined; }
     return hit.value;
   }
+  clear(): void { this.map.clear(); }
   set(key: string, value: V, now = Date.now()): void {
     this.map.delete(key);
     this.map.set(key, { at: now, value });

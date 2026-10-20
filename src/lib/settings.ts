@@ -39,11 +39,14 @@ export const SETTING_FIELDS: SettingField[] = [
   { key: "TELEGRAM_CHAT_ID", label: "Your Telegram chat ID", group: "telegram", kind: "text", help: "Only this chat can talk to the bot." },
   { key: "WEATHER_LOCATION", label: "Place", group: "weather", kind: "text", placeholder: "Atlanta, GA" },
   { key: "WEATHER_UNITS", label: "Units", group: "weather", kind: "select", options: ["imperial", "metric"] },
-  { key: "CALENDAR_ICS_URLS", label: "Calendar feed links", group: "calendar", kind: "list", secret: true, placeholder: "https://…/basic.ics", help: "Up to six, separated by spaces or commas. Private feed links work like passwords." },
-  { key: "IMAP_HOST", label: "Mail server", group: "imap", kind: "text", placeholder: "imap.gmail.com" },
+  { key: "CALENDAR_ICS_URLS", label: "Calendar feed links", group: "calendar", kind: "list", secret: true, placeholder: "https://…/basic.ics", help: "Google, iCloud, Outlook or Cozi share links (webcal:// links work too). Up to six, separated by spaces or commas. Private feed links work like passwords." },
+  { key: "IMAP_HOST", label: "Mail server (IMAP)", group: "imap", kind: "text", placeholder: "imap.gmail.com", help: "Gmail: imap.gmail.com. Outlook.com: outlook.office365.com. iCloud: imap.mail.me.com. Fastmail: imap.fastmail.com." },
   { key: "IMAP_PORT", label: "Port", group: "imap", kind: "number", placeholder: "993" },
-  { key: "IMAP_USER", label: "Mail username", group: "imap", kind: "text" },
-  { key: "IMAP_PASS", label: "Mail password (app password)", group: "imap", kind: "text", secret: true },
+  { key: "IMAP_USER", label: "Email address", group: "imap", kind: "text", placeholder: "you@gmail.com", help: "Your full address. Sending needs it." },
+  { key: "IMAP_PASS", label: "App password", group: "imap", kind: "text", secret: true, help: "Not your normal password. Gmail: turn on 2-Step Verification, then create a 16-character app password at myaccount.google.com/apppasswords." },
+  { key: "SMTP_HOST", label: "Sending server (SMTP)", group: "imap", kind: "text", placeholder: "smtp.gmail.com", help: "Leave empty to use the usual name (imap.gmail.com becomes smtp.gmail.com)." },
+  { key: "SMTP_PORT", label: "Sending port", group: "imap", kind: "number", placeholder: "465", help: "465 (encrypted straight away) or 587 (upgrades with STARTTLS)." },
+  { key: "MAIL_FROM_NAME", label: "Your name on sent mail", group: "imap", kind: "text", placeholder: "Chelli" },
   { key: "M365_CLIENT_ID", label: "Microsoft app (client) ID", group: "m365", kind: "text" },
   { key: "M365_TENANT", label: "Tenant", group: "m365", kind: "text", placeholder: "organizations" },
   { key: "BRIEF_TIME", label: "Brief time (24-hour)", group: "brief", kind: "time", placeholder: "07:30" },
@@ -72,7 +75,7 @@ export function cleanSetting(field: SettingField, raw: unknown): { ok: true; val
       return { ok: true, value: v.replace(/\/+$/, "") };
     }
     case "list": {
-      const parts = v.split(/[\s,]+/).filter(Boolean);
+      const parts = v.split(/[\s,]+/).filter(Boolean).map((u) => u.replace(/^webcal:/i, "https:"));
       if (parts.length > 6) return { ok: false, error: `${field.label}: six links at most.` };
       if (!parts.every((p) => /^https?:\/\//i.test(p))) return { ok: false, error: `${field.label}: every link must start with http:// or https://.` };
       return { ok: true, value: parts.join(",") };

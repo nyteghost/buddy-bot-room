@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiMailboxRouteImport } from './routes/api.mailbox'
 import { Route as ApiSettingsRouteImport } from './routes/api.settings'
 import { Route as ApiTasksRouteImport } from './routes/api.tasks'
 import { Route as ApiUpdateRouteImport } from './routes/api.update'
@@ -71,6 +72,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMailboxRoute = ApiMailboxRouteImport.update({
+  id: '/api/mailbox',
+  path: '/api/mailbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSettingsRoute = ApiSettingsRouteImport.update({
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/mailbox': typeof ApiMailboxRoute
   '/api/settings': typeof ApiSettingsRoute
   '/api/tasks': typeof ApiTasksRoute
   '/api/update': typeof ApiUpdateRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/mailbox': typeof ApiMailboxRoute
   '/api/settings': typeof ApiSettingsRoute
   '/api/tasks': typeof ApiTasksRoute
   '/api/update': typeof ApiUpdateRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/mailbox': typeof ApiMailboxRoute
   '/api/settings': typeof ApiSettingsRoute
   '/api/tasks': typeof ApiTasksRoute
   '/api/update': typeof ApiUpdateRoute
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/mailbox'
     | '/api/settings'
     | '/api/tasks'
     | '/api/update'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/mailbox'
     | '/api/settings'
     | '/api/tasks'
     | '/api/update'
@@ -448,6 +459,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/mailbox'
     | '/api/settings'
     | '/api/tasks'
     | '/api/update'
@@ -489,6 +501,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiMailboxRoute: typeof ApiMailboxRoute
   ApiSettingsRoute: typeof ApiSettingsRoute
   ApiTasksRoute: typeof ApiTasksRoute
   ApiUpdateRoute: typeof ApiUpdateRoute
@@ -559,6 +572,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mailbox': {
+      id: '/api/mailbox'
+      path: '/api/mailbox'
+      fullPath: '/api/mailbox'
+      preLoaderRoute: typeof ApiMailboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings': {
@@ -801,6 +821,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiMailboxRoute: ApiMailboxRoute,
   ApiSettingsRoute: ApiSettingsRoute,
   ApiTasksRoute: ApiTasksRoute,
   ApiUpdateRoute: ApiUpdateRoute,

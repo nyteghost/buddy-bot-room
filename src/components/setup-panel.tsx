@@ -78,6 +78,12 @@ export function SetupPanel({ open }: { open: boolean }) {
             <span className="text-xs text-muted-foreground">{i.what}{i.configured ? "" : mine.length ? " · not set up yet" : ` · set ${i.env} in Portainer`}</span>
             {isOpen && (
               <form className="mt-1 grid gap-2 border-t pt-2" onSubmit={(e) => { e.preventDefault(); void save(i.id, mine.map((f) => f.key)); }}>
+                {i.id === "imap" && (
+                  <div className="grid gap-1 rounded-md bg-muted/40 p-2 text-xs">
+                    <span>Using Gmail? Press the button, add your address and an app password, then Save.</span>
+                    <Button type="button" size="sm" variant="outline" className="h-7 w-fit" onClick={() => setDrafts((d) => ({ ...d, ...Object.fromEntries(([["IMAP_HOST", "imap.gmail.com"], ["IMAP_PORT", "993"], ["SMTP_HOST", "smtp.gmail.com"], ["SMTP_PORT", "465"]] as const).filter(([k]) => mine.find((f) => f.key === k)?.source !== "env")) }))}>Fill in for Gmail</Button>
+                  </div>
+                )}
                 {mine.map((f) => {
                   const locked = f.source === "env";
                   const draft = drafts[f.key];

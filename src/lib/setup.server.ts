@@ -4,6 +4,7 @@ import { briefConfig } from "./brief.server";
 import { caldavConfig, pingCaldav } from "./caldav.server";
 import { calendarData, mailData } from "./inbox.server";
 import { imapConfig } from "./imap.server";
+import { mailSendReady } from "./mailbox.server";
 import { ollamaBase } from "./ollama.server";
 import { INTEGRATIONS, itemById, type SetupItem, type SetupTest } from "./setup";
 import { telegramEnabled, telegramSend } from "./telegram.server";
@@ -63,7 +64,7 @@ const tests: Record<string, () => Promise<SetupTest>> = {
   whisper: () => reach(env("WHISPER_URL"), "/health"),
   weather: async () => { const r = await getWeather(); return "weather" in r ? { ok: true, note: `${r.weather.place}: found.` } : { ok: false, note: r.error }; },
   calendar: async () => { const c = await calendarData(7); return c.errors.length ? { ok: false, note: c.errors[0] ?? "Failed." } : { ok: true, note: `${c.feeds} feed${c.feeds === 1 ? "" : "s"} read, ${c.items.length} event${c.items.length === 1 ? "" : "s"} in the next 7 days.` }; },
-  imap: async () => { const m = await mailData(); return m.errors.length ? { ok: false, note: m.errors[0] ?? "Failed." } : { ok: true, note: `Signed in. ${m.items.length} unread.` }; },
+  imap: async () => { const m = await mailData(); if (m.errors.length) return { ok: false, note: m.errors[0] ?? "Failed." }; const send = await mailSendReady(); return { ok: send.ok, note: `Signed in, ${m.items.length} unread. ${send.note}` }; },
 };
 
 /** GET lists integrations and whether each is set up; POST { id } runs one connection test. Owner only. Values are never returned. */

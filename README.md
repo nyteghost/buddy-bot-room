@@ -483,17 +483,20 @@ Two windows in the left **Workspace** sidebar (also `/calendar`, `/mail` and the
 - **Google Calendar:** Settings → your calendar → *Integrate calendar* → **Secret address in iCal format**.
 - **iCloud:** Calendar → share → *Public Calendar* → copy the link (it is public to anyone with the link).
 - **Outlook.com:** Settings → Calendar → *Shared calendars* → publish → copy the **ICS** link.
+- **Cozi:** Settings → *Shared Cozi Calendars* → switch the person (or *All*) to *Shared* → *View or send Cozi URL* → *Copy Cozi URL*. Paste it into *Setup → Calendar feeds*. It is read-only: Cozi events show here, but you can't edit Cozi from Pixel Pals. (`webcal://` links work too.)
 
-Put one or more links in `CALENDAR_ICS_URLS` (comma separated, up to 6) and redeploy. Repeating events, all-day events, time zones and cancelled events are handled. Treat these links like passwords: anyone with one can read that calendar. If you connected Microsoft 365 ([7.11](#711-microsoft-365-work-read-only)) its events appear too, labelled by source.
+Paste the links into *Setup → Calendar feeds* (or `CALENDAR_ICS_URLS`, comma separated, up to 6). Repeating events, all-day events, time zones and cancelled events are handled. Treat these links like passwords: anyone with one can read that calendar. If you connected Microsoft 365 ([7.11](#711-microsoft-365-work-read-only)) its events appear too, labelled by source.
 
-**Mail** shows the **subject, sender and date of unread messages** over IMAP. It never downloads message bodies, marks anything read, sends, moves or deletes.
+**Mail** (owner only) connects to Gmail, iCloud, Outlook.com, Fastmail or any IMAP mailbox and lets you **read, reply, write and send, move and delete** mail. Open **Setup → Mail**, press **Fill in for Gmail**, enter your address and an **app password**, **Save**, then **Test** (it checks reading and sending).
 
-| Variable | Example |
-|---|---|
-| `IMAP_HOST` | `imap.gmail.com` · `imap.mail.me.com` (iCloud) · `outlook.office365.com` · `imap.fastmail.com` |
-| `IMAP_USER` | Your full address |
-| `IMAP_PASS` | An **app password** (Gmail, iCloud and Fastmail require one; it needs 2-step verification turned on) |
-| `IMAP_PORT` / `IMAP_FOLDER` | Optional: `993` / `INBOX` |
+- **Gmail app password:** turn on 2-Step Verification for your Google account, then create a 16-character app password at `myaccount.google.com/apppasswords`. Your normal password won't work. Google Workspace accounts may need the admin to allow app passwords.
+- **Reading:** pick a folder, search it, filter to unread, open a message. Bodies are shown as **plain text** (HTML is turned into text, images and remote content are never loaded, attachments are listed by name and not downloaded, and only the first 300 KB of a message is fetched). Opening a message marks it read; *Mark unread* undoes that.
+- **Delete** moves the message to Trash (recoverable). Inside Trash or Spam it deletes for good. **Move** puts it in any folder on the account.
+- **Send and Reply:** plain text only, no attachments. Nothing is sent until you press **Send** and then confirm. Recipients are checked, header lines can't be injected, and there is a limit of 20 sends per hour. Gmail keeps a copy in Sent by itself; other providers may not.
+- **Echo drafts:** *Get a draft from Echo* gives Echo only the sender, the subject and the few words you type, never the message itself.
+- **Variables** (all editable in Setup, no redeploy): `IMAP_HOST` (`imap.gmail.com`, `imap.mail.me.com`, `outlook.office365.com`, `imap.fastmail.com`), `IMAP_USER` (your full address), `IMAP_PASS` (the app password), optional `IMAP_PORT` (993), `SMTP_HOST` (guessed from the IMAP name, e.g. `smtp.gmail.com`), `SMTP_PORT` (465, or 587 with STARTTLS) and `MAIL_FROM_NAME`.
+- Everything runs on your server over encrypted connections; the app password is stored write-only and is left out of backups. If the mail server doesn't offer encryption on port 587, Pixel Pals refuses to send the password.
+- I tested it end to end against a stand-in IMAP and SMTP server that behaves like Gmail (list, search, read, move, delete, send, refusals). I could not run it against a real Gmail account, so the first connection is a shakedown.
 
 Microsoft 365 work mail can be added with `/m365 connect` instead. Results are cached for a minute and refresh every five minutes while the window is open. I could not test IMAP against a real mailbox, so if your provider refuses the login, check that IMAP access and the app password are enabled and look at the message under the list.
 
@@ -724,7 +727,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `WEATHER_LOCATION` / `WEATHER_LAT` / `WEATHER_LON` | empty | Where you are, for `/weather` and the brief ([7.13](#713-today-tasks-weather-and-events)) |
 | `WEATHER_UNITS` | `imperial` | `metric` for °C and km/h |
 | `CALENDAR_ICS_URLS` | empty | Private .ics links for the Calendar window ([7.12](#712-calendar-and-mail-windows)) |
-| `IMAP_HOST` / `IMAP_USER` / `IMAP_PASS` | empty | Unread mail for the Mail window (app password) |
+| `IMAP_HOST` / `IMAP_USER` / `IMAP_PASS` | empty | The Mail window: read, send, move, delete (app password) |
+| `SMTP_HOST` / `SMTP_PORT` / `MAIL_FROM_NAME` | guessed / `465` / empty | Sending: server (guessed from the IMAP name), port, and your name on sent mail |
 | `M365_CLIENT_ID` / `M365_TENANT` | empty / `organizations` | Microsoft 365 read-only ([7.11](#711-microsoft-365-work-read-only)) |
 | `COMPOSE_PROFILES` | empty | `tailscale` starts the Tailscale sidecar |
 | `WHISPER_REPLICAS` | `1` | `0` leaves the Whisper container off |

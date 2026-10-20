@@ -65,6 +65,7 @@ import { SETTING_FIELDS, cleanSetting, envValue, fieldByKey, fieldsFor } from "@
 import { describeSettings, saveSettings } from "@/lib/settings.server";
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { addressOf, allowSend, authPlain, buildMessage, decodeMutf7, dotStuff, extractBody, guessSmtpHost, htmlToText, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSmtpReply, parseSummary, parseUidSearch, replySubject, validAddress } from "@/lib/mailbox";
 import { backupName, insideData, isBackupName, pruneList } from "@/lib/backup";
 import { plexHas } from "@/lib/trakt";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
@@ -2096,6 +2097,7 @@ describe("in-app settings", () => {
     expect(cleanSetting(f("WEATHER_UNITS"), "kelvin")).toMatchObject({ ok: false });
     expect(cleanSetting(f("CALENDAR_ICS_URLS"), "https://a.example/x.ics, https://b.example/y.ics")).toEqual({ ok: true, value: "https://a.example/x.ics,https://b.example/y.ics" });
     expect(cleanSetting(f("CALENDAR_ICS_URLS"), "ftp://a")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("CALENDAR_ICS_URLS"), "webcal://api.cozi.com/ical/abc")).toEqual({ ok: true, value: "https://api.cozi.com/ical/abc" });
     expect(cleanSetting(f("TRAKT_USER"), "")).toEqual({ ok: true, value: "" });
     expect(envValue("UPDATE_CHECK", "off")).toBe("0");
     expect(envValue("UPDATE_CHECK", "on")).toBe("1");
@@ -2140,5 +2142,97 @@ describe("in-app settings", () => {
     expect(existsSync(`${dir}/app-secrets.json`)).toBe(true);
     delete process.env["SEERR_URL"];
     delete process.env["BUDDY_DATA_DIR"];
+  });
+});
+
+describe("mailbox helpers", () => {
+  it("lists folders with their roles", () => {
+    const raw = [
+      '* LIST (\\HasNoChildren) "/" "INBOX"',
+      '* LIST (\\HasNoChildren \\Sent) "/" "[Gmail]/Sent Mail"',
+      '* LIST (\\HasNoChildren \\Trash) "/" "[Gmail]/Trash"',
+      '* LIST (\\Noselect \\HasChildren) "/" "[Gmail]"',
+      '* LIST (\\HasNoChildren) "/" Receipts',
+      '* LIST (\\HasNoChildren) "/" "Caf&AOk-s"',
+      'a1 OK done',
+    ].join("\r\n") + "\r\n";
+    const f = parseFolderList(raw);
+    expect(f.map((x) => x.name)).toEqual(["INBOX", "[Gmail]/Sent Mail", "[Gmail]/Trash", "Cafés".replace("é", "&AOk-"), "Receipts"].sort((a, b) => 0));
+    expect(f.find((x) => x.name === "[Gmail]/Trash")).toMatchObject({ special: "trash", label: "Trash" });
+    expect(f.find((x) => x.name === "INBOX")?.special).toBe("inbox");
+    expect(f.some((x) => x.name === "[Gmail]")).toBe(false);
+    expect(decodeMutf7("Caf&AOk-s &-co")).toBe("Cafés &co");
+  });
+  it("reads FETCH replies with flags before or after the literal", () => {
+    const h1 = "From: Ann Lee <ann@x.test>\r\nSubject: =?UTF-8?B?SGk=?=\r\nDate: Tue, 20 Oct 2026 10:00:00 +0000\r\n\r\n";
+    const h2 = "From: bob@y.test\r\nSubject: Second\r\n\r\n";
+    const raw = `* 1 FETCH (UID 41 FLAGS (\\Seen) BODY[HEADER.FIELDS (FROM SUBJECT DATE)] {${h1.length}}\r\n${h1})\r\n* 2 FETCH (UID 42 BODY[HEADER.FIELDS (FROM SUBJECT DATE)] {${h2.length}}\r\n${h2} FLAGS ())\r\na2 OK Fetch completed\r\n`;
+    const items = parseFetchItems(raw);
+    expect(items.map((i) => i.uid)).toEqual([41, 42]);
+    expect(items[0]?.flags).toEqual(["\\Seen"]);
+    expect(items[1]?.flags).toEqual([]);
+    const s = parseSummary(41, items[0]!.flags, items[0]!.literal);
+    expect(s).toMatchObject({ uid: 41, from: "Ann Lee", fromAddr: "ann@x.test", subject: "Hi", seen: true });
+    expect(parseSummary(42, [], items[1]!.literal)).toMatchObject({ fromAddr: "bob@y.test", seen: false });
+    expect(parseUidSearch("* SEARCH 5 9 12\r\na3 OK\r\n")).toEqual([5, 9, 12]);
+    expect(parseUidSearch("* SEARCH\r\na3 OK\r\n")).toEqual([]);
+  });
+  it("turns MIME messages into readable text", () => {
+    const qp = "From: a@x.test\r\nSubject: t\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nCaf=C3=A9 soft=\r\nbreak\r\n";
+    expect(extractBody(qp).text).toBe("Café softbreak");
+    const alt = "Content-Type: multipart/alternative; boundary=\"b1\"\r\n\r\n--b1\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nplain version\r\n--b1\r\nContent-Type: text/html\r\n\r\n<p>html version</p>\r\n--b1--\r\n";
+    expect(extractBody(alt).text).toBe("plain version");
+    const htmlOnly = "Content-Type: text/html; charset=utf-8\r\n\r\n<style>p{}</style><p>Hello &amp; welcome</p><p>Line two<br>three &#8212; end</p>";
+    expect(extractBody(htmlOnly).text).toBe("Hello & welcome\nLine two\nthree — end");
+    const b64 = "Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" + Buffer.from("héllo wörld").toString("base64") + "\r\n";
+    expect(extractBody(b64).text).toBe("héllo wörld");
+    const latin = "Content-Type: text/plain; charset=iso-8859-1\r\nContent-Transfer-Encoding: 8bit\r\n\r\ncaf\xe9";
+    expect(extractBody(latin).text).toBe("café");
+    const mixed = "Content-Type: multipart/mixed; boundary=zz\r\n\r\n--zz\r\nContent-Type: text/plain\r\n\r\nSee attached\r\n--zz\r\nContent-Type: application/pdf; name=\"bill.pdf\"\r\nContent-Disposition: attachment; filename=\"bill.pdf\"\r\nContent-Transfer-Encoding: base64\r\n\r\nJVBERi0=\r\n--zz--\r\n";
+    expect(extractBody(mixed)).toEqual({ text: "See attached", truncated: false, attachments: ["bill.pdf"] });
+    expect(extractBody("Subject: x\r\n\r\n" + "a".repeat(50), 10)).toMatchObject({ truncated: true });
+    expect(htmlToText("<script>alert(1)</script>ok")).toBe("ok");
+    const full = parseMessage(7, ["\\Seen"], "From: \"Ann\" <ann@x.test>\r\nTo: me@x.test\r\nCc: c@x.test\r\nSubject: Hello\r\nMessage-ID: <abc@x.test>\r\n\r\nBody here");
+    expect(full).toMatchObject({ uid: 7, text: "Body here", cc: "c@x.test", messageId: "<abc@x.test>", seen: true });
+  });
+  it("checks recipients and refuses header tricks", () => {
+    expect(parseRecipients("a@x.test, Ann Lee <b@y.test>; A@X.test")).toEqual(["a@x.test", "b@y.test"]);
+    expect(parseRecipients("not an address")).toBeNull();
+    expect(parseRecipients("a@x.test\r\nBcc: evil@z.test")).toBeNull();
+    expect(parseRecipients(Array.from({ length: 21 }, (_, i) => `u${i}@x.test`).join(","))).toBeNull();
+    expect(validAddress("a@b")).toBe(false);
+    expect(addressOf('"Ann" <ann@x.test>')).toBe("ann@x.test");
+    expect(replySubject("Lunch")).toBe("Re: Lunch");
+    expect(replySubject("RE: Lunch")).toBe("RE: Lunch");
+  });
+  it("builds a safe message", () => {
+    const raw = buildMessage({ from: "me@x.test", fromName: 'Me "Q"\r\nBcc: x@y.test', to: ["a@x.test"], cc: ["c@x.test"], subject: "Hi\r\nBcc: evil@z.test", text: "Line one\n.dot line\nünï", messageId: "<id1@x.test>", inReplyTo: "<orig@x.test>", date: new Date("2026-10-20T15:00:00Z") });
+    const head = raw.split("\r\n\r\n")[0]!;
+    expect(head).toContain("To: a@x.test");
+    expect(head).toContain("Cc: c@x.test");
+    expect(head).toContain("In-Reply-To: <orig@x.test>");
+    expect(head.split("\r\n").filter((l) => /^Bcc:/i.test(l)).length).toBe(0);
+    expect(head).toContain("Subject: Hi Bcc: evil@z.test");
+    expect(head).toContain("Date: Tue, 20 Oct 2026 15:00:00 +0000");
+    const body = raw.split("\r\n\r\n")[1]!;
+    expect(Buffer.from(body.replace(/\r\n/g, ""), "base64").toString("utf8")).toBe("Line one\r\n.dot line\r\nünï");
+    expect(body.split("\r\n").every((l) => l.length <= 76)).toBe(true);
+    expect(buildMessage({ from: "me@x.test", to: ["a@x.test"], subject: "Café", text: "x", messageId: "<i>" })).toContain("Subject: =?UTF-8?B?");
+  });
+  it("speaks SMTP correctly", () => {
+    expect(parseSmtpReply("250-smtp.example\r\n250-AUTH PLAIN LOGIN\r\n250 SIZE 100\r\n")).toMatchObject({ code: 250, rest: "" });
+    expect(parseSmtpReply("250-smtp.example\r\n250-AUTH")).toBeNull();
+    expect(parseSmtpReply("535 5.7.8 Username and Password not accepted\r\n")).toMatchObject({ code: 535 });
+    expect(dotStuff("a\r\n.b\r\n..c")).toBe("a\r\n..b\r\n...c\r\n.\r\n");
+    expect(Buffer.from(authPlain("u@x.test", "pw"), "base64").toString("latin1")).toBe("\0u@x.test\0pw");
+    expect(guessSmtpHost("imap.gmail.com")).toBe("smtp.gmail.com");
+    expect(guessSmtpHost("outlook.office365.com")).toBe("smtp.office365.com");
+    expect(guessSmtpHost("mail.example.org")).toBe("mail.example.org");
+  });
+  it("limits sends per hour", () => {
+    let times: number[] = [];
+    for (let i = 0; i < 20; i++) { const r = allowSend(times, 1000 + i, 20); expect(r.ok).toBe(true); times = r.times; }
+    expect(allowSend(times, 2000, 20).ok).toBe(false);
+    expect(allowSend(times, 1000 + 3_700_000, 20).ok).toBe(true);
   });
 });

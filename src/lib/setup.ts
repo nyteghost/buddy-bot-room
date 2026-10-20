@@ -16,7 +16,7 @@ export const INTEGRATIONS: { id: string; name: string; what: string; env: string
   { id: "whisper", name: "Dictation (Whisper)", what: "Speak instead of typing", env: "WHISPER_URL", testable: true },
   { id: "weather", name: "Weather", what: "Forecast in Today and the brief", env: "WEATHER_LOCATION", testable: true },
   { id: "calendar", name: "Calendar feeds", what: "Calendar and Today windows", env: "CALENDAR_ICS_URLS", testable: true },
-  { id: "imap", name: "Mail (IMAP)", what: "Unread subjects in Mail", env: "IMAP_HOST, IMAP_USER, IMAP_PASS", testable: true },
+  { id: "imap", name: "Mail (Gmail or any IMAP)", what: "Read, send, move and delete mail in the Mail window", env: "IMAP_HOST, IMAP_USER, IMAP_PASS", testable: true },
   { id: "m365", name: "Microsoft 365", what: "Work calendar and mail, read-only", env: "M365_CLIENT_ID", testable: false },
   { id: "backup", name: "Backups", what: "Daily copy of your data", env: "BUDDY_BACKUP_PATH", testable: false },
   { id: "brief", name: "Morning brief", what: "A daily summary and weekly review pushed to your phone", env: "BRIEF_TIME, NTFY_URL", testable: false },
