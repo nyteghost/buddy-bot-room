@@ -45,7 +45,7 @@ export async function runBackup(cfg: BackupConfig, now = new Date()): Promise<Ba
     const final = `${cfg.dir}/${name}`;
     await f.mkdir(cfg.dir, { recursive: true });
     await f.rm(tmp, { recursive: true, force: true });
-    await f.cp(cfg.dataDir, tmp, { recursive: true, filter: (src: string) => !src.endsWith(".tmp") });
+    await f.cp(cfg.dataDir, tmp, { recursive: true, filter: (src: string) => !src.endsWith(".tmp") && !src.endsWith("/app-secrets.json") });
     await f.rm(final, { recursive: true, force: true });
     await f.rename(tmp, final);
     for (const old of pruneList(await names(cfg.dir), cfg.keep)) await f.rm(`${cfg.dir}/${old}`, { recursive: true, force: true });

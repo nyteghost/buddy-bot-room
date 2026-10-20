@@ -30,6 +30,7 @@ const configured: Record<string, () => boolean> = {
   m365: () => !!env("M365_CLIENT_ID"),
   backup: () => !!backupConfig(),
   brief: () => !!briefConfig(),
+  general: () => true,
 };
 
 async function reach(url: string, path = "", headers: Record<string, string> = {}): Promise<SetupTest> {
@@ -74,7 +75,7 @@ export async function handleSetup(request: Request): Promise<Response> {
     const item = itemById(String(body.id ?? ""));
     const run = item && tests[item.id];
     if (!item || !run) return Response.json({ ok: false, note: "Nothing to test for that one." });
-    if (!configured[item.id]?.()) return Response.json({ ok: false, note: `Not set up yet. Set ${item.env} and redeploy.` });
+    if (!configured[item.id]?.()) return Response.json({ ok: false, note: `Not set up yet. Open it, fill in the details and press Save.` });
     return Response.json(await run().catch(() => ({ ok: false, note: "The test failed unexpectedly." })));
   }
   const items: SetupItem[] = INTEGRATIONS.map((i) => ({ ...i, configured: configured[i.id]?.() ?? false }));

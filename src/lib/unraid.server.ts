@@ -110,6 +110,13 @@ export async function tick(cfg: UnraidConfig, f: FetchLike = fetch): Promise<Wat
 }
 
 /** Idempotent. Checks right away, then every UNRAID_CHECK_SECONDS (default 60). */
+/** Pick up a changed address or key (saved in the Setup window) without a redeploy. */
+export function restartWatcher(): void {
+  const w = watcher();
+  if (w.timer) { clearInterval(w.timer); delete w.timer; }
+  startWatcher();
+}
+
 export function startWatcher(): void {
   const cfg = unraidConfig();
   const w = watcher();

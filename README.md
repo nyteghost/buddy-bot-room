@@ -294,7 +294,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 
 ## 7. Connecting other things
 
-Every integration is **optional**. Each one turns on only when its variables are set. Set them in Portainer (stack → *Environment variables* → *Pull and redeploy*) or in `.env.local` and restart. API keys are only ever read by the server, never sent to the browser.
+Every integration is **optional**. **Most can be set up inside the app:** open **Setup** (sidebar or `/setup`), press **Set up** or **Edit** on a card, fill in the details and **Save**. It takes effect right away, with no redeploy. Values are saved in your data folder; keys and passwords go in a separate file that is write-only (the app never shows them back) and is left out of backups. A value set as an environment variable (Portainer → stack → *Environment variables*, or `.env.local`) wins and shows as locked in the app, so remove it there if you want to manage it in the app. Only things the stack needs before the app starts stay in Portainer: `COMPOSE_PROFILES`, `TS_AUTHKEY`/`TS_HOSTNAME`, `RADICALE_PASSWORD`/`RADICALE_USER`, `OLLAMA_RUNTIME` and the other Ollama/Whisper container settings, `BUDDY_PASSWORD`, accounts and the data and backup folders. API keys are only ever read by the server, never sent to the browser.
 
 ### 7.1 Web search (SearXNG)
 
@@ -511,7 +511,7 @@ I tested the date and time reading, the reminders logic, the brief and the `.ics
 
 ### 7.14 Setup, search, capture and more
 
-- **Setup window** (`/setup`, owner only): every integration with a green check when it's set up, the variable to set when it isn't, and a **Test** button that tries the connection (Plex, Seerr, Ollama, Trakt, ntfy, Telegram, Whisper, weather, calendar feeds, IMAP). Addresses and keys never leave the server. The same window has **Hide secrets** (`/hide`), which blurs share links and server addresses on this device so you can screenshot safely; click into a blurred field to read it.
+- **Setup window** (`/setup`, owner only): every integration with a green check when it's set up, the variable to set when it isn't, and a **Test** button that tries the connection (Plex, Seerr, Ollama, Trakt, ntfy, Telegram, Whisper, weather, calendar feeds, IMAP). Each card also opens its **settings** so you can fill them in here instead of Portainer (see section 7). Addresses and keys never leave the server. The same window has **Hide secrets** (`/hide`), which blurs share links and server addresses on this device so you can screenshot safely; click into a blurred field to read it.
 - **Search** (`/find`, or the Search window): one box over your saved chats, notes, tasks, memories and reminders. Every word you type has to appear; clicking a chat opens it.
 - **Quick capture:** message your Telegram bot `note: gate code is 1234`, `todo: call dentist`, `remember: I run Unraid` or `remind me in 1h stretch` and it is saved instead of answered. Notes, tasks and memories appear in the app the next time it's open (checked every minute); reminders are scheduled straight away. From an iPhone share sheet, build a Shortcut with **Get Contents of URL**: `POST` to `https://<your-address>/api/capture`, header `Authorization: Bearer <your Shortcut token>` (the same token as [7.8](#78-iphone-notes--trakt-sync)), JSON body `{"op":"add","text":"<Shortcut Input>"}`. Needs `BUDDY_DATA_DIR`; owner only.
 - **Repeating reminders and snooze:** `/remind every monday 9am send report`, `/remind every day 8pm take pills`, `/remind every weekday 7am gym` (also weekly and monthly). When one arrives on your phone, reply `snooze 30m` (or `snooze tomorrow`) to the Telegram bot to be reminded again; in the Tasks window use **+1h**. `/remind snooze 2 1h` snoozes reminder number 2.
@@ -683,6 +683,8 @@ All run in the browser. Files never leave your device.
 ---
 
 ## 14. Configuration reference
+
+These are the environment variable names. **Everything marked *(app)* can also be set in the Setup window** (Plex, Seerr, Jellyfin, Trakt, Unraid, ntfy, Telegram, weather, calendar feeds, IMAP, Microsoft 365, brief and review times, backup time and count, time zone, update check). The environment value wins if both are set.
 
 Set in Portainer's environment variables or in `.env.local`. Anything left empty is simply off.
 

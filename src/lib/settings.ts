@@ -1,0 +1,120 @@
+/**
+ * Settings you can change inside the app (Setup window) instead of in Portainer.
+ * Pure helpers and the field list; the file handling is in settings.server.ts.
+ *
+ * Rule: a value set as a real environment variable wins and is shown as "set in Portainer";
+ * anything else can be edited here. Things the stack itself needs before the app starts
+ * (COMPOSE_PROFILES, Tailscale, Radicale's password, the Ollama runtime, accounts) stay in Portainer.
+ */
+export type SettingKind = "text" | "url" | "select" | "time" | "number" | "list";
+export type SettingField = {
+  key: string;
+  label: string;
+  /** Matches an id in INTEGRATIONS (setup.ts). */
+  group: string;
+  /** Kept in a separate file that backups skip, and never sent back to the browser. */
+  secret?: boolean;
+  kind: SettingKind;
+  placeholder?: string;
+  options?: string[];
+  help?: string;
+};
+
+export const SETTING_FIELDS: SettingField[] = [
+  { key: "PLEX_URL", label: "Plex address", group: "plex", kind: "url", placeholder: "http://10.0.0.5:32400" },
+  { key: "PLEX_TOKEN", label: "Plex token", group: "plex", kind: "text", secret: true },
+  { key: "SEERR_URL", label: "Seerr address", group: "seerr", kind: "url", placeholder: "http://10.0.0.5:5055" },
+  { key: "SEERR_API_KEY", label: "Seerr API key", group: "seerr", kind: "text", secret: true },
+  { key: "JELLYFIN_URL", label: "Jellyfin address", group: "jellyfin", kind: "url", placeholder: "http://10.0.0.5:8096" },
+  { key: "TRAKT_CLIENT_ID", label: "Trakt client ID", group: "trakt", kind: "text" },
+  { key: "TRAKT_USER", label: "Trakt username", group: "trakt", kind: "text" },
+  { key: "TRAKT_LIST", label: "Trakt list", group: "trakt", kind: "text", placeholder: "watchlist", help: "The list's name or slug. Leave empty for your watchlist." },
+  { key: "TRAKT_CLIENT_SECRET", label: "Trakt client secret", group: "trakt", kind: "text", secret: true, help: "Only needed to add titles to your list." },
+  { key: "TRAKT_ACCESS_TOKEN", label: "Trakt access token", group: "trakt", kind: "text", secret: true, help: "Only needed for a private list." },
+  { key: "UNRAID_URL", label: "Unraid address", group: "unraid", kind: "url", placeholder: "http://10.0.0.5" },
+  { key: "UNRAID_API_KEY", label: "Unraid API key", group: "unraid", kind: "text", secret: true },
+  { key: "UNRAID_CHECK_SECONDS", label: "Check every (seconds)", group: "unraid", kind: "number", placeholder: "60" },
+  { key: "NTFY_URL", label: "ntfy topic link", group: "ntfy", kind: "url", secret: true, placeholder: "https://ntfy.sh/your-private-topic", help: "Treat it like a password: anyone with the link can post to your phone." },
+  { key: "TELEGRAM_BOT_TOKEN", label: "Telegram bot token", group: "telegram", kind: "text", secret: true },
+  { key: "TELEGRAM_CHAT_ID", label: "Your Telegram chat ID", group: "telegram", kind: "text", help: "Only this chat can talk to the bot." },
+  { key: "WEATHER_LOCATION", label: "Place", group: "weather", kind: "text", placeholder: "Atlanta, GA" },
+  { key: "WEATHER_UNITS", label: "Units", group: "weather", kind: "select", options: ["imperial", "metric"] },
+  { key: "CALENDAR_ICS_URLS", label: "Calendar feed links", group: "calendar", kind: "list", secret: true, placeholder: "https://…/basic.ics", help: "Up to six, separated by spaces or commas. Private feed links work like passwords." },
+  { key: "IMAP_HOST", label: "Mail server", group: "imap", kind: "text", placeholder: "imap.gmail.com" },
+  { key: "IMAP_PORT", label: "Port", group: "imap", kind: "number", placeholder: "993" },
+  { key: "IMAP_USER", label: "Mail username", group: "imap", kind: "text" },
+  { key: "IMAP_PASS", label: "Mail password (app password)", group: "imap", kind: "text", secret: true },
+  { key: "M365_CLIENT_ID", label: "Microsoft app (client) ID", group: "m365", kind: "text" },
+  { key: "M365_TENANT", label: "Tenant", group: "m365", kind: "text", placeholder: "organizations" },
+  { key: "BRIEF_TIME", label: "Brief time (24-hour)", group: "brief", kind: "time", placeholder: "07:30" },
+  { key: "REVIEW_DAY", label: "Weekly review day", group: "brief", kind: "select", options: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] },
+  { key: "REVIEW_TIME", label: "Weekly review time", group: "brief", kind: "time", placeholder: "18:00" },
+  { key: "BUDDY_BACKUP_TIME", label: "Backup time (24-hour)", group: "backup", kind: "time", placeholder: "03:30" },
+  { key: "BUDDY_BACKUP_KEEP", label: "Backups to keep", group: "backup", kind: "number", placeholder: "7" },
+  { key: "BUDDY_TZ", label: "Time zone", group: "general", kind: "text", placeholder: "America/New_York", help: "Used for the brief, reminders and backups." },
+  { key: "UPDATE_CHECK", label: "Check GitHub for updates", group: "general", kind: "select", options: ["on", "off"] },
+];
+
+export const fieldByKey = (key: string): SettingField | undefined => SETTING_FIELDS.find((f) => f.key === key);
+export const fieldsFor = (group: string): SettingField[] => SETTING_FIELDS.filter((f) => f.group === group);
+
+const MAX = 2000;
+
+/** Tidy and check one value. Surrounding quotes are dropped (a Portainer habit that breaks lookups). */
+export function cleanSetting(field: SettingField, raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
+  let v = String(raw ?? "").replace(/[\r\n\t]+/g, " ").trim();
+  if (/^(["']).*\1$/.test(v)) v = v.slice(1, -1).trim();
+  if (v.length > MAX) return { ok: false, error: `${field.label} is too long.` };
+  if (!v) return { ok: true, value: "" };
+  switch (field.kind) {
+    case "url": {
+      try { const p = new URL(v).protocol; if (p !== "http:" && p !== "https:") throw new Error("scheme"); } catch { return { ok: false, error: `${field.label} must be a full link starting with http:// or https://.` }; }
+      return { ok: true, value: v.replace(/\/+$/, "") };
+    }
+    case "list": {
+      const parts = v.split(/[\s,]+/).filter(Boolean);
+      if (parts.length > 6) return { ok: false, error: `${field.label}: six links at most.` };
+      if (!parts.every((p) => /^https?:\/\//i.test(p))) return { ok: false, error: `${field.label}: every link must start with http:// or https://.` };
+      return { ok: true, value: parts.join(",") };
+    }
+    case "time": {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(v);
+      if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return { ok: false, error: `${field.label} must look like 07:30 (24-hour).` };
+      return { ok: true, value: `${String(Number(m[1])).padStart(2, "0")}:${m[2]}` };
+    }
+    case "number": {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n <= 0 || n > 100000) return { ok: false, error: `${field.label} must be a positive number.` };
+      return { ok: true, value: String(Math.round(n)) };
+    }
+    case "select": {
+      const lower = v.toLowerCase();
+      const hit = field.options?.find((o) => o === lower);
+      if (!hit) return { ok: false, error: `${field.label} must be one of: ${field.options?.join(", ")}.` };
+      return { ok: true, value: hit };
+    }
+    default:
+      return { ok: true, value: v };
+  }
+}
+
+/** The environment value the rest of the app reads, for a stored setting ("on"/"off" become what UPDATE_CHECK expects). */
+export function envValue(key: string, stored: string): string {
+  if (key === "UPDATE_CHECK") return stored === "off" ? "0" : "1";
+  return stored;
+}
+
+export type SettingState = {
+  key: string;
+  label: string;
+  group: string;
+  kind: SettingKind;
+  secret: boolean;
+  options?: string[] | undefined;
+  placeholder?: string | undefined;
+  help?: string | undefined;
+  /** "env": set in Portainer and locked here. "app": saved here. "none": not set. */
+  source: "env" | "app" | "none";
+  /** Only for non-secret values saved here. Secrets and Portainer values are never sent. */
+  value?: string | undefined;
+};

@@ -19,7 +19,8 @@ export const INTEGRATIONS: { id: string; name: string; what: string; env: string
   { id: "imap", name: "Mail (IMAP)", what: "Unread subjects in Mail", env: "IMAP_HOST, IMAP_USER, IMAP_PASS", testable: true },
   { id: "m365", name: "Microsoft 365", what: "Work calendar and mail, read-only", env: "M365_CLIENT_ID", testable: false },
   { id: "backup", name: "Backups", what: "Daily copy of your data", env: "BUDDY_BACKUP_PATH", testable: false },
-  { id: "brief", name: "Morning brief", what: "A daily summary pushed to your phone", env: "BRIEF_TIME, NTFY_URL", testable: false },
+  { id: "brief", name: "Morning brief", what: "A daily summary and weekly review pushed to your phone", env: "BRIEF_TIME, NTFY_URL", testable: false },
+  { id: "general", name: "General", what: "Time zone and update checks", env: "BUDDY_TZ", testable: false },
 ];
 
 export const itemById = (id: string) => INTEGRATIONS.find((i) => i.id === id);

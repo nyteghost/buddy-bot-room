@@ -5,15 +5,15 @@ import { gate } from "./src/lib/gate.server";
 import { logServer } from "./src/lib/server-log.server";
 import { startScheduler } from "./src/lib/scheduler.server";
 import { startWatcher } from "./src/lib/unraid.server";
+import { ensureSettings } from "./src/lib/settings.server";
 
 export function selfHostedPlugin(): Plugin {
   return {
     name: "buddy-self-hosted",
     configureServer(server) {
-      // Start watching Unraid as soon as the server boots (no-op unless UNRAID_URL is set).
-      startWatcher();
-      // Daily jobs (backup, morning brief): no-op unless configured.
-      startScheduler();
+      // Load the settings saved in the app first, then start the Unraid watcher (no-op unless an Unraid address is set)
+      // and the daily jobs (backup, morning brief; no-op unless configured).
+      void ensureSettings().then(() => { startWatcher(); startScheduler(); });
       server.middlewares.use(async (req, res, next) => {
         try {
           const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);

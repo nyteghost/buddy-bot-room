@@ -14,7 +14,7 @@ const units = (): Units => ((process.env["WEATHER_UNITS"] ?? "").toLowerCase() =
 async function locate(): Promise<{ lat: number; lon: number; name: string } | null> {
   const lat = Number(process.env["WEATHER_LAT"]);
   const lon = Number(process.env["WEATHER_LON"]);
-  const name = (process.env["WEATHER_LOCATION"] ?? "").trim().slice(0, 80);
+  const name = (process.env["WEATHER_LOCATION"] ?? "").trim().replace(/^(["'])(.*)\1$/, "$2").trim().slice(0, 80);
   if (process.env["WEATHER_LAT"] && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon, name: name || "Your location" };
   if (!name) return null;
   if (located?.key === name) return located;

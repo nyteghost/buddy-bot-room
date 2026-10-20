@@ -61,6 +61,10 @@ import { sharedText } from "@/lib/share-prefill";
 import { PUBLIC_FILES } from "@/lib/gate.server";
 import { buildBrief, dailyPicks, unraidLine } from "@/lib/brief";
 import { ageText, isDue, parseHm, validZone, zonedParts } from "@/lib/schedule";
+import { SETTING_FIELDS, cleanSetting, envValue, fieldByKey, fieldsFor } from "@/lib/settings";
+import { describeSettings, saveSettings } from "@/lib/settings.server";
+import { mkdtempSync, readFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { backupName, insideData, isBackupName, pruneList } from "@/lib/backup";
 import { plexHas } from "@/lib/trakt";
 import { isSlug, markWatched, nextTopic, shapeTrakt, shapeTraktLists, traktListsMarkdown, traktMarkdown, watchedMovieIds } from "@/lib/trakt";
@@ -2074,5 +2078,67 @@ describe("three-way sync", () => {
     expect(p.push).toEqual([]);
     expect(p.remoteDelete).toEqual([]);
     expect(p.local.length).toBe(1);
+  });
+});
+
+describe("in-app settings", () => {
+  it("checks and tidies values", () => {
+    const f = (k: string) => fieldByKey(k)!;
+    expect(cleanSetting(f("WEATHER_LOCATION"), ' "Atlanta, GA" ')).toEqual({ ok: true, value: "Atlanta, GA" });
+    expect(cleanSetting(f("PLEX_URL"), "http://10.0.0.5:32400/")).toEqual({ ok: true, value: "http://10.0.0.5:32400" });
+    expect(cleanSetting(f("PLEX_URL"), "10.0.0.5:32400")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("PLEX_URL"), "javascript:alert(1)")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("BRIEF_TIME"), "7:30")).toEqual({ ok: true, value: "07:30" });
+    expect(cleanSetting(f("BRIEF_TIME"), "25:00")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("UNRAID_CHECK_SECONDS"), "45")).toEqual({ ok: true, value: "45" });
+    expect(cleanSetting(f("UNRAID_CHECK_SECONDS"), "-3")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("WEATHER_UNITS"), "Metric")).toEqual({ ok: true, value: "metric" });
+    expect(cleanSetting(f("WEATHER_UNITS"), "kelvin")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("CALENDAR_ICS_URLS"), "https://a.example/x.ics, https://b.example/y.ics")).toEqual({ ok: true, value: "https://a.example/x.ics,https://b.example/y.ics" });
+    expect(cleanSetting(f("CALENDAR_ICS_URLS"), "ftp://a")).toMatchObject({ ok: false });
+    expect(cleanSetting(f("TRAKT_USER"), "")).toEqual({ ok: true, value: "" });
+    expect(envValue("UPDATE_CHECK", "off")).toBe("0");
+    expect(envValue("UPDATE_CHECK", "on")).toBe("1");
+  });
+  it("only lists settings that belong to a Setup card", () => {
+    const ids = new Set(INTEGRATIONS.map((i) => i.id));
+    for (const field of SETTING_FIELDS) expect(ids.has(field.group)).toBe(true);
+    expect(new Set(SETTING_FIELDS.map((x) => x.key)).size).toBe(SETTING_FIELDS.length);
+    expect(fieldsFor("plex").map((x) => x.key)).toEqual(["PLEX_URL", "PLEX_TOKEN"]);
+    // Things the stack needs before the app starts must stay in Portainer.
+    for (const k of ["COMPOSE_PROFILES", "RADICALE_PASSWORD", "OLLAMA_RUNTIME", "TS_AUTHKEY", "BUDDY_PASSWORD", "BUDDY_DATA_DIR"]) expect(fieldByKey(k)).toBeUndefined();
+  });
+  it("saves to the data folder, keeps secrets apart, and lets the environment win", async () => {
+    const dir = mkdtempSync(`${tmpdir()}/pp-settings-`);
+    process.env["BUDDY_DATA_DIR"] = dir;
+    process.env["SEERR_URL"] = "http://from-env.example";
+    delete process.env["WEATHER_LOCATION"];
+    delete process.env["PLEX_TOKEN"];
+    const out = await saveSettings({ WEATHER_LOCATION: '"Atlanta, GA"', PLEX_TOKEN: "abc123", SEERR_URL: "http://other.example", NOPE: "x", BRIEF_TIME: "99:99" });
+    expect(out.saved.sort()).toEqual(["PLEX_TOKEN", "WEATHER_LOCATION"]);
+    expect(Object.keys(out.errors).sort()).toEqual(["BRIEF_TIME", "NOPE", "SEERR_URL"]);
+    expect(process.env["WEATHER_LOCATION"]).toBe("Atlanta, GA");
+    expect(process.env["PLEX_TOKEN"]).toBe("abc123");
+    expect(process.env["SEERR_URL"]).toBe("http://from-env.example");
+    const plain = readFileSync(`${dir}/app-settings.json`, "utf8");
+    const secret = readFileSync(`${dir}/app-secrets.json`, "utf8");
+    expect(plain).toContain("Atlanta, GA");
+    expect(plain.includes("abc123")).toBe(false);
+    expect(secret).toContain("abc123");
+    const view = await describeSettings();
+    const row = (k: string) => view.find((x) => x.key === k)!;
+    expect(row("PLEX_TOKEN")).toMatchObject({ source: "app", secret: true });
+    expect(row("PLEX_TOKEN").value).toBeUndefined();
+    expect(JSON.stringify(view).includes("abc123")).toBe(false);
+    expect(row("WEATHER_LOCATION")).toMatchObject({ source: "app", value: "Atlanta, GA" });
+    expect(row("SEERR_URL")).toMatchObject({ source: "env" });
+    expect(row("SEERR_URL").value).toBeUndefined();
+    const cleared = await saveSettings({ WEATHER_LOCATION: null, PLEX_TOKEN: "" });
+    expect(cleared.saved.sort()).toEqual(["PLEX_TOKEN", "WEATHER_LOCATION"]);
+    expect(process.env["WEATHER_LOCATION"]).toBeUndefined();
+    expect(process.env["PLEX_TOKEN"]).toBeUndefined();
+    expect(existsSync(`${dir}/app-secrets.json`)).toBe(true);
+    delete process.env["SEERR_URL"];
+    delete process.env["BUDDY_DATA_DIR"];
   });
 });

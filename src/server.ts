@@ -56,6 +56,7 @@ export default {
       if (url.pathname === "/__health") return new Response("ok");
       const stopped = await gate(request, typeof process !== "undefined" ? process.env["BUDDY_PASSWORD"] : undefined);
       if (stopped) return stopped;
+      if (typeof process !== "undefined") await (await import("./lib/settings.server")).ensureSettings();
       if (typeof process !== "undefined" && process.env["UNRAID_URL"]) startWatcher();
       if (typeof process !== "undefined" && (process.env["BUDDY_BACKUP_DIR"] || process.env["BRIEF_TIME"])) startScheduler();
       const handler = await getServerEntry();
