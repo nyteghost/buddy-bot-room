@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Briefcase, CalendarPlus, CalendarSync, Download, FileUp, Search } from "lucide-react";
+import { Briefcase, CalendarPlus, CalendarSync, Download, FileUp } from "lucide-react";
 import { calendarStatus, completeCalendarConnect, pushShiftsToCalendar, startCalendarConnect } from "@/lib/calendar.functions";
 import { useSession } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, timeToMinutes, vendors, withShiftIds, type EventEntry, type Shift } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, timeToMinutes, withShiftIds, type EventEntry, type Shift } from "@/lib/work-tools";
 import { deckReply } from "@/lib/deck-solver";
+import { VendorsPanel } from "@/components/vendors-panel";
 import { MessageResponse } from "@/components/ai-elements/message";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -371,19 +372,5 @@ function DeckTab() {
 }
 
 function VendorsTab() {
-  const [q, setQ] = useState("");
-  return (
-    <div className="space-y-3 pt-2">
-      <div className="flex items-center gap-2"><Search className="size-4" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="gaffer tape 2in black" aria-label="Item" /></div>
-      <ul className="space-y-2 text-sm">
-        {vendors.map((v) => (
-          <li key={v.name} className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1">
-            <span><strong>{v.name}</strong> <span className="text-muted-foreground">— {v.taxNote}</span></span>
-            <a className={q.trim() ? "text-primary underline" : "pointer-events-none opacity-50"} href={v.url(q.trim())} target="_blank" rel="noreferrer">Search</a>
-          </li>
-        ))}
-      </ul>
-      <p className="text-xs text-muted-foreground">Compare listed prices before tax — you're tax-exempt.</p>
-    </div>
-  );
+  return <VendorsPanel />;
 }

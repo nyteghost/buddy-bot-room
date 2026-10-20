@@ -2442,3 +2442,43 @@ describe("settings groups", () => {
     expect(g.find((x) => x.id === "basics")?.on).toBe(g.find((x) => x.id === "basics")?.items.filter((i) => i.configured).length);
   });
 });
+
+import { cheapest as vCheapest, cleanStore as vClean, extractPrice as vExtract, parseAiQuotes as vQuotes, parseMoney as vMoney, ranked as vRanked, safeProductUrl as vUrl, type Item as VItem } from "@/lib/vendors";
+describe("vendor prices", () => {
+  it("reads money", () => {
+    expect(vMoney("$1,299.50")).toBe(1299.5);
+    expect(vMoney("12 USD")).toBe(12);
+    expect(vMoney("call us")).toBe(undefined);
+  });
+  it("reads a price from shop page data", () => {
+    const ld = `<script type="application/ld+json">{"@type":"Product","name":"Tape","offers":{"@type":"Offer","price":"8.49","priceCurrency":"USD"}}</script>`;
+    expect(vExtract(ld)?.price).toBe(8.49);
+    expect(vExtract(`<meta property="product:price:amount" content="23.10">`)?.price).toBe(23.1);
+    expect(vExtract(`<script type="application/ld+json">{"@graph":[{"@type":"Product","offers":[{"price":5}]}]}</script>`)?.price).toBe(5);
+    expect(vExtract("<html>nothing here</html>")).toBe(null);
+  });
+  it("only fetches public web pages", () => {
+    expect(vUrl("https://www.homedepot.com/p/1")).toBe("https://www.homedepot.com/p/1");
+    for (const bad of ["http://localhost/x", "http://192.168.1.5/x", "http://10.0.0.1", "http://127.0.0.1", "ftp://a.com/x", "javascript:alert(1)", "https://user:pw@a.com", "http://[::1]/", "http://nas.local/"]) expect(vUrl(bad)).toBe(null);
+  });
+  it("ranks by price plus shipping and puts unpriced last", () => {
+    const item: VItem = { id: "1", name: "Cord", offers: [{ id: "a", vendor: "A", price: 10, shipping: 5 }, { id: "b", vendor: "B", price: 12 }, { id: "c", vendor: "C" }] };
+    expect(vRanked(item).map((o) => o.vendor)).toEqual(["B", "A", "C"]);
+    expect(vCheapest(item)?.vendor).toBe("B");
+    expect(vCheapest({ id: "2", name: "x", offers: [{ id: "z", vendor: "Z" }] })).toBe(null);
+  });
+  it("reads AI quote lines and drops junk", () => {
+    const out = vQuotes('Sure:\n```json\n[{"item":"Cord 50ft","price":"$12.50","unit":"each"},{"item":"","price":3},{"item":"x","price":"n/a"}]\n```');
+    expect(out.length).toBe(1);
+    expect(out[0]?.price).toBe(12.5);
+    expect(vQuotes("no prices")).toEqual([]);
+  });
+  it("cleans a stored file", () => {
+    const s = vClean({ items: [{ name: " Tape ", offers: [{ vendor: "Atlantic", url: "http://localhost/x", price: -4 }, { vendor: "" }] }, { name: "" }] });
+    expect(s.items.length).toBe(1);
+    expect(s.items[0]?.offers.length).toBe(1);
+    expect(s.items[0]?.offers[0]?.url).toBe(undefined);
+    expect(s.items[0]?.offers[0]?.price).toBe(undefined);
+    expect(s.vendors.length > 3).toBe(true);
+  });
+});

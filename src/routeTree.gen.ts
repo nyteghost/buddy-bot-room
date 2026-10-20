@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiVendorsRouteImport } from './routes/api.vendors'
 import { Route as ApiGoogleCallbackRouteImport } from './routes/api.google.callback'
 import { Route as ApiGoogleStartRouteImport } from './routes/api.google.start'
 import { Route as ApiGoogleRouteImport } from './routes/api.google'
@@ -75,6 +76,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVendorsRoute = ApiVendorsRouteImport.update({
+  id: '/api/vendors',
+  path: '/api/vendors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
@@ -269,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/vendors': typeof ApiVendorsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/start': typeof ApiGoogleStartRoute
   '/api/google': typeof ApiGoogleRoute
@@ -313,6 +320,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/vendors': typeof ApiVendorsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/start': typeof ApiGoogleStartRoute
   '/api/google': typeof ApiGoogleRoute
@@ -358,6 +366,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/vendors': typeof ApiVendorsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/start': typeof ApiGoogleStartRoute
   '/api/google': typeof ApiGoogleRoute
@@ -404,6 +413,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/vendors'
     | '/api/google/callback'
     | '/api/google/start'
     | '/api/google'
@@ -448,6 +458,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/vendors'
     | '/api/google/callback'
     | '/api/google/start'
     | '/api/google'
@@ -492,6 +503,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/vendors'
     | '/api/google/callback'
     | '/api/google/start'
     | '/api/google'
@@ -537,6 +549,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiVendorsRoute: typeof ApiVendorsRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
   ApiGoogleStartRoute: typeof ApiGoogleStartRoute
   ApiGoogleRoute: typeof ApiGoogleRoute
@@ -611,6 +624,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vendors': {
+      id: '/api/vendors'
+      path: '/api/vendors'
+      fullPath: '/api/vendors'
+      preLoaderRoute: typeof ApiVendorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/google/callback': {
@@ -881,6 +901,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiVendorsRoute: ApiVendorsRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
   ApiGoogleStartRoute: ApiGoogleStartRoute,
   ApiGoogleRoute: ApiGoogleRoute,

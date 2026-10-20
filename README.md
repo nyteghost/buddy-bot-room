@@ -815,3 +815,7 @@ Settings → Google Calendar takes a Client ID and secret from your own Google C
 Once connected, the Calendar window also shows your primary Google calendar (with a Connect / Disconnect control at its top), and Today and the brief include those events. Events that also arrive through a calendar feed are listed once.
 
 **No weekly reconnect (service account):** in the same Google Cloud project create a service account, make a JSON key, share your calendar with the account's email ("Make changes to events"), and enter `GOOGLE_SA_EMAIL`, `GOOGLE_SA_KEY` (the `private_key` value) and `GOOGLE_CALENDAR_ID` (your Gmail address) in Settings → Google Calendar. It takes over from the sign-in: no consent screen, no expiry.
+
+## Vendors
+
+Work tools -> Vendors compares prices from the places you buy. Each item has a row per vendor: paste a product link and the server reads the price off the page (shop data first, then Local AI as a flagged backup), or type in a quoted price. Cheapest (price plus shipping) is highlighted, old prices (30+ days) are marked, and "Who's cheapest?" asks Local AI. "Pull quotes from email" searches the IMAP mailbox for a vendor and suggests prices for you to add; nothing is saved without your click. Stored in `BUDDY_DATA_DIR/vendors.json` (in backups). Owner only; links to private networks are refused.
