@@ -1169,6 +1169,11 @@ export function Room() {
             <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
           </span>
           <EngineSettingsDialog />
+          {canSpeak && (
+            <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={voice.auto} title={voice.auto ? "Replies are read aloud. Click to turn off." : "Read replies aloud"} onClick={() => { if (voice.auto) stopSpeaking(); setVoiceSettings({ auto: !voice.auto }); }}>
+              {voice.auto ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />} Voice
+            </Button>
+          )}
           <Button variant="ghost" size="sm" className="engine-trigger" aria-pressed={setupOpen} title="Setup: what's connected, with connection tests" onClick={() => setSetupOpen((value) => !value)}><Settings2 className="size-4" /> Setup</Button>
           <AccountButton theme={characterMode} onTheme={setCharacterMode} />
           <Select
