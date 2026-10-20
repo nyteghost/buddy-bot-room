@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Briefcase, CalendarPlus, CalendarSync, Download, FileUp } from "lucide-react";
 import { calendarStatus, completeCalendarConnect, pushShiftsToCalendar, startCalendarConnect } from "@/lib/calendar.functions";
@@ -8,9 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, timeToMinutes, withShiftIds, type EventEntry, type Shift } from "@/lib/work-tools";
-import { deckReply } from "@/lib/deck-solver";
 import { VendorsPanel } from "@/components/vendors-panel";
-import { MessageResponse } from "@/components/ai-elements/message";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -359,14 +357,15 @@ function ShiftsTab() {
   );
 }
 
+const DeckPlanner = lazy(() => import("@/components/deck-planner/planner").then((m) => ({ default: m.DeckPlanner })));
+
 function DeckTab() {
-  const [size, setSize] = useState("24x24x32");
-  const reply = deckReply(`@deck ${size}`);
   return (
-    <div className="space-y-3 pt-2">
-      <Input value={size} onChange={(e) => setSize(e.target.value)} aria-label="Stage size" placeholder='width x length x height, e.g. 24x24x32' />
-      {reply && <div className="rounded-md border border-border p-3 text-sm"><MessageResponse>{reply}</MessageResponse></div>}
-      <p className="text-xs text-muted-foreground">Tip: type <code>@deck 24x24x32</code> in the chat box too.</p>
+    <div className="pt-2">
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the stage planner…</p>}>
+        <DeckPlanner />
+      </Suspense>
+      <p className="mt-3 text-xs text-muted-foreground">Tip: type <code>@deck 24x24x32</code> in the chat box for a quick answer.</p>
     </div>
   );
 }

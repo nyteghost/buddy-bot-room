@@ -2495,3 +2495,13 @@ describe("rental vendors", () => {
     expect(vRentUrl("unitedrentals.com", "scissor lift")).toBe("https://www.google.com/search?q=site%3Aunitedrentals.com%20scissor%20lift");
   });
 });
+
+import { allocateSingleDeckStages as dAlloc } from "@/lib/single-deck-allocation";
+describe("deck planner helper", () => {
+  it("fills 1-deck holders first, then larger ones", () => {
+    const r = dAlloc(3, { decks: 72, one: 1, two: 1, three: 1 });
+    expect(r?.capacities).toEqual([1, 2, 3]);
+    expect(dAlloc(2, { decks: 72, one: 0, two: 5, three: 0 }, false)).toBe(null);
+    expect(dAlloc(0, { decks: 72, one: 4, two: 8, three: 8 })).toBe(null);
+  });
+});
