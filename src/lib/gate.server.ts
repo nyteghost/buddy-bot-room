@@ -58,6 +58,7 @@ export async function gate(
     if (await currentUser(request, now)) return null;
     // The iPhone Shortcut has no cookie: it sends an access token, accepted for the note sync only.
     if (url.pathname === "/api/notes-sync" && (await tokenUser(request))) return null;
+    if (url.pathname === "/api/capture" && request.method === "POST" && (await tokenUser(request))) return null;
     if (url.pathname.startsWith("/api/")) return Response.json({ error: "Sign in required." }, { status: 401 });
     return authPage();
   }

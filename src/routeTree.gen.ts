@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiCaptureRouteImport } from './routes/api.capture'
 import { Route as ApiSetupRouteImport } from './routes/api.setup'
 import { Route as ApiIcsRouteImport } from './routes/api.ics'
 import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
@@ -66,6 +67,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCaptureRoute = ApiCaptureRouteImport.update({
+  id: '/api/capture',
+  path: '/api/capture',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSetupRoute = ApiSetupRouteImport.update({
@@ -215,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/capture': typeof ApiCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/capture': typeof ApiCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -286,6 +294,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/capture': typeof ApiCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/capture'
     | '/api/setup'
     | '/api/ics'
     | '/api/reminders'
@@ -358,6 +368,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/capture'
     | '/api/setup'
     | '/api/ics'
     | '/api/reminders'
@@ -393,6 +404,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/capture'
     | '/api/setup'
     | '/api/ics'
     | '/api/reminders'
@@ -429,6 +441,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiCaptureRoute: typeof ApiCaptureRoute
   ApiSetupRoute: typeof ApiSetupRoute
   ApiIcsRoute: typeof ApiIcsRoute
   ApiRemindersRoute: typeof ApiRemindersRoute
@@ -494,6 +507,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/capture': {
+      id: '/api/capture'
+      path: '/api/capture'
+      fullPath: '/api/capture'
+      preLoaderRoute: typeof ApiCaptureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/setup': {
@@ -701,6 +721,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiCaptureRoute: ApiCaptureRoute,
   ApiSetupRoute: ApiSetupRoute,
   ApiIcsRoute: ApiIcsRoute,
   ApiRemindersRoute: ApiRemindersRoute,

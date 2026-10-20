@@ -41,7 +41,7 @@ export type SlashAction =
   | { type: "focus"; mode: "on" | "off" | "toggle" }
   | { type: "status" }
   | { type: "weather" }
-  | { type: "remind"; op: "list" | "add" | "remove"; text: string }
+  | { type: "remind"; op: "list" | "add" | "remove" | "snooze"; text: string }
   | { type: "event"; text: string }
   | { type: "panel"; panel: "calendar" | "mail" | "today" | "tasks" | "setup" | "search" }
   | { type: "hide"; mode: "on" | "off" | "toggle" }
@@ -116,7 +116,7 @@ export const slashCommands = [
   { name: "hide", usage: "/hide [on|off]", description: "Blur links and addresses on this device so screenshots are safe" },
   { name: "today", usage: "/today", description: "Weather, calendar, unread mail, tasks and a watch pick in one window" },
   { name: "tasks", usage: "/tasks", description: "Open your to-dos and reminders" },
-  { name: "remind", usage: "/remind in 30m call mom | tomorrow 9am pay rent | list | remove N", description: "One-time reminder pushed to your phone (owner only; needs NTFY_URL or Telegram)" },
+  { name: "remind", usage: "/remind in 30m call mom | every monday 9am send report | list | snooze N 30m | remove N", description: "One-time reminder pushed to your phone (owner only; needs NTFY_URL or Telegram)" },
   { name: "event", usage: "/event friday 3pm dentist [for 1h]", description: "Make a calendar event: download an .ics file or add it to Google or Outlook" },
   { name: "weather", usage: "/weather", description: "Current weather and the next few days (set WEATHER_LOCATION on the server)" },
   { name: "status", usage: "/status", description: "Check that Local AI, search, Plex, Seerr, Jellyfin, Unraid and backups are all working" },
@@ -241,6 +241,10 @@ export function parseSlash(input: string): SlashResult | null {
     case "remind": case "reminder": case "reminders": {
       const first = (rawArg.split(/\s+/)[0] ?? "").toLowerCase();
       if (!rawArg || first === "list") return { ok: true, action: { type: "remind", op: "list", text: "" } };
+      if (first === "snooze") {
+        const rest = rawArg.split(/\s+/).slice(1);
+        return rest.length ? { ok: true, action: { type: "remind", op: "snooze", text: rest.join(" ") } } : fail("Use: /remind snooze 1 30m (the reminder number, then how long)");
+      }
       if (first === "remove" || first === "rm" || first === "delete") {
         const which = rawArg.split(/\s+/)[1] ?? "";
         return which ? { ok: true, action: { type: "remind", op: "remove", text: which } } : fail("Which one? /remind remove 1");

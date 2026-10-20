@@ -141,6 +141,7 @@ import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
 import { SetupPanel } from "@/components/setup-panel";
+import { mergeCaptures, type Capture } from "@/lib/capture";
 import { SearchPanel } from "@/components/search-panel";
 import { setHideSecrets, getHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import { MicButton } from "@/components/mic-button";
@@ -271,6 +272,20 @@ export function Room() {
   const voice = useVoice();
   useAppearance();
   useHideSecrets();
+  useEffect(() => {
+    // Things you sent from your phone (Telegram, share sheet) are waiting on the server; fold them into notes and tasks.
+    const collect = async () => {
+      try {
+        const res = await fetch("/api/capture", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "take" }) });
+        if (!res.ok) return;
+        const { items } = (await res.json()) as { items?: Capture[] };
+        if (items?.length) updateWorkbench((w) => mergeCaptures(w, items));
+      } catch { /* offline or not the owner */ }
+    };
+    void collect();
+    const t = window.setInterval(() => void collect(), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
   const speakingMessage = useSpeakingId();
   const [canSpeak, setCanSpeak] = useState(false);
   useEffect(() => { setCanSpeak(voiceSupported()); }, []);

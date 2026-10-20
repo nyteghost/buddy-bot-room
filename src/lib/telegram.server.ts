@@ -1,5 +1,6 @@
 import { logServer } from "./server-log.server";
 import { askPals } from "./ask.server";
+import { captureFromText } from "./capture.server";
 import { collectStatus } from "./status.server";
 
 /**
@@ -31,8 +32,12 @@ export async function handleTelegramText(text: string, chatId: string): Promise<
   if (chatId !== want) return null;
   const t = text.trim();
   if (!t) return null;
-  if (/^\/(start|help)\b/i.test(t)) return "Hi! Send any question and your pals will answer using your free keys or Local AI. /status checks your services. Paid providers are never used from here.";
+  if (/^\/(start|help)\b/i.test(t)) return "Hi! Send any question and your pals will answer using your free keys or Local AI. Start a message with note:, todo:, remember: or remind (for example: remind me in 1h stretch) to save it instead. /status checks your services. Paid providers are never used from here.";
   if (/^\/status\b/i.test(t)) return collectStatus();
+  const sn = /^\/?snooze(?:\s+(.*))?$/i.exec(t);
+  if (sn) return (await import("./reminders.server")).snooze("", (sn[1] ?? "").trim());
+  const captured = await captureFromText(t);
+  if (captured) return captured;
   const r = await askPals(t.startsWith("/") ? t.slice(1) : t);
   return r.ok ? `${r.text}\n\n— ${r.via}` : `Couldn't answer: ${r.error}`;
 }

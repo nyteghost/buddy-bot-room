@@ -8,10 +8,10 @@ import { describeCode, weatherLine, type Weather } from "@/lib/weather";
 import { whenLabel } from "@/lib/when";
 import { clock, dayLabel } from "./inbox-panels";
 
-type Remind = { id: string; at: number; text: string };
+type Remind = { id: string; at: number; text: string; repeat?: string | undefined };
 type RemindReply = { text?: string; error?: string; items?: Remind[] };
 
-async function remindCall(op: "list" | "add" | "remove", text = ""): Promise<RemindReply> {
+async function remindCall(op: "list" | "add" | "remove" | "snooze", text = ""): Promise<RemindReply> {
   try {
     const res = await fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op, text }) });
     return (await res.json()) as RemindReply;
@@ -58,14 +58,15 @@ export function TasksPanel({ open }: { open: boolean }) {
       <section className="grid gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reminders to your phone</h3>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void addReminder(); }}>
-          <input className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1" placeholder="in 30m call mom · tomorrow 9am pay rent" value={when} maxLength={300} onChange={(e) => setWhen(e.target.value)} />
+          <input className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1" placeholder="in 30m call mom · every monday 9am send report" value={when} maxLength={300} onChange={(e) => setWhen(e.target.value)} />
           <Button type="submit" size="sm" aria-label="Add reminder"><Plus className="size-4" /></Button>
         </form>
         {note && <p className="text-xs text-muted-foreground">{note}</p>}
         {reminders.map((r) => (
           <div key={r.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
             <span className="w-28 shrink-0 text-xs text-muted-foreground">{whenLabel(r.at, tz)}</span>
-            <span className="min-w-0 flex-1 truncate">{r.text}</span>
+            <span className="min-w-0 flex-1 truncate">{r.text}{r.repeat ? <span className="text-xs text-muted-foreground"> · {r.repeat === "weekdays" ? "every weekday" : r.repeat}</span> : null}</span>
+            <Button size="sm" variant="ghost" className="h-7 px-1 text-xs" title="Snooze 1 hour" onClick={() => void remindCall("snooze", `${r.id} 1h`).then((x) => { if (x.items) setReminders(x.items); })}>+1h</Button>
             <Button size="sm" variant="ghost" className="h-7 px-1" aria-label="Remove reminder" onClick={() => void remindCall("remove", r.id).then((x) => { if (x.items) setReminders(x.items); })}><Trash2 className="size-3.5" /></Button>
           </div>
         ))}

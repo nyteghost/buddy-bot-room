@@ -9,9 +9,10 @@ import { eventsInRange } from "@/lib/ics";
 import { decodeMimeWords, imapQuote, parseFetchHeaders, parseSearch, senderName } from "@/lib/imap";
 import { describeCode, shapeWeather, weatherLine, weatherText } from "@/lib/weather";
 import { fromWall, parseWhen, takeDuration, wallOf } from "@/lib/when";
-import { addReminder, dueReminders, parseRemindArgs, parseReminders, removeReminder, reminderList } from "@/lib/reminders";
+import { addReminder, afterFiring, dueReminders, nextOccurrence, parseRemindArgs, parseReminders, removeReminder, reminderList, snoozeReminder, snoozeTarget, takeRepeat } from "@/lib/reminders";
 import { INTEGRATIONS, setupSummary } from "@/lib/setup";
 import { messageText, searchDocs } from "@/lib/find";
+import { addCapture, mergeCaptures, parseCapture, parseCaptures } from "@/lib/capture";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1772,5 +1773,67 @@ describe("search", () => {
     expect(h.snippet).toContain("needle");
     expect(h.snippet.startsWith("…")).toBe(true);
     expect(messageText([{ type: "text", text: "hi" }, { type: "reasoning" }, { type: "text", text: "there" }])).toBe("hi there");
+  });
+});
+
+describe("quick capture", () => {
+  it("recognises prefixes and leaves questions alone", () => {
+    expect(parseCapture("todo: buy milk")).toEqual({ kind: "todo", text: "buy milk" });
+    expect(parseCapture("Note - the gate code is 1234")).toEqual({ kind: "note", text: "the gate code is 1234" });
+    expect(parseCapture("remember: I run Unraid")).toEqual({ kind: "memory", text: "I run Unraid" });
+    expect(parseCapture("remind me in 1h stretch")).toEqual({ kind: "remind", text: "in 1h stretch" });
+    expect(parseCapture("/task call dentist")).toEqual({ kind: "todo", text: "call dentist" });
+    expect(parseCapture("what is a note?")).toBeNull();
+    expect(parseCapture("todo:")).toBeNull();
+    expect(parseCapture("notebook sizes")).toBeNull();
+  });
+  it("stores, validates and merges captured items", () => {
+    let list = addCapture([], "todo", "buy milk", "a", 10);
+    list = addCapture(list, "note", "gate code", "b", 11);
+    expect(parseCaptures([...list, { id: "x", kind: "bad", text: "no", at: 1 }]).length).toBe(2);
+    const w = mergeCaptures({ memories: [], notes: [], todos: [] }, list);
+    expect(w.todos.map((t) => t.text)).toEqual(["buy milk"]);
+    expect(w.notes.map((n) => n.text)).toEqual(["gate code"]);
+    expect(mergeCaptures(w, list).notes.length).toBe(1); // notes don't duplicate
+  });
+});
+
+describe("repeating reminders and snooze", () => {
+  it("reads repeat phrases", () => {
+    expect(takeRepeat("every monday 9am send report")).toEqual({ repeat: "weekly", rest: "monday 9am send report" });
+    expect(takeRepeat("every day 8pm take pills")!.repeat).toBe("daily");
+    expect(takeRepeat("weekdays 7am gym")!.repeat).toBe("weekdays");
+    expect(takeRepeat("tomorrow 9am pay rent")).toBeNull();
+    const r = parseRemindArgs("every day 8pm take pills", NOW, NY);
+    expect("repeat" in r && r.repeat).toBe("daily");
+    if ("at" in r) { expect(local(r.at)).toBe("2026-10-20 20:00"); expect(r.text).toBe("take pills"); }
+    const w = parseRemindArgs("every monday 9am team notes", NOW, NY);
+    if ("at" in w) expect(local(w.at)).toBe("2026-10-26 09:00");
+  });
+  it("moves to the next time, skipping weekends", () => {
+    const fri = fromWall(2026, 10, 23, 7, 0, NY);
+    expect(local(nextOccurrence(fri, "weekdays", fri + 1, NY))).toBe("2026-10-26 07:00");
+    expect(local(nextOccurrence(fri, "daily", fri + 1, NY))).toBe("2026-10-24 07:00");
+    expect(local(nextOccurrence(fri, "weekly", fri + 1, NY))).toBe("2026-10-30 07:00");
+    expect(local(nextOccurrence(fromWall(2026, 12, 31, 9, 0, NY), "monthly", fromWall(2026, 12, 31, 9, 1, NY), NY))).toBe("2027-01-28 09:00");
+    // catches up if the server was off for days
+    expect(local(nextOccurrence(fri, "daily", fri + 3 * 86_400_000, NY))).toBe("2026-10-27 07:00");
+  });
+  it("keeps repeats and drops one-shots after they fire", () => {
+    const list = parseReminders([{ id: "a", at: NOW - 1, text: "pills", repeat: "daily" }, { id: "b", at: NOW - 1, text: "once" }, { id: "c", at: NOW + 5, text: "later" }]);
+    const out = afterFiring(list, dueReminders(list, NOW), NOW, NY);
+    expect(out.map((r) => r.id)).toEqual(["c", "a"]);
+    expect(out.find((r) => r.id === "a")!.at).toBeGreaterThan(NOW);
+  });
+  it("snoozes by a duration or to tomorrow", () => {
+    expect(snoozeTarget("30m", NOW, NY)).toBe(NOW + 30 * 60_000);
+    expect(snoozeTarget("", NOW, NY)).toBe(NOW + 10 * 60_000);
+    expect(snoozeTarget("2 hours", NOW, NY)).toBe(NOW + 2 * 3_600_000);
+    expect(local(snoozeTarget("tomorrow", NOW, NY)!)).toBe("2026-10-21 09:00");
+    expect(snoozeTarget("banana", NOW, NY)).toBeNull();
+    const list = parseReminders([{ id: "a", at: NOW + 100, text: "x" }, { id: "b", at: NOW + 200, text: "y" }]);
+    const s = snoozeReminder(list, "1", NOW + 900);
+    expect(s.list.map((r) => r.id)).toEqual(["b", "a"]);
+    expect(snoozeReminder(list, "9", NOW).changed).toBeUndefined();
   });
 });
