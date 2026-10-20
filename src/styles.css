@@ -1990,3 +1990,7 @@ html[data-scheme="light"]:not(.hellraiser):not(.horror):not(.matrix):not(.finalf
   --nova: oklch(0.5 0.16 300); --saiyan: oklch(0.55 0.17 55); --byte: oklch(0.48 0.13 225); --sage: oklch(0.5 0.12 155);
   --pip: oklch(0.55 0.14 75); --echo: oklch(0.5 0.16 350); --rune: oklch(0.5 0.11 190); --claude: oklch(0.5 0.14 40);
 }
+
+/* Hide secrets: anything with .secret is blurred until you focus it (tap or click into it). */
+html[data-hide-secrets="1"] .secret { filter: blur(7px); transition: filter 0.15s; }
+html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:focus-within { filter: none; }

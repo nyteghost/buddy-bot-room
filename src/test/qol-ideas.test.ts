@@ -10,6 +10,8 @@ import { decodeMimeWords, imapQuote, parseFetchHeaders, parseSearch, senderName 
 import { describeCode, shapeWeather, weatherLine, weatherText } from "@/lib/weather";
 import { fromWall, parseWhen, takeDuration, wallOf } from "@/lib/when";
 import { addReminder, dueReminders, parseRemindArgs, parseReminders, removeReminder, reminderList } from "@/lib/reminders";
+import { INTEGRATIONS, setupSummary } from "@/lib/setup";
+import { messageText, searchDocs } from "@/lib/find";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1740,5 +1742,35 @@ describe("mail reply drafting", () => {
     expect(p).toContain('"Re: Thursday lunch"');
     expect(p).toContain("yes Thursday works");
     expect(replyPrompt("x", "y", "")).toContain("acknowledgement");
+  });
+});
+
+describe("setup checklist", () => {
+  it("summarises progress and the next step", () => {
+    const items = INTEGRATIONS.map((i, n) => ({ ...i, configured: n < 2 }));
+    expect(setupSummary(items)).toContain(`2 of ${items.length} set up.`);
+    expect(setupSummary(items)).toContain(items[2]!.name);
+    expect(setupSummary(items.map((i) => ({ ...i, configured: true })))).toContain("Everything is set up.");
+    expect(new Set(INTEGRATIONS.map((i) => i.id)).size).toBe(INTEGRATIONS.length);
+  });
+});
+
+describe("search", () => {
+  const docs = [
+    { kind: "note" as const, id: "1", title: "Plex tips", text: "Remember to scan the 4K library after adding files", at: 1 },
+    { kind: "todo" as const, id: "2", title: "Buy cable", text: "Buy an HDMI cable for the library TV", at: 5 },
+    { kind: "chat" as const, id: "3", title: "Unraid help", text: "How do I fix the parity check on the array", at: 3 },
+  ];
+  it("needs every word and ranks title matches first", () => {
+    expect(searchDocs(docs, "library").map((h) => h.doc.id)).toEqual(["2", "1"]);
+    expect(searchDocs(docs, "plex library").map((h) => h.doc.id)).toEqual(["1"]);
+    expect(searchDocs(docs, "zzz")).toEqual([]);
+    expect(searchDocs(docs, "   ")).toEqual([]);
+  });
+  it("shows a snippet around the match", () => {
+    const h = searchDocs([{ kind: "note", id: "9", title: "t", text: `${"word ".repeat(40)}needle ${"tail ".repeat(40)}`, at: 0 }], "needle")[0]!;
+    expect(h.snippet).toContain("needle");
+    expect(h.snippet.startsWith("…")).toBe(true);
+    expect(messageText([{ type: "text", text: "hi" }, { type: "reasoning" }, { type: "text", text: "there" }])).toBe("hi there");
   });
 });

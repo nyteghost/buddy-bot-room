@@ -121,6 +121,7 @@ export function EngineSettingsDialog() {
               <span className="font-medium">Server URL</span>
               <Input
                 aria-label="Local server URL"
+                className="secret"
                 value={engine.ollamaUrl}
                 onChange={(e) => setEngine({ ollamaUrl: e.target.value })}
               />

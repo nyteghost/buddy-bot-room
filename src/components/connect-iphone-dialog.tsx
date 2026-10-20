@@ -9,7 +9,7 @@ function CopyRow({ label, value, onCopied }: { label: string; value: string; onC
     <div className="grid gap-1">
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="flex gap-2">
-        <input readOnly value={value} aria-label={label} className="min-w-0 flex-1" onFocus={(e) => e.currentTarget.select()} />
+        <input readOnly value={value} aria-label={label} className="secret min-w-0 flex-1" onFocus={(e) => e.currentTarget.select()} />
         <Button variant="outline" size="sm" className="h-11 sm:h-8" onClick={() => { void navigator.clipboard.writeText(value).then(() => onCopied(`${label} copied.`), () => onCopied("Select the text and copy it.")); }}><Copy /> Copy</Button>
       </div>
     </div>
