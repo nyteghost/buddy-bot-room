@@ -40,6 +40,7 @@ export type SlashAction =
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
   | { type: "status" }
+  | { type: "panel"; panel: "calendar" | "mail" }
   | { type: "appearance"; words: string }
   | { type: "m365"; op: string }
   | { type: "schedule"; op: "list" | "add" | "remove" | "run"; text: string }
@@ -104,6 +105,8 @@ export const slashCommands = [
   { name: "schedule", usage: "/schedule add 08:00 weekdays <question> | list | remove N | run N", description: "Have the pals answer something on a schedule and send it to your phone (owner only; free keys and Local AI only)" },
   { name: "m365", usage: "/m365 connect | status | today | mail | summary | disconnect", description: "Read-only work calendar and unread mail subjects (Microsoft 365). Summaries use Local AI only" },
   { name: "appearance", usage: "/appearance light|dark|auto · small|normal|large", description: "Colour scheme (light applies to the Normal theme) and text size" },
+  { name: "calendar", usage: "/calendar", description: "Open the Calendar window (next 7 days)" },
+  { name: "mail", usage: "/mail", description: "Open the Mail window (unread subjects)" },
   { name: "status", usage: "/status", description: "Check that Local AI, search, Plex, Seerr, Jellyfin, Unraid and backups are all working" },
   { name: "web", usage: "/web [on|off]", description: "Let the pals search the web on their own when a question needs current facts" },
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
@@ -209,6 +212,10 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "m365", op: arg } };
     case "appearance": case "theme-color": case "textsize":
       return rawArg ? { ok: true, action: { type: "appearance", words: rawArg } } : fail("Try /appearance light, /appearance dark, /appearance auto, or /appearance large.");
+    case "calendar": case "agenda":
+      return { ok: true, action: { type: "panel", panel: "calendar" } };
+    case "mail": case "inbox":
+      return { ok: true, action: { type: "panel", panel: "mail" } };
     case "status": case "health":
       return { ok: true, action: { type: "status" } };
     case "web": case "autosearch":

@@ -1,0 +1,80 @@
+import { currentUser } from "./accounts.server";
+import { eventsInRange } from "./ics";
+import { fetchUnread, imapConfig } from "./imap.server";
+import { m365Range, m365UnreadMail } from "./m365.server";
+import { validZone } from "./schedule";
+import { logServer } from "./server-log.server";
+import { TtlCache } from "./ttl-cache";
+
+/**
+ * Data for the Mail and Calendar windows. Owner only (it is your personal mail and calendar), read-only, and addresses/credentials
+ * never reach the browser. Calendars: CALENDAR_ICS_URLS (private .ics links, comma separated) plus Microsoft 365 if connected.
+ * Mail: IMAP_* (unread subjects only) plus Microsoft 365 if connected.
+ */
+const tz = () => validZone(process.env["BUDDY_TZ"]) ?? "UTC";
+const cache = new TtlCache<unknown>(60_000, 10);
+
+export type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
+
+function icsUrls(): { name: string; url: string }[] {
+  return (process.env["CALENDAR_ICS_URLS"] ?? "").split(/[\s,]+/).map((u) => u.trim()).filter(Boolean).slice(0, 6).flatMap((u, i) => {
+    try {
+      const url = new URL(u.replace(/^webcal:/i, "https:"));
+      return url.protocol === "https:" || url.protocol === "http:" ? [{ name: `Calendar ${i + 1}`, url: url.toString() }] : [];
+    } catch { return []; }
+  });
+}
+
+async function owner(request: Request): Promise<Response | null> {
+  const user = await currentUser(request);
+  return user?.owner ? null : Response.json({ error: "Only the owner account can open Mail and Calendar." }, { status: 403 });
+}
+
+export async function handleCalendar(request: Request): Promise<Response> {
+  const denied = await owner(request);
+  if (denied) return denied;
+  const days = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get("days")) || 7));
+  const hit = cache.get(`cal|${days}`);
+  if (hit) return Response.json(hit);
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const from = start.getTime() - 3600_000;
+  const to = from + days * 86400_000;
+  const items: CalItem[] = [];
+  const errors: string[] = [];
+  const feeds = icsUrls();
+  await Promise.all(feeds.map(async (f) => {
+    try {
+      const res = await fetch(f.url, { signal: AbortSignal.timeout(12_000), headers: { Accept: "text/calendar" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if (text.length > 8_000_000) throw new Error("feed too large");
+      for (const e of eventsInRange(text, from, to, tz())) items.push({ ...e, source: f.name });
+    } catch (e) { errors.push(`${f.name}: ${e instanceof Error ? e.message.slice(0, 60) : "failed"}`); }
+  }));
+  let m365 = false;
+  try { const r = await m365Range(from, to); if (r) { m365 = true; for (const e of r) items.push({ ...e, source: "Microsoft 365" }); } } catch { errors.push("Microsoft 365: couldn't read the calendar"); }
+  items.sort((a, b) => a.start - b.start);
+  const body = { tz: tz(), configured: feeds.length > 0 || m365, feeds: feeds.length, m365, items: items.slice(0, 300), errors };
+  cache.set(`cal|${days}`, body);
+  return Response.json(body);
+}
+
+export async function handleMail(request: Request): Promise<Response> {
+  const denied = await owner(request);
+  if (denied) return denied;
+  const hit = cache.get("mail");
+  if (hit) return Response.json(hit);
+  const items: { from: string; subject: string; date: string; source: string }[] = [];
+  const errors: string[] = [];
+  const cfg = imapConfig();
+  if (cfg) {
+    try { for (const m of await fetchUnread(cfg)) items.push({ ...m, source: "Mail" }); }
+    catch (e) { logServer("warn", `IMAP failed: ${e instanceof Error ? e.message.slice(0, 80) : "error"}`); errors.push(`Mail: ${e instanceof Error ? e.message.slice(0, 80) : "couldn't connect"}`); }
+  }
+  let m365 = false;
+  try { const r = await m365UnreadMail(); if (r) { m365 = true; for (const m of r) items.push({ ...m, source: "Microsoft 365" }); } } catch { errors.push("Microsoft 365: couldn't read mail"); }
+  items.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+  const body = { configured: !!cfg || m365, imap: !!cfg, m365, items: items.slice(0, 25), errors };
+  cache.set("mail", body);
+  return Response.json(body);
+}

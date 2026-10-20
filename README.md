@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -274,6 +274,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/focus [on\|off]` | Focus mode: calm, chat-only view |
 | `/appearance light\|dark\|auto` · `small\|normal\|large` | Colour scheme and text size |
 | `/schedule add 08:00 <question>` | Scheduled tasks sent to your phone; also `list`, `run N`, `remove N` (owner only, [8.3](#83-scheduled-tasks)) |
+| `/calendar` · `/mail` | Open the Calendar / Mail window ([7.12](#712-calendar-and-mail-windows)) |
 | `/web [on\|off]` | Automatic web lookup: when a question needs current facts (latest, price, news, a question with a `?`), the pals search your SearXNG first and cite the links. Off by default |
 | `/status` | One-shot health check: Local AI, search, Plex, Seerr, Jellyfin, Unraid, Trakt, ntfy and backups. Shows names and problems only, never addresses or keys |
 | `/log` | Debug log |
@@ -464,6 +465,29 @@ Commands: `/m365 today`, `/m365 mail`, `/m365 summary`, `/m365 status`, `/m365 d
 - `/m365 summary` asks **Local AI (Ollama) only**, so work content never goes to a cloud model, free or paid. If Local AI isn't available you just get the plain lists.
 - **Check your organisation's rules first.** Many workplaces require an admin to approve new apps, or forbid connecting work data to personal servers. Don't set this up against a work account if that's not allowed. The sign-in token is saved in the data volume (`m365-auth.json`); `/m365 disconnect` deletes it.
 
+### 7.12 Calendar and Mail windows
+
+Two windows in the left **Workspace** sidebar (also `/calendar`, `/mail` and the command palette) show your **next 7 days** and your **unread mail**. They are read-only and owner-only, and the addresses and passwords stay on the server.
+
+**Calendar** reads private `.ics` links, so there is no sign-in and no app registration:
+
+- **Google Calendar:** Settings → your calendar → *Integrate calendar* → **Secret address in iCal format**.
+- **iCloud:** Calendar → share → *Public Calendar* → copy the link (it is public to anyone with the link).
+- **Outlook.com:** Settings → Calendar → *Shared calendars* → publish → copy the **ICS** link.
+
+Put one or more links in `CALENDAR_ICS_URLS` (comma separated, up to 6) and redeploy. Repeating events, all-day events, time zones and cancelled events are handled. Treat these links like passwords: anyone with one can read that calendar. If you connected Microsoft 365 ([7.11](#711-microsoft-365-work-read-only)) its events appear too, labelled by source.
+
+**Mail** shows the **subject, sender and date of unread messages** over IMAP. It never downloads message bodies, marks anything read, sends, moves or deletes.
+
+| Variable | Example |
+|---|---|
+| `IMAP_HOST` | `imap.gmail.com` · `imap.mail.me.com` (iCloud) · `outlook.office365.com` · `imap.fastmail.com` |
+| `IMAP_USER` | Your full address |
+| `IMAP_PASS` | An **app password** (Gmail, iCloud and Fastmail require one; it needs 2-step verification turned on) |
+| `IMAP_PORT` / `IMAP_FOLDER` | Optional: `993` / `INBOX` |
+
+Microsoft 365 work mail can be added with `/m365 connect` instead. Results are cached for a minute and refresh every five minutes while the window is open. I could not test IMAP against a real mailbox, so if your provider refuses the login, check that IMAP access and the app password are enabled and look at the message under the list.
+
 ---
 
 ## 8. Automatic jobs
@@ -631,6 +655,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 | `TRAKT_CLIENT_SECRET` | empty | Only for `/trakt connect` (write access) |
+| `CALENDAR_ICS_URLS` | empty | Private .ics links for the Calendar window ([7.12](#712-calendar-and-mail-windows)) |
+| `IMAP_HOST` / `IMAP_USER` / `IMAP_PASS` | empty | Unread mail for the Mail window (app password) |
 | `M365_CLIENT_ID` / `M365_TENANT` | empty / `organizations` | Microsoft 365 read-only ([7.11](#711-microsoft-365-work-read-only)) |
 | `COMPOSE_PROFILES` | empty | `tailscale` starts the Tailscale sidecar |
 | `WHISPER_REPLICAS` | `1` | `0` leaves the Whisper container off |

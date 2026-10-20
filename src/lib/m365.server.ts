@@ -77,8 +77,8 @@ async function connect(): Promise<string> {
   return `Open ${j.verification_uri ?? "https://microsoft.com/devicelogin"} and enter the code ${j.user_code}, then sign in with your work account. Your organisation may ask an admin to approve the app first. Then run /m365 status.`;
 }
 
-async function graph(path: string, access: string): Promise<unknown> {
-  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, { headers: { Authorization: `Bearer ${access}`, Prefer: `outlook.timezone="${tz()}"` }, signal: AbortSignal.timeout(12_000) });
+async function graph(path: string, access: string, zone: string = tz()): Promise<unknown> {
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, { headers: { Authorization: `Bearer ${access}`, Prefer: `outlook.timezone="${zone}"` }, signal: AbortSignal.timeout(12_000) });
   if (!res.ok) throw new Error(`Graph ${res.status}`);
   return res.json();
 }
@@ -114,4 +114,19 @@ export async function handleM365(request: Request): Promise<Response> {
     logServer("warn", `Microsoft 365 call failed: ${e instanceof Error ? e.message.slice(0, 80) : "error"}`);
     return Response.json({ text: "Microsoft 365 didn't answer. If it keeps happening, run /m365 connect again (your organisation may have revoked the sign-in)." });
   }
+}
+
+/** For the Calendar and Mail windows: null when Microsoft 365 isn't connected. Read-only. */
+export async function m365Range(from: number, to: number): Promise<{ title: string; start: number; end: number; allDay: boolean; location: string }[] | null> {
+  const access = await token();
+  if (!access) return null;
+  const q = new URLSearchParams({ startDateTime: new Date(from).toISOString(), endDateTime: new Date(to).toISOString(), $select: "subject,start,end,location,isAllDay", $orderby: "start/dateTime", $top: "60" });
+  const json = (await graph(`/me/calendarView?${q}`, access, "UTC")) as { value?: Record<string, unknown>[] };
+  const ms = (o: unknown) => { const d = (o as { dateTime?: string } | undefined)?.dateTime; return d ? Date.parse(`${d.slice(0, 19)}Z`) : NaN; };
+  return (json.value ?? []).map((e) => ({ title: String(e["subject"] ?? "(no title)").slice(0, 120), start: ms(e["start"]), end: ms(e["end"]), allDay: e["isAllDay"] === true, location: String((e["location"] as { displayName?: string } | undefined)?.displayName ?? "").slice(0, 80) })).filter((e) => Number.isFinite(e.start) && Number.isFinite(e.end));
+}
+export async function m365UnreadMail(): Promise<{ from: string; subject: string; date: string }[] | null> {
+  const access = await token();
+  if (!access) return null;
+  return (await unread(access)).map((m) => ({ from: m.from, subject: m.subject, date: m.received }));
 }

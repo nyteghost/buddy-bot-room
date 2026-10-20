@@ -5,6 +5,8 @@ import { bestMatch, parseWrite, pollSeconds, syncBody } from "@/lib/trakt-write"
 import { agents, agentPersona, agentName, resolveMention } from "@/lib/agents";
 import { eventsText, mailText, parseM365, shapeEvents, shapeMail, summaryPrompt } from "@/lib/m365";
 import { appearanceFromWords, formatAppearance, parseAppearance, resolveScheme } from "@/lib/appearance";
+import { eventsInRange } from "@/lib/ics";
+import { decodeMimeWords, imapQuote, parseFetchHeaders, parseSearch, senderName } from "@/lib/imap";
 import { servicesReport } from "@/lib/status";
 import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, MAX_SCHEDULES } from "@/lib/schedules";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
@@ -1551,5 +1553,57 @@ describe("Automatic model per task", () => {
     expect(pickModel(base, { text: "hi" })).toBe("qwen2.5:3b");
     expect(pickModel({ ...base, localAuto: false }, { text: "fix this bug in my function" })).toBe("auto:chat");
     expect(pickModel({ ...base, localPals: { nova: "phi4:14b" } }, { agentId: "nova", text: "hello there friend, how is it going today" })).toBe("phi4:14b");
+  });
+});
+
+describe("calendar feeds (.ics)", () => {
+  const ics = [
+    "BEGIN:VCALENDAR", "BEGIN:VEVENT", "UID:a", "SUMMARY:Standup", "DTSTART;TZID=America/New_York:20261019T093000", "DTEND;TZID=America/New_York:20261019T094500",
+    "RRULE:FREQ=WEEKLY;BYDAY=MO,WE", "EXDATE;TZID=America/New_York:20261021T093000", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:b", "SUMMARY:Holiday", "DTSTART;VALUE=DATE:20261020", "DTEND;VALUE=DATE:20261021", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:c", "SUMMARY:Call\\, with Ann", "DTSTART:20261020T180000Z", "DURATION:PT1H", "LOCATION:Teams", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:d", "SUMMARY:Cancelled", "STATUS:CANCELLED", "DTSTART:20261020T180000Z", "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  const from = Date.UTC(2026, 9, 19, 4);
+  const to = Date.UTC(2026, 9, 27, 4);
+  it("expands repeats, honours EXDATE, converts time zones and skips cancelled events", () => {
+    const ev = eventsInRange(ics, from, to, "America/New_York");
+    expect(ev.map((e) => e.title)).toEqual(["Standup", "Holiday", "Call, with Ann", "Standup"]);
+    expect(new Date(ev[0]!.start).toISOString()).toBe("2026-10-19T13:30:00.000Z"); // 9:30 New York (EDT)
+    expect(new Date(ev[3]!.start).toISOString()).toBe("2026-10-26T13:30:00.000Z"); // the Wednesday is excluded
+    expect(ev[1]!.allDay).toBe(true);
+    expect(ev[2]!.location).toBe("Teams");
+    expect(ev[2]!.end - ev[2]!.start).toBe(3600000);
+  });
+  it("keeps a 9:30 meeting at 9:30 across the daylight-saving change", () => {
+    const rule = ["BEGIN:VEVENT", "UID:z", "SUMMARY:Daily", "DTSTART;TZID=America/New_York:20261101T093000", "RRULE:FREQ=DAILY;COUNT=3", "END:VEVENT"].join("\n");
+    const ev = eventsInRange(rule, Date.UTC(2026, 9, 31), Date.UTC(2026, 10, 5), "America/New_York");
+    expect(ev.length).toBe(3);
+    expect(new Date(ev[0]!.start).toISOString()).toBe("2026-11-01T14:30:00.000Z"); // 9:30 EST after the clocks change
+  });
+  it("ignores junk", () => {
+    expect(eventsInRange("not a calendar", from, to, "UTC")).toEqual([]);
+  });
+});
+
+describe("IMAP header reading", () => {
+  it("decodes encoded words and sender names", () => {
+    expect(decodeMimeWords("=?UTF-8?B?Q2Fmw6k=?=")).toBe("Café");
+    expect(decodeMimeWords("=?ISO-8859-1?Q?Caf=E9_Noir?=")).toBe("Café Noir");
+    expect(senderName('"Ann Lee" <ann@x.test>')).toBe("Ann Lee");
+    expect(senderName("bob@x.test")).toBe("bob@x.test");
+  });
+  it("parses a FETCH reply with literals and a SEARCH reply", () => {
+    const h1 = "From: Ann <a@x.test>\r\nSubject: Hello\r\n continued\r\nDate: Mon, 19 Oct 2026 10:00:00 +0000\r\n\r\n";
+    const raw = `* 3 FETCH (BODY[HEADER.FIELDS (FROM SUBJECT DATE)] {${h1.length}}\r\n${h1})\r\n* 4 FETCH (BODY[HEADER.FIELDS (FROM SUBJECT DATE)] {20}\r\nSubject: Two\r\n\r\n)\r\nok OK done\r\n`;
+    const items = parseFetchHeaders(raw);
+    expect(items.length).toBe(2);
+    expect(items[0]).toEqual({ from: "Ann", subject: "Hello continued", date: "Mon, 19 Oct 2026 10:00:00 +0000" });
+    expect(parseSearch("* SEARCH 4 9 12\r\nx OK\r\n")).toEqual([4, 9, 12]);
+    expect(parseSearch("* SEARCH\r\n")).toEqual([]);
+  });
+  it("quotes credentials safely", () => {
+    expect(imapQuote('pa"ss\\w')).toBe('"pa\\"ss\\\\w"');
+    expect(imapQuote("bad\r\nline")).toBeNull();
   });
 });

@@ -14,6 +14,8 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiMailRouteImport } from './routes/api.mail'
+import { Route as ApiCalendarRouteImport } from './routes/api.calendar'
 import { Route as ApiM365RouteImport } from './routes/api.m365'
 import { Route as ApiTraktWriteRouteImport } from './routes/api.trakt-write'
 import { Route as ApiSttRouteImport } from './routes/api.stt'
@@ -60,6 +62,16 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMailRoute = ApiMailRouteImport.update({
+  id: '/api/mail',
+  path: '/api/mail',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCalendarRoute = ApiCalendarRouteImport.update({
+  id: '/api/calendar',
+  path: '/api/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiM365Route = ApiM365RouteImport.update({
@@ -179,6 +191,8 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/mail': typeof ApiMailRoute
+  '/api/calendar': typeof ApiCalendarRoute
   '/api/m365': typeof ApiM365Route
   '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
@@ -208,6 +222,8 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/mail': typeof ApiMailRoute
+  '/api/calendar': typeof ApiCalendarRoute
   '/api/m365': typeof ApiM365Route
   '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
@@ -238,6 +254,8 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/mail': typeof ApiMailRoute
+  '/api/calendar': typeof ApiCalendarRoute
   '/api/m365': typeof ApiM365Route
   '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
@@ -269,6 +287,8 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/mail'
+    | '/api/calendar'
     | '/api/m365'
     | '/api/trakt-write'
     | '/api/stt'
@@ -298,6 +318,8 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/mail'
+    | '/api/calendar'
     | '/api/m365'
     | '/api/trakt-write'
     | '/api/stt'
@@ -327,6 +349,8 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/mail'
+    | '/api/calendar'
     | '/api/m365'
     | '/api/trakt-write'
     | '/api/stt'
@@ -357,6 +381,8 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiMailRoute: typeof ApiMailRoute
+  ApiCalendarRoute: typeof ApiCalendarRoute
   ApiM365Route: typeof ApiM365Route
   ApiTraktWriteRoute: typeof ApiTraktWriteRoute
   ApiSttRoute: typeof ApiSttRoute
@@ -416,6 +442,20 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mail': {
+      id: '/api/mail'
+      path: '/api/mail'
+      fullPath: '/api/mail'
+      preLoaderRoute: typeof ApiMailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar': {
+      id: '/api/calendar'
+      path: '/api/calendar'
+      fullPath: '/api/calendar'
+      preLoaderRoute: typeof ApiCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/m365': {
@@ -581,6 +621,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiMailRoute: ApiMailRoute,
+  ApiCalendarRoute: ApiCalendarRoute,
   ApiM365Route: ApiM365Route,
   ApiTraktWriteRoute: ApiTraktWriteRoute,
   ApiSttRoute: ApiSttRoute,
