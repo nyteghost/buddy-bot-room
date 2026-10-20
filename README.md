@@ -144,7 +144,7 @@ Your data lives in the `buddy-data` volume and survives updates.
 - **Chat niceties:** ↑/↓ prompt recall, hidden `<think>` blocks from reasoning models, emoji shortcodes (`:fire:` → 🔥), copy a reply, edit and resend your own message, regenerate, branch a conversation.
 - **Saved chats:** auto-saved, searchable, renameable, pinnable (per browser). Self-hosted chats are stored on the server and are private per account (see [section 9](#9-accounts-sharing-and-saved-settings)).
 - **Compare models** (`/compare`): sends one question to 2–3 engines with the names hidden. You vote, then see who wrote what; a scoreboard is kept in your browser.
-- **Pal memory, notes and to-dos:** everything in the *Notes & tasks* window. Open to-dos and memories are shared with every pal. You can also attach **documents** that the pals use as reference.
+- **Pal memory, notes and to-dos:** memories and notes in the *Notes* window (to-dos are in *Tasks*). Open to-dos and memories are shared with every pal. You can also attach **documents** that the pals use as reference.
 - **Presets and settings export/import:** Ctrl+K → *Export settings* / *Import settings*. Exports leave API keys out unless you choose "including API keys".
 
 ---
@@ -502,7 +502,7 @@ Microsoft 365 work mail can be added with `/m365 connect` instead. Results are c
 ### 7.13 Today, Tasks, weather and events
 
 - **Today** window (`/today`): weather, your calendar for today, unread mail count, open tasks and one Trakt pick, each with a short setup hint if it isn't connected yet.
-- **Tasks** window (`/tasks`): your to-do list (the same list as Notes & tasks, kept in this browser) and **reminders** (kept on the server, pushed to your phone by ntfy or Telegram when due). Reminders understand plain English: `/remind in 30m call mom`, `/remind tomorrow 9am pay rent`, `/remind friday at 3pm submit report`. Needs `BUDDY_DATA_DIR`, plus `NTFY_URL` or Telegram to reach your phone. Owner only.
+- **Tasks** window (`/tasks`): your to-do list (kept in this browser; open ones are shared with the pals) and **reminders** (kept on the server, pushed to your phone by ntfy or Telegram when due). Reminders understand plain English: `/remind in 30m call mom`, `/remind tomorrow 9am pay rent`, `/remind friday at 3pm submit report`. Needs `BUDDY_DATA_DIR`, plus `NTFY_URL` or Telegram to reach your phone. Owner only.
 - **Weather** (`/weather`): from Open-Meteo, which needs no key. Set `WEATHER_LOCATION="Atlanta, GA"` (or `WEATHER_LAT` and `WEATHER_LON`), and `WEATHER_UNITS=metric` for Celsius. The morning brief now also carries the weather, today's calendar, unread mail and today's reminders when those are set up.
 - **Draft a reply** (Mail window): pick a message, type what you want to say, and Echo writes the reply for you to copy into your own mail app. Echo only sees the sender, subject and your notes, never the message, and nothing is sent.
 - **`/event friday 3pm dentist for 1h`**: gives you a `.ics` file (opens in Apple, Outlook, Google and most calendar apps) and one-tap "Add to Google Calendar" / "Add to Outlook" links. Pixel Pals can't add the event directly because that needs permission to change your calendar, which it deliberately never asks for. Dates like `oct 25` make an all-day event.
@@ -531,7 +531,7 @@ I tested the logic of all of this with automated tests. I could not run it again
 Tasks and reminders can sync **both ways** with the iPhone **Reminders** app. Pixel Pals runs a small CalDAV server (Radicale) next to it, and the iPhone connects to that. Tick something off on your phone and it's done in Pixel Pals, and the other way round; changes arrive within a minute or two without any Shortcut.
 
 **What syncs**
-- **Your to-do list** (Tasks window, `/todo`, Notes & tasks) ⇄ a Reminders list called **Pixel Pals Tasks**: add, finish and delete in either place.
+- **Your to-do list** (Tasks window, `/todo`) ⇄ a Reminders list called **Pixel Pals Tasks**: add, finish and delete in either place.
 - **Reminders with a time** (`/remind …`) ⇄ a Reminders list called **Pixel Pals Reminders**, with the due time, so your iPhone also alerts at that time. Daily, weekday, weekly and monthly repeats carry over; fancier repeats made on the phone (every 2 weeks, yearly) are left as the phone has them. A one-time reminder you finish on the phone is dropped here, so it won't also push through ntfy.
 - If you edit the same item on both sides between syncs, **the phone's version wins**.
 
@@ -646,7 +646,7 @@ Then just type a question. `/status` checks your services. It uses long-polling,
 | `/dm status` | Show them |
 | `/dm end` | Back to normal discussions |
 
-The same controls are in the *Notes & tasks* window.
+The same controls are in the *Notes* window.
 
 ---
 

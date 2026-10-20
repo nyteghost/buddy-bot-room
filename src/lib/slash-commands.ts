@@ -105,7 +105,7 @@ export const slashCommands = [
   { name: "note", usage: "/note <text>", description: "Save a quick note" },
   { name: "todo", usage: "/todo <task>", description: "Add a to-do (or /todo clear)" },
   { name: "done", usage: "/done <number>", description: "Tick a to-do off" },
-  { name: "tasks", usage: "/tasks", description: "Open notes, memories and to-dos" },
+  { name: "tasks", usage: "/tasks", description: "Open notes and memories" },
   { name: "search", usage: "/search <query>", description: "Search the web (needs SearXNG)" },
   { name: "research", usage: "/research <question>", description: "Search, then let the pals discuss the results" },
   { name: "watch", usage: "/watch [mood]", description: "What should we watch tonight? The pals pick from your Plex library" },

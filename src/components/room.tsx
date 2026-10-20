@@ -1248,7 +1248,7 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Notes, memories and to-dos" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes &amp; tasks</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Notes and memories" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Search chats, notes, tasks and reminders" aria-pressed={searchOpen} onClick={() => setSearchOpen((value) => !value)}><Search /><span>Search</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Setup: what's connected, with connection tests" aria-pressed={setupOpen} onClick={() => setSetupOpen((value) => !value)}><Settings2 /><span>Setup</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
@@ -1641,7 +1641,7 @@ export function Room() {
             <WorkspaceWindow id="recorder" title="Echo’s recorder" icon={<Mic className="size-4" />} open={recorderOpen} onClose={() => setRecorderOpen(false)} resetVersion={resetVersion}>
               <MicRecorder onClose={() => setRecorderOpen(false)} />
             </WorkspaceWindow>
-            <WorkspaceWindow id="notes" title="Notes & tasks" icon={<ListTodo className="size-4" />} open={notesOpen} onClose={() => setNotesOpen(false)} resetVersion={resetVersion}>
+            <WorkspaceWindow id="notes" title="Notes" icon={<ListTodo className="size-4" />} open={notesOpen} onClose={() => setNotesOpen(false)} resetVersion={resetVersion}>
               <NotesPanel />
             </WorkspaceWindow>
             <WorkspaceWindow id="search" title="Search" icon={<Search className="size-4" />} open={searchOpen} onClose={() => setSearchOpen(false)} resetVersion={resetVersion}>

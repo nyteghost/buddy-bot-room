@@ -19,7 +19,7 @@ async function remindCall(op: "list" | "add" | "remove" | "snooze", text = ""): 
   } catch { return { error: "Couldn't reach the server." }; }
 }
 
-/** To-dos (kept in this browser, shared with Notes & tasks) plus reminders (kept on the server, pushed to your phone). */
+/** To-dos (kept in this browser, the list the pals see) plus reminders (kept on the server, pushed to your phone). */
 export function TasksPanel({ open }: { open: boolean }) {
   const { todos } = useWorkbench();
   const [text, setText] = useState("");
@@ -54,7 +54,7 @@ export function TasksPanel({ open }: { open: boolean }) {
           </div>
         ))}
         {todos.some((t) => t.done) && <Button size="sm" variant="ghost" className="justify-start" onClick={() => updateWorkbench((w) => ({ ...w, todos: clearDone(w.todos) }))}>Clear finished</Button>}
-        <p className="text-xs text-muted-foreground">These are the same tasks as Notes &amp; tasks, kept in this browser.</p>
+        <p className="text-xs text-muted-foreground">Kept in this browser; open ones are shared with the pals.</p>
       </section>
       <section className="grid gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reminders to your phone</h3>
