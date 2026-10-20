@@ -138,6 +138,28 @@ function ViewportTracker() {
   return null;
 }
 
+/**
+ * A dialog or menu that closes oddly can leave <body> set to ignore all touches: the page still draws but nothing responds.
+ * If nothing modal is open, clear it. Runs on style changes and on the next touch, so a stuck page frees itself.
+ */
+function StuckTouchGuard() {
+  useEffect(() => {
+    const modalOpen = () => !!document.querySelector('[role="dialog"][data-state="open"],[role="alertdialog"][data-state="open"],[role="menu"][data-state="open"],[role="listbox"],[data-radix-popper-content-wrapper],[data-vaul-drawer]');
+    const heal = () => { if (document.body.style.pointerEvents === "none" && !modalOpen()) document.body.style.pointerEvents = ""; };
+    const observer = new MutationObserver(() => { window.setTimeout(heal, 400); });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
+    window.addEventListener("pointerdown", heal, true);
+    window.addEventListener("touchstart", heal, { capture: true, passive: true });
+    heal();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("pointerdown", heal, true);
+      window.removeEventListener("touchstart", heal, true);
+    };
+  }, []);
+  return null;
+}
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
@@ -148,6 +170,7 @@ function RootShell({ children }: { children: ReactNode }) {
         {children}
         <Scripts />
         <ViewportTracker />
+        <StuckTouchGuard />
       </body>
     </html>
   );
