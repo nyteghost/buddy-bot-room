@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Mailbox } from "@/components/mailbox";
 
 type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
-type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean }; items: CalItem[]; errors: string[]; error?: string };
+type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean; mode?: string }; items: CalItem[]; errors: string[]; error?: string };
 type MailItem = { from: string; subject: string; date: string; source: string };
 type MailData = { configured: boolean; imap: boolean; m365: boolean; items: MailItem[]; errors: string[]; error?: string };
 
@@ -76,13 +76,13 @@ export function CalendarPanel({ open }: { open: boolean }) {
         <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
           {data.google.connected ? (
             <>
-              <span className="text-xs text-muted-foreground">Google Calendar is connected: your events show here, and shifts can be pushed from Work tools.</span>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void disconnect()}>Disconnect</Button>
+              <span className="text-xs text-muted-foreground">{data.google.mode === "service" ? "Google Calendar is connected through your service account." : "Google Calendar is connected."} Your events show here, and shifts can be pushed from Work tools.</span>
+              {data.google.mode !== "service" && <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void disconnect()}>Disconnect</Button>}
             </>
           ) : data.google.configured ? (
             <Button size="sm" variant="outline" onClick={connect}>Connect Google Calendar</Button>
           ) : (
-            <span className="text-xs text-muted-foreground">To connect Google Calendar, enter the Google client ID and secret in Settings → Google Calendar first.</span>
+            <span className="text-xs text-muted-foreground">To connect Google Calendar, enter the Google details in Settings → Google Calendar first.</span>
           )}
           {note && <span className="text-xs text-muted-foreground">{note}</span>}
         </div>

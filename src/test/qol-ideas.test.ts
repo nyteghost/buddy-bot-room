@@ -2391,3 +2391,23 @@ describe("self-hosted Google Calendar helpers", () => {
     expect(gTok({})).toBe(null);
   });
 });
+
+import { normalizePrivateKey as gKey, serviceJwtParts as gJwt } from "@/lib/gcal";
+describe("service account helpers", () => {
+  const body = "A".repeat(300);
+  it("rebuilds a key from escaped, flattened or raw text", () => {
+    const want = `-----BEGIN PRIVATE KEY-----\n${"A".repeat(64)}\n${"A".repeat(64)}\n${"A".repeat(64)}\n${"A".repeat(64)}\n${"A".repeat(44)}\n-----END PRIVATE KEY-----\n`;
+    expect(gKey(`-----BEGIN PRIVATE KEY-----\\n${body}\\n-----END PRIVATE KEY-----\\n`)).toBe(want);
+    expect(gKey(`-----BEGIN PRIVATE KEY----- ${body} -----END PRIVATE KEY-----`)).toBe(want);
+    expect(gKey(`"${body}",`)).toBe(want);
+    expect(gKey("not a key")).toBe(null);
+  });
+  it("builds the unsigned sign-in request", () => {
+    const [h, c] = gJwt("bot@x.iam.gserviceaccount.com", 1000).split(".");
+    expect(JSON.parse(Buffer.from(h ?? "", "base64url").toString()).alg).toBe("RS256");
+    const claims = JSON.parse(Buffer.from(c ?? "", "base64url").toString());
+    expect(claims.iss).toBe("bot@x.iam.gserviceaccount.com");
+    expect(claims.exp).toBe(4300);
+    expect(claims.scope).toBe("https://www.googleapis.com/auth/calendar.events");
+  });
+});

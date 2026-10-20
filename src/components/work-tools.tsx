@@ -133,7 +133,7 @@ function waitForOAuthCompletion(popup: Window) {
 }
 
 /** Button that connects Google Calendar once, then pushes every shift with one click. */
-type GoogleReply = { configured?: boolean; connected?: boolean; error?: string; added?: number; updated?: number; removed?: number; skipped?: number; reasons?: string[] };
+type GoogleReply = { configured?: boolean; connected?: boolean; mode?: string; error?: string; added?: number; updated?: number; removed?: number; skipped?: number; reasons?: string[] };
 
 function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownload }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void; onDownload: () => void }) {
   const session = useSession();

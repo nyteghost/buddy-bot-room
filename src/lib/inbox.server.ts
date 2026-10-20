@@ -33,7 +33,7 @@ async function owner(request: Request): Promise<Response | null> {
   return user?.owner ? null : Response.json({ error: "Only the owner account can open Mail and Calendar." }, { status: 403 });
 }
 
-export type CalendarData = { tz: string; configured: boolean; feeds: number; m365: boolean; google: { configured: boolean; connected: boolean }; items: CalItem[]; errors: string[] };
+export type CalendarData = { tz: string; configured: boolean; feeds: number; m365: boolean; google: { configured: boolean; connected: boolean; mode?: string }; items: CalItem[]; errors: string[] };
 export type MailData = { configured: boolean; imap: boolean; m365: boolean; items: { from: string; subject: string; date: string; source: string }[]; errors: string[] };
 
 export async function handleCalendar(request: Request): Promise<Response> {

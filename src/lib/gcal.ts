@@ -62,3 +62,17 @@ export function explainGoogle(status: number, body: string): string {
   } catch { /* keep default */ }
   return detail;
 }
+
+/** Rebuild a private key from whatever was pasted: the JSON's escaped \\n text, real line breaks, or spaces (the settings field flattens lines). */
+export function normalizePrivateKey(raw: string): string | null {
+  const body = String(raw ?? "").replace(/\\n/g, "\n").replace(/-----(BEGIN|END) [A-Z ]*PRIVATE KEY-----/g, "").replace(/["',\s]/g, "");
+  if (!/^[A-Za-z0-9+/=]{200,}$/.test(body)) return null;
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
+}
+
+export const b64url = (s: string): string => Buffer.from(s, "utf8").toString("base64url");
+/** The unsigned part of a service-account sign-in request. */
+export function serviceJwtParts(email: string, nowSec: number): string {
+  return `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: email, scope: SCOPE, aud: "https://oauth2.googleapis.com/token", iat: nowSec, exp: nowSec + 3300 }))}`;
+}

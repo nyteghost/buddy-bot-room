@@ -1,5 +1,5 @@
 import { currentUser } from "./accounts.server";
-import { authUrl, buildEvent, cleanOrigin, clean, EVENT_ID, explainGoogle, parseTokenResponse, redirectUri, validShift, type ShiftInput } from "./gcal";
+import { normalizePrivateKey, serviceJwtParts, authUrl, buildEvent, cleanOrigin, clean, EVENT_ID, explainGoogle, parseTokenResponse, redirectUri, validShift, type ShiftInput } from "./gcal";
 import { logServer } from "./server-log.server";
 import { validZone } from "./schedule";
 
@@ -17,6 +17,15 @@ const cfg = () => {
   const secret = (process.env["GOOGLE_CLIENT_SECRET"] ?? "").trim();
   return id && secret ? { id, secret } : null;
 };
+
+/** A service account (a Google "robot" the calendar is shared with) never needs a consent screen and its key doesn't expire. */
+const sa = () => {
+  const email = (process.env["GOOGLE_SA_EMAIL"] ?? "").trim();
+  const key = normalizePrivateKey(process.env["GOOGLE_SA_KEY"] ?? "");
+  const calendar = (process.env["GOOGLE_CALENDAR_ID"] ?? "").trim();
+  return email && key && calendar ? { email, key, calendar } : null;
+};
+const calendarPath = () => `calendars/${encodeURIComponent(sa()?.calendar ?? "primary")}/events`;
 
 const pending = new Map<string, { origin: string; exp: number }>();
 let access: { token: string; exp: number } | null = null;
@@ -47,8 +56,25 @@ async function tokenCall(params: Record<string, string>): Promise<{ ok: true; js
   } catch (e) { return { ok: false, error: e instanceof Error && e.name === "TimeoutError" ? "Google didn't answer in time." : "Couldn't reach Google.", revoked: false }; }
 }
 
+async function serviceToken(s: { email: string; key: string }): Promise<{ token: string } | { error: string }> {
+  try {
+    const { createSign } = (await import(/* @vite-ignore */ "node:" + "crypto")) as typeof import("node:crypto");
+    const unsigned = serviceJwtParts(s.email, Math.floor(Date.now() / 1000));
+    const jwt = `${unsigned}.${createSign("RSA-SHA256").update(unsigned).sign(s.key, "base64url")}`;
+    const res = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }), signal: AbortSignal.timeout(12_000) });
+    const text = await res.text();
+    if (!res.ok) return { error: `Google refused the service account: ${explainGoogle(res.status, text)}` };
+    const t = parseTokenResponse(JSON.parse(text));
+    if (!t) return { error: "Google's answer wasn't understood." };
+    access = { token: t.access, exp: Date.now() + t.expiresIn * 1000 };
+    return { token: t.access };
+  } catch { return { error: "The service account key couldn't be used. Check it in Settings → Google Calendar." }; }
+}
+
 async function accessToken(): Promise<{ token: string } | { error: string; reconnect?: boolean }> {
   if (access && access.exp > Date.now() + 60_000) return { token: access.token };
+  const robot = sa();
+  if (robot) return serviceToken(robot);
   const refresh = await readRefresh();
   if (!refresh) return { error: "Google Calendar isn't connected yet.", reconnect: true };
   const r = await tokenCall({ grant_type: "refresh_token", refresh_token: refresh });
@@ -64,15 +90,16 @@ async function owner(request: Request): Promise<Response | null> {
   return user?.owner ? null : Response.json({ error: "Only the owner account can use Google Calendar here." }, { status: 403 });
 }
 
-export const gcalStatus = async (): Promise<{ configured: boolean; connected: boolean }> => ({ configured: !!cfg(), connected: !!cfg() && !!(await readRefresh()) });
+const linked = async (): Promise<boolean> => !!sa() || (!!cfg() && !!(await readRefresh()));
+export const gcalStatus = async (): Promise<{ configured: boolean; connected: boolean; mode: "service" | "sign-in" | "none" }> => ({ configured: !!cfg() || !!sa(), connected: await linked(), mode: sa() ? "service" : cfg() ? "sign-in" : "none" });
 
 /** Events from the primary Google calendar between two instants (epoch ms), or null when Google isn't connected. Throws a short message on failure. */
 export async function googleRange(from: number, to: number): Promise<{ title: string; start: number; end: number; allDay: boolean; location: string }[] | null> {
-  if (!cfg() || !(await readRefresh())) return null;
+  if (!(await linked())) return null;
   const t = await accessToken();
   if ("error" in t) throw new Error(t.error);
   const q = new URLSearchParams({ timeMin: new Date(from).toISOString(), timeMax: new Date(to).toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "100", fields: "items(summary,location,status,start,end)" });
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${q}`, { headers: { authorization: `Bearer ${t.token}` }, signal: AbortSignal.timeout(12_000) });
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/${calendarPath()}?${q}`, { headers: { authorization: `Bearer ${t.token}` }, signal: AbortSignal.timeout(12_000) });
   if (!res.ok) throw new Error(explainGoogle(res.status, await res.text()));
   const json = (await res.json()) as { items?: { summary?: string; location?: string; status?: string; start?: { date?: string; dateTime?: string }; end?: { date?: string; dateTime?: string } }[] };
   return (json.items ?? []).filter((e) => e.status !== "cancelled").flatMap((e) => {
@@ -84,17 +111,17 @@ export async function googleRange(from: number, to: number): Promise<{ title: st
   });
 }
 
-export const gcalReady = async (): Promise<boolean> => !!cfg() && !!(await readRefresh());
+export const gcalReady = linked;
 
 /** POST { op: "status" | "push" | "disconnect" }. */
 export async function handleGoogle(request: Request): Promise<Response> {
   const denied = await owner(request);
   if (denied) return denied;
-  if (!dir()) return Response.json({ configured: false, connected: false, error: "Needs BUDDY_DATA_DIR (the data volume)." });
+  if (!sa() && !dir()) return Response.json({ configured: false, connected: false, error: "Needs BUDDY_DATA_DIR (the data volume)." });
   const body = (await request.json().catch(() => ({}))) as { op?: string; shifts?: ShiftInput[]; title?: string; remove?: string[] };
   if (body.op === "disconnect") { await forget(); (await import(/* @vite-ignore */ "./inbox" + ".server")).clearMailCache(); return Response.json({ ok: true }); }
   if (body.op === "push") return push(body);
-  return Response.json({ configured: !!cfg(), connected: !!(await readRefresh()) });
+  return Response.json(await gcalStatus());
 }
 
 async function push(body: { shifts?: ShiftInput[]; title?: string; remove?: string[] }): Promise<Response> {
@@ -104,7 +131,7 @@ async function push(body: { shifts?: ShiftInput[]; title?: string; remove?: stri
   const zone = tz();
   let added = 0, updated = 0, removed = 0, skipped = 0;
   const reasons: string[] = [];
-  const call = (path: string, method: string, json?: unknown) => fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events${path}`, { method, headers: { authorization: `Bearer ${t.token}`, ...(json ? { "content-type": "application/json" } : {}) }, ...(json ? { body: JSON.stringify(json) } : {}), signal: AbortSignal.timeout(15_000) });
+  const call = (path: string, method: string, json?: unknown) => fetch(`https://www.googleapis.com/calendar/v3/${calendarPath()}${path}`, { method, headers: { authorization: `Bearer ${t.token}`, ...(json ? { "content-type": "application/json" } : {}) }, ...(json ? { body: JSON.stringify(json) } : {}), signal: AbortSignal.timeout(15_000) });
   try {
     for (const id of (body.remove ?? []).filter((x) => EVENT_ID.test(x)).slice(0, 60)) {
       const res = await call(`/${id}`, "DELETE");
