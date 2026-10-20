@@ -1046,6 +1046,7 @@ describe("free key helper", () => {
   it("recognises each provider from a pasted key", () => {
     expect(detectProvider("gsk_" + "a".repeat(40))?.id).toBe("groq");
     expect(detectProvider("AIza" + "b".repeat(35))?.id).toBe("gemini");
+    expect(detectProvider("AQ.Ab8RN6" + "x".repeat(30))?.id).toBe("gemini");
     expect(detectProvider("sk-or-v1-" + "c".repeat(30))?.id).toBe("openrouter");
     expect(detectProvider("nvapi-" + "d".repeat(30))?.id).toBe("nvidia");
   });

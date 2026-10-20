@@ -15,7 +15,7 @@ export type KeyProvider = {
 
 export const KEY_PROVIDERS: KeyProvider[] = [
   { id: "groq", field: "groqKey", name: "Groq", url: "https://console.groq.com/keys", free: "Free tier, very fast (GPT-OSS 120B).", placeholder: "gsk_...", pattern: /^gsk_[A-Za-z0-9]{20,}$/ },
-  { id: "gemini", field: "geminiKey", name: "Gemini", url: "https://aistudio.google.com/apikey", free: "Free tier in Google AI Studio (2.5 Flash).", placeholder: "AIza...", pattern: /^AIza[0-9A-Za-z_-]{30,}$/ },
+  { id: "gemini", field: "geminiKey", name: "Gemini", url: "https://aistudio.google.com/apikey", free: "Free tier in Google AI Studio (2.5 Flash).", placeholder: "AIza... or AQ....", pattern: /^(AIza[0-9A-Za-z_-]{30,}|AQ\.[0-9A-Za-z_.-]{20,})$/ },
   { id: "openrouter", field: "openrouterKey", name: "OpenRouter", url: "https://openrouter.ai/keys", free: "Has free models (Llama 3.3 70B).", placeholder: "sk-or-...", pattern: /^sk-or-[A-Za-z0-9_-]{20,}$/ },
   { id: "nvidia", field: "nvidiaKey", name: "NVIDIA NIM", url: "https://build.nvidia.com/settings/api-keys", free: "Free credits (Llama 3.1 70B).", placeholder: "nvapi-...", pattern: /^nvapi-[A-Za-z0-9_-]{20,}$/ },
   { id: "anthropic", field: "anthropicKey", name: "Claude (Anthropic)", paid: true, url: "https://console.anthropic.com/settings/keys", free: "PAID. Billed per use; Haiku 5.5 costs about $0.10 in / $0.50 out per million tokens.", placeholder: "sk-ant-...", pattern: /^sk-ant-[A-Za-z0-9_-]{20,}$/ },
