@@ -819,3 +819,7 @@ Once connected, the Calendar window also shows your primary Google calendar (wit
 ## Vendors
 
 Work tools -> Vendors compares prices from the places you buy. Each item has a row per vendor: paste a product link and the server reads the price off the page (shop data first, then Local AI as a flagged backup), or type in a quoted price. Cheapest (price plus shipping) is highlighted, old prices (30+ days) are marked, and "Who's cheapest?" asks Local AI. "Pull quotes from email" searches the IMAP mailbox for a vendor and suggests prices for you to add; nothing is saved without your click. Stored in `BUDDY_DATA_DIR/vendors.json` (in backups). Owner only; links to private networks are refused.
+
+## One-file Stage Deck Planner
+
+`public/stage-planner.html` is the same planner as the Deck tab, bundled into a single file with its styles and code, so you can email it and anyone can open it in a browser without Pixel Pals (works offline; its saved stages stay in that person's own browser). It is also linked from the Deck tab. After changing anything under `src/components/deck-planner/`, rebuild it with `npm run standalone` (or `bun run standalone`) and commit the result.

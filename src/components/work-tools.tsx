@@ -365,7 +365,7 @@ function DeckTab() {
       <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the stage planner…</p>}>
         <DeckPlanner />
       </Suspense>
-      <p className="mt-3 text-xs text-muted-foreground">Tip: type <code>@deck 24x24x32</code> in the chat box for a quick answer.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Tip: type <code>@deck 24x24x32</code> in the chat box for a quick answer. Want to send the planner to someone without Pixel Pals? <a className="text-primary underline" href="/stage-planner.html" download="stage-planner.html">Download the one-file version</a>. It works offline in any browser.</p>
     </div>
   );
 }

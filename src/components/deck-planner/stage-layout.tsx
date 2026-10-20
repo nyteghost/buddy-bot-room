@@ -77,8 +77,8 @@ export function StageLayout({ stages: sourceStages }: { stages: LayoutStage[] })
     setError("");
   };
   const printBounds = {
-    x: Math.max(0, Math.min(...stages.map(stage => positionOf(stage.id).x)) - 2),
-    y: Math.max(0, Math.min(...stages.map(stage => positionOf(stage.id).y)) - 2),
+    x: stages.length ? Math.max(0, Math.min(...stages.map(stage => positionOf(stage.id).x)) - 2) : 0,
+    y: stages.length ? Math.max(0, Math.min(...stages.map(stage => positionOf(stage.id).y)) - 2) : 0,
     right: Math.max(8, ...stages.map(stage => positionOf(stage.id).x + stage.width)) + 2,
     bottom: Math.max(8, ...stages.map(stage => positionOf(stage.id).y + stage.length)) + 2,
   };
