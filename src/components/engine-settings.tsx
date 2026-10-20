@@ -30,12 +30,12 @@ import { CUSTOM_PRESETS } from "@/lib/custom-provider";
 import { UsagePanel } from "@/components/usage-panel";
 
 const options: { kind: EngineKind; label: string; note: string }[] = [
-  { kind: "cloud", label: "Free keys", note: "Uses every free key you enter below, sharing turns between them." },
-  { kind: "auto", label: "Auto (fastest)", note: "Free keys answer first (about 40× faster); the in-browser model takes over if a key hits its limit." },
-  { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once, then loads from cache." },
-  { kind: "local-server", label: "Local AI (this server)", note: "Uses the Ollama in your Pixel Pals stack. Nothing to type: models are chosen per task and downloaded from here." },
-  { kind: "ollama", label: "Local server / Ollama", note: "Uses Ollama or llama.cpp on your computer for full native GPU speed." },
-  { kind: "auto-ollama", label: "Auto (keys + Ollama)", note: "Free keys answer first; your local Ollama server takes over if a key hits its limit or none are set." },
+  { kind: "cloud", label: "Free keys", note: "Shares turns between the free keys you add." },
+  { kind: "auto", label: "Auto (fastest)", note: "Free keys first; the in-browser model steps in if a key runs out." },
+  { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once." },
+  { kind: "local-server", label: "Local AI (this server)", note: "The Ollama in your Pixel Pals stack. Nothing to type." },
+  { kind: "ollama", label: "Ollama on my computer", note: "Your own Ollama or llama.cpp, at full GPU speed." },
+  { kind: "auto-ollama", label: "Auto (keys + Ollama)", note: "Free keys first; your Ollama takes over if they fail." },
 ];
 
 export function EngineSettingsDialog() {
@@ -75,46 +75,53 @@ export function EngineSettingsDialog() {
           <Cpu /> {label}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>AI engine</DialogTitle>
           <DialogDescription>
-            All options are free. Voices use your browser's built-in speech.
+            Choose where the pals' replies come from. Everything here is free unless you turn on a paid provider.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-2">
+        <div className="grid gap-1.5" role="radiogroup" aria-label="Where replies come from">
           {options.map((o) => (
             <button
               key={o.kind}
               type="button"
+              role="radio"
+              aria-checked={engine.kind === o.kind}
               onClick={() => setEngine({ kind: o.kind })}
               className={cn(
-                "rounded-md border border-border p-3 text-left",
+                "flex items-start gap-3 rounded-md border border-border px-3 py-2 text-left",
                 engine.kind === o.kind && "border-primary bg-accent",
               )}
             >
-              <div className="font-semibold">{o.label}</div>
-              <div className="text-sm text-muted-foreground">{o.note}</div>
+              <span aria-hidden className={cn("mt-1 size-3 shrink-0 rounded-full border border-muted-foreground", engine.kind === o.kind && "border-primary bg-primary")} />
+              <span className="grid">
+                <span className="text-sm font-semibold leading-tight">{o.label}</span>
+                <span className="text-xs text-muted-foreground">{o.note}</span>
+              </span>
             </button>
           ))}
         </div>
-        <div className="grid gap-2 text-sm">
-          <span className="font-medium">Presets <small className="text-muted-foreground">(engine choice and Ollama settings — never your keys)</small></span>
-          {presets.length > 0 && (
-            <div className="flex gap-2">
-              <select aria-label="Saved presets" className="h-9 flex-1 rounded-md border border-input bg-background px-2" value={presetPick} onChange={(e) => setPresetPick(e.target.value)}>
-                <option value="">Choose a preset…</option>
-                {presets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
-              </select>
-              <Button type="button" size="sm" disabled={!presetPick} onClick={() => { const p = presets.find((x) => x.name === presetPick); if (p) setEngine(presetToEngine(p)); }}>Use</Button>
-              <Button type="button" size="sm" variant="ghost" disabled={!presetPick} onClick={() => { updatePresets((l) => deletePreset(l, presetPick)); setPresetPick(""); }}>Delete</Button>
-            </div>
-          )}
-          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const p = makePreset(presetName, engine); if (p) { updatePresets((l) => savePreset(l, p)); setPresetPick(p.name); setPresetName(""); } }}>
-            <Input aria-label="Preset name" placeholder="Name this setup, e.g. Fast Groq" value={presetName} onChange={(e) => setPresetName(e.target.value)} />
-            <Button type="submit" size="sm" disabled={!presetName.trim()}>Save current</Button>
-          </form>
-        </div>
+        <details className="rounded-md border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Saved setups <small className="font-normal text-muted-foreground">(engine choice and Ollama settings, never your keys)</small></summary>
+          <div className="mt-2 grid gap-2">
+            {presets.length > 0 && (
+              <div className="flex gap-2">
+                <select aria-label="Saved presets" className="h-9 flex-1 rounded-md border border-input bg-background px-2" value={presetPick} onChange={(e) => setPresetPick(e.target.value)}>
+                  <option value="">Choose a setup…</option>
+                  {presets.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                </select>
+                <Button type="button" size="sm" disabled={!presetPick} onClick={() => { const p = presets.find((x) => x.name === presetPick); if (p) setEngine(presetToEngine(p)); }}>Use</Button>
+                <Button type="button" size="sm" variant="ghost" disabled={!presetPick} onClick={() => { updatePresets((l) => deletePreset(l, presetPick)); setPresetPick(""); }}>Delete</Button>
+              </div>
+            )}
+            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const p = makePreset(presetName, engine); if (p) { updatePresets((l) => savePreset(l, p)); setPresetPick(p.name); setPresetName(""); } }}>
+              <Input aria-label="Preset name" placeholder="Name this setup, e.g. Fast Groq" value={presetName} onChange={(e) => setPresetName(e.target.value)} />
+              <Button type="submit" size="sm" disabled={!presetName.trim()}>Save current</Button>
+            </form>
+          </div>
+        </details>
         {(engine.kind === "ollama" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3 text-sm">
             <label className="grid gap-1">
@@ -169,6 +176,7 @@ export function EngineSettingsDialog() {
         {(engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3">
             <FreeKeysWizard />
+            <p className="text-sm font-medium">Free keys <small className="font-normal text-muted-foreground">(a ✓ means a key is saved in this browser)</small></p>
             <KeyField
               label="Groq (GPT-OSS 120B)"
               value={engine.groqKey}
@@ -197,8 +205,10 @@ export function EngineSettingsDialog() {
               href="https://build.nvidia.com/settings/api-keys"
               placeholder="nvapi-..."
             />
-            <div className="grid gap-2 rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm">
-              <p className="font-medium">Claude (Anthropic) — paid service</p>
+            <p className="pt-1 text-sm font-medium">More providers <small className="font-normal text-muted-foreground">(optional)</small></p>
+            <details className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm" open={engine.claudeMode !== "off"}>
+              <summary className="cursor-pointer font-medium">Claude (Anthropic), paid{engine.claudeMode !== "off" ? " · ON" : ""}</summary>
+              <div className="mt-2 grid gap-2">
               <p className="text-muted-foreground">
                 Unlike the providers above, Claude charges per use on your Anthropic account (Haiku 5.5 is about $0.10 in / $0.50 out per million tokens, so a discussion costs a few cents). It stays <b>off</b> until you choose how to use it. Set a monthly spending limit at console.anthropic.com.
               </p>
@@ -237,6 +247,7 @@ export function EngineSettingsDialog() {
               {engine.claudeMode !== "off" && !engine.anthropicKey.trim() && <p className="text-destructive">Add a Claude key above, or turn this off.</p>}
               {engine.claudeMode !== "off" && engine.anthropicKey.trim() && <p className="text-amber-600">Claude is ON: replies it writes are billed to your Anthropic account.</p>}
             </div>
+            </details>
             <CustomProviderBox />
             <UsagePanel />
             <p className="text-sm text-muted-foreground">
@@ -366,11 +377,12 @@ function KeyField(props: {
   href: string;
   placeholder: string;
 }) {
+  const saved = props.value.trim().length > 0;
   return (
     <div className="grid gap-1 text-sm">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">{props.label}</span>
-        <a className="text-primary underline" href={props.href} target="_blank" rel="noreferrer">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium">{props.label} {saved && <span className="text-green-600 dark:text-green-400" aria-label="key saved">✓</span>}</span>
+        <a className="text-xs text-primary underline" href={props.href} target="_blank" rel="noreferrer">
           Get a free key
         </a>
       </div>
