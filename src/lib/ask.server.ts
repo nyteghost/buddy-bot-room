@@ -3,7 +3,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { engineFromJson, freeModels, localServerProvider, turnProviders, type TurnProvider } from "./engine";
 import { accountFileName } from "./local-account";
 import { ownerName } from "./accounts.server";
-import { ollamaBase } from "./ollama.server";
+import { ollamaBase, resolveLocalModel } from "./ollama.server";
 import { isModelName } from "./model-catalog";
 import { handleSearch } from "./search.server";
 import { wantsWeb, webContext } from "./web-context";
@@ -63,7 +63,8 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
     } catch { /* search is optional */ }
   }
   let lastError = "";
-  for (const p of chain) {
+  for (const original of chain) {
+    const p = original.kind === "ollama-server" ? { ...original, model: (await resolveLocalModel(original.model ?? "")) ?? "" } : original;
     const m = modelFor(p);
     if (!m) continue;
     try {

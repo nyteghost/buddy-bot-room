@@ -5,7 +5,7 @@ import { setEngine, useEngine } from "@/lib/engine";
 import { describeHardware, modelBudgetGb, type Hardware } from "@/lib/hardware";
 import { agents } from "@/lib/agents";
 import { newSuggestions, type FeedModel } from "@/lib/model-feed";
-import { describeBench, CATALOG, TASKS, fitFor, fitLabel, recommend, type TaskKey } from "@/lib/model-catalog";
+import { describeBench, AUTO_MODEL, CATALOG, TASKS, bestInstalled, fitFor, fitLabel, recommend, type TaskKey } from "@/lib/model-catalog";
 
 type Status = {
   configured: boolean;
@@ -113,7 +113,10 @@ export function LocalAiPanel() {
   const rec = hw ? recommend(hw) : [];
   const onGpu = hw ? modelBudgetGb(hw).onGpu : false;
   const newOnes = hw && status.feed?.models.length ? newSuggestions(status.feed.models, hw, names as Set<string>, new Set<string>(CATALOG.map((c) => c.id))) : [];
-  const choices = (current: string) => (current && !names.has(current) ? [current, ...installed.map((m) => m.name)] : installed.map((m) => m.name));
+  const choices = (current: string) => (current && current !== AUTO_MODEL && !names.has(current) ? [current, ...installed.map((m) => m.name)] : installed.map((m) => m.name));
+  /** What "Automatic" means right now for a task, so the choice is never a mystery. */
+  const autoNow = (task: TaskKey) => bestInstalled(task, installed, hw ?? null);
+  const allAuto = TASKS.every((t) => engine[FIELD[t.key]] === AUTO_MODEL) && engine.localAuto;
 
   return (
     <div className="grid gap-3 text-sm">
@@ -147,11 +150,18 @@ export function LocalAiPanel() {
 
           <div className="grid gap-2">
             <span className="font-medium">Model per task</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+              <div className="min-w-0 text-xs text-muted-foreground">
+                <b className="text-foreground">Automatic</b> picks, for every message, the best model you've already downloaded for that kind of task on this machine: the biggest that fits your GPU for chat, code and reasoning, and the smallest quick model for short messages.
+              </div>
+              <Button size="sm" variant={allAuto ? "outline" : "default"} className="h-11 sm:h-8" disabled={allAuto || !installed.length} onClick={() => setEngine({ localAuto: true, localChat: AUTO_MODEL, localCode: AUTO_MODEL, localReasoning: AUTO_MODEL, localFast: AUTO_MODEL })}>{allAuto ? "All automatic" : "Set all to Automatic"}</Button>
+            </div>
             <label className="flex items-center gap-2"><input type="checkbox" checked={engine.localAuto} onChange={(e) => setEngine({ localAuto: e.target.checked })} /> Choose automatically from what each message looks like</label>
             {TASKS.map((t) => (
               <label key={t.key} className="grid gap-1">
                 <span>{t.label} <span className="text-xs text-muted-foreground">{t.hint}</span></span>
                 <select className="rounded-md border bg-background px-2 py-2" value={engine[FIELD[t.key]]} onChange={(e) => setEngine({ [FIELD[t.key]]: e.target.value })}>
+                  <option value={AUTO_MODEL}>Automatic (best installed){engine[FIELD[t.key]] === AUTO_MODEL && autoNow(t.key) ? ` → ${autoNow(t.key)}` : ""}</option>
                   {t.key !== "chat" && <option value="">Same as Chat</option>}
                   {choices(engine[FIELD[t.key]]).map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>

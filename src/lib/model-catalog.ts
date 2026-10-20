@@ -88,16 +88,64 @@ export function pickTask(hint: RouteHint): TaskKey {
 
 export const DEFAULT_LOCAL_MODEL = "qwen2.5:7b";
 
+/** A task set to "auto" lets the server pick the best installed model for it at the moment of the request. */
+export const AUTO_MODEL = "auto";
+export const autoMarker = (task: TaskKey): string => `auto:${task}`;
+export function parseAutoMarker(model: unknown): TaskKey | null {
+  const m = typeof model === "string" ? /^auto:(chat|code|reasoning|fast)$/.exec(model) : null;
+  return m ? (m[1] as TaskKey) : null;
+}
+
+export type Installed = { name: string; gb: number };
+
+/** Which job an installed model is for: the catalog when it knows the model, otherwise its name and size. */
+export function taskOfInstalled(m: Installed): TaskKey {
+  const known = CATALOG.find((c) => c.id === m.name || `${c.id}` === m.name.replace(/:latest$/, ""));
+  if (known) return known.task;
+  if (/coder|code/i.test(m.name)) return "code";
+  if (/r1|qwen3|qwq|reason|think/i.test(m.name)) return "reasoning";
+  return m.gb > 0 && m.gb <= 2.6 ? "fast" : "chat";
+}
+
+/**
+ * The best model you already have for a task, given this machine. Quick replies get the smallest small model (speed matters);
+ * everything else gets the largest model that fits the GPU (or runs comfortably on CPU). A task with no suitable model borrows the Chat choice.
+ */
+export function bestInstalled(task: TaskKey, installed: Installed[], hw: Hardware | null): string | null {
+  const usable = installed.filter((m) => !/embed/i.test(m.name) && m.gb > 0);
+  if (!usable.length) return null;
+  const fits = (m: Installed): Fit => (hw ? fitFor({ id: m.name, task: taskOfInstalled(m), gb: m.gb, note: "" }, hw) : "cpu");
+  const preferred: Fit = hw && modelBudgetGb(hw).onGpu ? "gpu" : "cpu";
+  const inClass = (t: TaskKey) => usable.filter((m) => taskOfInstalled(m) === t && fits(m) !== "no");
+  const pickLargest = (list: Installed[]): Installed | undefined => {
+    const good = list.filter((m) => fits(m) === preferred);
+    return (good.length ? good : list).sort((a, b) => (good.length ? b.gb - a.gb : a.gb - b.gb))[0];
+  };
+  if (task === "fast") {
+    const small = inClass("fast").sort((a, b) => a.gb - b.gb)[0];
+    if (small) return small.name;
+    const any = usable.filter((m) => fits(m) !== "no").sort((a, b) => a.gb - b.gb)[0];
+    return any ? any.name : null;
+  }
+  const own = pickLargest(inClass(task));
+  if (own) return own.name;
+  if (task !== "chat") return bestInstalled("chat", installed, hw);
+  const general = pickLargest(usable.filter((m) => taskOfInstalled(m) !== "code" && fits(m) !== "no"));
+  return general ? general.name : null;
+}
+
 /** Chooses the model for a turn: the pal's own model if set, else by task. With routing off, or when a task has no model set, the Chat model is used. */
 export function pickModel(s: LocalModels, hint: RouteHint): string {
   // A model you assigned to a specific pal always wins.
   const mine = hint.agentId ? s.localPals?.[hint.agentId]?.trim() : "";
   if (mine) return mine;
   const chat = s.localChat.trim() || DEFAULT_LOCAL_MODEL;
-  if (!s.localAuto) return chat;
+  if (!s.localAuto) return chat === AUTO_MODEL ? autoMarker("chat") : chat;
   const task = pickTask(hint);
   const by: Record<TaskKey, string> = { chat: s.localChat, code: s.localCode, reasoning: s.localReasoning, fast: s.localFast };
-  return by[task].trim() || chat;
+  const chosen = by[task].trim();
+  if (chosen === AUTO_MODEL) return autoMarker(task);
+  return chosen || (chat === AUTO_MODEL ? autoMarker("chat") : chat);
 }
 
 /** Ollama model names only: letters, digits, dots, dashes, slashes and one tag. */

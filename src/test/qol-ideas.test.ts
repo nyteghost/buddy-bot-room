@@ -21,7 +21,7 @@ import { planAdd } from "@/lib/documents";
 import { cleanKey, detectProvider, keyCount } from "@/lib/key-providers";
 import { notesSyncUrl, shareSheetUrl, bearerHeader, isSecure, notesSteps, shareSteps } from "@/lib/iphone-setup";
 import { parseNvidiaSmi, modelBudgetGb, describeHardware } from "@/lib/hardware";
-import { describeBench, CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName } from "@/lib/model-catalog";
+import { describeBench, CATALOG, fitFor, needGb, pickModel, pickTask, recommend, isModelName, bestInstalled, parseAutoMarker, taskOfInstalled } from "@/lib/model-catalog";
 import { parseLibraryPage, parsePulls, sizeToGb, feedToCatalog, newSuggestions } from "@/lib/model-feed";
 import { parseProviderReadme, keyPageFor, isSupported } from "@/lib/provider-feed";
 import { validateCustomUrl, isCustomModel, CUSTOM_PRESETS } from "@/lib/custom-provider";
@@ -1510,5 +1510,45 @@ describe("appearance", () => {
     expect(resolveScheme("auto", true)).toBe("light");
     expect(resolveScheme("auto", false)).toBe("dark");
     expect(resolveScheme("dark", true)).toBe("dark");
+  });
+});
+
+describe("Automatic model per task", () => {
+  const gpu = { cpu: "Ryzen 7", cores: 16, ramGb: 32, gpus: [{ name: "RTX 3080", vramGb: 10 }], gpuSource: "nvidia-smi" as const };
+  const cpu = { cpu: "i5", cores: 8, ramGb: 16, gpus: [], gpuSource: "none" as const };
+  const have = [
+    { name: "llama3.2:3b", gb: 2 }, { name: "qwen2.5:7b", gb: 4.7 }, { name: "qwen2.5:14b", gb: 9 }, { name: "qwen2.5:32b", gb: 20 },
+    { name: "qwen2.5-coder:7b", gb: 4.7 }, { name: "deepseek-r1:7b", gb: 4.7 }, { name: "nomic-embed-text:latest", gb: 0.3 },
+  ];
+  it("chooses the largest model that fits the GPU, per task", () => {
+    expect(bestInstalled("chat", have, gpu)).toBe("qwen2.5:7b"); // 14b needs ~11 GB, over the 10 GB card
+    expect(bestInstalled("code", have, gpu)).toBe("qwen2.5-coder:7b");
+    expect(bestInstalled("reasoning", have, gpu)).toBe("deepseek-r1:7b");
+  });
+  it("uses the smallest quick model for short messages and never the embedding model", () => {
+    expect(bestInstalled("fast", have, gpu)).toBe("llama3.2:3b");
+    expect(bestInstalled("fast", [{ name: "nomic-embed-text", gb: 0.3 }], gpu)).toBeNull();
+  });
+  it("falls back to the chat choice when a task has no model", () => {
+    const onlyChat = [{ name: "qwen2.5:7b", gb: 4.7 }];
+    expect(bestInstalled("code", onlyChat, gpu)).toBe("qwen2.5:7b");
+    expect(bestInstalled("reasoning", onlyChat, gpu)).toBe("qwen2.5:7b");
+    expect(bestInstalled("chat", [], gpu)).toBeNull();
+  });
+  it("is conservative on a CPU-only machine and handles unknown names", () => {
+    expect(bestInstalled("chat", have, cpu)).toBe("llama3.2:3b"); // a 7B needs ~6.1 GB, just over the 6 GB CPU budget
+    expect(taskOfInstalled({ name: "my-coder-model:q4", gb: 5 })).toBe("code");
+    expect(taskOfInstalled({ name: "mystery:1b", gb: 1 })).toBe("fast");
+    expect(parseAutoMarker("auto:code")).toBe("code");
+    expect(parseAutoMarker("auto:nonsense")).toBeNull();
+    expect(parseAutoMarker("qwen2.5:7b")).toBeNull();
+  });
+  it("pickModel turns an automatic choice into a marker the server resolves", () => {
+    const base = { localChat: "auto", localCode: "auto", localReasoning: "", localFast: "qwen2.5:3b", localAuto: true, localPals: {} };
+    expect(pickModel(base, { text: "fix this bug in my function" })).toBe("auto:code");
+    expect(pickModel(base, { mode: "solve", text: "a question that is long enough to not be quick" })).toBe("auto:chat"); // reasoning blank = same as chat
+    expect(pickModel(base, { text: "hi" })).toBe("qwen2.5:3b");
+    expect(pickModel({ ...base, localAuto: false }, { text: "fix this bug in my function" })).toBe("auto:chat");
+    expect(pickModel({ ...base, localPals: { nova: "phi4:14b" } }, { agentId: "nova", text: "hello there friend, how is it going today" })).toBe("phi4:14b");
   });
 });

@@ -1,5 +1,5 @@
 import { readHardware } from "@/lib/hardware.server";
-import { isModelName } from "@/lib/model-catalog";
+import { bestInstalled, isModelName, parseAutoMarker } from "@/lib/model-catalog";
 import { logServer } from "./server-log.server";
 import { currentFeed, feedEnabled, refreshFeed } from "./model-feed.server";
 
@@ -76,4 +76,18 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
     }
   }
   return json({ error: "Unknown action." }, 400);
+}
+
+/** Turns "auto:code" into the best model that is actually installed for this machine right now. Plain names pass through. */
+export async function resolveLocalModel(model: string): Promise<string | null> {
+  const task = parseAutoMarker(model);
+  if (!task) return model;
+  try {
+    const [tags, hardware] = await Promise.all([ollama("/api/tags"), readHardware()]);
+    if (!tags.ok) return null;
+    const list = (((await tags.json()) as { models?: Tag[] }).models ?? []).map((m) => ({ name: m.name, gb: (m.size ?? 0) / 1024 ** 3 }));
+    return bestInstalled(task, list, hardware);
+  } catch {
+    return null;
+  }
 }

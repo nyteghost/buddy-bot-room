@@ -13,8 +13,8 @@ import { logServer } from "./server-log.server";
 import { clampBudget, trimTranscript } from "./context-trim";
 import { DM_SETTING, dmTask, isDmRole } from "./campaign";
 
-import { ollamaBase } from "./ollama.server";
-import { isModelName } from "./model-catalog";
+import { ollamaBase, resolveLocalModel } from "./ollama.server";
+import { isModelName, parseAutoMarker } from "./model-catalog";
 import { isCustomModel, validateCustomUrl } from "./custom-provider";
 const CLAUDE_IDS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
 
@@ -148,7 +148,13 @@ export async function handleChat(request: Request) {
       const localServer = engine.kind === "ollama-server";
       if (localServer && !ollamaBase())
         return Response.json({ error: "Local AI isn't set up on this server. Add Ollama to the stack (see the README) or choose another engine." }, { status: 400 });
-      if (localServer && !isModelName(engine.model))
+      let localModel = localServer ? String(engine.model ?? "") : "";
+      if (localServer && parseAutoMarker(localModel)) {
+        const resolved = await resolveLocalModel(localModel);
+        if (!resolved) return Response.json({ error: "Automatic model choice found no downloaded model that fits this machine. Download one in the Local AI panel." }, { status: 400 });
+        localModel = resolved;
+      }
+      if (localServer && !isModelName(localModel))
         return Response.json({ error: "Pick a Local AI model in engine settings." }, { status: 400 });
       const custom = engine.kind === "custom";
       const customUrl = custom ? validateCustomUrl(engine.baseUrl, process.env["ALLOW_PRIVATE_CUSTOM"] === "1") : null;
@@ -175,7 +181,7 @@ export async function handleChat(request: Request) {
                 : "https://generativelanguage.googleapis.com/v1beta/openai",
       });
       const free = streamText({
-        model: provider(custom ? String(engine.model) : localServer ? String(engine.model) : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
+        model: provider(custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
         abortSignal: request.signal,
