@@ -101,7 +101,7 @@ Your data lives in the `buddy-data` volume and survives updates.
    sudo tailscale serve --bg --https=443 http://localhost:8090
    ```
    Then use `https://<machine>.<your-tailnet>.ts.net` on every device. Browsers only allow notifications and some PWA features on HTTPS or localhost.
-4. **Tailscale inside the stack (no host setup, no open ports).** In Portainer add `COMPOSE_PROFILES=tailscale` and `TS_AUTHKEY` (a reusable auth key from the Tailscale admin console, *Settings → Keys*), optionally `TS_HOSTNAME` (default `pixelpals`), and redeploy. The `tailscale` container joins your tailnet and serves Pixel Pals at `https://pixelpals.<your-tailnet>.ts.net`. HTTPS must be enabled once in the Tailscale admin console (*DNS → HTTPS Certificates*). This replaces a Caddy/reverse-proxy setup for private use; the page is reachable only from devices on your tailnet. The serve rules are inline in the compose file (the same JSON is in `config/tailscale/serve.json`), which needs Docker Compose 2.23 or newer. Combine with voice using `COMPOSE_PROFILES=voice,tailscale`.
+4. **Tailscale inside the stack (no host setup, no open ports).** In Portainer add `COMPOSE_PROFILES=tailscale` and `TS_AUTHKEY` (a reusable auth key from the Tailscale admin console, *Settings → Keys*), optionally `TS_HOSTNAME` (default `pixelpals`), and redeploy. The `tailscale` container joins your tailnet and serves Pixel Pals at `https://pixelpals.<your-tailnet>.ts.net`. HTTPS must be enabled once in the Tailscale admin console (*DNS → HTTPS Certificates*). This replaces a Caddy/reverse-proxy setup for private use; the page is reachable only from devices on your tailnet. The serve rules are inline in the compose file (the same JSON is in `config/tailscale/serve.json`), which needs Docker Compose 2.23 or newer. 
 
 ---
 
@@ -554,7 +554,7 @@ It uses your device's built-in voices: nothing to install, no keys, and no audio
 
 Speak instead of typing. A small microphone appears next to Send once a speech server is running; tap it, talk, tap again, and the text lands in the message box (nothing is sent automatically).
 
-- Start the optional **Whisper** container: in Portainer add the environment variable `COMPOSE_PROFILES=voice` and *Pull and redeploy*. Nothing leaves your network.
+- The **Whisper** container is part of the stack, so it starts with everything else (*Pull and redeploy* to get it). Nothing leaves your network. Set `WHISPER_REPLICAS=0` if you don't want it running (the mic button then hides itself).
 - The first dictation downloads the speech model (`WHISPER_MODEL`, default `Systran/faster-whisper-small`), so allow a minute and try again if it fails once. Use `WHISPER_IMAGE` to pick a different image (for example a GPU build).
 - Already have a Whisper server? Set `WHISPER_URL` to it (it must offer `/v1/audio/transcriptions` and `/health`).
 - Recordings stop at 60 seconds and are never stored. Browsers only allow the microphone over HTTPS or `localhost` ([section 3](#3-first-run-accounts-and-https)).
@@ -608,7 +608,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
 | `TRAKT_CLIENT_SECRET` | empty | Only for `/trakt connect` (write access) |
 | `M365_CLIENT_ID` / `M365_TENANT` | empty / `organizations` | Microsoft 365 read-only ([7.11](#711-microsoft-365-work-read-only)) |
-| `COMPOSE_PROFILES` | empty | `voice` starts the Whisper dictation container; `tailscale` starts the Tailscale sidecar (comma-separate to use both) |
+| `COMPOSE_PROFILES` | empty | `tailscale` starts the Tailscale sidecar |
+| `WHISPER_REPLICAS` | `1` | `0` leaves the Whisper container off |
 | `TS_AUTHKEY` / `TS_HOSTNAME` | empty / `pixelpals` | Tailscale sidecar ([section 3](#3-first-run-accounts-and-https)) |
 | `WHISPER_URL` | `http://whisper:8000` | Speech server for the microphone button |
 | `WHISPER_MODEL` / `WHISPER_IMAGE` | small model / CPU image | What the Whisper container runs |
