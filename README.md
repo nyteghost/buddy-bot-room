@@ -646,7 +646,7 @@ Then just type a question. `/status` checks your services. It uses long-polling,
 | `/dm status` | Show them |
 | `/dm end` | Back to normal discussions |
 
-The same controls are in the *Notes* window.
+The same controls are in the *Fun* window (left menu).
 
 ---
 
