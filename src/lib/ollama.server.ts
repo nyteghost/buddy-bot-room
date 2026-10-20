@@ -1,5 +1,5 @@
-import { readHardware } from "@/lib/hardware.server";
-import { bestInstalled, isModelName, parseAutoMarker } from "@/lib/model-catalog";
+import { readHardware } from "./hardware.server";
+import { bestInstalled, isModelName, parseAutoMarker } from "./model-catalog";
 import { logServer } from "./server-log.server";
 import { currentFeed, feedEnabled, refreshFeed } from "./model-feed.server";
 

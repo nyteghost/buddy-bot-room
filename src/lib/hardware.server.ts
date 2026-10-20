@@ -1,5 +1,5 @@
-import type { Hardware } from "@/lib/hardware";
-import { parseNvidiaSmi } from "@/lib/hardware";
+import type { Hardware } from "./hardware";
+import { parseNvidiaSmi } from "./hardware";
 
 let cache: { at: number; value: Hardware } | null = null;
 
