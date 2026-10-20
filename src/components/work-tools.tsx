@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, entryLabel, formatMinutes, googleCalendarLink, parsePastedShifts, summarizeEvents, vendors, type EventEntry, type Shift } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, timeToMinutes, vendors, withShiftIds, type EventEntry, type Shift } from "@/lib/work-tools";
 import { deckReply } from "@/lib/deck-solver";
 import { MessageResponse } from "@/components/ai-elements/message";
 
@@ -133,7 +133,7 @@ function waitForOAuthCompletion(popup: Window) {
 }
 
 /** Button that connects Google Calendar once, then pushes every shift with one click. */
-function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s: string) => void }) {
+function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void }) {
   const session = useSession();
   const start = useServerFn(startCalendarConnect);
   const complete = useServerFn(completeCalendarConnect);
@@ -172,14 +172,16 @@ function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s:
     onStatus(popup ? "Approve Google Calendar access in the popup…" : "");
     try {
       if (popup && !(await connect(popup))) return;
-      const r = await push({ data: { shifts } });
+      const r = await push({ data: { shifts, title, remove } });
       if (!r.connected) {
         setReady(false);
         onStatus(r.reconnectRequired ? "Your Google Calendar access needs to be renewed — click the button again to reconnect." : "Google Calendar is not connected yet — click the button again to connect.");
         return;
       }
       const why = r.reasons?.length ? ` — ${r.reasons.slice(0, 3).join("; ")}${r.reasons.length > 3 ? ` (+${r.reasons.length - 3} more)` : ""}` : "";
-      onStatus(`Added ${r.added} shift${r.added === 1 ? "" : "s"} to your Google Calendar${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
+      if (!r.skipped) onPushed();
+      const bits = [r.added ? `added ${r.added}` : "", r.updated ? `updated ${r.updated}` : "", r.removed ? `removed ${r.removed}` : ""].filter(Boolean).join(", ") || "nothing to change";
+      onStatus(`Google Calendar: ${bits}${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
     } catch (e) {
       onStatus((e as Error).message);
     } finally {
@@ -189,7 +191,7 @@ function AddAllToCalendar({ shifts, onStatus }: { shifts: Shift[]; onStatus: (s:
 
   return (
     <Button size="sm" variant="outline" disabled={busy || !shifts.length} onClick={run}>
-      <CalendarSync className="size-4" /> {busy ? "Working…" : "Add all to Google Calendar"}
+      <CalendarSync className="size-4" /> {busy ? "Working…" : "Add or update in Google Calendar"}
     </Button>
   );
 }
@@ -199,16 +201,32 @@ function ShiftsTab() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [status, setStatus] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("Mark Work");
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [editing, setEditing] = useState<number | null>(null);
+  const edit = (i: number, change: Parameters<typeof editShift>[1]) => setShifts((list) => list.map((x, n) => (n === i ? editShift(x, change) : x)));
+  const drop = (i: number) => {
+    const gone = shifts[i];
+    if (gone?.id) setRemoved((r) => [...new Set([...r, gone.id!])]);
+    setShifts((list) => list.filter((_, n) => n !== i));
+    setEditing(null);
+  };
+  const add = () => {
+    const last = shifts[shifts.length - 1];
+    const date = last ? new Date(Date.parse(`${last.date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    setShifts((list) => [...list, { date, start: 9 * 60, end: 17 * 60, raw: "9a-5p", id: newShiftId() }]);
+    setEditing(shifts.length);
+  };
   async function load(f: File, who = name) {
     setFile(f); setStatus("Reading…");
     try {
       const { readScheduleWorkbook } = await import("@/lib/work-files");
       const { shifts, people } = await readScheduleWorkbook(f, who);
-      setShifts(shifts);
+      setShifts(withShiftIds(shifts)); setRemoved([]); setEditing(null);
       setStatus(shifts.length ? `${shifts.length} shifts for ${who}.` : `No shifts found for “${who}”. Names on sheet: ${people.slice(0, 12).join(", ")}`);
     } catch (e) { setStatus(`Could not read that workbook: ${(e as Error).message}`); }
   }
-  const ics = () => import("@/lib/work-files").then((m) => m.downloadBlob(new Blob([buildIcs(shifts)], { type: "text/calendar" }), "my-shifts.ics"));
+  const ics = () => import("@/lib/work-files").then((m) => m.downloadBlob(new Blob([buildIcs(shifts, title.trim() || "Mark Work")], { type: "text/calendar" }), "my-shifts.ics"));
   const [pasted, setPasted] = useState("");
   const [weekStart, setWeekStart] = useState(() => {
     const d = new Date();
@@ -217,7 +235,7 @@ function ShiftsTab() {
   });
   function readPasted() {
     const list = parsePastedShifts(pasted, weekStart, name);
-    setShifts(list);
+    setShifts(withShiftIds(list)); setRemoved([]); setEditing(null);
     setStatus(list.length ? `${list.length} shifts for ${name}.` : `No shifts found — make sure the first line starts with “${name}” and the times look like 9a-6p.`);
   }
   return (
@@ -246,17 +264,48 @@ function ShiftsTab() {
         </div>
       </details>
       {status && <p className="text-sm">{status}</p>}
-      {shifts.length > 0 && (
+      {(shifts.length > 0 || removed.length > 0) && (
         <>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={ics}><Download className="size-4" /> Download all (.ics)</Button>
-            <AddAllToCalendar shifts={shifts} onStatus={setStatus} />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs text-muted-foreground" htmlFor="shift-title">Event title</label>
+            <Input id="shift-title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} className="w-48" />
           </div>
-          <ul className="max-h-72 space-y-1 overflow-y-auto text-sm">
-            {shifts.map((s) => (
-              <li key={s.date} className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1">
-                <span>{dayLabel(s.date)} · <span className="font-mono">{formatMinutes(s.start)}–{formatMinutes(s.end)}</span></span>
-                <a href={googleCalendarLink(s)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline"><CalendarPlus className="size-4" /> Google</a>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={ics} disabled={!shifts.length}><Download className="size-4" /> Download all (.ics)</Button>
+            <AddAllToCalendar shifts={shifts} title={title.trim() || "Mark Work"} remove={removed} onPushed={() => setRemoved([])} onStatus={setStatus} />
+            <Button size="sm" variant="outline" onClick={add}>Add a shift</Button>
+          </div>
+          {removed.length > 0 && <p className="text-xs text-muted-foreground">{removed.length} removed shift{removed.length === 1 ? "" : "s"} will also be deleted from Google Calendar the next time you press “Add or update”.</p>}
+          <p className="text-xs text-muted-foreground">Press Edit on a shift to change its date, times or note. Pushing again updates the events you already added instead of making copies.</p>
+          <ul className="max-h-80 space-y-1 overflow-y-auto text-sm">
+            {shifts.map((s, i) => (
+              <li key={s.id ?? `${s.date}-${i}`} className="rounded border border-border px-2 py-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span>{dayLabel(s.date)} · <span className="font-mono">{shiftLabel(s)}</span>{s.note ? <span className="text-muted-foreground"> · {s.note}</span> : null}</span>
+                  <span className="flex items-center gap-2">
+                    <button type="button" className="text-primary underline" aria-expanded={editing === i} onClick={() => setEditing(editing === i ? null : i)}>{editing === i ? "Done" : "Edit"}</button>
+                    <a href={googleCalendarLink(s, title.trim() || "Mark Work")} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline"><CalendarPlus className="size-4" /> Google</a>
+                  </span>
+                </div>
+                {editing === i && (
+                  <div className="mt-2 grid gap-2 border-t border-border pt-2 sm:grid-cols-2">
+                    <label className="grid gap-1 text-xs text-muted-foreground">Date
+                      <Input type="date" value={s.date} onChange={(e) => { if (isIsoDate(e.target.value)) edit(i, { date: e.target.value }); }} />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="grid gap-1 text-xs text-muted-foreground">Start
+                        <Input type="time" value={minutesToTime(s.start)} onChange={(e) => { const m = timeToMinutes(e.target.value); if (m !== null) edit(i, { start: m }); }} />
+                      </label>
+                      <label className="grid gap-1 text-xs text-muted-foreground">End
+                        <Input type="time" value={minutesToTime(s.end)} onChange={(e) => { const m = timeToMinutes(e.target.value); if (m !== null) edit(i, { end: m }); }} />
+                      </label>
+                    </div>
+                    <label className="grid gap-1 text-xs text-muted-foreground sm:col-span-2">Note (added to the event description)
+                      <Input value={s.note ?? ""} maxLength={300} onChange={(e) => edit(i, { note: e.target.value })} placeholder="e.g. Hall B load-in" />
+                    </label>
+                    <div className="sm:col-span-2"><Button size="sm" variant="ghost" className="text-destructive" onClick={() => drop(i)}>Remove this shift</Button></div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

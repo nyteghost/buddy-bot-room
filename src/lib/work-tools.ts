@@ -136,7 +136,30 @@ export function escalatorHours(entries: EventEntry[]): Map<string, { start: numb
 export const escalatorLabel = (h: { start: number; end: number }) => `${formatMinutes(h.start)}-${h.end >= 1440 ? "12a" : formatMinutes(h.end)}`;
 
 // ---------- my shifts ----------
-export type Shift = { date: string; start: number; end: number; raw: string };
+/** id: stable across edits, so pushing again updates the same calendar event instead of adding a copy. note: optional text added to the event description. */
+export type Shift = { date: string; start: number; end: number; raw: string; id?: string; note?: string };
+
+/** Google event ids use only a-v and 0-9. Derived from the original date and start so re-reading the same sheet gives the same ids. */
+export const shiftId = (date: string, start: number): string => `ppshift${date.replace(/\D/g, "")}s${start}`;
+export const newShiftId = (rand: () => number = Math.random): string => `ppadd${Math.floor(rand() * 1e12).toString(32).padStart(8, "0")}`;
+export const withShiftIds = (list: Shift[]): Shift[] => list.map((x) => (x.id ? x : { ...x, id: shiftId(x.date, x.start) }));
+export const shiftLabel = (x: { start: number; end: number }): string => `${formatMinutes(x.start)}-${formatMinutes(x.end)}`;
+export const shiftDescription = (x: Shift): string => `Schedule: ${x.raw}${x.note?.trim() ? `\n${x.note.trim().slice(0, 300)}` : ""}`;
+/** "09:30" ⇄ minutes. An end earlier than the start means the shift runs past midnight. */
+export const minutesToTime = (min: number): string => `${String(Math.floor((min % 1440) / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+export function timeToMinutes(v: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+/** Apply an edit: keeps the id, fixes an overnight end, and rewrites the schedule text when the times changed. */
+export function editShift(x: Shift, change: Partial<Pick<Shift, "date" | "start" | "end" | "note">>): Shift {
+  const next: Shift = { ...x, ...change };
+  if (next.end <= next.start) next.end += 1440;
+  else if (next.end >= 1440 + next.start) next.end -= 1440;
+  if (change.start !== undefined || change.end !== undefined) next.raw = shiftLabel(next);
+  return next;
+}
+export const isIsoDate = (d: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
 
 const pad = (n: number) => String(n).padStart(2, "0");
 function stamp(date: string, min: number) {
@@ -146,20 +169,22 @@ function stamp(date: string, min: number) {
 }
 
 export function googleCalendarLink(s: Shift, title = "Mark Work") {
-  const q = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${stamp(s.date, s.start)}/${stamp(s.date, s.end)}`, ctz: TIME_ZONE, details: `Schedule: ${s.raw}` });
+  const q = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${stamp(s.date, s.start)}/${stamp(s.date, s.end)}`, ctz: TIME_ZONE, details: shiftDescription(s) });
   return `https://calendar.google.com/calendar/render?${q}`;
 }
+
+const icsText = (t: string): string => t.replace(/\\/g, "\\\\").replace(/[;,]/g, "\\$&").replace(/\r?\n/g, "\\n");
 
 export function buildIcs(shifts: Shift[], title = "Mark Work"): string {
   const now = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
   const events = shifts.map((s) => [
     "BEGIN:VEVENT",
-    `UID:${s.date}-${s.start}@pixel-pals`,
+    `UID:${s.id ?? `${s.date}-${s.start}`}@pixel-pals`,
     `DTSTAMP:${now}`,
     `DTSTART;TZID=${TIME_ZONE}:${stamp(s.date, s.start)}`,
     `DTEND;TZID=${TIME_ZONE}:${stamp(s.date, s.end)}`,
-    `SUMMARY:${title}`,
-    `DESCRIPTION:Schedule ${s.raw}`,
+    `SUMMARY:${icsText(title)}`,
+    `DESCRIPTION:${icsText(shiftDescription(s))}`,
     "END:VEVENT",
   ].join("\r\n"));
   return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Pixel Pals//Shifts//EN", ...events, "END:VCALENDAR"].join("\r\n");

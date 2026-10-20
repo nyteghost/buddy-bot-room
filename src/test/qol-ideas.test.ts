@@ -65,6 +65,7 @@ import { SETTING_FIELDS, cleanSetting, envValue, fieldByKey, fieldsFor } from "@
 import { describeSettings, saveSettings } from "@/lib/settings.server";
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { buildIcs as buildShiftIcs, editShift, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, shiftDescription, shiftId, shiftLabel, timeToMinutes, withShiftIds } from "@/lib/work-tools";
 import { addressOf, allowSend, authPlain, buildMessage, decodeMutf7, dotStuff, extractBody, guessSmtpHost, htmlToText, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSmtpReply, parseSummary, parseUidSearch, replySubject, validAddress } from "@/lib/mailbox";
 import { backupName, insideData, isBackupName, pruneList } from "@/lib/backup";
 import { plexHas } from "@/lib/trakt";
@@ -2234,5 +2235,46 @@ describe("mailbox helpers", () => {
     for (let i = 0; i < 20; i++) { const r = allowSend(times, 1000 + i, 20); expect(r.ok).toBe(true); times = r.times; }
     expect(allowSend(times, 2000, 20).ok).toBe(false);
     expect(allowSend(times, 1000 + 3_700_000, 20).ok).toBe(true);
+  });
+});
+
+describe("editable shifts", () => {
+  const base = { date: "2026-10-19", start: 540, end: 1080, raw: "9a-6p" };
+  it("gives every shift a stable calendar id", () => {
+    const [a] = withShiftIds([base]);
+    expect(a!.id).toBe("ppshift20261019s540");
+    expect(/^[a-v0-9]{5,100}$/.test(a!.id!)).toBe(true);
+    expect(withShiftIds([a!])[0]!.id).toBe(a!.id);
+    expect(/^[a-v0-9]{5,100}$/.test(newShiftId(() => 0.123456))).toBe(true);
+    expect(shiftId("2026-10-19", 540)).toBe(a!.id);
+  });
+  it("edits times, dates and notes and keeps the id", () => {
+    const a = withShiftIds([base])[0]!;
+    const moved = editShift(a, { start: 600, end: 1020 });
+    expect(moved).toMatchObject({ id: a.id, start: 600, end: 1020, raw: "10a-5p" });
+    expect(editShift(a, { date: "2026-10-20" })).toMatchObject({ date: "2026-10-20", raw: "9a-6p", id: a.id });
+    expect(editShift(a, { end: 120 }).end).toBe(120 + 1440); // runs past midnight
+    expect(editShift(a, { note: "Hall B" }).note).toBe("Hall B");
+    expect(shiftLabel({ start: 540, end: 1080 })).toBe("9a-6p");
+  });
+  it("converts times for the form", () => {
+    expect(minutesToTime(570)).toBe("09:30");
+    expect(minutesToTime(1560)).toBe("02:00");
+    expect(timeToMinutes("17:45")).toBe(1065);
+    expect(timeToMinutes("24:00")).toBeNull();
+    expect(timeToMinutes("nope")).toBeNull();
+    expect(isIsoDate("2026-10-19")).toBe(true);
+    expect(isIsoDate("2026-13-40")).toBe(false);
+  });
+  it("uses the title, note and id in the calendar file and link", () => {
+    const a = { ...withShiftIds([base])[0]!, note: "Hall B, load-in" };
+    const ics = buildShiftIcs([a], "Show; Crew");
+    expect(ics).toContain("SUMMARY:Show\\; Crew");
+    expect(ics).toContain("UID:ppshift20261019s540@pixel-pals");
+    expect(ics).toContain("DESCRIPTION:Schedule: 9a-6p\\nHall B\\, load-in");
+    expect(shiftDescription(a)).toBe("Schedule: 9a-6p\nHall B, load-in");
+    expect(googleCalendarLink(a, "Show")).toContain("text=Show");
+    expect(decodeURIComponent(googleCalendarLink(a, "Show").replace(/\+/g, " "))).toContain("Hall B, load-in");
+    expect(buildShiftIcs([base])).toContain("UID:2026-10-19-540@pixel-pals");
   });
 });
