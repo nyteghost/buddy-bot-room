@@ -2,6 +2,7 @@
 const PATTERNS: RegExp[] = [
   /\bgsk_[A-Za-z0-9]{20,}\b/g, // Groq
   /\bAIza[0-9A-Za-z_-]{30,}\b/g, // Google
+  /\bAQ\.[0-9A-Za-z_.-]{20,}/g, // Google (newer key format)
   /\bsk-[A-Za-z0-9_-]{20,}\b/g, // OpenAI / OpenRouter
   /\bnvapi-[A-Za-z0-9_-]{20,}\b/g, // NVIDIA
   /\beyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{10,}\b/g, // JWTs

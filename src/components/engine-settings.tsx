@@ -180,7 +180,7 @@ export function EngineSettingsDialog() {
               value={engine.geminiKey}
               onChange={(geminiKey) => setEngine({ geminiKey })}
               href="https://aistudio.google.com/apikey"
-              placeholder="AIza..."
+              placeholder="AIza... or AQ...."
             />
             <KeyField
               label="OpenRouter (Llama 3.3 70B free)"
