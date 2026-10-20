@@ -823,3 +823,7 @@ Work tools -> Vendors compares prices from the places you buy. Each item has a r
 ## One-file Stage Deck Planner
 
 `public/stage-planner.html` is the same planner as the Deck tab, bundled into a single file with its styles and code, so you can email it and anyone can open it in a browser without Pixel Pals (works offline; its saved stages stay in that person's own browser). It is also linked from the Deck tab. After changing anything under `src/components/deck-planner/`, rebuild it with `npm run standalone` (or `bun run standalone`) and commit the result.
+
+## Repo watch
+
+Work tools -> Repos keeps an eye on GitHub repos you pick (type `owner/name` or paste a link): the latest commits, whether the last build passed, open pull requests and issues, and when it was last pushed. It is read-only. Public repos work right away; for private repos or a higher hourly limit add a token in Settings -> Code (GITHUB_TOKEN, fine-grained, read access). The list is saved in `BUDDY_DATA_DIR/repos.json`.

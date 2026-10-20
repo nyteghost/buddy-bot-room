@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, timeToMinutes, withShiftIds, type EventEntry, type Shift } from "@/lib/work-tools";
 import { VendorsPanel } from "@/components/vendors-panel";
+import { RepoWatch } from "@/components/repo-watch";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -31,16 +32,18 @@ export function WorkTools() {
 
 export function ShowServicesTools() {
   return <Tabs defaultValue="events">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="shifts">My shifts</TabsTrigger>
             <TabsTrigger value="deck">Deck</TabsTrigger>
             <TabsTrigger value="vendors">Vendors</TabsTrigger>
+            <TabsTrigger value="repos">Repos</TabsTrigger>
           </TabsList>
           <TabsContent value="events"><EventsTab /></TabsContent>
           <TabsContent value="shifts"><ShiftsTab /></TabsContent>
           <TabsContent value="deck"><DeckTab /></TabsContent>
           <TabsContent value="vendors"><VendorsTab /></TabsContent>
+          <TabsContent value="repos"><RepoWatch /></TabsContent>
         </Tabs>;
 }
 

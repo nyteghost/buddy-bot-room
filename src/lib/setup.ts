@@ -17,6 +17,7 @@ export const INTEGRATIONS: { id: string; name: string; what: string; env: string
   { id: "weather", name: "Weather", what: "Forecast in Today and the brief", env: "WEATHER_LOCATION", testable: true },
   { id: "calendar", name: "Calendar feeds", what: "Calendar and Today windows", env: "CALENDAR_ICS_URLS", testable: true },
   { id: "gcal", name: "Google Calendar (shifts)", what: "Add or update your shifts in Google Calendar with one button", env: "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (or GOOGLE_SA_EMAIL, GOOGLE_SA_KEY, GOOGLE_CALENDAR_ID)", testable: true },
+  { id: "github", name: "GitHub (repo watch)", what: "Watch repos in Work tools: latest commits, build status, open pull requests and issues", env: "GITHUB_TOKEN (optional)", testable: true },
   { id: "imap", name: "Mail (Gmail or any IMAP)", what: "Read, send, move and delete mail in the Mail window", env: "IMAP_HOST, IMAP_USER, IMAP_PASS", testable: true },
   { id: "m365", name: "Microsoft 365", what: "Work calendar and mail, read-only", env: "M365_CLIENT_ID", testable: false },
   { id: "backup", name: "Backups", what: "Daily copy of your data", env: "BUDDY_BACKUP_PATH", testable: false },
@@ -40,6 +41,7 @@ export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: strin
   { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "telegram", "brief", "caldav"] },
   { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
   { id: "home", name: "Home & server", blurb: "Weather and your Unraid server", ids: ["weather", "unraid"] },
+  { id: "code", name: "Code", blurb: "GitHub repos you keep an eye on", ids: ["github"] },
   { id: "maintenance", name: "Backups & schedules", blurb: "Daily backups and scheduled tasks", ids: ["backup"] },
 ];
 

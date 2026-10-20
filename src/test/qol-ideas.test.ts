@@ -2505,3 +2505,40 @@ describe("deck planner helper", () => {
     expect(dAlloc(0, { decks: 72, one: 4, two: 8, three: 8 })).toBe(null);
   });
 });
+
+import { ago as rAgo, ciState as rCi, cleanRepoList as rClean, explainGithub as rExplain, parseRepo as rParse, shapeRepo as rShape } from "@/lib/repos";
+describe("repo watch", () => {
+  it("reads repo names and links", () => {
+    expect(rParse("nyteghost/buddy-bot-room")).toBe("nyteghost/buddy-bot-room");
+    expect(rParse("https://github.com/nyteghost/deck-stage-builder/tree/main/src")).toBe("nyteghost/deck-stage-builder");
+    expect(rParse("git@github.com:nyteghost/moonlight-qt.git")).toBe("nyteghost/moonlight-qt");
+    for (const bad of ["", "nope", "a/b/c d", "../etc/passwd", "https://evil.com/a/b", "a/"]) expect(rParse(bad)).toBe(null);
+  });
+  it("keeps a clean, unique list", () => {
+    expect(rClean(["a/b", "A/B", "junk", "c/d"])).toEqual(["a/b", "c/d"]);
+  });
+  it("reads build state", () => {
+    expect(rCi({ status: "completed", conclusion: "success" })).toBe("passing");
+    expect(rCi({ status: "completed", conclusion: "failure" })).toBe("failing");
+    expect(rCi({ status: "in_progress" })).toBe("running");
+    expect(rCi({ status: "completed", conclusion: "cancelled" })).toBe("other");
+    expect(rCi(undefined)).toBe("none");
+  });
+  it("shapes GitHub's replies", () => {
+    const v = rShape("o/r", { html_url: "https://github.com/o/r", default_branch: "main", open_issues_count: 5, pushed_at: "2026-10-20T10:00:00Z", description: "hi" },
+      [{ sha: "abcdef1234", html_url: "u", commit: { message: "Fix thing\n\nmore", author: { name: "Me", date: "2026-10-20T09:00:00Z" } } }],
+      { workflow_runs: [{ status: "completed", conclusion: "failure", html_url: "r", display_title: "CI", updated_at: "2026-10-20T10:05:00Z" }] }, [{}, {}]);
+    expect(v.openPrs).toBe(2);
+    expect(v.openIssues).toBe(3);
+    expect(v.ci.state).toBe("failing");
+    expect(v.commits[0]?.message).toBe("Fix thing");
+    expect(v.commits[0]?.sha).toBe("abcdef1");
+  });
+  it("says how long ago and what an error means", () => {
+    const now = Date.parse("2026-10-20T12:00:00Z");
+    expect(rAgo("2026-10-20T11:30:00Z", now)).toBe("30m ago");
+    expect(rAgo("2026-10-18T12:00:00Z", now)).toBe("2d ago");
+    expect(rExplain(404, false).includes("token")).toBe(true);
+    expect(rExplain(403, false, "0").includes("limit")).toBe(true);
+  });
+});

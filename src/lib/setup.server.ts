@@ -29,6 +29,7 @@ const configured: Record<string, () => boolean> = {
   weather: () => weatherConfigured(),
   calendar: () => !!env("CALENDAR_ICS_URLS"),
   gcal: () => (!!env("GOOGLE_CLIENT_ID") && !!env("GOOGLE_CLIENT_SECRET")) || !!env("GOOGLE_SA_EMAIL"),
+  github: () => !!env("GITHUB_TOKEN"),
   imap: () => !!imapConfig(),
   m365: () => !!env("M365_CLIENT_ID"),
   backup: () => !!backupConfig(),
@@ -67,6 +68,16 @@ const tests: Record<string, () => Promise<SetupTest>> = {
   weather: async () => { const r = await getWeather(); return "weather" in r ? { ok: true, note: `${r.weather.place}: found.` } : { ok: false, note: r.error }; },
   calendar: async () => { const c = await calendarData(7); return c.errors.length ? { ok: false, note: c.errors[0] ?? "Failed." } : { ok: true, note: `${c.feeds} feed${c.feeds === 1 ? "" : "s"} read, ${c.items.length} event${c.items.length === 1 ? "" : "s"} in the next 7 days.` }; },
   gcal: async () => ((await gcalReady()) ? { ok: true, note: "Connected. Shifts can be pushed from Work tools and your events show in Calendar." } : { ok: false, note: "Keys saved, but not signed in yet. Open Work tools → My shifts and press Add or update in Google Calendar." }),
+  github: async () => {
+    const t = env("GITHUB_TOKEN");
+    try {
+      const res = await fetch("https://api.github.com/rate_limit", { headers: { accept: "application/vnd.github+json", "user-agent": "pixel-pals-repo-watch", ...(t ? { authorization: `Bearer ${t}` } : {}) }, signal: AbortSignal.timeout(8000) });
+      if (res.status === 401) return { ok: false, note: "GitHub rejected that token." };
+      if (!res.ok) return { ok: false, note: `GitHub answered ${res.status}.` };
+      const j = (await res.json()) as { rate?: { remaining?: number; limit?: number } };
+      return { ok: true, note: `${t ? "Token works" : "No token (public repos only)"}. ${j.rate?.remaining ?? "?"} of ${j.rate?.limit ?? "?"} requests left this hour.` };
+    } catch { return { ok: false, note: "Couldn't reach GitHub." }; }
+  },
   imap: async () => { const m = await mailData(); if (m.errors.length) return { ok: false, note: m.errors[0] ?? "Failed." }; const send = await mailSendReady(); return { ok: send.ok, note: `Signed in, ${m.items.length} unread. ${send.note}` }; },
 };
 
