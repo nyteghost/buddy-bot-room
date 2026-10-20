@@ -13,6 +13,8 @@ import { addReminder, afterFiring, dueReminders, nextOccurrence, parseRemindArgs
 import { INTEGRATIONS, setupSummary } from "@/lib/setup";
 import { messageText, searchDocs } from "@/lib/find";
 import { addCapture, mergeCaptures, parseCapture, parseCaptures } from "@/lib/capture";
+import { buildWeekly, reviewDay } from "@/lib/weekly";
+import { pickReason, watchQueue } from "@/lib/pick-reason";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1835,5 +1837,44 @@ describe("repeating reminders and snooze", () => {
     const s = snoozeReminder(list, "1", NOW + 900);
     expect(s.list.map((r) => r.id)).toEqual(["b", "a"]);
     expect(snoozeReminder(list, "9", NOW).changed).toBeUndefined();
+  });
+});
+
+describe("weekly review", () => {
+  it("lists busy days, reminders, mail and picks", () => {
+    const w = buildWeekly({ from: "Oct 21", days: [{ label: "Wed Oct 21", events: ["9:00 AM Standup"] }, { label: "Thu Oct 22", events: [] }], reminders: ["Fri 9:00 AM — pay rent"], mail: { count: 2 }, picks: ["Dune", "Severance"], weather: "Rain" });
+    expect(w.title).toBe("Your week ahead (Oct 21)");
+    expect(w.body).toContain("Wed Oct 21: 9:00 AM Standup");
+    expect(w.body).not.toContain("Thu Oct 22");
+    expect(w.body).toContain("• Fri 9:00 AM — pay rent");
+    expect(w.body).toContain("2 unread emails");
+    expect(w.body).toContain("Worth watching: Dune, Severance");
+    expect(buildWeekly({ from: "x", days: [{ label: "d", events: [] }] }).body).toBe("Your calendar is clear this week.");
+  });
+  it("reads the review day", () => {
+    expect(reviewDay("Sunday")).toBe(0);
+    expect(reviewDay("fri")).toBe(5);
+    expect(reviewDay("6")).toBe(6);
+    expect(reviewDay("nope")).toBeNull();
+    expect(reviewDay("")).toBeNull();
+  });
+});
+
+describe("watch queue", () => {
+  const items = [
+    { title: "Seen", kind: "movie" as const, watched: true },
+    { title: "Not yet", kind: "movie" as const, inPlex: false },
+    { title: "Ready", kind: "show" as const, inPlex: true },
+    { title: "Unknown", kind: "movie" as const },
+  ];
+  it("puts what Plex has first and picks the right action", () => {
+    const q = watchQueue(items);
+    expect(q.map((e) => e.item.title)).toEqual(["Ready", "Not yet", "Unknown"]);
+    expect(q.map((e) => e.action)).toEqual(["watch", "request", "none"]);
+    expect(q[0]!.reason).toContain("Top pick");
+    expect(q[0]!.reason).toContain("already in Plex");
+    expect(q[1]!.reason).toContain("request it");
+    expect(watchQueue(items, 1).length).toBe(1);
+    expect(watchQueue([])).toEqual([]);
   });
 });

@@ -254,8 +254,13 @@ export function Room() {
       const detail = (e as CustomEvent<{ partner: AgentId; text: string }>).detail;
       if (detail?.text) void startRef.current(detail);
     };
+    const onRequest = (e: Event) => {
+      const title = (e as CustomEvent<{ title?: string }>).detail?.title;
+      if (title) setSeerrQuery({ title, is4k: false });
+    };
+    window.addEventListener("pixelpals:request", onRequest);
     window.addEventListener("pixelpals:ask", onAsk);
-    return () => window.removeEventListener("pixelpals:ask", onAsk);
+    return () => { window.removeEventListener("pixelpals:ask", onAsk); window.removeEventListener("pixelpals:request", onRequest); };
   }, []);
   const [selectedModels, setSelectedModels] = useState<Record<AgentId, string>>({
     nova: agents[0].model,
@@ -802,6 +807,7 @@ export function Room() {
         return say(command, next ? "Voice is on: I'll read each discussion's replies aloud when it finishes, in a different voice per pal. Use the speaker button on any reply to hear just that one. (iPhone: sound plays only after you've tapped something on the page.)" : "Voice is off.");
       }
       case "brief": void briefCmd(command, action.send); return;
+      case "review": void briefCmd(command, action.send, "/api/weekly"); return;
       case "backup": void backupCmd(command, action.now); return;
       case "request": { const q = parseSeerr(`@seerr ${action.title}`); if (q) setSeerrQuery(q); return; }
       case "trakt": void trakt(action.list, command, null); return;
@@ -911,9 +917,9 @@ export function Room() {
     }
   }
   /** /brief previews the morning brief; /brief send pushes it to your phone. */
-  async function briefCmd(command: string, send: boolean) {
+  async function briefCmd(command: string, send: boolean, url = "/api/brief") {
     try {
-      const res = await fetch("/api/brief", { method: send ? "POST" : "GET" });
+      const res = await fetch(url, { method: send ? "POST" : "GET" });
       const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
       return say(command, json.text ?? json.error ?? "The brief failed.");
     } catch {

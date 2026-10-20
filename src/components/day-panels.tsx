@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { dailyPicks } from "@/lib/brief";
+import { watchQueue } from "@/lib/pick-reason";
 import type { TraktItem } from "@/lib/trakt";
 import { addTodo, clearDone, removeAt, toggleTodo, updateWorkbench, useWorkbench } from "@/lib/workbench";
 import { describeCode, weatherLine, type Weather } from "@/lib/weather";
@@ -113,6 +114,7 @@ export function TodayPanel({ open }: { open: boolean }) {
   const open_ = todos.filter((t) => !t.done);
   const todayReminders = reminders.filter((r) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(r.at) === day);
   const pick = dailyPicks(trakt.data?.items ?? [], day, 1)[0];
+  const queue = watchQueue(trakt.data?.items ?? [], 6);
   return (
     <div className="grid gap-3 p-3 text-sm">
       <div className="font-medium">{dayLabel(Date.now(), tz)} · {new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(Date.now())}</div>
@@ -138,7 +140,18 @@ export function TodayPanel({ open }: { open: boolean }) {
       </Block>
       <Block title="Tonight">
         {pick ? <p>{pick.kind === "show" ? "📺" : "🎬"} {pick.title}{pick.year ? ` (${pick.year})` : ""}{pick.inPlex ? " · in Plex" : ""}</p> : <Quiet>{trakt.error ? "Connect Trakt to get a pick." : trakt.data ? "Nothing unwatched on your list." : "Loading…"}</Quiet>}
+        {pick && <Quiet>{queue.find((q) => q.item.title === pick.title)?.reason}</Quiet>}
       </Block>
+      {queue.length > 0 && (
+        <Block title="Watch queue">
+          {queue.map((q) => (
+            <div key={`${q.item.kind}-${q.item.title}`} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1"><span className="block truncate">{q.item.kind === "show" ? "📺" : "🎬"} {q.item.title}{q.item.year ? ` (${q.item.year})` : ""}</span><span className="block truncate text-xs text-muted-foreground">{q.reason}</span></span>
+              {q.action === "request" && <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={() => window.dispatchEvent(new CustomEvent("pixelpals:request", { detail: { title: q.item.title } }))}>Request</Button>}
+            </div>
+          ))}
+        </Block>
+      )}
     </div>
   );
 }

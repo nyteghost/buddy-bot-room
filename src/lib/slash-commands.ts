@@ -37,6 +37,7 @@ export type SlashAction =
   | { type: "request"; title: string }
   | { type: "backup"; now: boolean }
   | { type: "brief"; send: boolean }
+  | { type: "review"; send: boolean }
   | { type: "voice"; mode: "on" | "off" | "toggle" }
   | { type: "focus"; mode: "on" | "off" | "toggle" }
   | { type: "status" }
@@ -123,6 +124,7 @@ export const slashCommands = [
   { name: "web", usage: "/web [on|off]", description: "Let the pals search the web on their own when a question needs current facts" },
   { name: "focus", usage: "/focus [on|off]", description: "Calm, chat-only view with nothing else on screen" },
   { name: "voice", usage: "/voice [on|off]", description: "Read replies aloud (your browser's own voices)" },
+  { name: "review", usage: "/review [send]", description: "Your week ahead: calendar, reminders, mail and picks (owner only)" },
   { name: "brief", usage: "/brief [send]", description: "Today's morning brief (add send to push it to your phone)" },
   { name: "backup", usage: "/backup [now]", description: "Show the nightly backup status, or back up now (owner)" },
   { name: "request", usage: "/request <title> [4k]", description: "Request a title through Seerr (same as @seerr)" },
@@ -263,6 +265,8 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "focus", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
     case "voice": case "speak":
       return { ok: true, action: { type: "voice", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
+    case "review": case "week": case "weekly":
+      return { ok: true, action: { type: "review", send: arg === "send" } };
     case "brief": case "morning":
       return { ok: true, action: { type: "brief", send: arg === "send" } };
     case "backup":

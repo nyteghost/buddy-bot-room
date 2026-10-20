@@ -6,11 +6,12 @@ import { startFeedTimer } from "./model-feed.server";
 import { startProviderTimer } from "./provider-feed.server";
 import { ollamaBase } from "./ollama.server";
 import { tickReminders } from "./reminders.server";
+import { isReviewDay, sendWeekly, weeklyConfig } from "./weekly.server";
 import { tickSchedules } from "./schedules.server";
 import { startTelegram } from "./telegram.server";
 
 /** One 30-second ticker for the daily jobs. Idempotent. Does nothing unless a job is configured. */
-type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string };
+type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string; lastReviewDay?: string };
 const dataDir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim();
 const holder = globalThis as unknown as { __buddyScheduler?: S };
 
@@ -19,7 +20,7 @@ export function startScheduler(): void {
   startProviderTimer();
   if (holder.__buddyScheduler?.timer) return;
   startTelegram();
-  if (!backupConfig() && !briefConfig() && !dataDir()) return;
+  if (!backupConfig() && !briefConfig() && !weeklyConfig() && !dataDir()) return;
   const s: S = (holder.__buddyScheduler ??= { lastBackupDay: "", lastBriefDay: "" });
   logServer("info", "Scheduler started");
   s.timer = setInterval(() => { void tick(s); }, 30_000);
@@ -43,6 +44,12 @@ async function tick(s: S): Promise<void> {
   }
   await tickSchedules(now).catch(() => undefined);
   await tickReminders(now.getTime()).catch(() => undefined);
+  const review = weeklyConfig();
+  if (review && isReviewDay(now, review) && isDue(now, review.tz, review.time, s.lastReviewDay ?? "")) {
+    s.lastReviewDay = zonedParts(now, review.tz).day;
+    const r = await sendWeekly();
+    if (!r.ok) logServer("warn", "Weekly review not sent: no phone push configured");
+  }
   const brief = briefConfig();
   if (brief && isDue(now, brief.tz, brief.time, s.lastBriefDay)) {
     s.lastBriefDay = zonedParts(now, brief.tz).day;

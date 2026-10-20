@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiWeeklyRouteImport } from './routes/api.weekly'
 import { Route as ApiCaptureRouteImport } from './routes/api.capture'
 import { Route as ApiSetupRouteImport } from './routes/api.setup'
 import { Route as ApiIcsRouteImport } from './routes/api.ics'
@@ -67,6 +68,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWeeklyRoute = ApiWeeklyRouteImport.update({
+  id: '/api/weekly',
+  path: '/api/weekly',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCaptureRoute = ApiCaptureRouteImport.update({
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/weekly': typeof ApiWeeklyRoute
   '/api/capture': typeof ApiCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
@@ -257,6 +264,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/weekly': typeof ApiWeeklyRoute
   '/api/capture': typeof ApiCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
@@ -294,6 +302,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/weekly': typeof ApiWeeklyRoute
   '/api/capture': typeof ApiCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/weekly'
     | '/api/capture'
     | '/api/setup'
     | '/api/ics'
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/weekly'
     | '/api/capture'
     | '/api/setup'
     | '/api/ics'
@@ -404,6 +415,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/weekly'
     | '/api/capture'
     | '/api/setup'
     | '/api/ics'
@@ -441,6 +453,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiWeeklyRoute: typeof ApiWeeklyRoute
   ApiCaptureRoute: typeof ApiCaptureRoute
   ApiSetupRoute: typeof ApiSetupRoute
   ApiIcsRoute: typeof ApiIcsRoute
@@ -507,6 +520,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/weekly': {
+      id: '/api/weekly'
+      path: '/api/weekly'
+      fullPath: '/api/weekly'
+      preLoaderRoute: typeof ApiWeeklyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/capture': {
@@ -721,6 +741,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiWeeklyRoute: ApiWeeklyRoute,
   ApiCaptureRoute: ApiCaptureRoute,
   ApiSetupRoute: ApiSetupRoute,
   ApiIcsRoute: ApiIcsRoute,
