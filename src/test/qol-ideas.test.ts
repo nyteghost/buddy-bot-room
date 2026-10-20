@@ -2542,3 +2542,45 @@ describe("repo watch", () => {
     expect(rExplain(403, false, "0").includes("limit")).toBe(true);
   });
 });
+
+import { alertText as pAlert, keepByWords as pKeep, listingId as pId, mergeListings as pMerge, parseFeed as pFeed, parseLinks as pLinks } from "@/lib/playtests";
+describe("playtest watch", () => {
+  it("reads Atom and RSS feeds", () => {
+    const atom = `<feed><entry><title>[Closed Beta] Cool &amp; Game</title><link href="https://www.reddit.com/r/BetaTests/comments/1/x/"/><updated>2026-10-20</updated></entry><entry><title>Second</title><link href="https://example.com/2?a=1&amp;b=2"/></entry></feed>`;
+    const f = pFeed(atom);
+    expect(f.length).toBe(2);
+    expect(f[0]?.title).toBe("[Closed Beta] Cool & Game");
+    expect(f[1]?.url).toBe("https://example.com/2?a=1&b=2");
+    const rss = `<rss><channel><item><title><![CDATA[Alpha test: Foo]]></title><link>https://foo.example/a</link></item></channel></rss>`;
+    expect(pFeed(rss)[0]).toEqual({ title: "Alpha test: Foo", url: "https://foo.example/a" });
+    expect(pFeed("<html></html>")).toEqual([]);
+  });
+  it("reads links on a page and filters by address", () => {
+    const html = `<a href="/app/123/Some_Game/"><span class="title">Some Game Playtest</span></a><a href="/about">About us here</a><a href="/app/123/Some_Game/">dup</a><a href="/app/9/Other/">x</a>`;
+    const l = pLinks(html, "https://store.steampowered.com/search/", "/app/");
+    expect(l.length).toBe(1);
+    expect(l[0]?.title).toBe("Some Game Playtest");
+    expect(l[0]?.url).toBe("https://store.steampowered.com/app/123/Some_Game/");
+  });
+  it("filters by words", () => {
+    const f = [{ title: "Closed BETA signup", url: "https://a/1" }, { title: "Sale 50%", url: "https://a/2" }];
+    expect(pKeep(f, "beta, playtest").length).toBe(1);
+    expect(pKeep(f, "").length).toBe(2);
+  });
+  it("sets a baseline then flags only new listings", () => {
+    const first = pMerge([], "s", [{ title: "A one", url: "https://a/1" }, { title: "B two", url: "https://a/2" }], "t1", true);
+    expect(first.added.length).toBe(0);
+    expect(first.items.every((i) => !i.fresh)).toBe(true);
+    const second = pMerge(first.items, "s", [{ title: "A one", url: "https://a/1" }, { title: "C new", url: "https://a/3" }], "t2", false);
+    expect(second.added.length).toBe(1);
+    expect(second.added[0]?.title).toBe("C new");
+    expect(second.added[0]?.fresh).toBe(true);
+    expect(second.items.length).toBe(3);
+    expect(pId("https://a/1")).toBe(pId("https://a/1"));
+  });
+  it("writes a short alert", () => {
+    const a = pAlert([{ id: "1", title: "Game X beta", url: "https://x", source: "s", found: "t", fresh: true }], { s: "Steam" });
+    expect(a.title).toBe("1 new playtest or beta");
+    expect(a.body.includes("Game X beta")).toBe(true);
+  });
+});

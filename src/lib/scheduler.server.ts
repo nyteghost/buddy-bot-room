@@ -48,6 +48,8 @@ async function tick(s: S): Promise<void> {
   await tickReminders(now.getTime()).catch(() => undefined);
   await tickUpdate(now.getTime()).catch(() => undefined);
   await tickCaldav(now.getTime()).catch(() => undefined);
+  // Loaded lazily (computed name): this file is reachable from the Vite config, which can't resolve the app's "@/" imports.
+  await (await import(/* @vite-ignore */ "./playtests" + ".server")).tickPlaytests(now.getTime()).catch(() => undefined);
   const review = weeklyConfig();
   if (review && isReviewDay(now, review) && isDue(now, review.tz, review.time, s.lastReviewDay ?? "")) {
     s.lastReviewDay = zonedParts(now, review.tz).day;

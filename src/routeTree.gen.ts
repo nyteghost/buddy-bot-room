@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiPlaytestsRouteImport } from './routes/api.playtests'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiVendorsRouteImport } from './routes/api.vendors'
 import { Route as ApiGoogleCallbackRouteImport } from './routes/api.google.callback'
@@ -77,6 +78,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlaytestsRoute = ApiPlaytestsRouteImport.update({
+  id: '/api/playtests',
+  path: '/api/playtests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiReposRoute = ApiReposRouteImport.update({
@@ -281,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/playtests': typeof ApiPlaytestsRoute
   '/api/repos': typeof ApiReposRoute
   '/api/vendors': typeof ApiVendorsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
@@ -327,6 +334,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/playtests': typeof ApiPlaytestsRoute
   '/api/repos': typeof ApiReposRoute
   '/api/vendors': typeof ApiVendorsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
@@ -374,6 +382,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/playtests': typeof ApiPlaytestsRoute
   '/api/repos': typeof ApiReposRoute
   '/api/vendors': typeof ApiVendorsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
@@ -422,6 +431,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/playtests'
     | '/api/repos'
     | '/api/vendors'
     | '/api/google/callback'
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/playtests'
     | '/api/repos'
     | '/api/vendors'
     | '/api/google/callback'
@@ -514,6 +525,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/playtests'
     | '/api/repos'
     | '/api/vendors'
     | '/api/google/callback'
@@ -561,6 +573,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiPlaytestsRoute: typeof ApiPlaytestsRoute
   ApiReposRoute: typeof ApiReposRoute
   ApiVendorsRoute: typeof ApiVendorsRoute
   ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
@@ -637,6 +650,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/playtests': {
+      id: '/api/playtests'
+      path: '/api/playtests'
+      fullPath: '/api/playtests'
+      preLoaderRoute: typeof ApiPlaytestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/repos': {
@@ -921,6 +941,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiPlaytestsRoute: ApiPlaytestsRoute,
   ApiReposRoute: ApiReposRoute,
   ApiVendorsRoute: ApiVendorsRoute,
   ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,

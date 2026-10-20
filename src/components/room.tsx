@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Gamepad2,
+  FlaskConical,
   Wrench,
   Minus,
   Play,
@@ -119,6 +120,7 @@ import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
 import { ShowServicesTools } from "./work-tools";
+import { PlaytestsPanel } from "./playtests-panel";
 import { WorkspaceWindow } from "./workspace-window";
 import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
@@ -261,6 +263,7 @@ export function Room() {
   const [ready, setReady] = useState(false);
 
   const [recorderOpen, setRecorderOpen] = useState(false);
+  const [playtestsOpen, setPlaytestsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Focus mode: a calm, chat-only view. Saved per device (a phone and a desktop can differ).
   const [focusMode, setFocusMode] = useState(false);
@@ -1739,6 +1742,7 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Work tools, recorder, compare models and the debug log" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More</span></Button>
           {moreOpen && <>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Open betas and playtests" aria-pressed={playtestsOpen} onClick={() => setPlaytestsOpen((value) => !value)}><FlaskConical /><span>Playtests</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Copy a bug report for Claude" onClick={() => setLogOpen(true)}><Bug /><span>Debug log</span></Button>
@@ -1912,6 +1916,9 @@ export function Room() {
             <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
               <ShowServicesTools />
             </WorkspaceWindow>
+            <WorkspaceWindow id="playtests" title="Betas & playtests" icon={<FlaskConical className="size-4" />} open={playtestsOpen} onClose={() => setPlaytestsOpen(false)} resetVersion={resetVersion}>
+              <PlaytestsPanel />
+            </WorkspaceWindow>
             <WorkspaceWindow id="recorder" title="Echo’s recorder" icon={<Mic className="size-4" />} open={recorderOpen} onClose={() => setRecorderOpen(false)} resetVersion={resetVersion}>
               <MicRecorder onClose={() => setRecorderOpen(false)} />
             </WorkspaceWindow>
@@ -1939,7 +1946,7 @@ export function Room() {
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />
             </WorkspaceWindow>
-            {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
+            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
           </main>
         </div>
       </div>
