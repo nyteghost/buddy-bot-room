@@ -72,7 +72,7 @@ export async function runCheck(): Promise<number> {
     const added: import("./playtests").Listing[] = [];
     let first = true;
     for (const src of s.sources.filter((x) => x.enabled)) {
-      if (!first) await new Promise((r) => setTimeout(r, 1500));
+      if (!first) await new Promise((r) => setTimeout(r, 5000));
       first = false;
       const r = await read(src);
       if ("error" in r) { s.status[src.id] = { at: now, ok: false, count: s.status[src.id]?.count ?? 0, error: r.error }; continue; }

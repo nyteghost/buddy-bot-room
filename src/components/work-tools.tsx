@@ -1,8 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Briefcase, CalendarPlus, CalendarSync, Download, FileUp } from "lucide-react";
-import { calendarStatus, completeCalendarConnect, pushShiftsToCalendar, startCalendarConnect } from "@/lib/calendar.functions";
-import { useSession } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -102,64 +99,19 @@ function useDeliver() {
   return { deliver: (blob: Blob, name: string) => import("@/lib/work-files").then((m) => m.downloadBlob(blob, name)) };
 }
 
-function waitForOAuthCompletion(popup: Window) {
-  return new Promise<string | null>((resolve, reject) => {
-    let poll: number | undefined;
-    const cleanup = () => {
-      window.removeEventListener("message", onMessage);
-      if (poll !== undefined) window.clearInterval(poll);
-    };
-    const onMessage = (event: MessageEvent) => {
-      const type = event.data?.type;
-      if (
-        event.origin !== window.location.origin ||
-        event.source !== popup ||
-        event.data?.connectorId !== "google_calendar" ||
-        (type !== "appUserConnectorOAuthComplete" && type !== "appUserConnectorOAuthFailed")
-      ) return;
-      cleanup();
-      if (type === "appUserConnectorOAuthComplete") {
-        resolve(typeof event.data?.code === "string" ? event.data.code : null);
-        return;
-      }
-      popup.close();
-      reject(new Error("Google Calendar connection failed."));
-    };
-    window.addEventListener("message", onMessage);
-    poll = window.setInterval(() => {
-      if (!popup.closed) return;
-      cleanup();
-      reject(new Error("Google sign-in window was closed before finishing."));
-    }, 500);
-  });
-}
-
 /** Button that connects Google Calendar once, then pushes every shift with one click. */
 type GoogleReply = { configured?: boolean; connected?: boolean; mode?: string; error?: string; added?: number; updated?: number; removed?: number; skipped?: number; reasons?: string[] };
 
 function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownload }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void; onDownload: () => void }) {
-  const session = useSession();
-  const start = useServerFn(startCalendarConnect);
-  const complete = useServerFn(completeCalendarConnect);
-  const push = useServerFn(pushShiftsToCalendar);
-  const status = useServerFn(calendarStatus);
-  const [busy, setBusy] = useState(false);
-  // null = unknown yet; false = must open the Google popup on the next click.
-  const [ready, setReady] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (!session) return;
-    status().then((r) => setReady(r.connected)).catch(() => setReady(false));
-  }, [session, status]);
   const [own, setOwn] = useState<{ configured: boolean; connected: boolean } | null>(null);
   const [ownBusy, setOwnBusy] = useState(false);
   const ownCall = async (body: object) => (await fetch("/api/google", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json() as Promise<GoogleReply>;
   useEffect(() => {
-    if (session) return;
     ownCall({ op: "status" }).then((r) => setOwn({ configured: !!r.configured, connected: !!r.connected })).catch(() => setOwn({ configured: false, connected: false }));
     const done = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.pixelpals === "google-connected") setOwn({ configured: true, connected: true }); };
     window.addEventListener("message", done);
     return () => window.removeEventListener("message", done);
-  }, [session]);
+  }, []);
   async function ownRun() {
     setOwnBusy(true);
     try {
@@ -176,9 +128,9 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
       onStatus(`Google Calendar: ${bits}${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
     } catch { onStatus("Couldn't reach Pixel Pals."); } finally { setOwnBusy(false); }
   }
-  // Not signed in to the hosted app (your own server): use your own Google sign-in when it's set up, otherwise download one calendar file.
+  // (self-hosted): use your own Google sign-in when it's set up, otherwise download one calendar file.
   // Each event has a fixed id, so pushing or importing again updates the same events instead of making copies.
-  if (!session) return (
+  return (
     <>
       {own?.connected
         ? <Button size="sm" variant="outline" disabled={ownBusy || !shifts.length} onClick={ownRun}><CalendarSync className="size-4" /> {ownBusy ? "Working…" : "Add or update in Google Calendar"}</Button>
@@ -191,53 +143,6 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
         onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Importing again later updates the same events.");
       }}><CalendarPlus className="size-4" /> {own?.connected ? "Download .ics instead" : "Add all to Google Calendar"}</Button>
     </>
-  );
-
-  // The popup must open synchronously inside the click, before any await, or browsers block it.
-  async function connect(popup: Window): Promise<boolean> {
-    try {
-      const { authorizationUrl } = await start();
-      const completion = waitForOAuthCompletion(popup);
-      popup.location.href = authorizationUrl;
-      const code = await completion;
-      if (code) await complete({ data: { code } });
-      setReady(true);
-      return true;
-    } catch (e) {
-      popup.close();
-      onStatus((e as Error).message);
-      return false;
-    }
-  }
-
-  async function run() {
-    const popup = ready ? null : window.open("", "lovable-oauth", "width=600,height=720");
-    if (!ready && !popup) { onStatus("Popup blocked — allow popups for this site and try again."); return; }
-    setBusy(true);
-    onStatus(popup ? "Approve Google Calendar access in the popup…" : "");
-    try {
-      if (popup && !(await connect(popup))) return;
-      const r = await push({ data: { shifts, title, remove } });
-      if (!r.connected) {
-        setReady(false);
-        onStatus(r.reconnectRequired ? "Your Google Calendar access needs to be renewed — click the button again to reconnect." : "Google Calendar is not connected yet — click the button again to connect.");
-        return;
-      }
-      const why = r.reasons?.length ? ` — ${r.reasons.slice(0, 3).join("; ")}${r.reasons.length > 3 ? ` (+${r.reasons.length - 3} more)` : ""}` : "";
-      if (!r.skipped) onPushed();
-      const bits = [r.added ? `added ${r.added}` : "", r.updated ? `updated ${r.updated}` : "", r.removed ? `removed ${r.removed}` : ""].filter(Boolean).join(", ") || "nothing to change";
-      onStatus(`Google Calendar: ${bits}${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
-    } catch (e) {
-      onStatus((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Button size="sm" variant="outline" disabled={busy || !shifts.length} onClick={run}>
-      <CalendarSync className="size-4" /> {busy ? "Working…" : "Add or update in Google Calendar"}
-    </Button>
   );
 }
 

@@ -53,7 +53,6 @@ import { Route as ApiStoreRouteImport } from './routes/api.store'
 import { Route as ApiJellyfinRouteImport } from './routes/api.jellyfin'
 import { Route as ApiDebuglogRouteImport } from './routes/api.debuglog'
 import { Route as ApiTranscribeRouteImport } from './routes/api.transcribe'
-import { Route as ApiOauthGoogleReturnRouteImport } from './routes/api/oauth/google/return'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -275,11 +274,6 @@ const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOauthGoogleReturnRoute = ApiOauthGoogleReturnRouteImport.update({
-  id: '/api/oauth/google/return',
-  path: '/api/oauth/google/return',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -326,7 +320,6 @@ export interface FileRoutesByFullPath {
   '/api/jellyfin': typeof ApiJellyfinRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/transcribe': typeof ApiTranscribeRoute
-  '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -373,7 +366,6 @@ export interface FileRoutesByTo {
   '/api/jellyfin': typeof ApiJellyfinRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/transcribe': typeof ApiTranscribeRoute
-  '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -421,7 +413,6 @@ export interface FileRoutesById {
   '/api/jellyfin': typeof ApiJellyfinRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/transcribe': typeof ApiTranscribeRoute
-  '/api/oauth/google/return': typeof ApiOauthGoogleReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -470,7 +461,6 @@ export interface FileRouteTypes {
     | '/api/jellyfin'
     | '/api/debuglog'
     | '/api/transcribe'
-    | '/api/oauth/google/return'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -517,7 +507,6 @@ export interface FileRouteTypes {
     | '/api/jellyfin'
     | '/api/debuglog'
     | '/api/transcribe'
-    | '/api/oauth/google/return'
   id:
     | '__root__'
     | '/'
@@ -564,7 +553,6 @@ export interface FileRouteTypes {
     | '/api/jellyfin'
     | '/api/debuglog'
     | '/api/transcribe'
-    | '/api/oauth/google/return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -612,7 +600,6 @@ export interface RootRouteChildren {
   ApiJellyfinRoute: typeof ApiJellyfinRoute
   ApiDebuglogRoute: typeof ApiDebuglogRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
-  ApiOauthGoogleReturnRoute: typeof ApiOauthGoogleReturnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -925,13 +912,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/oauth/google/return': {
-      id: '/api/oauth/google/return'
-      path: '/api/oauth/google/return'
-      fullPath: '/api/oauth/google/return'
-      preLoaderRoute: typeof ApiOauthGoogleReturnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -980,7 +960,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJellyfinRoute: ApiJellyfinRoute,
   ApiDebuglogRoute: ApiDebuglogRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
-  ApiOauthGoogleReturnRoute: ApiOauthGoogleReturnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
