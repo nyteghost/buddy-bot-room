@@ -2360,3 +2360,34 @@ describe("living room", () => {
     expect(seasonal(4)).toEqual([]);
   });
 });
+
+import { buildEvent as gBuild, cleanOrigin as gOrigin, localStamp as gStamp, redirectUri as gRedirect, validShift as gValid, authUrl as gAuth, parseTokenResponse as gTok } from "@/lib/gcal";
+describe("self-hosted Google Calendar helpers", () => {
+  it("builds events with local wall-clock times and notes", () => {
+    const e = gBuild({ id: "abcde12345", date: "2026-03-05", start: 600, end: 1080, raw: "10a-6p", note: "Hall B" }, "Mark Work", "America/New_York");
+    expect(e.start).toEqual({ dateTime: "2026-03-05T10:00:00", timeZone: "America/New_York" });
+    expect(e.end.dateTime).toBe("2026-03-05T18:00:00");
+    expect(e.description).toBe("Schedule: 10a-6p\nHall B");
+  });
+  it("rolls overnight shifts into the next day", () => { expect(gStamp("2026-03-05", 1500)).toBe("2026-03-06T01:00:00"); });
+  it("rejects bad shifts and bad ids", () => {
+    expect(gValid({ date: "2026-03-05", start: 600, end: 700, raw: "x" })).toBe(true);
+    expect(gValid({ date: "nope", start: 600, end: 700, raw: "x" })).toBe(false);
+    expect(gValid({ date: "2026-03-05", start: 700, end: 600, raw: "x" })).toBe(false);
+    expect(gValid({ id: "BAD ID!", date: "2026-03-05", start: 1, end: 2, raw: "x" })).toBe(false);
+  });
+  it("only accepts https or localhost origins", () => {
+    expect(gOrigin("https://cachyos-x8664-1.tailb6d9c7.ts.net/foo")).toBe("https://cachyos-x8664-1.tailb6d9c7.ts.net");
+    expect(gOrigin("http://localhost:3000")).toBe("http://localhost:3000");
+    expect(gOrigin("http://192.168.1.5:3000")).toBe(null);
+    expect(gOrigin("javascript:alert(1)")).toBe(null);
+    expect(gRedirect("https://a.b")).toBe("https://a.b/api/google/callback");
+  });
+  it("makes an offline consent url and reads token answers", () => {
+    const u = new URL(gAuth("cid", "https://a.b/api/google/callback", "st"));
+    expect(u.searchParams.get("access_type")).toBe("offline");
+    expect(u.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/calendar.events");
+    expect(gTok({ access_token: "a", expires_in: 3599, refresh_token: "r" })).toEqual({ access: "a", expiresIn: 3599, refresh: "r" });
+    expect(gTok({})).toBe(null);
+  });
+});

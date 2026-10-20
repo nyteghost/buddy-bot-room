@@ -133,6 +133,8 @@ function waitForOAuthCompletion(popup: Window) {
 }
 
 /** Button that connects Google Calendar once, then pushes every shift with one click. */
+type GoogleReply = { configured?: boolean; connected?: boolean; error?: string; added?: number; updated?: number; removed?: number; skipped?: number; reasons?: string[] };
+
 function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownload }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void; onDownload: () => void }) {
   const session = useSession();
   const start = useServerFn(startCalendarConnect);
@@ -146,14 +148,47 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
     if (!session) return;
     status().then((r) => setReady(r.connected)).catch(() => setReady(false));
   }, [session, status]);
-  // Not signed in to the hosted app (for example on your own server): download one calendar file and open Google Calendar's import page.
-  // Each event has a fixed id, so importing the file again updates the same events instead of making copies.
+  const [own, setOwn] = useState<{ configured: boolean; connected: boolean } | null>(null);
+  const [ownBusy, setOwnBusy] = useState(false);
+  const ownCall = async (body: object) => (await fetch("/api/google", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json() as Promise<GoogleReply>;
+  useEffect(() => {
+    if (session) return;
+    ownCall({ op: "status" }).then((r) => setOwn({ configured: !!r.configured, connected: !!r.connected })).catch(() => setOwn({ configured: false, connected: false }));
+    const done = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.pixelpals === "google-connected") setOwn({ configured: true, connected: true }); };
+    window.addEventListener("message", done);
+    return () => window.removeEventListener("message", done);
+  }, [session]);
+  async function ownRun() {
+    setOwnBusy(true);
+    try {
+      const r = await ownCall({ op: "push", shifts, title, remove });
+      if (!r.connected) {
+        setOwn((o) => ({ configured: o?.configured ?? true, connected: false }));
+        onStatus(String(r.error ?? "Google Calendar isn't connected yet."));
+        return;
+      }
+      const reasons = r.reasons ?? [];
+      const why = reasons.length ? ` — ${reasons.slice(0, 3).join("; ")}${reasons.length > 3 ? ` (+${reasons.length - 3} more)` : ""}` : "";
+      if (!r.skipped) onPushed();
+      const bits = [r.added ? `added ${r.added}` : "", r.updated ? `updated ${r.updated}` : "", r.removed ? `removed ${r.removed}` : ""].filter(Boolean).join(", ") || "nothing to change";
+      onStatus(`Google Calendar: ${bits}${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
+    } catch { onStatus("Couldn't reach Pixel Pals."); } finally { setOwnBusy(false); }
+  }
+  // Not signed in to the hosted app (your own server): use your own Google sign-in when it's set up, otherwise download one calendar file.
+  // Each event has a fixed id, so pushing or importing again updates the same events instead of making copies.
   if (!session) return (
-    <Button size="sm" variant="secondary" disabled={!shifts.length} onClick={() => {
-      onDownload();
-      window.open("https://calendar.google.com/calendar/u/0/r/settings/export", "_blank", "noopener");
-      onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Importing again later updates the same events.");
-    }}><CalendarPlus className="size-4" /> Add all to Google Calendar</Button>
+    <>
+      {own?.connected
+        ? <Button size="sm" variant="outline" disabled={ownBusy || !shifts.length} onClick={ownRun}><CalendarSync className="size-4" /> {ownBusy ? "Working…" : "Add or update in Google Calendar"}</Button>
+        : own?.configured
+          ? <Button size="sm" variant="outline" onClick={() => { if (!window.open(`/api/google/start?origin=${encodeURIComponent(location.origin)}`, "pixelpals-google", "width=520,height=700")) onStatus("Popup blocked. Allow popups for this site and try again."); else onStatus("Approve Google Calendar access in the popup, then press the button again."); }}><CalendarSync className="size-4" /> Connect Google Calendar</Button>
+          : null}
+      <Button size="sm" variant="secondary" disabled={!shifts.length} onClick={() => {
+        onDownload();
+        window.open("https://calendar.google.com/calendar/u/0/r/settings/export", "_blank", "noopener");
+        onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Importing again later updates the same events.");
+      }}><CalendarPlus className="size-4" /> {own?.connected ? "Download .ics instead" : "Add all to Google Calendar"}</Button>
+    </>
   );
 
   // The popup must open synchronously inside the click, before any await, or browsers block it.

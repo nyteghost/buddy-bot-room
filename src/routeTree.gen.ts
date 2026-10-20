@@ -14,6 +14,9 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiGoogleCallbackRouteImport } from './routes/api.google.callback'
+import { Route as ApiGoogleStartRouteImport } from './routes/api.google.start'
+import { Route as ApiGoogleRouteImport } from './routes/api.google'
 import { Route as ApiMailboxRouteImport } from './routes/api.mailbox'
 import { Route as ApiSettingsRouteImport } from './routes/api.settings'
 import { Route as ApiTasksRouteImport } from './routes/api.tasks'
@@ -72,6 +75,21 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
+  id: '/api/google/callback',
+  path: '/api/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGoogleStartRoute = ApiGoogleStartRouteImport.update({
+  id: '/api/google/start',
+  path: '/api/google/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGoogleRoute = ApiGoogleRouteImport.update({
+  id: '/api/google',
+  path: '/api/google',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMailboxRoute = ApiMailboxRouteImport.update({
@@ -251,6 +269,9 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
+  '/api/google/start': typeof ApiGoogleStartRoute
+  '/api/google': typeof ApiGoogleRoute
   '/api/mailbox': typeof ApiMailboxRoute
   '/api/settings': typeof ApiSettingsRoute
   '/api/tasks': typeof ApiTasksRoute
@@ -292,6 +313,9 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
+  '/api/google/start': typeof ApiGoogleStartRoute
+  '/api/google': typeof ApiGoogleRoute
   '/api/mailbox': typeof ApiMailboxRoute
   '/api/settings': typeof ApiSettingsRoute
   '/api/tasks': typeof ApiTasksRoute
@@ -334,6 +358,9 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/google/callback': typeof ApiGoogleCallbackRoute
+  '/api/google/start': typeof ApiGoogleStartRoute
+  '/api/google': typeof ApiGoogleRoute
   '/api/mailbox': typeof ApiMailboxRoute
   '/api/settings': typeof ApiSettingsRoute
   '/api/tasks': typeof ApiTasksRoute
@@ -377,6 +404,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/google/callback'
+    | '/api/google/start'
+    | '/api/google'
     | '/api/mailbox'
     | '/api/settings'
     | '/api/tasks'
@@ -418,6 +448,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/google/callback'
+    | '/api/google/start'
+    | '/api/google'
     | '/api/mailbox'
     | '/api/settings'
     | '/api/tasks'
@@ -459,6 +492,9 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/google/callback'
+    | '/api/google/start'
+    | '/api/google'
     | '/api/mailbox'
     | '/api/settings'
     | '/api/tasks'
@@ -501,6 +537,9 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiGoogleCallbackRoute: typeof ApiGoogleCallbackRoute
+  ApiGoogleStartRoute: typeof ApiGoogleStartRoute
+  ApiGoogleRoute: typeof ApiGoogleRoute
   ApiMailboxRoute: typeof ApiMailboxRoute
   ApiSettingsRoute: typeof ApiSettingsRoute
   ApiTasksRoute: typeof ApiTasksRoute
@@ -572,6 +611,27 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google/callback': {
+      id: '/api/google/callback'
+      path: '/api/google/callback'
+      fullPath: '/api/google/callback'
+      preLoaderRoute: typeof ApiGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google/start': {
+      id: '/api/google/start'
+      path: '/api/google/start'
+      fullPath: '/api/google/start'
+      preLoaderRoute: typeof ApiGoogleStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google': {
+      id: '/api/google'
+      path: '/api/google'
+      fullPath: '/api/google'
+      preLoaderRoute: typeof ApiGoogleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/mailbox': {
@@ -821,6 +881,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiGoogleCallbackRoute: ApiGoogleCallbackRoute,
+  ApiGoogleStartRoute: ApiGoogleStartRoute,
+  ApiGoogleRoute: ApiGoogleRoute,
   ApiMailboxRoute: ApiMailboxRoute,
   ApiSettingsRoute: ApiSettingsRoute,
   ApiTasksRoute: ApiTasksRoute,

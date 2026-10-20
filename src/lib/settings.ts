@@ -40,6 +40,8 @@ export const SETTING_FIELDS: SettingField[] = [
   { key: "WEATHER_LOCATION", label: "Place", group: "weather", kind: "text", placeholder: "Atlanta, GA" },
   { key: "WEATHER_UNITS", label: "Units", group: "weather", kind: "select", options: ["imperial", "metric"] },
   { key: "CALENDAR_ICS_URLS", label: "Calendar feed links", group: "calendar", kind: "list", secret: true, placeholder: "https://…/basic.ics", help: "Google, iCloud, Outlook or Cozi share links (webcal:// links work too). Up to six, separated by spaces or commas. Private feed links work like passwords." },
+  { key: "GOOGLE_CLIENT_ID", label: "Google client ID", group: "gcal", kind: "text", help: "From Google Cloud Console → Credentials → OAuth client (Web application). Lets Pixel Pals add your shifts to Google Calendar." },
+  { key: "GOOGLE_CLIENT_SECRET", label: "Google client secret", group: "gcal", kind: "text", secret: true },
   { key: "IMAP_HOST", label: "Mail server (IMAP)", group: "imap", kind: "text", placeholder: "imap.gmail.com", help: "Gmail: imap.gmail.com. Outlook.com: outlook.office365.com. iCloud: imap.mail.me.com. Fastmail: imap.fastmail.com." },
   { key: "IMAP_PORT", label: "Port", group: "imap", kind: "number", placeholder: "993" },
   { key: "IMAP_USER", label: "Email address", group: "imap", kind: "text", placeholder: "you@gmail.com", help: "Your full address. Sending needs it." },
