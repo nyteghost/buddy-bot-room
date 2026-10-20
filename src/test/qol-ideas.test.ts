@@ -2482,3 +2482,16 @@ describe("vendor prices", () => {
     expect(s.vendors.length > 3).toBe(true);
   });
 });
+
+import { RENT_VENDORS as vRent, rentalSearchUrl as vRentUrl, vendorChoices as vChoices } from "@/lib/vendors";
+describe("rental vendors", () => {
+  it("keeps rentals apart from purchases", () => {
+    expect(vRent.map((v) => v.name)).toEqual(["Sunbelt Rentals", "United Rentals", "Herc Rentals"]);
+    expect(vChoices("rent", []).includes("Home Depot")).toBe(false);
+    expect(vChoices("buy", []).includes("Herc Rentals")).toBe(false);
+    expect(vChoices("rent", ["Local Lift Co"]).includes("Local Lift Co")).toBe(true);
+  });
+  it("searches only that company's site", () => {
+    expect(vRentUrl("unitedrentals.com", "scissor lift")).toBe("https://www.google.com/search?q=site%3Aunitedrentals.com%20scissor%20lift");
+  });
+});

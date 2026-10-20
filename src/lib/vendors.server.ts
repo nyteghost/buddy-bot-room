@@ -83,9 +83,9 @@ async function owner(request: Request): Promise<Response | null> {
 }
 
 type Body = {
-  op?: string; item?: { id?: string; name?: string; unit?: string }; itemId?: string; offerId?: string;
+  op?: string; item?: { id?: string; name?: string; unit?: string; kind?: string }; itemId?: string; offerId?: string;
   offer?: { id?: string; vendor?: string; url?: string; price?: unknown; shipping?: unknown; note?: string; source?: string };
-  vendors?: string[]; vendor?: string; q?: string; question?: string;
+  vendors?: string[]; vendor?: string; q?: string; question?: string; kind?: string;
 };
 
 export async function handleVendors(request: Request): Promise<Response> {
@@ -102,7 +102,7 @@ export async function handleVendors(request: Request): Promise<Response> {
       if (!name) return Response.json({ error: "Give the item a name." }, { status: 400 });
       const it = find(body.item?.id);
       if (it) { it.name = name; it.unit = clean(body.item?.unit, 30) || undefined; }
-      else { if (s.items.length >= MAX_ITEMS) return Response.json({ error: "That's the most items I'll track." }, { status: 400 }); s.items.push({ id: newId(), name, unit: clean(body.item?.unit, 30) || undefined, offers: [] }); }
+      else { if (s.items.length >= MAX_ITEMS) return Response.json({ error: "That's the most items I'll track." }, { status: 400 }); s.items.push({ id: newId(), name, unit: clean(body.item?.unit, 30) || undefined, kind: body.item?.kind === "rent" ? "rent" : "buy", offers: [] }); }
       await save(s);
       return Response.json(s);
     }
@@ -136,15 +136,15 @@ export async function handleVendors(request: Request): Promise<Response> {
       return Response.json({ ...s, read: jobs.length });
     }
     case "mail": return mailQuotes(clean(body.q, 60));
-    case "ask": return ask(s, clean(body.question, 300));
+    case "ask": return ask({ ...s, items: s.items.filter((i) => (i.kind ?? "buy") === (body.kind === "rent" ? "rent" : "buy")) }, clean(body.question, 300), body.kind === "rent");
     default: return Response.json(s);
   }
 }
 
-async function ask(s: Store, question: string): Promise<Response> {
+async function ask(s: Store, question: string, rent = false): Promise<Response> {
   if (!s.items.length) return Response.json({ error: "Add some items first." }, { status: 400 });
   const { askPals } = await import(/* @vite-ignore */ "./ask" + ".server");
-  const r = await askPals(`${question || "Which vendor is cheapest for each item, and is anything worth checking?"}\n\nPrices (before tax, I'm tax-exempt; OLD means over a month old):\n${comparisonText(s.items)}`, {
+  const r = await askPals(`${question || (rent ? "Which rental company is cheapest for each rental, and is anything worth checking?" : "Which vendor is cheapest for each item, and is anything worth checking?")}\n\nPrices (before tax, I'm tax-exempt; OLD means over a month old):\n${comparisonText(s.items)}`, {
     localOnly: true, maxTokens: 500,
     system: "You compare vendor prices for a convention center buyer. Use only the numbers given. Name the cheapest vendor per item (price plus shipping), call out old or AI-read prices that need checking, and keep it short. Do not invent prices.",
   });

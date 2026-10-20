@@ -17,11 +17,21 @@ export type Offer = {
   /** Why the last automatic read failed, shown so you know to type the price in. */
   error?: string | undefined;
 };
-export type Item = { id: string; name: string; unit?: string | undefined; offers: Offer[] };
+export type Kind = "buy" | "rent";
+export type Item = { id: string; name: string; unit?: string | undefined; kind?: Kind | undefined; offers: Offer[] };
 export type Store = { items: Item[]; vendors: string[] };
 
-/** The vendors you buy from, offered as quick picks. */
-export const DEFAULT_VENDORS = ["Milspec/Gehr", "Atlantic Tape", "SICO", "Home Depot", "Lowe's", "Sunbelt Rentals", "Industrial Webbing", "Rhinos", "Amazon"];
+/** Quick picks for the vendor box. Rentals are kept apart from things you buy. */
+export const BUY_VENDORS = ["Milspec/Gehr", "Atlantic Tape", "SICO", "Home Depot", "Lowe's", "Industrial Webbing", "Rhinos", "Amazon"];
+export const RENT_VENDORS = [
+  { name: "Sunbelt Rentals", site: "sunbeltrentals.com" },
+  { name: "United Rentals", site: "unitedrentals.com" },
+  { name: "Herc Rentals", site: "hercrentals.com" },
+];
+export const DEFAULT_VENDORS = [...BUY_VENDORS, ...RENT_VENDORS.map((v) => v.name)];
+export const vendorChoices = (kind: Kind, saved: string[]): string[] => [...new Set([...(kind === "rent" ? RENT_VENDORS.map((v) => v.name) : BUY_VENDORS), ...saved.filter((v) => !(kind === "rent" ? BUY_VENDORS : RENT_VENDORS.map((x) => x.name)).includes(v))])];
+/** A search of one rental company's own site (a web search limited to that site, so no site-specific address has to be guessed). */
+export const rentalSearchUrl = (site: string, q: string): string => `https://www.google.com/search?q=${encodeURIComponent(`site:${site} ${q}`.trim())}`;
 
 export const MAX_ITEMS = 60;
 export const MAX_OFFERS = 20;
@@ -148,7 +158,7 @@ export function cleanStore(raw: unknown): Store {
         note: clean(x["note"], 200) || undefined, source, checked, error: clean(x["error"], 160) || undefined,
       });
     }
-    items.push({ id: clean(o["id"], 20) || newId(), name, unit: clean(o["unit"], 30) || undefined, offers });
+    items.push({ id: clean(o["id"], 20) || newId(), name, unit: clean(o["unit"], 30) || undefined, kind: o["kind"] === "rent" ? "rent" : "buy", offers });
   }
   const vendors = [...new Set((Array.isArray(r.vendors) ? r.vendors : DEFAULT_VENDORS).map((v) => clean(v, 60)).filter(Boolean))].slice(0, 40);
   return { items, vendors: vendors.length ? vendors : DEFAULT_VENDORS };

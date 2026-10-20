@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Mail, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cheapest, DEFAULT_VENDORS, isStale, landed, ranked, sourceLabel, type Item, type Offer, type Proposed, type Store } from "@/lib/vendors";
+import { cheapest, DEFAULT_VENDORS, isStale, landed, ranked, rentalSearchUrl, RENT_VENDORS, sourceLabel, vendorChoices, type Item, type Kind, type Offer, type Proposed, type Store } from "@/lib/vendors";
 import { MessageResponse } from "@/components/ai-elements/message";
 
 type Reply = Partial<Store> & { error?: string; read?: number; answer?: string; via?: string; found?: number; emails?: { from: string; subject: string; date: string; quotes: Proposed[] }[] };
@@ -17,6 +17,7 @@ export function VendorsPanel() {
   const [store, setStore] = useState<Store | null>(null);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<Kind>("buy");
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("");
   const [answer, setAnswer] = useState("");
@@ -31,6 +32,7 @@ export function VendorsPanel() {
   const run: Run = async (body, ok = "") => { setBusy(true); apply(await call(body), ok); setBusy(false); };
   useEffect(() => { call({ op: "list" }).then((r) => (r.error ? setStatus(r.error) : apply(r))); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  const shown = (store?.items ?? []).filter((i) => (i.kind ?? "buy") === kind);
   if (!store) return <p className="pt-2 text-sm text-muted-foreground">{status || "Loading…"}</p>;
   const addProposal = async (itemName: string, q: Proposed, from: string) => {
     let it = store.items.find((i) => i.name.toLowerCase() === itemName.toLowerCase());
@@ -45,20 +47,24 @@ export function VendorsPanel() {
 
   return (
     <div className="space-y-3 pt-2">
+      <div className="flex gap-1" role="tablist" aria-label="Buying or renting">
+        {(["buy", "rent"] as const).map((k) => <Button key={k} size="sm" role="tab" aria-selected={kind === k} variant={kind === k ? "default" : "outline"} onClick={() => { setKind(k); setAnswer(""); }}>{k === "buy" ? "Buy" : "Rent"}</Button>)}
+      </div>
+      {kind === "rent" && <RentSearch />}
       <div className="flex flex-wrap items-center gap-2">
-        <Input className="min-w-40 flex-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="Item, like 50ft flat power cord" aria-label="Item name" />
-        <Input className="w-24" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="each" aria-label="Unit" />
-        <Button size="sm" disabled={busy || !name.trim()} onClick={async () => { await run({ op: "saveItem", item: { name, unit } }); setName(""); setUnit(""); }}><Plus className="size-4" /> Add item</Button>
+        <Input className="min-w-40 flex-1" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "rent" ? "Rental, like 19ft scissor lift" : "Item, like 50ft flat power cord"} aria-label="Item name" />
+        <Input className="w-24" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={kind === "rent" ? "day" : "each"} aria-label="Unit" />
+        <Button size="sm" disabled={busy || !name.trim()} onClick={async () => { await run({ op: "saveItem", item: { name, unit: unit || (kind === "rent" ? "day" : ""), kind } }); setName(""); setUnit(""); }}><Plus className="size-4" /> {kind === "rent" ? "Add rental" : "Add item"}</Button>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" disabled={busy || !store.items.length} onClick={() => run({ op: "refresh" }, "Prices refreshed.")}><RefreshCw className="size-4" /> Refresh all pages</Button>
-        <Button size="sm" variant="outline" disabled={busy || !store.items.length} onClick={async () => { setBusy(true); setAnswer(""); const r = await call({ op: "ask" }); if (r.error) setStatus(r.error); else { setAnswer(r.answer ?? ""); setStatus(r.via ? `Answered by ${r.via}` : ""); } setBusy(false); }}><Sparkles className="size-4" /> Who's cheapest?</Button>
+        <Button size="sm" variant="outline" disabled={busy || !shown.length} onClick={() => run({ op: "refresh" }, "Prices refreshed.")}><RefreshCw className="size-4" /> Refresh all pages</Button>
+        <Button size="sm" variant="outline" disabled={busy || !shown.length} onClick={async () => { setBusy(true); setAnswer(""); const r = await call({ op: "ask", kind }); if (r.error) setStatus(r.error); else { setAnswer(r.answer ?? ""); setStatus(r.via ? `Answered by ${r.via}` : ""); } setBusy(false); }}><Sparkles className="size-4" /> Who's cheapest?</Button>
       </div>
       {answer && <div className="rounded-md border border-border p-3 text-sm"><MessageResponse>{answer}</MessageResponse></div>}
       {status && <p className="text-xs text-muted-foreground" role="status">{status}</p>}
 
-      {!store.items.length && <p className="text-sm text-muted-foreground">Add an item, then add each vendor's product link or the price you were quoted. Pages that publish a price are read for you; the rest you type in once.</p>}
-      {store.items.map((it) => <ItemCard key={it.id} item={it} vendors={store.vendors} busy={busy} run={run} />)}
+      {!shown.length && <p className="text-sm text-muted-foreground">{kind === "rent" ? "Add a rental, then add each company's quoted rate (rental prices are by quote and change by date and location, so you type them in)." : "Add an item, then add each vendor's product link or the price you were quoted. Pages that publish a price are read for you; the rest you type in once."}</p>}
+      {shown.map((it) => <ItemCard key={it.id} item={it} vendors={vendorChoices(kind, store.vendors)} busy={busy} run={run} />)}
 
       <div className="space-y-2 rounded-md border border-dashed border-border p-3">
         <div className="flex items-center gap-2 text-sm font-medium"><Mail className="size-4" /> Pull quotes from email</div>
@@ -151,6 +157,19 @@ function OfferForm({ initial, vendors, busy, onSave, onCancel }: { initial?: Off
       <div className="flex gap-2 sm:col-span-2">
         <Button size="sm" disabled={busy || !vendor.trim() || (!url.trim() && !price.trim())} onClick={() => onSave({ vendor, url, price, shipping, note })}>Save</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Search each rental company's own site. Rates are by quote, so these just open the search for you. */
+function RentSearch() {
+  const [q, setQ] = useState("");
+  return (
+    <div className="space-y-2 rounded-md border border-border p-2">
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="What do you need to rent? e.g. 19ft scissor lift" aria-label="Rental search" />
+      <div className="flex flex-wrap gap-2">
+        {RENT_VENDORS.map((v) => <a key={v.name} className={`rounded border border-border px-2 py-1 text-sm ${q.trim() ? "text-primary underline" : "pointer-events-none opacity-50"}`} href={rentalSearchUrl(v.site, q.trim())} target="_blank" rel="noreferrer">{v.name}</a>)}
       </div>
     </div>
   );
