@@ -2298,3 +2298,24 @@ describe("conversation mode windows", () => {
     expect([...SOLVE_ROLE_ORDER]).toEqual(["diagnoser", "fixer", "skeptic"]);
   });
 });
+
+import { calendarText, dayWant, mailText as dayMailText, tasksText, wantsAny } from "@/lib/day-context";
+
+describe("pals see your real day", () => {
+  it("only asks for data when the message does", () => {
+    expect(wantsAny(dayWant("tell me a joke", null))).toBe(false);
+    expect(dayWant("@mail anything new?", "nova")).toEqual({ calendar: false, mail: true, tasks: false });
+    expect(dayWant("what's on today", null)).toEqual({ calendar: true, mail: true, tasks: true });
+    expect(dayWant("plan my tasks", "byte").tasks).toBe(true);
+    expect(dayWant("check my inbox", null).mail).toBe(true);
+  });
+  it("builds short plain text", () => {
+    const now = Date.UTC(2026, 9, 20, 15, 0);
+    const text = calendarText([{ title: "Load-in", start: now + 3600_000, end: now + 7200_000, allDay: false, location: "Hall B" }], "UTC", now);
+    expect(text).toContain("Load-in (Hall B)");
+    expect(calendarText([], "UTC", now)).toContain("nothing scheduled");
+    expect(dayMailText([{ from: "A\nB", subject: "Hi   there", date: "" }])).toContain("- A B: Hi there");
+    expect(dayMailText([])).toBe("Unread mail: none.");
+    expect(tasksText([{ text: "Pay rent", done: false }, { text: "Old", done: true }])).toBe("Open tasks (1):\n- Pay rent");
+  });
+});

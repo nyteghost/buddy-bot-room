@@ -2025,3 +2025,24 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .window-mode { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; }
   .window-mode:not(.window-mode-active) { display: none !important; }
 }
+.usage-meter { font-size: 10px; color: var(--muted-foreground); white-space: nowrap; }
+.conversation-footer { gap: 10px; flex-wrap: wrap; }
+
+/* Phones: a bottom tab bar, one window at a time. */
+.mobile-tabbar { display: none; }
+@media (max-width: 700px) {
+  .mobile-tabbar { display: grid; grid-template-columns: repeat(6, 1fr); position: sticky; bottom: 0; z-index: 70; background: var(--card); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
+  .mobile-tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; font-size: 10px; color: var(--muted-foreground); background: none; border: 0; }
+  .mobile-tabbar button svg { width: 18px; height: 18px; }
+  .mobile-tabbar button[aria-pressed="true"] { color: var(--primary); }
+  .workspace-sidebar { display: none; }
+  .workspace-frame, .sidebar-collapsed .workspace-frame { grid-template-columns: minmax(0, 1fr); }
+  .app-footer { display: none; }
+}
+.focus-mode .mobile-tabbar { display: none; }
+.mobile-modes { display: none; }
+@media (max-width: 700px) {
+  .mobile-modes { display: flex; gap: 4px; overflow-x: auto; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .mobile-modes button { flex: 0 0 auto; font-size: 11px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted-foreground); }
+  .mobile-modes button[aria-selected="true"] { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+}

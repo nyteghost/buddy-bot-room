@@ -169,6 +169,8 @@ import { setVoiceSettings, speakItems, stopSpeaking, useSpeakingId, useVoice, vo
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
+import { UsageMeter } from "@/components/usage-panel";
+import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
 import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
 import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
 
@@ -277,6 +279,10 @@ export function Room() {
   }, []);
   const [rounds, setRounds] = useState(2);
   const [judgeOn, setJudgeOn] = useState(false);
+  // "Short answers" per mode window: cheaper and quicker replies. Remembered on this device.
+  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
+  useEffect(() => { try { const v = JSON.parse(localStorage.getItem("pixel-pals-short-v1") ?? "null"); if (v && typeof v === "object") setShortOn((cur) => ({ ...cur, ...Object.fromEntries(ALL_MODES.map((m) => [m, v[m] === true])) })); } catch { /* optional storage */ } }, []);
+  const setShort = (m: Mode, on: boolean) => setShortOn((cur) => { const next = { ...cur, [m]: on }; try { localStorage.setItem("pixel-pals-short-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan").map((a) => a.id)); // Saiyan joins when you switch him on
   const direct = mode === "direct";
@@ -373,6 +379,14 @@ export function Room() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
+  function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
+    setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
+    setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
+    setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
+    setToolsOpen(false); setFunOpen(false); setSetupOpen(false); setSearchOpen(false); setRecorderOpen(false);
+    if (tab === "chat") showMode(mode);
+  }
   const [mailOpen, setMailOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -555,6 +569,27 @@ export function Room() {
         if (res.ok && json.hits?.length) docText = `${docText}\n\n${webContext(topic.trim(), json.hits.slice(0, 5))}`.trim();
       } catch { /* search is optional; carry on without it */ }
     }
+    // Real data (calendar, unread mail subjects, open tasks) only when this message asks for it.
+    const want = dayWant(topic, mentioned ?? (ask ? ask.partner : null));
+    let realCache: Promise<{ calendar: string; mail: string; tasks: string }> | null = null;
+    const loadReal = () => (realCache ??= (async () => {
+      const get = async (path: string) => { try { const r = await fetch(path, { signal: AbortSignal.timeout(10_000) }); return r.ok ? await r.json() : null; } catch { return null; } };
+      const [cal, mail] = await Promise.all([want.calendar ? get("/api/calendar?days=7") : null, want.mail ? get("/api/mail") : null]);
+      return {
+        calendar: want.calendar ? (cal?.configured ? calendarText(cal.items ?? [], cal.tz ?? "UTC") : "Calendar: not connected (Settings → Calendar).") : "",
+        mail: want.mail ? (mail?.configured ? mailText(mail.items ?? []) : "Mail: not connected (Settings → Mail).") : "",
+        tasks: want.tasks ? tasksText(getWorkbench().todos) : "",
+      };
+    })());
+    const realDataFor = async (id: AgentId): Promise<string | undefined> => {
+      if (!wantsAny(want)) return undefined;
+      const day = want.calendar && want.mail && want.tasks;
+      const r = await loadReal();
+      // A mentioned job pal gets just its own data; "my day" gives everyone the lot.
+      const parts = day ? [r.calendar, r.mail, r.tasks] : [id === "sage" || !mentioned ? r.calendar : "", id === "nova" || !mentioned ? r.mail : "", id === "byte" || !mentioned ? r.tasks : ""];
+      const text = parts.filter(Boolean).join("\n\n");
+      return text || undefined;
+    };
     try {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
@@ -601,6 +636,7 @@ export function Room() {
             ...(role ? { role } : {}),
             ...(side ? { side } : {}),
             ...(summary ? { summary: true } : {}),
+            ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
             memoryContext: promptContext(getWorkbench(), 1500, agent.id),
@@ -608,6 +644,7 @@ export function Room() {
             agentNote: notesNow[agent.id] ?? "",
             docContext: docText,
             linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
+            realData: await realDataFor(agent.id),
           };
           const fetchPrompt = async () => {
             const res = await fetch("/api/chat", {
@@ -1307,6 +1344,11 @@ export function Room() {
               </Dialog>
             </div>
           </div>
+          <div className="mobile-modes" role="tablist" aria-label="Conversation mode">
+            {ALL_MODES.map((m) => (
+              <button key={m} type="button" role="tab" aria-selected={m === wm} disabled={running && m !== wm} onClick={() => { setMode(m); setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, [m]: true }); }}>{modeLabel[m]}</button>
+            ))}
+          </div>
           <SavedDiscussions perMode openRequest={wm === mode ? historyRequest : 0} forkSignal={forkSignals[wm]} messages={msgs} mode={wm} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessagesIn(wm, items); setCharacterMode(theme); setMode(wm); setRound(0); setError(""); void discussionMode; }} />
           <div className="conversation-subhead">
             <span className="status-dot" />
@@ -1464,6 +1506,7 @@ export function Room() {
             <span>
               <Check size={12} /> AUTO-SAVED
             </span>
+            <UsageMeter />
           </footer>
                   <section className="workspace-composer" aria-label={`${modeLabel[wm]} message box`}>
             <button type="button" className="focus-options-btn" aria-expanded={focusOptions} onClick={() => setFocusOptions((v) => !v)}>{focusOptions ? "Hide options" : "Options"}</button>
@@ -1541,6 +1584,9 @@ export function Room() {
                   </div>
                 </div>
               )}
+              <label className="judge-toggle" title="Replies of 1–3 sentences: faster and cheaper">
+                <input type="checkbox" checked={shortOn[wm]} disabled={running} onChange={(e) => setShort(wm, e.target.checked)} /> Short answers
+              </label>
               {wm === "broadcast" && (
                 <label className="judge-toggle" title="After everyone answers, one pal ranks the answers and picks the best">
                   <input type="checkbox" checked={judgeOn} disabled={running} onChange={(e) => setJudgeOn(e.target.checked)} /> Judge picks the best
@@ -1870,6 +1916,14 @@ export function Room() {
           </main>
         </div>
       </div>
+      <nav className="mobile-tabbar" aria-label="Windows">
+        <button type="button" aria-pressed={conversationOpen} onClick={() => mobileTab("chat")}><MessageSquare /><span>Chat</span></button>
+        <button type="button" aria-pressed={todayOpen} onClick={() => mobileTab("today")}><Sun /><span>Today</span></button>
+        <button type="button" aria-pressed={tasksOpen} onClick={() => mobileTab("tasks")}><CheckSquare /><span>Tasks</span></button>
+        <button type="button" aria-pressed={notesOpen} onClick={() => mobileTab("notes")}><ListTodo /><span>Notes</span></button>
+        <button type="button" aria-pressed={roomOpen} onClick={() => mobileTab("room")}><Users /><span>Room</span></button>
+        <button type="button" aria-pressed={setupOpen} onClick={() => { mobileTab("chat"); setOpenModes((o) => ({ ...o, [mode]: false })); setSetupOpen(true); }}><Settings2 /><span>Settings</span></button>
+      </nav>
       <footer className="app-footer">
         <span>SMALL PIXELS. BIG PERSPECTIVES.</span>
         <span>

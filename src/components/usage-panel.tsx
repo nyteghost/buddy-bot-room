@@ -6,6 +6,18 @@ import { clearUsage, useUsage } from "@/lib/usage-store";
 const NAMES: Record<string, string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA NIM", anthropic: "Claude (paid)", custom: "Custom provider", "ollama-server": "Local AI" };
 const tok = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n));
 
+/** A one-line meter for the corner of a chat window: replies today and estimated spend this month. */
+export function UsageMeter() {
+  const engine = useEngine();
+  const entries = useUsage();
+  const now = new Date();
+  const { usd } = summarize(entries, now, { inPerM: engine.customPriceIn, outPerM: engine.customPriceOut });
+  const day = now.toDateString();
+  const today = entries.filter((e) => new Date(e.t).toDateString() === day).length;
+  const capped = engine.spendCapUsd > 0 && usd >= engine.spendCapUsd;
+  return <span className="usage-meter" title="Estimated from message length, kept in this browser. Free providers cost nothing; paid ones count toward your monthly cap.">{today} repl{today === 1 ? "y" : "ies"} today · {usd > 0 ? `about ${fmtUsd(usd)}` : "$0"} this month{capped ? " · CAP REACHED" : engine.spendCapUsd > 0 ? ` of $${engine.spendCapUsd}` : ""}</span>;
+}
+
 /** Estimated usage and spend this month, with an optional cap that switches paid providers off. */
 export function UsagePanel() {
   const engine = useEngine();
