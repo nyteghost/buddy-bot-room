@@ -2,7 +2,7 @@
 
 # Pixel Pals · Buddy Bot Room
 
-**A multi-model AI chat room where a cast of pixel-art characters talk your topic through, and an optional self-hosted hub for your Plex, Trakt, Seerr, Unraid and iPhone Notes.**
+**A multi-model AI chat room where a cast of pixel-art characters talk your topic through, backed by free or local AI, plus an optional self-hosted hub for your media, server, phone and calendar.**
 
 [Live app](https://buddy-bot-room.lovable.app) · [Self-hosting guide](docs/SELF_HOSTING.md) · [Architecture rules](AGENTS.md)
 
@@ -36,15 +36,38 @@
 
 ## 1. What is Pixel Pals?
 
-Pick a topic, choose a conversation mode, and watch seven pixel pals walk around their office, sit at desks and talk it out. Each pal runs on whichever AI engine you choose.
+Pixel Pals is a chat room where a cast of pixel-art pals, each running on an AI model of your choice, talk your topic through, and a private home hub that can look after the rest of your digital life. You can use it as a fun group chat with AIs, as a calm one-to-one assistant, or both.
 
-There are two ways to run it:
+### The chat room
 
-| | Lovable-hosted app | Self-hosted (Docker) |
+- **Eight pals** (seven classic pals plus Saiyan, who has real art for all eight facing directions) that walk the office in eight directions, sit at their desks and act out what they're doing. Each theme (Hellraiser, Matrix, Final Fantasy, Dev Team, Cyberpunk, Dungeon Crawler Carl, Linux and more) recasts them with new names, looks and personalities.
+- **Four ways to talk:** roundtable (they respond to each other), broadcast (independent answers), one-on-one, and problem solving (they debate and deliver a verdict). There is also a Dungeon Master mode with dice, and a blind model **Compare** mode.
+- **Chat with your files:** attach documents and the pals answer from them, finding passages by meaning when Local AI is available.
+- **Calm when you want it:** Focus mode strips the screen down to just the chat, there are light and dark colours and three text sizes, and the layout is built for phones as well as desktops.
+
+### Your AI, your choice (free by default)
+
+- **Free cloud keys:** a guided wizard helps you collect free API keys (Groq, Gemini, OpenRouter, NVIDIA and more) and spreads the pals across them.
+- **Local AI on your own machine:** a bundled Ollama detects your CPU, RAM and GPU, suggests models that fit, downloads them, and can choose the best installed model for each kind of task automatically (chat, code, reasoning, quick replies), or a model per pal.
+- **Optional paid providers** (Claude, or any OpenAI-compatible service) are off until you switch them on, carry a clear warning, and can be capped by a monthly spend limit.
+- **Works without a server too:** a small in-browser model is available on the hosted app.
+
+### A private hub for your home server (self-hosted)
+
+- **Media:** ask what to watch from Plex, Trakt and Jellyfin, request titles through Seerr, and (optionally) add to your Trakt watchlist from chat.
+- **Your server:** an Unraid watcher with phone alerts (ntfy), a morning brief, and nightly backups.
+- **Your phone:** a one-tap iPhone setup for Notes sync and the share sheet, a Telegram bot to message your pals from anywhere, and dictation through a built-in Whisper container.
+- **Automation:** scheduled tasks that ask the pals something at a set time and send the answer to your phone, and a `/status` check of every service.
+- **Work:** read-only Microsoft 365 calendar and unread mail subjects, summarised by Local AI only, so work content never goes to a cloud model.
+- **Safe by design:** built-in accounts with an owner, API keys and tokens stay on your server, anything that changes something outside the app only happens when you type the command, and unattended jobs never use paid providers.
+
+### Two ways to run it
+
+| | Lovable-hosted app | Self-hosted (Docker / Portainer) |
 |---|---|---|
 | Where | https://buddy-bot-room.lovable.app | Your own server or PC |
 | Sign-in | Optional Google sign-in | Built-in accounts (no outside service) |
-| Plex / Trakt / Seerr / Unraid / backups / brief | Not available | Yes (everything in section 7 and 8) |
+| Local AI, hub features, scheduled tasks, Telegram, dictation, backups | Not available | Yes (sections 5, 7 and 8) |
 | Default AI | Lovable AI | Ollama or your own free API keys |
 
 Everything from section 2 onward is about the **self-hosted** build unless noted.
