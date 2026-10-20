@@ -4,7 +4,7 @@ import { logServer } from "./server-log.server";
 
 /**
  * Server-side saved chats for the self-hosted build: one JSON file in BUDDY_DATA_DIR (a Docker volume).
- * Only active when BUDDY_DATA_DIR is set, so Lovable's cloud build never touches the filesystem.
+ * Only active when BUDDY_DATA_DIR is set, so a plain build never touches the filesystem.
  * node:fs is loaded lazily through a computed specifier so bundlers don't try to resolve it for other targets.
  */
 const MAX_CHATS = 300;

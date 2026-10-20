@@ -81,7 +81,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "A little room for big ideas. Bring pixel AI characters together to discuss your topic.",
       },
-      { name: "author", content: "Lovable" },
       { property: "og:title", content: "Pixel Pals Chat" },
       {
         property: "og:description",
@@ -89,7 +88,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
       { name: "theme-color", content: "#14121f" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },

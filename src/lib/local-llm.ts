@@ -276,7 +276,7 @@ export async function localTurn(
   });
 }
 
-/** Free browser voice used when the pals aren't on Lovable AI. */
+/** Free browser voice used when no cloud voice is set up. */
 export function speakFree(text: string, signal: AbortSignal) {
   return new Promise<void>((resolve) => {
     if (typeof speechSynthesis === "undefined") return resolve();

@@ -4,7 +4,7 @@
 
 **A multi-model AI chat room where a cast of pixel-art characters talk your topic through, backed by free or local AI, plus an optional self-hosted hub for your media, server, phone and calendar.**
 
-[Live app](https://buddy-bot-room.lovable.app) · [Self-hosting guide](docs/SELF_HOSTING.md) · [Architecture rules](AGENTS.md)
+[Self-hosting guide](docs/SELF_HOSTING.md) · [Architecture rules](AGENTS.md)
 
 </div>
 
@@ -61,16 +61,7 @@ Pixel Pals is a chat room where a cast of pixel-art pals, each running on an AI 
 - **Work:** read-only Microsoft 365 calendar and unread mail subjects, summarised by Local AI only, so work content never goes to a cloud model.
 - **Safe by design:** built-in accounts with an owner, API keys and tokens stay on your server, anything that changes something outside the app only happens when you type the command, and unattended jobs never use paid providers.
 
-### Two ways to run it
-
-| | Lovable-hosted app | Self-hosted (Docker / Portainer) |
-|---|---|---|
-| Where | https://buddy-bot-room.lovable.app | Your own server or PC |
-| Sign-in | Optional Google sign-in | Built-in accounts (no outside service) |
-| Local AI, hub features, scheduled tasks, Telegram, dictation, backups | Not available | Yes (sections 5, 7 and 8) |
-| Default AI | Lovable AI | Ollama or your own free API keys |
-
-Everything from section 2 onward is about the **self-hosted** build unless noted.
+Pixel Pals runs self-hosted (Docker / Portainer) on your own server or PC, with built-in accounts and no outside sign-in service.
 
 ---
 
@@ -169,7 +160,6 @@ Open **Free keys** (or *AI engine*) in the top bar. Pick one engine or let **Aut
 
 | Engine | Where to get it | Notes |
 |---|---|---|
-| **Lovable AI** | Built in | Only works on Lovable's hosting, not self-hosted |
 | **Groq** | https://console.groq.com/keys | Free tier, very fast |
 | **Gemini** | https://aistudio.google.com/app/apikey | Free tier |
 | **OpenRouter** | https://openrouter.ai/keys | Has free models |
@@ -786,7 +776,7 @@ bun run dev          # http://localhost:8080
 bunx vitest run      # tests
 ```
 
-**Stack:** TanStack Start (React 19, Vite, SSR), Tailwind CSS v4, shadcn/ui, Tauri for the desktop build, exceljs / xlsx / pdf.js for the work tools. The default build targets Cloudflare Workers on Lovable; the Docker image runs the same code on Node with `BUDDY_SELF_HOSTED=1`.
+**Stack:** TanStack Start (React 19, Vite, SSR), Tailwind CSS v4, shadcn/ui, Tauri for the desktop build, exceljs / xlsx / pdf.js for the work tools. The Docker image runs on Node with `BUDDY_SELF_HOSTED=1`.
 
 ```text
 src/
@@ -802,13 +792,7 @@ packaging/         install scripts and desktop build notes
 
 See [`AGENTS.md`](AGENTS.md) for architecture rules and [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) for extended self-hosting notes.
 
----
 
-<div align="center">
-
-Built with [Lovable](https://lovable.dev) · edit in the [Lovable editor](https://lovable.dev/projects/12804d65-d2a1-4f59-8779-f480d1faa8f1) · changes sync both ways with GitHub.
-
-</div>
 
 ### Google Calendar for shifts (self-hosted)
 Settings → Google Calendar takes a Client ID and secret from your own Google Cloud project (OAuth client type "Web application", scope `calendar.events`, app published "In production" so the key doesn't expire after 7 days). Add the redirect URI `https://<your-https-address>/api/google/callback`. Then Work tools → My shifts → **Connect Google Calendar** once; after that **Add or update in Google Calendar** pushes with fixed event ids (no copies). The refresh token is kept in `google-token.json` in the data volume and is left out of backups. Without the keys, the `.ics` download still works.

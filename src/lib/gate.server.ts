@@ -1,6 +1,6 @@
 /**
  * Optional shared-password gate for the self-hosted build.
- * Set BUDDY_PASSWORD in the server environment to turn it on; unset (Lovable, local dev) it does nothing.
+ * Set BUDDY_PASSWORD in the server environment to turn it on; unset (local dev) it does nothing.
  * The cookie holds a SHA-256 of the password, never the password itself, and is HttpOnly.
  */
 import { readCookie, safeEqual } from "./cookies";

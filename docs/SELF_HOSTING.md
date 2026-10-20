@@ -53,14 +53,14 @@ bun run dev --host 0.0.0.0 --port 8090
 Put the same variables in `.env.local` (bun loads it automatically).
 
 ## The AI engine
-The default "Lovable AI" engine only works on Lovable's hosting. Self-hosted, pick **Ollama** or add a
+Pick **Ollama** or add a
 free Groq/Gemini/OpenRouter/NVIDIA key in AI engine settings. Ollama is called by your **browser**, so the
 URL must be reachable from the machine you browse on, and Ollama needs
 `OLLAMA_ORIGINS="*" OLLAMA_HOST=0.0.0.0 ollama serve`.
 
 ## Sign-in
 
-The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Dockerfile). Lovable's Google sign-in can't redirect back to a LAN address, so the button is replaced by the built-in accounts (or a "Local mode" label when accounts are off) (or your own account once you create one, see below). Engine settings, keys and theme are saved in the browser instead of an account. Sign-in still works on the Lovable-hosted app.
+The Docker build runs in **Local mode** (`BUDDY_SELF_HOSTED=1`, set in the Dockerfile). Sign-in uses the built-in accounts (or a "Local mode" label when accounts are off) (or your own account once you create one, see below). Engine settings, keys and theme are saved in the browser instead of an account.
 
 ## Password, health, logs and saved chats
 

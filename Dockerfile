@@ -2,7 +2,7 @@
 #   docker compose up -d --build     -> http://<this-machine>:8090
 #
 # Targets:
-#   dev  (default)  Vite dev server. The reliable way to run this app away from Lovable's hosting.
+#   dev  (default)  Vite dev server. The way this app is run self-hosted.
 #   prod            EXPERIMENTAL Node production build. The project builds for Cloudflare Workers by
 #                   default, so this forces Nitro's node-server preset. Try it with
 #                   BUDDY_TARGET=prod docker compose up -d --build

@@ -9,6 +9,6 @@ Goal: edit this app with Claude and build it with a plain Vite config, without L
 | 3 | Drop `integrations/lovable/appUserConnector.ts` and the Lovable-connector calendar paths (`calendar.functions.ts`, `api/oauth/google/return.ts`, popup in `work-tools.tsx`); the self-hosted Google Calendar flow replaces them | medium | done |
 | 4 | Drop the Lovable AI gateway helpers (`lib/ai/*`, used by `chat.server.ts`) and `LOVABLE_API_KEY` speech/transcribe paths | medium | done |
 | 5 | Replace `@lovable.dev/vite-tanstack-config` in `vite.config.ts` with the plain plugins it wraps | highest | todo |
-| 6 | Remove the `.lovable/` folder, Lovable lines in README/AGENTS.md, and the npm packages | low | todo |
+| 6 | Remove the `.lovable/` folder, Lovable lines in README/AGENTS.md, and the npm packages | low | mostly done (packages and AGENTS note remain) |
 
 Do step 5 last: it changes how everything builds, so it needs a real build check on the server.

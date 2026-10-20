@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { History, Plus, Trash2, Check, Pin, PinOff, Pencil, Search, Share2 } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import type { RoomMessage, Mode } from "@/lib/agents";
@@ -8,8 +7,6 @@ import type { CharacterMode } from "@/lib/hellraiser";
 import { chatTitle, type SavedDiscussion } from "@/lib/saved-discussions";
 import { deleteLocalOrServer, listLocalOrServer, saveLocalOrServer, shareOnServer, storeWhere } from "@/lib/chat-store";
 import { displayTitle, filterRows, renameChat, sortRows, togglePin, updateChatMeta, useChatMeta } from "@/lib/chat-meta";
-import { useSession } from "@/hooks/use-session";
-import { deleteCloudDiscussion, loadAccount, saveCloudDiscussion } from "@/lib/account.functions";
 
 const baseActiveKey = "pixel-pals-active-chat-v1";
 
@@ -24,11 +21,6 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
   onOpen: (messages: RoomMessage[], theme: CharacterMode, mode: Mode) => void;
 }) {
   const activeKey = perMode ? `${baseActiveKey}:${mode}` : baseActiveKey;
-  const session = useSession();
-  const signedIn = !!session;
-  const load = useServerFn(loadAccount);
-  const saveRemote = useServerFn(saveCloudDiscussion);
-  const deleteRemote = useServerFn(deleteCloudDiscussion);
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<SavedDiscussion[]>([]);
   const [id, setId] = useState<string>();
@@ -59,31 +51,27 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
   }
 
   async function list(): Promise<SavedDiscussion[]> {
-    if (!signedIn) return listLocalOrServer();
-    return (await load()).discussions.map((d) => ({ ...d, messages: JSON.parse(d.messages) })) as SavedDiscussion[];
+    return listLocalOrServer();
   }
 
   // Auto-save once a reply finishes (not mid-stream).
   useEffect(() => {
-    if (running || !messages.length || session === undefined) return;
+    if (running || !messages.length) return;
     const sig = `${id}:${messages.length}:${messages[messages.length - 1]?.id}:${theme}:${mode}`;
     if (sig === lastSaved.current) return;
     const t = setTimeout(async () => {
       const rowId = id ?? crypto.randomUUID();
       const title = chatTitle(messages);
       try {
-        if (signedIn) await saveRemote({ data: { id: rowId, title, theme, mode, messages } });
-        else {
-          const row: SavedDiscussion = { id: rowId, title, messages, theme, mode, updatedAt: new Date().toISOString() };
-          await saveLocalOrServer(row);
-        }
+        const row: SavedDiscussion = { id: rowId, title, messages, theme, mode, updatedAt: new Date().toISOString() };
+        await saveLocalOrServer(row);
         lastSaved.current = `${rowId}:${messages.length}:${messages[messages.length - 1]?.id}:${theme}:${mode}`;
         if (!id) pick(rowId);
-        setError(""); setStatus(signedIn ? "Saved to your account" : where === "server" ? "Saved on the server" : "Saved in this browser");
+        setError(""); setStatus(where === "server" ? "Saved on the server" : "Saved in this browser");
       } catch (e) { setError(e instanceof Error ? e.message : "Could not save this chat."); }
     }, 800);
     return () => clearTimeout(t);
-  }, [messages, running, theme, mode, id, signedIn, session]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [messages, running, theme, mode, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { void storeWhere().then(setWhere); }, []);
   useEffect(() => {
@@ -104,13 +92,13 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
   return <div className="saved-toolbar">
     <Button size="sm" variant="outline" disabled={running} onClick={showPanel}><History size={14} /> Chats</Button>
     <Button size="sm" variant="ghost" disabled={running} onClick={newChat}><Plus size={14} /> New chat</Button>
-    <span className="save-status" role="status">{status ? <><Check size={12} /> {status}</> : signedIn ? "Chats save to your account automatically." : where === "server" ? "Chats save automatically on your server." : "Chats save automatically. Sign in to see them on other devices."}</span>
+    <span className="save-status" role="status">{status ? <><Check size={12} /> {status}</> : where === "server" ? "Chats save automatically on your server." : "Chats save automatically in this browser."}</span>
     {error && <p role="alert" className="text-destructive text-xs w-full">{error}</p>}
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent side="left" className="history-panel">
         <SheetHeader>
           <SheetTitle>Your chats</SheetTitle>
-          <SheetDescription>{signedIn ? "Synced to your account — available on any device you sign in on." : where === "server" ? "Saved on your server. With accounts, each chat is private to you unless you share it (the share icon)." : "Saved in this browser. Sign in to sync across devices."}</SheetDescription>
+          <SheetDescription>{where === "server" ? "Saved on your server. With accounts, each chat is private to you unless you share it (the share icon)." : "Saved in this browser. Sign in to sync across devices."}</SheetDescription>
         </SheetHeader>
         <Button size="sm" className="mx-4" onClick={newChat}><Plus size={14} /> New chat</Button>
         <label className="saved-search mx-4">
@@ -132,8 +120,7 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
             <Button size="icon" variant="ghost" aria-label={`Delete ${row.title}`} onClick={async () => {
               if (!window.confirm(`Delete “${row.title}”?`)) return;
               try {
-                if (signedIn) await deleteRemote({ data: { id: row.id } });
-                else await deleteLocalOrServer(row.id);
+                await deleteLocalOrServer(row.id);
                 setRows((r) => r.filter((x) => x.id !== row.id));
                 if (id === row.id) newChat();
               } catch (e) { setError(e instanceof Error ? e.message : "Could not delete."); }
