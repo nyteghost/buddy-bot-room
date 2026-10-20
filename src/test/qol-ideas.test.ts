@@ -3,6 +3,7 @@ import { cosine, candidateChunks, rerank } from "@/lib/embed-rerank";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { bestMatch, parseWrite, pollSeconds, syncBody } from "@/lib/trakt-write";
 import { agents, agentPersona, agentName, resolveMention } from "@/lib/agents";
+import { eventsText, mailText, parseM365, shapeEvents, shapeMail, summaryPrompt } from "@/lib/m365";
 import { servicesReport } from "@/lib/status";
 import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, MAX_SCHEDULES } from "@/lib/schedules";
 import { clampBudget, trimTranscript, DEFAULT_CONTEXT_CHARS, MIN_CONTEXT_CHARS, MAX_CONTEXT_CHARS } from "@/lib/context-trim";
@@ -1467,5 +1468,25 @@ describe("Saiyan, the eighth pal", () => {
   it("can be @mentioned", () => {
     expect(resolveMention("@saiyan help me plan", "normal")).toBe("saiyan");
     expect(resolveMention("@goals set a target", "linux")).toBe("saiyan");
+  });
+});
+
+describe("Microsoft 365 (read-only)", () => {
+  it("understands the commands", () => {
+    expect(parseM365("connect")).toBe("connect");
+    expect(parseM365("calendar")).toBe("today");
+    expect(parseM365("inbox")).toBe("mail");
+    expect(parseM365("")).toBe("status");
+    expect(parseM365("something odd")).toBe("status");
+  });
+  it("shapes events and mail and never asks for bodies", () => {
+    const ev = shapeEvents({ value: [{ subject: "Standup", start: { dateTime: "2026-10-20T09:30:00.0000000" }, end: { dateTime: "2026-10-20T09:45:00.0000000" }, location: { displayName: "Teams" }, isAllDay: false }, { subject: "Offsite", start: { dateTime: "2026-10-20T00:00:00" }, end: { dateTime: "2026-10-21T00:00:00" }, isAllDay: true }] });
+    expect(eventsText(ev)).toBe("• 09:30–09:45  Standup (Teams)\n• All day  Offsite");
+    const mail = shapeMail({ value: [{ subject: "Invoice", from: { emailAddress: { name: "Ann", address: "a@x.test" } }, body: { content: "SECRET" } }] });
+    expect(mailText(mail)).toContain("Ann: Invoice");
+    expect(JSON.stringify(mail)).not.toContain("SECRET");
+    expect(shapeEvents(null)).toEqual([]);
+    expect(eventsText([])).toContain("Nothing");
+    expect(summaryPrompt(ev, mail)).toContain("Standup");
   });
 });

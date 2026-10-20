@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -230,6 +230,8 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/search <query>` · `/research <question>` | Web search · search then discuss |
 | `/plex <title\|recent>` · `/watch [mood]` | Plex lookup · "what should we watch tonight" |
 | `/trakt [lists\|<list>]` · `/next [list:name] [mood]` | Trakt lists · pals pick from a list |
+| `/trakt connect\|status\|add <title>\|watched <title>\|remove <title>` | Change your Trakt (owner only, [7.4](#74-trakt)) |
+| `/m365 today\|mail\|summary\|connect\|disconnect` | Read-only work calendar and unread mail subjects ([7.11](#711-microsoft-365-work-read-only)) |
 | `/request <title> [4k]` (or `@seerr`) | Request a title in Seerr |
 | `/library <title\|recent>` | Jellyfin lookup |
 | `/server` · `/diagnose` | Unraid status · pals look at it and advise |
@@ -306,6 +308,12 @@ Pixel Pals reads your Trakt lists **directly from Trakt's API** (no Plex needed 
    - `/trakt lists` shows your lists and their short names; `/trakt <list>` shows one.
    - `/next` (or `/next list:name cozy`) has the pals choose. Movies you've already watched are skipped when your history is public.
    - **With Plex also set**, each item is marked **📺 in Plex** or *not in Plex*, and the pals prefer what you can watch right now. For anything not in Plex use `/request <title>` to open the Seerr dialog.
+
+**Adding to Trakt from chat (optional write access):** by default Pixel Pals only reads Trakt. To let the owner account change it, set `TRAKT_CLIENT_SECRET` (from the same app at trakt.tv/oauth/applications) and redeploy, then:
+
+- `/trakt connect` → open the link, enter the code, approve. `/trakt status` confirms.
+- `/trakt add <title>` adds to your watchlist, `/trakt watched <title>` marks it watched, `/trakt remove <title>` takes it off the watchlist. The reply names exactly what it matched (for example *Dune (2021) — movie*), so you can correct a wrong guess with a more exact title.
+- Writes only happen when **you** type the command, never from a pal's reply. The login is stored in the data volume (`trakt-auth.json`) and is also used to read private lists.
 
 ### 7.5 Jellyfin
 
@@ -400,6 +408,29 @@ Send any text or link from any app straight into Pixel Pals' message box.
 3. Add **Open URLs** with `https://<your-address>/?q=` followed by the encoded text.
 
 Whatever you share lands in the message box, ready to send (nothing is sent automatically). You must already be signed in. iOS opens the link in Safari, not the installed home-screen app.
+
+### 7.10 Mac Notes helper
+
+For a Mac, `tools/mac-helper/notes-sync.sh` does what the iPhone Shortcut does ([7.8](#78-iphone-notes--trakt-sync)): it reads **one** Apple Note you name, sends it to your server and writes the updated text back. It reads nothing else on the Mac, and Messages are deliberately not touched.
+
+```bash
+PP_URL="https://pixelpals.example.com" PP_TOKEN="pp_..." PP_NOTE="Watchlist" ./tools/mac-helper/notes-sync.sh
+```
+
+Use your access token from *Connect iPhone*. Try it with `PP_DRY=1` first (prints the result without changing the note). The first run asks to let Terminal control Notes (System Settings → Privacy & Security → Automation). To run it daily, put the command in a `launchd` job or `cron`. It was written without a Mac to test on, so check the dry run before trusting it with a note you care about.
+
+### 7.11 Microsoft 365 (work, read-only)
+
+See today's **work calendar** and the **subjects of unread mail**, from chat. Nothing is ever sent, created or changed, and mail bodies are never requested.
+
+1. In the Azure portal (**Microsoft Entra ID → App registrations → New registration**) create an app, then under **Authentication** turn on **Allow public client flows**. Add the delegated Microsoft Graph permissions `User.Read`, `Calendars.Read` and `Mail.ReadBasic`.
+2. Set `M365_CLIENT_ID` to the app's *Application (client) ID* (and `M365_TENANT` if you want to limit it to your organisation's tenant id; default `organizations`) and redeploy.
+3. Run `/m365 connect`, open the link, enter the code and sign in with your work account.
+
+Commands: `/m365 today`, `/m365 mail`, `/m365 summary`, `/m365 status`, `/m365 disconnect`. Owner only.
+
+- `/m365 summary` asks **Local AI (Ollama) only**, so work content never goes to a cloud model, free or paid. If Local AI isn't available you just get the plain lists.
+- **Check your organisation's rules first.** Many workplaces require an admin to approve new apps, or forbid connecting work data to personal servers. Don't set this up against a work account if that's not allowed. The sign-in token is saved in the data volume (`m365-auth.json`); `/m365 disconnect` deletes it.
 
 ---
 
@@ -567,6 +598,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
+| `TRAKT_CLIENT_SECRET` | empty | Only for `/trakt connect` (write access) |
+| `M365_CLIENT_ID` / `M365_TENANT` | empty / `organizations` | Microsoft 365 read-only ([7.11](#711-microsoft-365-work-read-only)) |
 | `COMPOSE_PROFILES` | empty | `voice` starts the Whisper dictation container |
 | `WHISPER_URL` | `http://whisper:8000` | Speech server for the microphone button |
 | `WHISPER_MODEL` / `WHISPER_IMAGE` | small model / CPU image | What the Whisper container runs |

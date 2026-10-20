@@ -673,6 +673,16 @@ export function Room() {
         })();
         return;
       }
+      case "m365": {
+        void (async () => {
+          try {
+            const res = await fetch("/api/m365", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: action.op }) });
+            const json = (await res.json()) as { text?: string; error?: string };
+            say(command, json.text ?? json.error ?? "Nothing came back.");
+          } catch { say(command, "I couldn't reach the server."); }
+        })();
+        return;
+      }
       case "schedule": {
         void (async () => {
           try {

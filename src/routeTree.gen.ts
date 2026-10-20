@@ -14,6 +14,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiM365RouteImport } from './routes/api.m365'
 import { Route as ApiTraktWriteRouteImport } from './routes/api.trakt-write'
 import { Route as ApiSttRouteImport } from './routes/api.stt'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
@@ -59,6 +60,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiM365Route = ApiM365RouteImport.update({
+  id: '/api/m365',
+  path: '/api/m365',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTraktWriteRoute = ApiTraktWriteRouteImport.update({
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/m365': typeof ApiM365Route
   '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
   '/api/schedules': typeof ApiSchedulesRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/m365': typeof ApiM365Route
   '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
   '/api/schedules': typeof ApiSchedulesRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/m365': typeof ApiM365Route
   '/api/trakt-write': typeof ApiTraktWriteRoute
   '/api/stt': typeof ApiSttRoute
   '/api/schedules': typeof ApiSchedulesRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/m365'
     | '/api/trakt-write'
     | '/api/stt'
     | '/api/schedules'
@@ -288,6 +298,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/m365'
     | '/api/trakt-write'
     | '/api/stt'
     | '/api/schedules'
@@ -316,6 +327,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/m365'
     | '/api/trakt-write'
     | '/api/stt'
     | '/api/schedules'
@@ -345,6 +357,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiM365Route: typeof ApiM365Route
   ApiTraktWriteRoute: typeof ApiTraktWriteRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
@@ -403,6 +416,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/m365': {
+      id: '/api/m365'
+      path: '/api/m365'
+      fullPath: '/api/m365'
+      preLoaderRoute: typeof ApiM365RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/trakt-write': {
@@ -561,6 +581,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiM365Route: ApiM365Route,
   ApiTraktWriteRoute: ApiTraktWriteRoute,
   ApiSttRoute: ApiSttRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,

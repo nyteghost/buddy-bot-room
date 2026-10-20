@@ -43,18 +43,19 @@ function modelFor(p: TurnProvider): { base: string; model: string; key: string }
 
 export type AskResult = { ok: true; text: string; via: string } | { ok: false; error: string };
 
-export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number } = {}): Promise<AskResult> {
+export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean } = {}): Promise<AskResult> {
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
   const s = engineFromJson(raw);
-  const chain: TurnProvider[] = s.kind === "local-server" ? [localServerProvider(s, { text: prompt })] : turnProviders(s, true).filter((p) => modelFor(p));
-  if (s.kind !== "local-server" && ollamaBase() && s.localChat) chain.push(localServerProvider(s, { text: prompt }));
-  if (!chain.length) return { ok: false, error: "No free key or Local AI is saved for the owner account. Add one in engine settings." };
+  const local = s.kind === "local-server" || opts.localOnly === true;
+  const chain: TurnProvider[] = local ? [] : turnProviders(s, true).filter((p) => modelFor(p));
+  if ((local || chain.length) && ollamaBase() && s.localChat) chain.push(localServerProvider(s, { text: prompt }));
+  if (!chain.length) return { ok: false, error: opts.localOnly ? "This needs Local AI (Ollama) on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
 
   let system = opts.system ?? "You are the Pixel Pals assistant answering a scheduled or phone request for the owner. Reply in plain text, no markdown headings, under 150 words unless asked for more. Be concrete. If you don't know something current, say so instead of guessing.";
   system += `\nNow: ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`;
   let user = prompt;
-  if (wantsWeb(prompt)) {
+  if (!opts.localOnly && wantsWeb(prompt)) {
     try {
       const res = await handleSearch(new Request(`http://local/api/search?q=${encodeURIComponent(prompt.slice(0, 200))}`));
       const json = (await res.json()) as { hits?: SearchHit[] };
