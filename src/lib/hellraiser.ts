@@ -2,7 +2,6 @@ import { useSyncExternalStore } from "react";
 
 const key = "pixel-pals-hellraiser-v1";
 const characterKey = "pixel-pals-character-mode-v1";
-const assistantKey = "pixel-pals-assistant-mode-v1";
 // "assistant" is kept only so old saved discussions/settings still load; it maps to Linux theme + Assistant on.
 export const characterModes = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux", "assistant"] as const;
 export type CharacterMode = (typeof characterModes)[number];
@@ -18,10 +17,9 @@ if (typeof window !== "undefined") {
     currentMode = isCharacterMode(saved)
       ? saved
       : localStorage.getItem(key) === "1" ? "hellraiser" : "normal";
-    const savedAssistant = localStorage.getItem(assistantKey);
-    // Legacy: Linux/Assistant used to be the only assistant themes.
-    assistantOn = savedAssistant === null ? isAssistantFamily(currentMode) : savedAssistant === "1";
+    // The office look is just the Linux theme now; the separate Assistant switch is gone (@mail, @tasks and @calendar always work).
     if (currentMode === "assistant") currentMode = "linux";
+    assistantOn = isAssistantFamily(currentMode);
   } catch { /* storage unavailable */ }
 }
 const emit = () => listeners.forEach((l) => l());
@@ -30,11 +28,9 @@ export function setHellraiser(value: boolean) {
   setCharacterMode(value ? "hellraiser" : "normal");
 }
 export function setCharacterMode(value: CharacterMode) {
-  if (value === "assistant") {
-    value = "linux";
-    setAssistantMode(true);
-  }
+  if (value === "assistant") value = "linux";
   currentMode = value;
+  assistantOn = isAssistantFamily(value);
   try {
     localStorage.setItem(characterKey, value);
     localStorage.setItem(key, value === "hellraiser" ? "1" : "0");
@@ -43,14 +39,10 @@ export function setCharacterMode(value: CharacterMode) {
   }
   emit();
 }
+/** Kept for old commands: "assistant on" now picks the Linux (office) theme, "off" goes back to Normal. */
 export function setAssistantMode(value: boolean) {
-  assistantOn = value;
-  try {
-    localStorage.setItem(assistantKey, value ? "1" : "0");
-  } catch {
-    /* storage unavailable */
-  }
-  emit();
+  if (value) setCharacterMode("linux");
+  else if (currentMode === "linux") setCharacterMode("normal");
 }
 export function useAssistantMode() {
   return useSyncExternalStore(

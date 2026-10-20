@@ -94,7 +94,7 @@ export const slashCommands = [
   { name: "mode", usage: "/mode <roundtable|broadcast|direct|solve|debate>", description: "Switch conversation mode" },
   { name: "rounds", usage: `/rounds <${MIN_ROUNDS}-${MAX_ROUNDS}>`, description: "How many rounds the pals debate" },
   { name: "theme", usage: "/theme <name>", description: "Swap the whole cast" },
-  { name: "assistant", usage: "/assistant [on|off]", description: "Turn Assistant Mode on or off" },
+  { name: "assistant", usage: "/assistant [on|off]", description: "Office look on or off (same as /theme linux)" },
   { name: "clear", usage: "/clear", description: "Start a fresh conversation" },
   { name: "stop", usage: "/stop", description: "Stop the current discussion" },
   { name: "export", usage: "/export", description: "Download this chat as Markdown" },

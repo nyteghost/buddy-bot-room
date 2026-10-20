@@ -372,6 +372,7 @@ export function Room() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -399,13 +400,18 @@ export function Room() {
         if (saved.openModes && typeof saved.openModes === "object") setOpenModes({ ...defaultOpenModes, ...Object.fromEntries(ALL_MODES.map((m) => [m, saved.openModes[m] === true])) });
         else setOpenModes({ ...defaultOpenModes, roundtable: saved.conversationOpen !== false });
         setSidebarCompact(saved.sidebarCompact === true);
-      } else if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
+        if (saved.todayOpen !== undefined) setTodayOpen(saved.todayOpen === true);
+      } else {
+        // First visit: Today is the front page.
+        setTodayOpen(true);
+        if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
+      }
     } catch { /* optional layout preferences */ }
   }, []);
   useEffect(() => {
     if (!ready) return;
-    try { localStorage.setItem("pixel-pals-workspace-v1", JSON.stringify({ roomOpen, openModes, sidebarCompact })); } catch { /* optional storage */ }
-  }, [roomOpen, openModes, sidebarCompact, ready]);
+    try { localStorage.setItem("pixel-pals-workspace-v1", JSON.stringify({ roomOpen, openModes, sidebarCompact, todayOpen })); } catch { /* optional storage */ }
+  }, [roomOpen, openModes, sidebarCompact, todayOpen, ready]);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
@@ -596,7 +602,7 @@ export function Room() {
             ...(side ? { side } : {}),
             ...(summary ? { summary: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
-            assistant: assistantRef.current,
+            assistant: assistantRef.current || !!ask || !!mentioned,
             memoryContext: promptContext(getWorkbench(), 1500, agent.id),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
@@ -1159,8 +1165,6 @@ export function Room() {
     { id: "chat-compare", group: "Chat", label: "Compare models (blind test)", run: () => { setCompareQuestion(""); setCompareOpen(true); } },
     ...modeNames.map((m): PaletteAction => ({ id: `mode-${m}`, group: "Mode", label: `Mode: ${m}`, run: () => { setMode(m as Mode); showMode(m as Mode); } })),
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
-    { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
-    { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
     { id: "appearance-light", group: "View", label: "Appearance: light colours", keywords: "light mode bright theme", run: () => runSlash({ type: "appearance", words: "light" }, "/appearance light") },
     { id: "appearance-dark", group: "View", label: "Appearance: dark colours", keywords: "dark mode", run: () => runSlash({ type: "appearance", words: "dark" }, "/appearance dark") },
@@ -1612,10 +1616,7 @@ export function Room() {
               <SelectItem value="linux">Linux Theme</SelectItem>
             </SelectContent>
           </Select>
-          <label className="assistant-toggle" title="Pals act as your assistants for mail, tasks, calendar, notes, Q&A and system">
-            <Switch checked={assistantOn} disabled={running} onCheckedChange={setAssistantMode} aria-label="Assistant Mode" />
-            <span>Assistant</span>
-          </label>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="About this room">
@@ -1658,19 +1659,20 @@ export function Room() {
             <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : <Swords />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
           ))}
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
-          <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes and memories" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Fun: Dungeon Master campaigns" aria-pressed={funOpen} onClick={() => setFunOpen((value) => !value)}><Gamepad2 /><span>Fun</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Search chats, notes, tasks and reminders" aria-pressed={searchOpen} onClick={() => setSearchOpen((value) => !value)}><Search /><span>Search</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Copy a bug report for Claude" onClick={() => setLogOpen(true)}><Bug /><span>Debug log</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Work tools, recorder, compare models and the debug log" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More</span></Button>
+          {moreOpen && <>
+          <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Copy a bug report for Claude" onClick={() => setLogOpen(true)}><Bug /><span>Debug log</span></Button>
+          </>}
           <div className="sidebar-divider" />
-          <Button variant="ghost" className="sidebar-item" title="Saved chats" disabled={running} onClick={() => { setConversationOpen(true); setHistoryRequest((value) => value + 1); }}><History /><span>Saved chats</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
