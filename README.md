@@ -133,11 +133,13 @@ Your data lives in the `buddy-data` volume and survives updates.
 - **Seven pixel pals, plus Saiyan** with hand-drawn sprites that walk, sit at desks and act out tasks. In the Linux/Assistant office they walk in all eight directions and lean, shrink and grow slightly as they turn.
 - **Saiyan** (the eighth pal, a cyberpunk dragon-ball fan: "the power-up", motivation and goals) has real art for every facing direction, so he turns to face where he is walking and shows his back at a desk. He is **off by default**; switch him on under *The pals*. Mention him with `@saiyan` or `@goals`. Art lives in `src/assets/pals/saiyan/` (`north.png` … `south-west.png`); replace those eight files to change him.
 - **Themes** swap the entire cast (names, looks, personalities, room): Normal, Hellraiser, Horror, Matrix, Final Fantasy, Dev Team, Cyberpunk, Dungeon Crawler Carl and Linux.
-- **Conversation modes:**
-  - *Roundtable*: pals respond to each other.
-  - *Broadcast*: independent answers.
-  - *One-on-one*: talk to a single pal.
-  - *Problem solving*: pals debate and deliver a verdict (with confetti).
+- **Conversation modes**, each in its own window with its own chat and message box (open them from the left menu; one answers at a time):
+  - *Roundtable*: pals respond to each other, then the lead pal gives a verdict (Agreed / Disputed / Verdict).
+  - *Broadcast*: every pal answers on their own. Tick "Judge picks the best" and one pal ranks the answers.
+  - *One-on-one*: a private chat with one pal. The menu shows which AI each pal uses, like "Nova (Groq · gpt-oss-120b)".
+  - *Problem solving*: a team with roles (Diagnoser, Fixer, Skeptic) that ends in a plan (Best approach / Steps / Watch out). The "Add these steps to Tasks" button on the plan puts the steps on your task list.
+  - *Debate*: two pals argue for and against your claim and a third judges who argued better.
+  - Every window has **Keep going** (one more step) and **Summarize** (a short recap of that chat). `/mode debate` etc. opens the window.
 - **Rounds**: how many times the pals go around (1–5).
 - **@mentions** talk to one pal directly: `@calendar`, `@gmail`, `@notes`, `@system`, `@terminal`, `@deck`, `@price`, `@gear`, `@seerr`, `@record`.
 - **Assistant Mode** turns any cast into office helpers while keeping their names and voices.

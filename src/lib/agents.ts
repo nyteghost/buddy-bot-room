@@ -213,11 +213,18 @@ export function resolveMention(text: string, mode?: CharacterMode): AgentId | nu
   }
   return null;
 }
-export type Mode = "roundtable" | "broadcast" | "direct" | "solve";
+export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate";
+export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate"];
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
   verdict?: boolean;
+  /** Debate: which side this pal argued. */
+  side?: "for" | "against";
+  /** Problem solving: the working role this pal took. */
+  role?: string;
+  /** A summary of the chat, not a discussion turn. */
+  summary?: boolean;
   /** Dungeon Master mode: who spoke this turn. */
   dm?: "dm" | "party";
   elapsed?: number;

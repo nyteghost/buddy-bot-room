@@ -17,7 +17,8 @@ function readSize(raw: string | null): Size | null {
   } catch { return null; }
 }
 
-export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion }: {
+export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className }: {
+  className?: string;
   id: string; title: string; icon: ReactNode; open: boolean; onClose: () => void;
   children: ReactNode; resetVersion: number;
 }) {
@@ -127,7 +128,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   const handle = (edge: Edge) => <div className={`window-resize window-resize-${edge}`} aria-hidden
     onPointerDown={beginResize(edge)} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} />;
   return <section ref={ref} aria-label={title} hidden={!open} style={style}
-    className={cn("workspace-window", `window-${id}`, size && "window-sized", expanded && "window-expanded")}
+    className={cn("workspace-window", `window-${id}`, className, size && "window-sized", expanded && "window-expanded")}
     onPointerDownCapture={() => setFront(++windowStack)}>
     <div className="window-titlebar" onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
       <span className="window-title">{icon}{title}</span>

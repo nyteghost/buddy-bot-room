@@ -50,7 +50,7 @@ import { applyBackup, buildBackup, BACKUP_KEYS } from "@/lib/settings-io";
 import { libraryMarkdown, shapeLibrary } from "@/lib/jellyfin";
 import { validRow } from "@/lib/store.server";
 import { logServer, serverLogText } from "@/lib/server-log.server";
-import { parseSlash } from "@/lib/slash-commands";
+import { parseSlash, modeNames } from "@/lib/slash-commands";
 import { accountFileName, normalizeAccountData } from "@/lib/local-account";
 import { SYNC_KEYS, validSyncData } from "@/lib/settings-io";
 import { buildPool, buildReport as noteReport, counts, decide, missingFromNote, needsSearch, norm, parseNote, searchKey, shapeHistory, shapeSearch } from "@/lib/notes-sync";
@@ -2276,5 +2276,25 @@ describe("editable shifts", () => {
     expect(googleCalendarLink(a, "Show")).toContain("text=Show");
     expect(decodeURIComponent(googleCalendarLink(a, "Show").replace(/\+/g, " "))).toContain("Hall B, load-in");
     expect(buildShiftIcs([base])).toContain("UID:2026-10-19-540@pixel-pals");
+  });
+});
+
+import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
+import { ALL_MODES } from "@/lib/agents";
+
+describe("conversation mode windows", () => {
+  it("has five modes including debate", () => {
+    expect(ALL_MODES).toEqual(["roundtable", "broadcast", "direct", "solve", "debate"]);
+    expect(modeNames).toEqual([...ALL_MODES]);
+    expect(parseSlash("/mode debate")).toEqual({ ok: true, action: { type: "mode", mode: "debate" } });
+  });
+  it("pulls the numbered steps out of a plan", () => {
+    const plan = "Best approach: restart the transcoder.\nSteps:\n1. Open **Plex** settings\n2) Turn off hardware transcoding\n  3. Restart the server\nWatch out: this lowers quality.";
+    expect(extractSteps(plan)).toEqual(["Open Plex settings", "Turn off hardware transcoding", "Restart the server"]);
+    expect(extractSteps("no steps here")).toEqual([]);
+    expect(extractSteps(Array.from({ length: 12 }, (_, i) => `${i + 1}. step ${i + 1}`).join("\n")).length).toBe(8);
+  });
+  it("gives the first three seats distinct roles", () => {
+    expect([...SOLVE_ROLE_ORDER]).toEqual(["diagnoser", "fixer", "skeptic"]);
   });
 });

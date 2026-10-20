@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import {
   ArrowUpRight,
@@ -22,6 +22,7 @@ import {
   Play,
   Plus,
   Radio,
+  Swords,
   RotateCcw,
   Search,
   Settings2,
@@ -89,6 +90,7 @@ import {
   messageText,
   type AgentId,
   type Mode,
+  ALL_MODES,
   type RoomMessage,
 } from "@/lib/agents";
 import { SavedDiscussions } from "./saved-discussions";
@@ -167,6 +169,7 @@ import { setVoiceSettings, speakItems, stopSpeaking, useSpeakingId, useVoice, vo
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
+import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
 import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -175,9 +178,47 @@ const suggestions = [
   "Is creativity uniquely human?",
   "Pitch the next big indie game",
 ];
+const chatsKey = "pixel-pals-conversations-v2";
+const defaultOpenModes: Record<Mode, boolean> = { roundtable: true, broadcast: false, direct: false, solve: false, debate: false };
+const modeLabel: Record<Mode, string> = { roundtable: "Roundtable", broadcast: "Broadcast", direct: "One-on-one", solve: "Problem solving", debate: "Debate" };
+const modeHelp: Record<Mode, string> = {
+  roundtable: "Everyone hears everyone: pals react to each other, then one gives the verdict.",
+  broadcast: "Each pal answers on their own, without seeing the others. Optionally a judge ranks the answers.",
+  direct: "A private chat with one pal.",
+  solve: "A team with roles (Diagnoser, Fixer, Skeptic) that ends in a plan you can send to Tasks.",
+  debate: "Two pals argue for and against; a third judges who argued better.",
+};
+const modePlaceholder: Record<Mode, string> = {
+  roundtable: "Give your pals something to talk about…",
+  broadcast: "Ask a question and get independent answers…",
+  direct: "Message your pal…",
+  solve: "Describe the problem you need solved…",
+  debate: "State a claim for the pals to argue about…",
+};
+const modeSuggestions: Record<Mode, string[]> = {
+  roundtable: suggestions,
+  broadcast: ["Name my new indie game", "Best way to learn guitar in 3 months?", "Write a one-line pitch for a pixel café"],
+  direct: ["Help me plan my week", "Explain this like I'm new to it", "What should I cook tonight?"],
+  solve: ["My Plex server keeps buffering on one TV", "My Docker container restarts every few minutes", "I can't focus when I work from home"],
+  debate: ["Remote work beats the office", "Cats make better pets than dogs", "AI should write first drafts of everything"],
+};
 
 export function Room() {
-  const [messages, setMessages] = useState<RoomMessage[]>([]);
+  // Each conversation mode (Roundtable, Broadcast, One-on-one, Problem solving, Debate) has its own window, chat and draft.
+  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>({ roundtable: [], broadcast: [], direct: [], solve: [], debate: [] });
+  const [drafts, setDrafts] = useState<Record<Mode, string>>({ roundtable: "", broadcast: "", direct: "", solve: "", debate: "" });
+  /** The mode window you are working in; plain "messages" and "topic" below mean that window's. */
+  const [mode, setMode] = useState<Mode>("roundtable");
+  const messages = chats[mode];
+  const topic = drafts[mode];
+  function setMessagesIn(target: Mode, value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) {
+    setChats((all) => ({ ...all, [target]: typeof value === "function" ? value(all[target]) : value }));
+  }
+  function setDraftIn(target: Mode, value: string | ((current: string) => string)) {
+    setDrafts((all) => ({ ...all, [target]: typeof value === "function" ? value(all[target]) : value }));
+  }
+  const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
+  const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
   const characterMode = useCharacterMode();
   const assistantOn = useAssistantMode();
   const assistantRef = useRef(assistantOn);
@@ -213,7 +254,6 @@ export function Room() {
   modeRef.current = characterMode;
   const [ready, setReady] = useState(false);
 
-  const [topic, setTopic] = useState("");
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Focus mode: a calm, chat-only view. Saved per device (a phone and a desktop can differ).
@@ -235,8 +275,8 @@ export function Room() {
     window.addEventListener("touchend", up, { passive: true });
     return () => { window.removeEventListener("touchstart", down); window.removeEventListener("touchend", up); };
   }, []);
-  const [mode, setMode] = useState<Mode>("roundtable");
   const [rounds, setRounds] = useState(2);
+  const [judgeOn, setJudgeOn] = useState(false);
   const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan").map((a) => a.id)); // Saiyan joins when you switch him on
   const direct = mode === "direct";
@@ -323,7 +363,12 @@ export function Room() {
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(true);
   const [roomOpen, setRoomOpen] = useState(true);
-  const [conversationOpen, setConversationOpen] = useState(true);
+  const [openModes, setOpenModes] = useState<Record<Mode, boolean>>(defaultOpenModes);
+  const conversationOpen = ALL_MODES.some((m) => openModes[m]);
+  const showMode = (m: Mode) => setOpenModes((o) => (o[m] ? o : { ...o, [m]: true }));
+  const toggleMode = (m: Mode) => setOpenModes((o) => ({ ...o, [m]: !o[m] }));
+  const setConversationOpen = (value: boolean) => { if (value) showMode(mode); };
+  const resetModes = () => setOpenModes(defaultOpenModes);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
@@ -336,8 +381,10 @@ export function Room() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [forkSignal, setForkSignal] = useState(0);
-  const [regen, setRegen] = useState<string | null>(null);
+  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>({ roundtable: 0, broadcast: 0, direct: 0, solve: 0, debate: 0 });
+  const bumpFork = (m: Mode) => setForkSignals((f) => ({ ...f, [m]: f[m] + 1 }));
+  const [runningMode, setRunningMode] = useState<Mode | null>(null);
+  const [regen, setRegen] = useState<{ text: string; mode: Mode } | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [compareQuestion, setCompareQuestion] = useState("");
   const [seerrQuery, setSeerrQuery] = useState<SeerrQuery | null>(null);
@@ -349,32 +396,39 @@ export function Room() {
       const saved = JSON.parse(localStorage.getItem("pixel-pals-workspace-v1") ?? "null");
       if (saved) {
         setRoomOpen(saved.roomOpen !== false);
-        setConversationOpen(saved.conversationOpen !== false);
+        if (saved.openModes && typeof saved.openModes === "object") setOpenModes({ ...defaultOpenModes, ...Object.fromEntries(ALL_MODES.map((m) => [m, saved.openModes[m] === true])) });
+        else setOpenModes({ ...defaultOpenModes, roundtable: saved.conversationOpen !== false });
         setSidebarCompact(saved.sidebarCompact === true);
       } else if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
     } catch { /* optional layout preferences */ }
   }, []);
   useEffect(() => {
     if (!ready) return;
-    try { localStorage.setItem("pixel-pals-workspace-v1", JSON.stringify({ roomOpen, conversationOpen, sidebarCompact })); } catch { /* optional storage */ }
-  }, [roomOpen, conversationOpen, sidebarCompact, ready]);
+    try { localStorage.setItem("pixel-pals-workspace-v1", JSON.stringify({ roomOpen, openModes, sidebarCompact })); } catch { /* optional storage */ }
+  }, [roomOpen, openModes, sidebarCompact, ready]);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const inputEls = useRef<Partial<Record<Mode, HTMLTextAreaElement | null>>>({});
+  const modeNow = useRef(mode);
+  modeNow.current = mode;
+  /** The message box of the window you are working in. */
+  const inputRef = { get current(): HTMLTextAreaElement | null { return inputEls.current[modeNow.current] ?? null; } };
   const runLock = useRef(false);
   const recall = useRef<RecallState>(freshRecall);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (
-          Array.isArray(parsed) &&
-          parsed.every((m) => typeof m.id === "string" && Array.isArray(m.parts))
-        )
-          setMessages(parsed);
+      const validList = (v: unknown): v is RoomMessage[] => Array.isArray(v) && v.every((m) => m && typeof m.id === "string" && Array.isArray(m.parts));
+      const savedAll = localStorage.getItem(chatsKey);
+      if (savedAll) {
+        const parsed = JSON.parse(savedAll);
+        if (parsed && typeof parsed === "object") setChats((c) => ({ ...c, ...Object.fromEntries(ALL_MODES.filter((m) => validList(parsed[m])).map((m) => [m, parsed[m]])) }));
+      } else {
+        // Before the mode windows there was one chat; it becomes the Roundtable chat.
+        const legacy = localStorage.getItem(storageKey);
+        const parsed = legacy ? JSON.parse(legacy) : null;
+        if (validList(parsed)) setChats((c) => ({ ...c, roundtable: parsed }));
       }
     } catch {
       setSaveError("Your saved conversation could not be opened.");
@@ -389,11 +443,11 @@ export function Room() {
   useEffect(() => {
     if (!ready || cloud) return;
     try {
-      localStorage.setItem(storageKey, JSON.stringify(messages));
+      localStorage.setItem(chatsKey, JSON.stringify(chats));
     } catch {
       setSaveError("Browser storage is full. This conversation could not be saved.");
     }
-  }, [messages, ready, cloud]);
+  }, [chats, ready, cloud]);
 
   const stop = () => {
     stopSpeaking();
@@ -401,14 +455,23 @@ export function Room() {
     replayRef.current?.abort();
   };
 
-  async function start(ask?: { partner: AgentId; text: string }, override?: string) {
+  /** Sends in the given mode window (the one you are working in when none is given). */
+  async function start(ask?: { partner: AgentId; text: string }, override?: string, inMode?: Mode, extra?: { summary?: boolean }) {
+    return startIn(inMode ?? mode, ask, override, extra);
+  }
+  async function startIn(mode: Mode, ask?: { partner: AgentId; text: string }, override?: string, extra?: { summary?: boolean }) {
     if (runLock.current) return;
-    setConversationOpen(true);
+    const messages = chats[mode];
+    const topicDraft = drafts[mode];
+    const direct0 = mode === "direct";
+    const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
+    const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
+    showMode(mode);
     replayRef.current?.abort();
     setReplayId(null);
     const topic = ask?.text ?? override ?? topicDraft;
     const mentioned = ask || override ? null : resolveMention(topic, modeRef.current);
-    const direct = ask || mentioned ? true : directMode;
+    const direct = ask || mentioned ? true : direct0;
     const partner = ask?.partner ?? mentioned ?? partnerChoice;
     const tooFew = !direct && enabled.length < 2;
     const seerr = ask || override ? null : parseSeerr(topic);
@@ -462,6 +525,7 @@ export function Room() {
     if (runLock.current || !topic.trim() || tooFew || !ready) return;
     runLock.current = true;
     setRunning(true);
+    setRunningMode(mode);
     setError("");
     setRound(0);
     const controller = new AbortController();
@@ -489,19 +553,29 @@ export function Room() {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
         : agents.filter((a) => enabled.includes(a.id));
-      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean; dmRole?: DmRole }[] = [];
+      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean; dmRole?: DmRole; role?: string; side?: "for" | "against"; summary?: boolean }[] = [];
       // Dungeon Master mode: the first seated pal narrates, the rest react as the party, one pass per action.
       const campaign = getCampaign();
-      if (campaign.active) seated.forEach((agent, i) => turns.push({ agent, round: 1, verdict: false, dmRole: i === 0 ? "dm" : "party" }));
+      if (extra?.summary && seated[0]) turns.push({ agent: seated[0], round: 1, verdict: false, summary: true });
+      else if (campaign.active) seated.forEach((agent, i) => turns.push({ agent, round: 1, verdict: false, dmRole: i === 0 ? "dm" : "party" }));
       else {
-        for (let r = 1; r <= (direct ? 1 : rounds); r++)
-          for (const agent of seated) turns.push({ agent, round: r, verdict: false });
-        const lead = seated[0];
-        if ((mode === "roundtable" || mode === "solve") && seated.length > 1 && lead)
-          turns.push({ agent: lead, round: rounds, verdict: true });
+        if (mode === "debate" && !direct) {
+          // Two pals take the sides; the next pal (or the first, with only two) judges.
+          const debaters = seated.slice(0, 2);
+          for (let r = 1; r <= rounds; r++)
+            debaters.forEach((agent, i) => turns.push({ agent, round: r, verdict: false, side: i === 0 ? "for" : "against" }));
+          const judge = seated[2] ?? seated[0];
+          if (judge && debaters.length === 2) turns.push({ agent: judge, round: rounds, verdict: true });
+        } else {
+          for (let r = 1; r <= (direct ? 1 : rounds); r++)
+            seated.forEach((agent, i) => turns.push({ agent, round: r, verdict: false, ...(mode === "solve" && !direct ? { role: SOLVE_ROLE_ORDER[i % SOLVE_ROLE_ORDER.length] } : {}) }));
+          const lead = seated[0];
+          if ((mode === "roundtable" || mode === "solve" || (mode === "broadcast" && judgeOn)) && !direct && seated.length > 1 && lead)
+            turns.push({ agent: lead, round: rounds, verdict: true });
+        }
       }
       {
-        for (const [turnIndex, { agent, round: currentRound, verdict, dmRole }] of turns.entries()) {
+        for (const [turnIndex, { agent, round: currentRound, verdict, dmRole, role, side, summary }] of turns.entries()) {
           setRound(currentRound);
           if (controller.signal.aborted) return;
           setSpeaking(agent.id);
@@ -517,7 +591,10 @@ export function Room() {
             horror: turnMode === "horror",
             characterMode: turnMode,
             // In a campaign every pal needs to see the whole table, even in one-on-one.
-            mode: dmRole ? ("roundtable" as Mode) : direct ? ("direct" as Mode) : mode,
+            mode: dmRole || summary ? ("roundtable" as Mode) : direct ? ("direct" as Mode) : mode,
+            ...(role ? { role } : {}),
+            ...(side ? { side } : {}),
+            ...(summary ? { summary: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current,
             memoryContext: promptContext(getWorkbench(), 1500, agent.id),
@@ -560,6 +637,9 @@ export function Room() {
                   assistant: assistantRef.current,
                   round: currentRound,
                   ...(verdict ? { verdict: true } : {}),
+                  ...(side ? { side } : {}),
+                  ...(role ? { role } : {}),
+                  ...(summary ? { summary: true } : {}),
                   ...(dmRole ? { dm: dmRole } : {}),
                   elapsed: (performance.now() - began) / 1000,
                 },
@@ -569,7 +649,7 @@ export function Room() {
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
           const blockPaid = isOverCap(engine.spendCapUsd, { inPerM: engine.customPriceIn, outPerM: engine.customPriceOut });
-          const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
+          const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
             const chain = [first, ...chainAfter(engine, first, blockPaid)];
@@ -655,6 +735,7 @@ export function Room() {
       }
     } finally {
       setRunning(false);
+      setRunningMode(null);
       setSpeaking(null);
       runLock.current = false;
       abortRef.current = null;
@@ -679,7 +760,7 @@ export function Room() {
       case "export": exportChat(); return say(command, "Chat downloaded as Markdown.");
       case "record": setRecorderOpen(true); return say(command, "Recorder is open — press Record, then Stop.");
       case "confetti": celebrate(); return;
-      case "mode": setMode(action.mode); return say(command, `Conversation mode: ${action.mode === "direct" ? "one-on-one" : action.mode}.`);
+      case "mode": setMode(action.mode); showMode(action.mode); return say(command, `Conversation mode: ${action.mode === "direct" ? "one-on-one" : action.mode}.`);
       case "rounds": setRounds(action.rounds); return say(command, `Pals will debate for ${action.rounds} round${action.rounds === 1 ? "" : "s"}.`);
       case "theme": setCharacterMode(action.theme); return say(command, `Theme switched to ${action.theme}.`);
       case "assistant": setAssistantMode(action.on); return say(command, `Assistant Mode ${action.on ? "on" : "off"}.`);
@@ -916,17 +997,19 @@ export function Room() {
     }
   }
   /** Put a message you sent back in the box and rewind the chat to just before it. */
-  function editAndRetry(id: string) {
-    const index = messages.findIndex((m) => m.id === id);
+  function editAndRetry(target: Mode, id: string) {
+    const list = chats[target];
+    const index = list.findIndex((m) => m.id === id);
     if (index < 0 || running) return;
-    setTopic(messageText(messages[index]));
-    setMessages(messages.slice(0, index));
-    inputRef.current?.focus();
+    setMode(target);
+    setDraftIn(target, messageText(list[index]!));
+    setMessagesIn(target, list.slice(0, index));
+    inputEls.current[target]?.focus();
   }
   /** Start a fresh chat (and a fresh saved-chat record). */
   function newChat() {
     if (runLock.current) return;
-    setMessages([]); setRound(0); setError(""); setForkSignal((v) => v + 1);
+    setMessages([]); setRound(0); setError(""); bumpFork(mode);
     inputRef.current?.focus();
   }
   /** Jellyfin lookup: shows what's in your library (needs JELLYFIN_URL on the server). */
@@ -1004,26 +1087,36 @@ export function Room() {
     }
   }
   /** Re-run the last question: drop the replies after it and ask again. */
-  function regenerate() {
+  function regenerate(target: Mode) {
     if (running) return;
-    const at = messages.map((m) => m.role).lastIndexOf("user");
-    const last = messages[at];
+    const list = chats[target];
+    const at = list.map((m) => m.role).lastIndexOf("user");
+    const last = list[at];
     if (at < 0 || !last) return;
-    setRegen(messageText(last));
-    setMessages(messages.slice(0, at));
+    setMode(target);
+    setRegen({ text: messageText(last), mode: target });
+    setMessagesIn(target, list.slice(0, at));
   }
   /** Continue from an earlier message as a separate saved chat. */
-  function branchFrom(id: string) {
-    const at = messages.findIndex((m) => m.id === id);
+  function branchFrom(target: Mode, id: string) {
+    const list = chats[target];
+    const at = list.findIndex((m) => m.id === id);
     if (at < 0 || running) return;
-    setMessages(messages.slice(0, at + 1));
-    setForkSignal((v) => v + 1);
+    setMessagesIn(target, list.slice(0, at + 1));
+    bumpFork(target);
+  }
+  /** Problem solving: put the plan's numbered steps on the Tasks list. */
+  function addStepsToTasks(m: RoomMessage) {
+    const steps = extractSteps(messageText(m));
+    if (!steps.length) return;
+    updateWorkbench((w) => ({ ...w, todos: steps.reduce((list, step) => addTodo(list, step), w.todos) }));
+    say("Add steps to Tasks", `Added ${steps.length} step${steps.length === 1 ? "" : "s"} to your Tasks.`);
   }
   useEffect(() => {
     if (regen === null || running) return;
-    const text = regen;
+    const { text, mode: target } = regen;
     setRegen(null);
-    void startRef.current?.(undefined, text);
+    void startRef.current?.(undefined, text, target);
   }, [regen, running]); // eslint-disable-line react-hooks/exhaustive-deps
   function download(name: string, text: string, type: string) {
     const url = URL.createObjectURL(new Blob([text], { type }));
@@ -1057,14 +1150,14 @@ export function Room() {
     { id: "win-calendar", group: "Windows", label: "Open Calendar (next 7 days)", keywords: "schedule events agenda ics google outlook", run: () => setCalendarOpen(true) },
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
     { id: "win-fun", group: "Windows", label: "Open Fun (Dungeon Master campaign)", keywords: "dnd rpg adventure dice dungeon master games", run: () => setFunOpen(true) },
-    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
+    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
     { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
-    { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: regenerate },
-    { id: "chat-export", group: "Chat", label: "Export this chat as Markdown", run: exportChat },
+    { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: () => regenerate(mode) },
+    { id: "chat-export", group: "Chat", label: "Export this chat as Markdown", run: () => exportChat(mode) },
     { id: "chat-stop", group: "Chat", label: "Stop the discussion", hint: "Esc", run: stop },
     { id: "chat-compare", group: "Chat", label: "Compare models (blind test)", run: () => { setCompareQuestion(""); setCompareOpen(true); } },
-    ...modeNames.map((m): PaletteAction => ({ id: `mode-${m}`, group: "Mode", label: `Mode: ${m}`, run: () => setMode(m as Mode) })),
+    ...modeNames.map((m): PaletteAction => ({ id: `mode-${m}`, group: "Mode", label: `Mode: ${m}`, run: () => { setMode(m as Mode); showMode(m as Mode); } })),
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
     { id: "assist-on", group: "Theme", label: "Assistant Mode on", run: () => setAssistantMode(true) },
     { id: "assist-off", group: "Theme", label: "Assistant Mode off", run: () => setAssistantMode(false) },
@@ -1127,8 +1220,9 @@ export function Room() {
     recall.current = step.state;
     setTopic(step.value);
   }
-  function exportChat() {
-    const text = messages
+  const tooFewFor = (m: Mode) => m !== "direct" && !resolveMention(drafts[m], characterMode) && enabled.length < 2;
+  function exportChat(target: Mode = mode) {
+    const text = chats[target]
       .map(
         (m) =>
           `### ${m.metadata?.agentId ? agentName(m.metadata?.agentId, m.metadata?.characterMode === "hellraiser", m.metadata?.characterMode === "horror", m.metadata?.characterMode ?? characterMode) : "You"}\n\n${messageText(m)}`,
@@ -1137,7 +1231,7 @@ export function Room() {
     const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "pixel-pals-chat.md";
+    link.download = `pixel-pals-${target}-chat.md`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -1147,6 +1241,328 @@ export function Room() {
   const liveText =
     running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
   const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
+  /** One window per conversation mode, each with its own chat and message box. */
+  function renderModeWindow(wm: Mode) {
+    const msgs = chats[wm];
+    const busyHere = running && runningMode === wm;
+    const icons: Record<Mode, ReactNode> = { roundtable: <Users className="size-4" />, broadcast: <Radio className="size-4" />, direct: <MessageSquare className="size-4" />, solve: <Wrench className="size-4" />, debate: <Swords className="size-4" /> };
+    return (
+      <WorkspaceWindow id={`mode-${wm}`} className={cn("window-conversation window-mode", `window-mode-${wm}`, wm === mode && "window-mode-active")} title={modeLabel[wm]} icon={icons[wm]} open={openModes[wm]} onClose={() => setOpenModes((o) => ({ ...o, [wm]: false }))} resetVersion={resetVersion}>
+        <section className="conversation-panel" onPointerDownCapture={() => { if (mode !== wm) setMode(wm); }}>
+          <div className="conversation-header">
+            <h2>
+              <MessageSquare size={18} />
+              {modeLabel[wm]}
+              <span className="message-count">
+                {msgs.filter((m) => m.role === "assistant").length}
+              </span>
+            </h2>
+            <div>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Download conversation"
+                aria-label="Download conversation"
+                onClick={() => exportChat(wm)}
+                disabled={!msgs.length}
+              >
+                <Download />
+              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Clear conversation"
+                    aria-label="Clear conversation"
+                    disabled={running || !msgs.length}
+                  >
+                    <RotateCcw />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Clear this conversation?</DialogTitle>
+                    <DialogDescription>
+                      This clears the current chat. Previously saved discussions stay until you delete them. Download a copy first if you want to
+                      keep it.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setMessagesIn(wm, []);
+                      setForkSignals((f) => ({ ...f, [wm]: f[wm] + 1 }));
+                      setRound(0);
+                      setError("");
+                    }}
+                  >
+                    Clear conversation
+                  </Button>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+          <SavedDiscussions perMode openRequest={wm === mode ? historyRequest : 0} forkSignal={forkSignals[wm]} messages={msgs} mode={wm} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessagesIn(wm, items); setCharacterMode(theme); setMode(wm); setRound(0); setError(""); void discussionMode; }} />
+          <div className="conversation-subhead">
+            <span className="status-dot" />
+            {busyHere
+              ? `${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`
+              : msgs.length
+                ? "The floor is yours"
+                : "The room is open"}
+            <span title={modeHelp[wm]}>{modeLabel[wm].toUpperCase()}</span>
+          </div>
+          <Conversation className="chat-log">
+            <ConversationContent
+              className={cn("chat-content", !msgs.length && "empty-content")}
+            >
+              {!msgs.length ? (
+                <div className="chat-empty">
+                  <div className="empty-pals">
+                    <PixelCharacter id="byte" />
+                    <PixelCharacter id="nova" />
+                    <PixelCharacter id="sage" />
+                  </div>
+                  <div className="pixel-speech">···</div>
+                  <h3>
+                    {modeLabel[wm]}
+                  </h3>
+                  <p>{modeHelp[wm]}</p>
+                  <span className="empty-divider" />
+                  <span className="empty-caption">FOUR PERSONALITIES. ENDLESS POSSIBILITIES.</span>
+                </div>
+              ) : (
+                msgs.map((m) => {
+                  const a = agents.find((a) => a.id === m.metadata?.agentId);
+                  const messageMode = m.metadata?.characterMode ?? characterMode;
+                  const sideTag = m.metadata?.side === "for" ? " · FOR" : m.metadata?.side === "against" ? " · AGAINST" : "";
+                  const roleTag = m.metadata?.role ? ` · ${String(m.metadata.role).toUpperCase()}` : "";
+                  const name = a
+                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror", messageMode)
+                    : "You";
+                  return (
+                    <Message
+                      key={m.id}
+                      from={m.role}
+                      className={cn("room-message", m.metadata?.verdict && "verdict-message")}
+                    >
+                      {a && (
+                        <div className={`message-avatar agent-${a.id}`}>
+                          <PixelCharacter id={a.id} mode={messageMode} />
+                        </div>
+                      )}
+                      <div className="message-main">
+                        <div className="message-heading">
+                          <b className={a ? `agent-${a.id}` : "text-primary"}>{name}</b>
+                          <span>
+                            {!a
+                              ? "THE TOPIC"
+                              : m.metadata?.dm === "dm"
+                                ? "DUNGEON MASTER"
+                                : m.metadata?.dm === "party"
+                                  ? "PARTY"
+                                  : m.metadata?.verdict
+                                ? "THE VERDICT"
+                                : m.metadata?.summary ? "SUMMARY" : m.metadata?.verdict && wm === "debate" ? "THE JUDGE" : m.metadata?.verdict && wm === "broadcast" ? "THE JUDGE" : `ROUND ${m.metadata?.round ?? 1}${sideTag}${roleTag}`}
+                          </span>
+                          {m.metadata?.elapsed && (
+                            <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
+                          )}
+                        </div>
+                        <MessageContent className={cn(m.role === "user" && "user-message-content")}>
+                          {m.parts.map((part, i) =>
+                            part.type === "text" ? (
+                              <div key={i}>
+                                <MessageResponse>{m.role === "assistant" ? replaceEmojiShortcodes(part.text) : part.text}</MessageResponse>
+                                {m.role === "assistant" && (m.metadata?.assistant ?? (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant")) && !running && <LinuxActions text={part.text} canRun={desktopApp} />}
+                              </div>
+                            ) : part.type === "reasoning" ? (
+                              <details className="reasoning" key={i}>
+                                <summary>Thinking</summary>
+                                <MessageResponse>{part.text}</MessageResponse>
+                              </details>
+                            ) : null,
+                          )}
+                        </MessageContent>
+                        {!running && (
+                          <div className="message-actions">
+                            {m.role === "assistant" ? (
+                              <>
+                                <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
+                                  <Copy size={13} />
+                                </MessageAction>
+                                {canSpeak && (
+                                  <MessageAction tooltip={speakingMessage === m.id ? "Stop reading" : "Read aloud"} label={speakingMessage === m.id ? "Stop reading" : "Read aloud"} onClick={() => { if (speakingMessage === m.id) stopSpeaking(); else void speakItems([{ id: m.id, text: messageText(m), agentId: String(m.metadata?.agentId ?? "echo") }]); }}>
+                                    {speakingMessage === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                                  </MessageAction>
+                                )}
+                                {m.id === lastMessage?.id && m.metadata?.agentId !== "echo" && (
+                                  <MessageAction tooltip="Regenerate" label="Regenerate answer" onClick={() => regenerate(wm)}>
+                                    <RefreshCw size={13} />
+                                  </MessageAction>
+                                )}
+                                {wm === "solve" && m.metadata?.verdict && extractSteps(messageText(m)).length > 0 && (
+                                  <MessageAction tooltip="Add these steps to Tasks" label="Add these steps to Tasks" onClick={() => addStepsToTasks(m)}>
+                                    <ListTodo size={13} />
+                                  </MessageAction>
+                                )}
+                                <MessageAction tooltip="Branch a new chat from here" label="Branch from here" onClick={() => branchFrom(wm, m.id)}>
+                                  <GitBranch size={13} />
+                                </MessageAction>
+                              </>
+                            ) : (
+                              <MessageAction tooltip="Edit and resend" label="Edit and resend" onClick={() => editAndRetry(wm, m.id)}>
+                                <Pencil size={13} />
+                              </MessageAction>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </Message>
+                  );
+                })
+              )}
+              {busyHere && (
+                <div className="thinking-row">
+                  {speaking && <PixelCharacter id={speaking} animated />}
+                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
+                </div>
+              )}
+            </ConversationContent>
+            <ConversationScrollButton />
+          </Conversation>
+          {(error || saveError) && (
+            <div className="chat-error" role="alert">
+              {error || saveError}
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Dismiss error"
+                onClick={() => {
+                  setError("");
+                  setSaveError("");
+                }}
+              >
+                <X />
+              </Button>
+            </div>
+          )}
+          <footer className="conversation-footer">
+            <span>
+              <span className="status-dot" />
+              {busyHere
+                ? `ROUND ${round} / ${rounds}`
+                : round && runningMode === wm
+                  ? `${round} ROUND${round > 1 ? "S" : ""} COMPLETE`
+                  : "READY TO START"}
+            </span>
+            <span>
+              <Check size={12} /> AUTO-SAVED
+            </span>
+          </footer>
+                  <section className="workspace-composer" aria-label={`${modeLabel[wm]} message box`}>
+            <button type="button" className="focus-options-btn" aria-expanded={focusOptions} onClick={() => setFocusOptions((v) => !v)}>{focusOptions ? "Hide options" : "Options"}</button>
+            <div className="topic-section">
+              {wm === mode && suggestions_.length > 0 && (
+                <ul className="slash-menu" role="listbox" aria-label="Slash commands">
+                  {suggestions_.slice(0, 6).map((item, i) => (
+                    <li key={item.insert} role="option" aria-selected={i === 0}>
+                      <button type="button" onClick={() => { setDraftIn(wm, item.insert); inputEls.current[wm]?.focus(); }}>
+                        <code>{item.label}</code>
+                        {item.description && <span>{item.description}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <PromptInput onSubmit={() => start(undefined, undefined, wm)} className="topic-composer">
+                <PromptInputTextarea
+                  ref={(el) => { inputEls.current[wm] = el; }}
+                  aria-label={`${modeLabel[wm]} message`}
+                  placeholder={modePlaceholder[wm]}
+                  value={drafts[wm]}
+                  onFocus={() => setMode(wm)}
+                  onChange={(e) => {
+                    recall.current = freshRecall;
+                    setMode(wm);
+                    setDraftIn(wm, e.target.value);
+                  }}
+                  onKeyDown={onComposerKeyDown}
+                  className="min-h-12"
+                  disabled={running}
+                />
+                <PromptInputFooter>
+                  <span className="composer-label">
+                    <MessageSquare size={13} /> {modeHelp[wm]}
+                  </span>
+                  <MicButton disabled={running} onText={(t) => { setDraftIn(wm, (cur) => (cur.trim() ? `${cur.trim()} ${t}` : t)); inputEls.current[wm]?.focus(); }} />
+                  <PromptInputSubmit
+                    aria-label={busyHere ? "Stop" : "Send"}
+                    status={busyHere ? "streaming" : "ready"}
+                    onStop={stop}
+                    disabled={running ? !busyHere : !drafts[wm].trim() || (!characterModeCommand(drafts[wm]) && !drafts[wm].trim().startsWith("/") && tooFewFor(wm)) || !ready}
+                  />
+                </PromptInputFooter>
+              </PromptInput>
+              <div className="suggestions">
+                {modeSuggestions[wm].map((text) => (
+                  <Button key={text} variant="ghost" size="sm" disabled={running} onClick={() => { setMode(wm); setDraftIn(wm, text); inputEls.current[wm]?.focus(); }}>
+                    {text}
+                    <ArrowUpRight size={12} />
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="launch-controls">
+              {wm === "direct" && (
+                <div>
+                  <span className="control-label">TALK WITH</span>
+                  <select className="partner-select" aria-label="Pal to talk with" value={partner} disabled={running} onChange={(e) => setPartner(e.target.value as AgentId)}>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {agentName(a.id, hell, horror, characterMode)} ({palEngineLabel(engine, agents.findIndex((x) => x.id === a.id))})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {wm !== "direct" && (
+                <div>
+                  <span className="control-label">ROUNDS</span>
+                  <div className="round-stepper">
+                    <Button variant="ghost" size="icon" aria-label="Fewer rounds" disabled={running || rounds <= 1} onClick={() => setRounds(rounds - 1)}><Minus /></Button>
+                    <span>{rounds}</span>
+                    <Button variant="ghost" size="icon" aria-label="More rounds" disabled={running || rounds >= 5} onClick={() => setRounds(rounds + 1)}><Plus /></Button>
+                  </div>
+                </div>
+              )}
+              {wm === "broadcast" && (
+                <label className="judge-toggle" title="After everyone answers, one pal ranks the answers and picks the best">
+                  <input type="checkbox" checked={judgeOn} disabled={running} onChange={(e) => setJudgeOn(e.target.checked)} /> Judge picks the best
+                </label>
+              )}
+              {msgs.length > 0 && !running && (
+                <>
+                  <Button variant="ghost" size="sm" title="Take it one step further" onClick={() => void start(undefined, "Keep going: build on that and take it one step further.", wm)}>Keep going</Button>
+                  <Button variant="ghost" size="sm" title="Short summary of this chat" onClick={() => void start(undefined, "Summarize this chat.", wm, { summary: true })}>Summarize</Button>
+                </>
+              )}
+              <Button
+                className="start-button"
+                onClick={busyHere ? stop : () => void start(undefined, undefined, wm)}
+                disabled={running ? !busyHere : !drafts[wm].trim() || (!characterModeCommand(drafts[wm]) && tooFewFor(wm)) || !ready}
+              >
+                {busyHere ? <Square /> : <Play fill="currentColor" />}
+                {busyHere ? "Stop" : wm === "direct" ? "Send" : wm === "debate" ? "Start debate" : wm === "solve" ? "Solve it" : wm === "broadcast" ? "Ask everyone" : "Start discussion"}
+              </Button>
+            </div>
+            {tooFewFor(wm) && <p className="validation-note">Invite at least two pals to start.</p>}
+          </section>
+        </section>
+      </WorkspaceWindow>
+    );
+  }
   return (
     <div className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
@@ -1219,7 +1635,7 @@ export function Room() {
           </Dialog>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
-          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
         </div>
       </header>
       <button type="button" className="mobile-strip" onClick={() => setRoomOpen((v) => !v)}>
@@ -1238,7 +1654,9 @@ export function Room() {
       <div className="workspace-frame">
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
-          <Button variant="ghost" className="sidebar-item" title="Conversation" aria-pressed={conversationOpen} onClick={() => setConversationOpen((value) => !value)}><MessageSquare /><span>Conversation</span><i className={conversationOpen ? "status-dot" : ""} /></Button>
+          {ALL_MODES.map((m) => (
+            <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : <Swords />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
+          ))}
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
@@ -1253,7 +1671,7 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
           <div className="sidebar-divider" />
           <Button variant="ghost" className="sidebar-item" title="Saved chats" disabled={running} onClick={() => { setConversationOpen(true); setHistoryRequest((value) => value + 1); }}><History /><span>Saved chats</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setConversationOpen(true); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
@@ -1323,7 +1741,7 @@ export function Room() {
             ))}
             <div className="scene-bottom">
               <span>
-                <Users size={13} /> {mode === "roundtable" ? "Roundtable" : direct ? "One-on-one" : mode === "solve" ? "Problem solving" : "Broadcast"}
+                <Users size={13} /> {modeLabel[mode as Mode]}
               </span>
               <span>
                 {running ? (direct ? "Chatting" : `Round ${round} of ${rounds}`) : "Ready when you are"}
@@ -1415,220 +1833,7 @@ export function Room() {
           )}
 </div>
             </WorkspaceWindow>
-            <WorkspaceWindow id="conversation" title="Conversation" icon={<MessageSquare className="size-4" />} open={conversationOpen} onClose={() => setConversationOpen(false)} resetVersion={resetVersion}>
-        <section className="conversation-panel">
-          <div className="conversation-header">
-            <h2>
-              <MessageSquare size={18} />
-              The conversation
-              <span className="message-count">
-                {messages.filter((m) => m.role === "assistant").length}
-              </span>
-            </h2>
-            <div>
-              <Button
-                variant="ghost"
-                size="icon"
-                title="Download conversation"
-                aria-label="Download conversation"
-                onClick={exportChat}
-                disabled={!messages.length}
-              >
-                <Download />
-              </Button>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Clear conversation"
-                    aria-label="Clear conversation"
-                    disabled={running || !messages.length}
-                  >
-                    <RotateCcw />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Clear this conversation?</DialogTitle>
-                    <DialogDescription>
-                      This clears the current chat. Previously saved discussions stay until you delete them. Download a copy first if you want to
-                      keep it.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      setMessages([]);
-                      setRound(0);
-                      setError("");
-                    }}
-                  >
-                    Clear conversation
-                  </Button>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-          <SavedDiscussions openRequest={historyRequest} forkSignal={forkSignal} messages={messages} mode={mode} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessages(items); setCharacterMode(theme); setMode(discussionMode); setRound(0); setError(""); }} />
-          <div className="conversation-subhead">
-            <span className="status-dot" />
-            {running
-              ? `${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`
-              : messages.length
-                ? "The floor is yours"
-                : "The room is open"}
-            <span>{mode === "roundtable" ? "ROUND TABLE" : direct ? "ONE-ON-ONE" : mode === "solve" ? "PROBLEM SOLVING" : "BROADCAST"}</span>
-          </div>
-          <Conversation className="chat-log">
-            <ConversationContent
-              className={cn("chat-content", !messages.length && "empty-content")}
-            >
-              {!messages.length ? (
-                <div className="chat-empty">
-                  <div className="empty-pals">
-                    <PixelCharacter id="byte" />
-                    <PixelCharacter id="nova" />
-                    <PixelCharacter id="sage" />
-                  </div>
-                  <div className="pixel-speech">···</div>
-                  <h3>
-                    Good conversations
-                    <br />
-                    start with a little curiosity.
-                  </h3>
-                  <p>
-                    Your pals are all here.
-                    <br />
-                    What should they talk about?
-                  </p>
-                  <span className="empty-divider" />
-                  <span className="empty-caption">FOUR PERSONALITIES. ENDLESS POSSIBILITIES.</span>
-                </div>
-              ) : (
-                messages.map((m) => {
-                  const a = agents.find((a) => a.id === m.metadata?.agentId);
-                  const messageMode = m.metadata?.characterMode ?? characterMode;
-                  const name = a
-                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror", messageMode)
-                    : "You";
-                  return (
-                    <Message
-                      key={m.id}
-                      from={m.role}
-                      className={cn("room-message", m.metadata?.verdict && "verdict-message")}
-                    >
-                      {a && (
-                        <div className={`message-avatar agent-${a.id}`}>
-                          <PixelCharacter id={a.id} mode={messageMode} />
-                        </div>
-                      )}
-                      <div className="message-main">
-                        <div className="message-heading">
-                          <b className={a ? `agent-${a.id}` : "text-primary"}>{name}</b>
-                          <span>
-                            {!a
-                              ? "THE TOPIC"
-                              : m.metadata?.dm === "dm"
-                                ? "DUNGEON MASTER"
-                                : m.metadata?.dm === "party"
-                                  ? "PARTY"
-                                  : m.metadata?.verdict
-                                ? "THE VERDICT"
-                                : `ROUND ${m.metadata?.round ?? 1}`}
-                          </span>
-                          {m.metadata?.elapsed && (
-                            <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
-                          )}
-                        </div>
-                        <MessageContent className={cn(m.role === "user" && "user-message-content")}>
-                          {m.parts.map((part, i) =>
-                            part.type === "text" ? (
-                              <div key={i}>
-                                <MessageResponse>{m.role === "assistant" ? replaceEmojiShortcodes(part.text) : part.text}</MessageResponse>
-                                {m.role === "assistant" && (m.metadata?.assistant ?? (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant")) && !running && <LinuxActions text={part.text} canRun={desktopApp} />}
-                              </div>
-                            ) : part.type === "reasoning" ? (
-                              <details className="reasoning" key={i}>
-                                <summary>Thinking</summary>
-                                <MessageResponse>{part.text}</MessageResponse>
-                              </details>
-                            ) : null,
-                          )}
-                        </MessageContent>
-                        {!running && (
-                          <div className="message-actions">
-                            {m.role === "assistant" ? (
-                              <>
-                                <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
-                                  <Copy size={13} />
-                                </MessageAction>
-                                {canSpeak && (
-                                  <MessageAction tooltip={speakingMessage === m.id ? "Stop reading" : "Read aloud"} label={speakingMessage === m.id ? "Stop reading" : "Read aloud"} onClick={() => { if (speakingMessage === m.id) stopSpeaking(); else void speakItems([{ id: m.id, text: messageText(m), agentId: String(m.metadata?.agentId ?? "echo") }]); }}>
-                                    {speakingMessage === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                                  </MessageAction>
-                                )}
-                                {m.id === lastMessage?.id && m.metadata?.agentId !== "echo" && (
-                                  <MessageAction tooltip="Regenerate" label="Regenerate answer" onClick={regenerate}>
-                                    <RefreshCw size={13} />
-                                  </MessageAction>
-                                )}
-                                <MessageAction tooltip="Branch a new chat from here" label="Branch from here" onClick={() => branchFrom(m.id)}>
-                                  <GitBranch size={13} />
-                                </MessageAction>
-                              </>
-                            ) : (
-                              <MessageAction tooltip="Edit and resend" label="Edit and resend" onClick={() => editAndRetry(m.id)}>
-                                <Pencil size={13} />
-                              </MessageAction>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </Message>
-                  );
-                })
-              )}
-              {running && (
-                <div className="thinking-row">
-                  {speaking && <PixelCharacter id={speaking} animated />}
-                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
-                </div>
-              )}
-            </ConversationContent>
-            <ConversationScrollButton />
-          </Conversation>
-          {(error || saveError) && (
-            <div className="chat-error" role="alert">
-              {error || saveError}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Dismiss error"
-                onClick={() => {
-                  setError("");
-                  setSaveError("");
-                }}
-              >
-                <X />
-              </Button>
-            </div>
-          )}
-          <footer className="conversation-footer">
-            <span>
-              <span className="status-dot" />
-              {running
-                ? `ROUND ${round} / ${rounds}`
-                : round
-                  ? `${round} ROUND${round > 1 ? "S" : ""} COMPLETE`
-                  : "READY TO START"}
-            </span>
-            <span>
-              <Check size={12} /> AUTO-SAVED
-            </span>
-          </footer>
-        </section>
-            </WorkspaceWindow>
+            {ALL_MODES.map((wm) => <Fragment key={wm}>{renderModeWindow(wm)}</Fragment>)}
             <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
               <ShowServicesTools />
             </WorkspaceWindow>
@@ -1642,7 +1847,7 @@ export function Room() {
               <FunPanel />
             </WorkspaceWindow>
             <WorkspaceWindow id="search" title="Search" icon={<Search className="size-4" />} open={searchOpen} onClose={() => setSearchOpen(false)} resetVersion={resetVersion}>
-              <SearchPanel open={searchOpen} onOpenChat={(row) => { setMessages(row.messages); setCharacterMode(row.theme); setMode(row.mode); setRound(0); setError(""); setConversationOpen(true); }} />
+              <SearchPanel open={searchOpen} onOpenChat={(row) => { setMessagesIn(row.mode, row.messages); setCharacterMode(row.theme); setMode(row.mode); showMode(row.mode); setRound(0); setError(""); }} />
             </WorkspaceWindow>
             <WorkspaceWindow id="setup" title="Settings" icon={<Settings2 className="size-4" />} open={setupOpen} onClose={() => setSetupOpen(false)} resetVersion={resetVersion}>
               <SetupPanel open={setupOpen} />
@@ -1661,183 +1866,6 @@ export function Room() {
             </WorkspaceWindow>
             {!roomOpen && !conversationOpen && !toolsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
           </main>
-          <section className="workspace-composer" aria-label="Message composer">
-            <button type="button" className="focus-options-btn" aria-expanded={focusOptions} onClick={() => setFocusOptions((v) => !v)}>{focusOptions ? "Hide options" : "Options"}</button>
-          <div className="mode-row">
-            <span className="control-label">CONVERSATION MODE</span>
-            <div className="mode-switch">
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={mode === "roundtable"}
-                className={cn(mode === "roundtable" && "mode-active")}
-                onClick={() => setMode("roundtable")}
-              >
-                <Users />
-                Roundtable
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={mode === "broadcast"}
-                className={cn(mode === "broadcast" && "mode-active")}
-                onClick={() => setMode("broadcast")}
-              >
-                <Radio />
-                Broadcast
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={direct}
-                className={cn(direct && "mode-active")}
-                onClick={() => setMode("direct")}
-              >
-                <MessageSquare />
-                One-on-one
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={running}
-                aria-pressed={mode === "solve"}
-                className={cn(mode === "solve" && "mode-active")}
-                onClick={() => setMode("solve")}
-              >
-                <Wrench />
-                Problem solving
-              </Button>
-            </div>
-          </div>
-          <div className="topic-section">
-            <div className="section-heading">
-              <h2>What's on your mind?</h2>
-
-              <span className="muted-label">YOU SET THE TOPIC</span>
-            </div>
-            {suggestions_.length > 0 && (
-              <ul className="slash-menu" role="listbox" aria-label="Slash commands">
-                {suggestions_.slice(0, 6).map((item, i) => (
-                  <li key={item.insert} role="option" aria-selected={i === 0}>
-                    <button type="button" onClick={() => { setTopic(item.insert); inputRef.current?.focus(); }}>
-                      <code>{item.label}</code>
-                      {item.description && <span>{item.description}</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <PromptInput onSubmit={() => start()} className="topic-composer">
-              <PromptInputTextarea
-                ref={inputRef}
-                aria-label="Discussion topic"
-                placeholder="Give your pals something to talk about…"
-                value={topic}
-                onChange={(e) => {
-                  recall.current = freshRecall;
-                  setTopic(e.target.value);
-                }}
-                onKeyDown={onComposerKeyDown}
-                className="min-h-12"
-                disabled={running}
-              />
-              <PromptInputFooter>
-                <span className="composer-label">
-                  <MessageSquare size={13} /> A question, an idea, a rabbit hole.
-                </span>
-                <MicButton disabled={running} onText={(t) => { setTopic((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t)); inputRef.current?.focus(); }} />
-                <PromptInputSubmit
-                  aria-label={running ? "Stop discussion" : "Start topic"}
-                  status={running ? "streaming" : "ready"}
-                  onStop={stop}
-                  disabled={
-                    !running &&
-                    (!topic.trim() ||
-                      (!characterModeCommand(topic) && !topic.trim().startsWith("/") && tooFew) ||
-                      !ready)
-                  }
-                />
-              </PromptInputFooter>
-            </PromptInput>
-            <div className="suggestions">
-              {suggestions.map((s) => (
-                <Button
-                  key={s}
-                  variant="ghost"
-                  size="sm"
-                  disabled={running}
-                  onClick={() => {
-                    setTopic(s);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  {s}
-                  <ArrowUpRight size={12} />
-                </Button>
-              ))}
-            </div>
-          </div>
-          <div className="launch-controls">
-            {direct && (
-
-              <div>
-                <span className="control-label">TALK WITH</span>
-                <select
-                  className="partner-select"
-                  aria-label="Pal to talk with"
-                  value={partner}
-                  disabled={running}
-                  onChange={(e) => setPartner(e.target.value as AgentId)}
-                >
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {agentName(a.id, hell, horror, characterMode)} ({palEngineLabel(engine, agents.findIndex((x) => x.id === a.id))})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {!direct && (
-            <div>
-              <span className="control-label">ROUNDS</span>
-              <div className="round-stepper">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Fewer rounds"
-                  disabled={running || rounds <= 1}
-                  onClick={() => setRounds(rounds - 1)}
-                >
-                  <Minus />
-                </Button>
-                <span>{rounds}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="More rounds"
-                  disabled={running || rounds >= 5}
-                  onClick={() => setRounds(rounds + 1)}
-                >
-                  <Plus />
-                </Button>
-              </div>
-            </div>
-            )}
-            <Button
-              className="start-button"
-              onClick={running ? stop : () => void start()}
-              disabled={
-                !running &&
-                (!topic.trim() || (!characterModeCommand(topic) && tooFew) || !ready)
-              }
-            >
-              {running ? <Square /> : <Play fill="currentColor" />}
-              {running ? "Stop" : direct ? "Send" : "Start discussion"}
-            </Button>
-          </div>
-          {tooFew && (
-            <p className="validation-note">Invite at least two pals to start a discussion.</p>
-          )}
-          </section>
         </div>
       </div>
       <footer className="app-footer">

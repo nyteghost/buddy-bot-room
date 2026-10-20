@@ -46,6 +46,8 @@
 - Installable app: public/manifest.webmanifest and the icons are listed in PUBLIC_FILES (gate.server.ts) so the browser can fetch them without cookies; keep that list to static, non-sensitive files. /?q= only prefills the message box and never sends.
 - Plex (plex.ts pure, plex.server.ts I/O): read-only; PLEX_URL and PLEX_TOKEN come only from server env and are never returned to the browser. /watch gives the pals the library list as data and tells them to recommend only from it.
 
+- Conversation modes (roundtable, broadcast, direct, solve, debate) each have their own window, chat (`chats[mode]`), draft and message box in room.tsx (`renderModeWindow`); `mode` is the window you are working in, `startIn(mode, …)` runs one at a time (`runLock`). Roles, debate sides and judge turns are sent to /api/chat as `role`, `side`, `verdict`, `summary`; the server owns the prompts.
+
 ## Local AI (server-side Ollama)
 - Engine kind `local-server` sends `/api/chat` an `ollama-server` provider; the server calls `OLLAMA_URL` (never a browser-supplied URL). Model names are validated with `isModelName`.
 - `/api/ollama` reports status, installed models and hardware, and pulls/removes models. Hardware comes from `os` plus `nvidia-smi` (or `LOCAL_VRAM_GB`); model suggestions are pure code in `src/lib/model-catalog.ts` and are tested.

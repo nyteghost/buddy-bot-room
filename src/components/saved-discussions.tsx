@@ -11,16 +11,19 @@ import { displayTitle, filterRows, renameChat, sortRows, togglePin, updateChatMe
 import { useSession } from "@/hooks/use-session";
 import { deleteCloudDiscussion, loadAccount, saveCloudDiscussion } from "@/lib/account.functions";
 
-const activeKey = "pixel-pals-active-chat-v1";
+const baseActiveKey = "pixel-pals-active-chat-v1";
 
 /** Chats save themselves as you talk; the left slide-out panel lists them for one-click switching. */
-export function SavedDiscussions({ messages, mode, theme, running, onOpen, openRequest = 0, forkSignal = 0 }: {
+export function SavedDiscussions({ messages, mode, theme, running, onOpen, openRequest = 0, forkSignal = 0, perMode = false }: {
+  /** Each mode window keeps its own current chat and lists only chats of its mode. */
+  perMode?: boolean;
   openRequest?: number;
   /** Bumps when the room starts a fresh or branched chat, so the next save gets a new record. */
   forkSignal?: number;
   messages: RoomMessage[]; mode: Mode; theme: CharacterMode; running: boolean;
   onOpen: (messages: RoomMessage[], theme: CharacterMode, mode: Mode) => void;
 }) {
+  const activeKey = perMode ? `${baseActiveKey}:${mode}` : baseActiveKey;
   const session = useSession();
   const signedIn = !!session;
   const load = useServerFn(loadAccount);
@@ -84,7 +87,7 @@ export function SavedDiscussions({ messages, mode, theme, running, onOpen, openR
   }, [openRequest]); // eslint-disable-line react-hooks/exhaustive-deps
   function newChat() { pick(undefined); lastSaved.current = ""; setStatus(""); onOpen([], theme, mode); setOpen(false); }
 
-  const shown = sortRows<SavedDiscussion>(filterRows<SavedDiscussion>(rows, meta, query), meta);
+  const shown = sortRows<SavedDiscussion>(filterRows<SavedDiscussion>(perMode ? rows.filter((r) => r.mode === mode) : rows, meta, query), meta);
   return <div className="saved-toolbar">
     <Button size="sm" variant="outline" disabled={running} onClick={showPanel}><History size={14} /> Chats</Button>
     <Button size="sm" variant="ghost" disabled={running} onClick={newChat}><Plus size={14} /> New chat</Button>

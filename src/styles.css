@@ -2010,3 +2010,18 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
 .update-banner-details { padding-top: 6px; }
 .update-banner-details ul { margin: 0 0 6px; padding-left: 18px; list-style: disc; }
 .update-banner-details p { margin: 0; opacity: .9; }
+
+/* One window per conversation mode: staggered so several can be open at once; each has its own message box. */
+.window-mode-roundtable { left: var(--window-x, 46%); top: var(--window-y, 0px); width: 54%; }
+.window-mode-broadcast { left: var(--window-x, 42%); top: var(--window-y, 26px); width: 54%; height: calc(100% - 26px); }
+.window-mode-direct { left: var(--window-x, 38%); top: var(--window-y, 52px); width: 54%; height: calc(100% - 52px); }
+.window-mode-solve { left: var(--window-x, 34%); top: var(--window-y, 78px); width: 54%; height: calc(100% - 78px); }
+.window-mode-debate { left: var(--window-x, 30%); top: var(--window-y, 104px); width: 54%; height: calc(100% - 104px); }
+.window-mode .conversation-panel > .workspace-composer { border-top: 1px solid var(--border); }
+.judge-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-foreground); white-space: nowrap; }
+.focus-mode .window-mode:not(.window-mode-active) { display: none !important; }
+.focus-mode .window-mode > .window-titlebar { display: none !important; }
+@media (max-width: 760px) {
+  .window-mode { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; }
+  .window-mode:not(.window-mode-active) { display: none !important; }
+}
