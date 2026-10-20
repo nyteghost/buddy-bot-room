@@ -13,7 +13,7 @@ export function selfHostedPlugin(): Plugin {
     configureServer(server) {
       // Load the settings saved in the app first, then start the Unraid watcher (no-op unless an Unraid address is set)
       // and the daily jobs (backup, morning brief; no-op unless configured).
-      void ensureSettings().then(() => { startWatcher(); startScheduler(); });
+      void ensureSettings().catch(() => undefined).then(() => { startWatcher(); startScheduler(); });
       server.middlewares.use(async (req, res, next) => {
         try {
           const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
