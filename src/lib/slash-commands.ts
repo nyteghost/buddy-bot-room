@@ -115,11 +115,10 @@ export const slashCommands = [
   { name: "appearance", usage: "/appearance light|dark|auto · small|normal|large", description: "Colour scheme (light applies to the Normal theme) and text size" },
   { name: "calendar", usage: "/calendar", description: "Open the Calendar window (next 7 days)" },
   { name: "mail", usage: "/mail", description: "Open the Mail window (unread subjects)" },
-  { name: "search", usage: "/search", description: "Search your saved chats, notes, tasks, memories and reminders" },
+  { name: "find", usage: "/find", description: "Search your saved chats, notes, tasks, memories and reminders" },
   { name: "setup", usage: "/setup", description: "See what is connected and test each connection (owner only)" },
   { name: "hide", usage: "/hide [on|off]", description: "Blur links and addresses on this device so screenshots are safe" },
   { name: "today", usage: "/today", description: "Weather, calendar, unread mail, tasks and a watch pick in one window" },
-  { name: "tasks", usage: "/tasks", description: "Open your to-dos and reminders" },
   { name: "remind", usage: "/remind in 30m call mom | every monday 9am send report | list | snooze N 30m | remove N", description: "One-time reminder pushed to your phone (owner only; needs NTFY_URL or Telegram)" },
   { name: "event", usage: "/event friday 3pm dentist [for 1h]", description: "Make a calendar event: download an .ics file or add it to Google or Outlook" },
   { name: "weather", usage: "/weather", description: "Current weather and the next few days (set WEATHER_LOCATION on the server)" },
@@ -242,7 +241,7 @@ export function parseSlash(input: string): SlashResult | null {
       return rawArg ? { ok: true, action: { type: "appearance", words: rawArg } } : fail("Try /appearance light, /appearance dark, /appearance auto, or /appearance large.");
     case "calendar": case "agenda":
       return { ok: true, action: { type: "panel", panel: "calendar" } };
-    case "search": case "find":
+    case "find": case "lookup":
       return { ok: true, action: { type: "panel", panel: "search" } };
     case "setup": case "connections":
       return { ok: true, action: { type: "panel", panel: "setup" } };
@@ -250,8 +249,6 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "hide", mode: arg === "on" ? "on" : arg === "off" ? "off" : "toggle" } };
     case "today": case "day":
       return { ok: true, action: { type: "panel", panel: "today" } };
-    case "tasks": case "todo": case "todos":
-      return { ok: true, action: { type: "panel", panel: "tasks" } };
     case "mail": case "inbox":
       return { ok: true, action: { type: "panel", panel: "mail" } };
     case "remind": case "reminder": case "reminders": {

@@ -272,7 +272,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 | `/backup list` · `/backup restore N` | List backups · restore one, with a safety copy and a confirm step (owner, [7.14](#714-setup-search-capture-and-more)) |
 | `/update` | Check for a newer version and how to install it (owner) |
 | `/review [send]` | Your week ahead: calendar, reminders, mail, picks ([7.14](#714-setup-search-capture-and-more)) |
-| `/setup` · `/search` · `/hide` | Setup checklist with connection tests · search everything · blur secrets for screenshots ([7.14](#714-setup-search-capture-and-more)) |
+| `/setup` · `/find` · `/hide` | Setup checklist with connection tests · search everything · blur secrets for screenshots ([7.14](#714-setup-search-capture-and-more)) |
 | `/voice [on\|off]` | Read replies aloud |
 | `/dm …` · `/roll …` | Dungeon Master mode · dice |
 | `/compare <question>` | Blind model comparison |
@@ -512,7 +512,7 @@ I tested the date and time reading, the reminders logic, the brief and the `.ics
 ### 7.14 Setup, search, capture and more
 
 - **Setup window** (`/setup`, owner only): every integration with a green check when it's set up, the variable to set when it isn't, and a **Test** button that tries the connection (Plex, Seerr, Ollama, Trakt, ntfy, Telegram, Whisper, weather, calendar feeds, IMAP). Addresses and keys never leave the server. The same window has **Hide secrets** (`/hide`), which blurs share links and server addresses on this device so you can screenshot safely; click into a blurred field to read it.
-- **Search** (`/search`): one box over your saved chats, notes, tasks, memories and reminders. Every word you type has to appear; clicking a chat opens it.
+- **Search** (`/find`, or the Search window): one box over your saved chats, notes, tasks, memories and reminders. Every word you type has to appear; clicking a chat opens it.
 - **Quick capture:** message your Telegram bot `note: gate code is 1234`, `todo: call dentist`, `remember: I run Unraid` or `remind me in 1h stretch` and it is saved instead of answered. Notes, tasks and memories appear in the app the next time it's open (checked every minute); reminders are scheduled straight away. From an iPhone share sheet, build a Shortcut with **Get Contents of URL**: `POST` to `https://<your-address>/api/capture`, header `Authorization: Bearer <your Shortcut token>` (the same token as [7.8](#78-iphone-notes--trakt-sync)), JSON body `{"op":"add","text":"<Shortcut Input>"}`. Needs `BUDDY_DATA_DIR`; owner only.
 - **Repeating reminders and snooze:** `/remind every monday 9am send report`, `/remind every day 8pm take pills`, `/remind every weekday 7am gym` (also weekly and monthly). When one arrives on your phone, reply `snooze 30m` (or `snooze tomorrow`) to the Telegram bot to be reminded again; in the Tasks window use **+1h**. `/remind snooze 2 1h` snoozes reminder number 2.
 - **Weekly review:** `/review` previews your week ahead (calendar by day, reminders, unread mail, a few Trakt picks); `/review send` pushes it. Set `REVIEW_DAY` (for example `sun`) and `REVIEW_TIME` (for example `18:00`) to get it automatically, through the same ntfy/Telegram as the morning brief.
