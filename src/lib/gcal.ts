@@ -76,3 +76,13 @@ export const b64url = (s: string): string => Buffer.from(s, "utf8").toString("ba
 export function serviceJwtParts(email: string, nowSec: number): string {
   return `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: email, scope: SCOPE, aud: "https://oauth2.googleapis.com/token", iat: nowSec, exp: nowSec + 3300 }))}`;
 }
+
+/** Read a downloaded service-account JSON key file. Returns just the two values the app needs, or null if it isn't one. */
+export function parseServiceKeyFile(text: string): { email: string; key: string } | null {
+  try {
+    const j = JSON.parse(text) as { type?: unknown; client_email?: unknown; private_key?: unknown };
+    if (j.type !== "service_account" || typeof j.client_email !== "string" || typeof j.private_key !== "string") return null;
+    if (!/^[^\s@]+@[^\s@]+\.gserviceaccount\.com$/.test(j.client_email) || !normalizePrivateKey(j.private_key)) return null;
+    return { email: j.client_email, key: j.private_key };
+  } catch { return null; }
+}

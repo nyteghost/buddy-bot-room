@@ -1,3 +1,4 @@
+import { parseServiceKeyFile } from "@/lib/gcal";
 import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, Circle, Loader2 } from "lucide-react";
@@ -107,6 +108,24 @@ export function SetupPanel({ open }: { open: boolean }) {
                   <div className="grid gap-1 rounded-md bg-muted/40 p-2 text-xs">
                     <span>Using Gmail? Press the button, add your address and an app password, then Save.</span>
                     <Button type="button" size="sm" variant="outline" className="h-7 w-fit" onClick={() => setDrafts((d) => ({ ...d, ...Object.fromEntries(([["IMAP_HOST", "imap.gmail.com"], ["IMAP_PORT", "993"], ["SMTP_HOST", "smtp.gmail.com"], ["SMTP_PORT", "465"]] as const).filter(([k]) => mine.find((f) => f.key === k)?.source !== "env")) }))}>Fill in for Gmail</Button>
+                  </div>
+                )}
+                {i.id === "gcal" && (
+                  <div className="grid gap-1 rounded-md bg-muted/40 p-2 text-xs">
+                    <span>Using a service account? Choose the JSON key file you downloaded from Google Cloud. It fills in the email and key below; then add your calendar address and Save. The file stays in your browser until you press Save.</span>
+                    <label className="w-fit cursor-pointer rounded-md border bg-background px-3 py-1 text-xs font-medium hover:bg-muted">
+                      Choose key file…
+                      <input type="file" accept=".json,application/json" className="sr-only" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        if (file.size > 20_000) { setError("That file is too big to be a Google key file."); return; }
+                        const parsed = parseServiceKeyFile(await file.text());
+                        if (!parsed) { setError("That isn't a Google service account key file (it should be the .json you downloaded)."); return; }
+                        setError("");
+                        setDrafts((d) => ({ ...d, ...(mine.find((f) => f.key === "GOOGLE_SA_EMAIL")?.source !== "env" ? { GOOGLE_SA_EMAIL: parsed.email } : {}), ...(mine.find((f) => f.key === "GOOGLE_SA_KEY")?.source !== "env" ? { GOOGLE_SA_KEY: parsed.key } : {}) }));
+                      }} />
+                    </label>
                   </div>
                 )}
                 {mine.map((f) => {

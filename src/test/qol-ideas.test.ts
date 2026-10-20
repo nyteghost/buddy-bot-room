@@ -2411,3 +2411,16 @@ describe("service account helpers", () => {
     expect(claims.scope).toBe("https://www.googleapis.com/auth/calendar.events");
   });
 });
+
+import { parseServiceKeyFile as gFile } from "@/lib/gcal";
+describe("service account key file", () => {
+  const key = `-----BEGIN PRIVATE KEY-----\\n${"A".repeat(300)}\\n-----END PRIVATE KEY-----\\n`.replace(/\\\\n/g, "\n");
+  it("reads the two needed values", () => {
+    expect(gFile(JSON.stringify({ type: "service_account", client_email: "bot@p.iam.gserviceaccount.com", private_key: key }))).toEqual({ email: "bot@p.iam.gserviceaccount.com", key });
+  });
+  it("rejects other files", () => {
+    expect(gFile("{}")).toBe(null);
+    expect(gFile("nope")).toBe(null);
+    expect(gFile(JSON.stringify({ type: "service_account", client_email: "me@gmail.com", private_key: key }))).toBe(null);
+  });
+});
