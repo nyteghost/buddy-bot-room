@@ -16,4 +16,6 @@ jobs:
       - name: Tests
         run: bun run test
       - name: Build
-        run: bun run build
+        run: |
+          set -o pipefail
+          bun run build 2>&1 | tee build.log || { tail -c 3000 build.log | tr '\n' ' ' | sed 's/%/%25/g' | xargs -0 -I{} echo "::error title=Build output::{}"; exit 1; }
