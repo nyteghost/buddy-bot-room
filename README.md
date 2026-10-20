@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
