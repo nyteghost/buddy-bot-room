@@ -2,7 +2,7 @@
 # Settings come from the stack's "Environment variables" panel (no .env.local file needed):
 #   SEERR_URL, SEERR_API_KEY, SEARXNG_URL, BUDDY_PORT, BUDDY_PASSWORD,
 #   JELLYFIN_URL, JELLYFIN_API_KEY, JELLYFIN_PUBLIC_URL,
-#   PLEX_URL, PLEX_TOKEN, BUDDY_ACCOUNTS, TRAKT_CLIENT_ID, TRAKT_USER, TRAKT_LIST, TRAKT_ACCESS_TOKEN, TRAKT_CLIENT_SECRET, UNRAID_URL, UNRAID_API_KEY, UNRAID_CHECK_SECONDS, NTFY_URL, BUDDY_TZ, BRIEF_TIME, BUDDY_BACKUP_PATH, BUDDY_BACKUP_TIME, BUDDY_BACKUP_KEEP, OLLAMA_PORT, OLLAMA_MODELS, OLLAMA_RUNTIME, LOCAL_VRAM_GB, MODEL_FEED, PROVIDER_FEED, ALLOW_PRIVATE_CUSTOM, COMPOSE_PROFILES, WHISPER_REPLICAS, TS_AUTHKEY, TS_HOSTNAME, WHISPER_URL, WHISPER_MODEL, WHISPER_IMAGE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, M365_CLIENT_ID, M365_TENANT, UPDATE_CHECK, REVIEW_DAY, REVIEW_TIME, WEATHER_LOCATION, WEATHER_LAT, WEATHER_LON, WEATHER_UNITS, CALENDAR_ICS_URLS, IMAP_HOST, IMAP_PORT, IMAP_USER, IMAP_PASS  (all optional)
+#   PLEX_URL, PLEX_TOKEN, BUDDY_ACCOUNTS, TRAKT_CLIENT_ID, TRAKT_USER, TRAKT_LIST, TRAKT_ACCESS_TOKEN, TRAKT_CLIENT_SECRET, UNRAID_URL, UNRAID_API_KEY, UNRAID_CHECK_SECONDS, NTFY_URL, BUDDY_TZ, BRIEF_TIME, BUDDY_BACKUP_PATH, BUDDY_BACKUP_TIME, BUDDY_BACKUP_KEEP, OLLAMA_PORT, OLLAMA_MODELS, OLLAMA_RUNTIME, LOCAL_VRAM_GB, MODEL_FEED, PROVIDER_FEED, ALLOW_PRIVATE_CUSTOM, COMPOSE_PROFILES, WHISPER_REPLICAS, TS_AUTHKEY, TS_HOSTNAME, WHISPER_URL, WHISPER_MODEL, WHISPER_IMAGE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, M365_CLIENT_ID, M365_TENANT, RADICALE_USER, RADICALE_PASSWORD, RADICALE_URL, RADICALE_PORT, UPDATE_CHECK, REVIEW_DAY, REVIEW_TIME, WEATHER_LOCATION, WEATHER_LAT, WEATHER_LON, WEATHER_UNITS, CALENDAR_ICS_URLS, IMAP_HOST, IMAP_PORT, IMAP_USER, IMAP_PASS  (all optional)
 # Ollama is included in this stack. It starts on CPU; for an NVIDIA GPU set OLLAMA_RUNTIME=nvidia (needs the NVIDIA Container Toolkit on the host).
 # In Pixel Pals choose the engine "Local AI (this server)": it talks to this Ollama itself, so there is nothing to type and no HTTPS problem.
 services:
@@ -49,6 +49,9 @@ services:
       LOCAL_VRAM_GB: ${LOCAL_VRAM_GB:-}   # only if the GPU isn't detected
       WHISPER_URL: ${WHISPER_URL:-http://whisper:8000}   # voice input, served by the whisper container below
       WHISPER_MODEL: ${WHISPER_MODEL:-Systran/faster-whisper-small}
+      RADICALE_USER: ${RADICALE_USER:-pixelpals}   # iPhone Reminders sync: see the radicale service below
+      RADICALE_PASSWORD: ${RADICALE_PASSWORD:-}
+      RADICALE_URL: ${RADICALE_URL:-}
       UPDATE_CHECK: ${UPDATE_CHECK:-}   # 0 turns the "update available" check off
       REVIEW_DAY: ${REVIEW_DAY:-}   # e.g. sun (weekly review to your phone)
       REVIEW_TIME: ${REVIEW_TIME:-}   # e.g. 18:00
@@ -154,14 +157,34 @@ services:
     depends_on:
       - buddy-bot
 
+  # Optional calendar/tasks server so tasks and reminders sync both ways with the iPhone Reminders app (and any CalDAV app).
+  # Turn on by adding "radicale" to COMPOSE_PROFILES (for example tailscale,radicale) and setting RADICALE_PASSWORD.
+  # Reachable from your phone over Tailscale at https://<TS_HOSTNAME>.<your-tailnet>.ts.net:5233 (see the README).
+  radicale:
+    build:
+      context: ./packaging/radicale
+    image: pixelpals-radicale:local
+    pull_policy: build
+    container_name: buddy-radicale
+    profiles: ["radicale"]
+    restart: unless-stopped
+    environment:
+      RADICALE_USER: ${RADICALE_USER:-pixelpals}
+      RADICALE_PASSWORD: ${RADICALE_PASSWORD:-}
+    volumes:
+      - radicale-data:/data
+    ports:
+      - "127.0.0.1:${RADICALE_PORT:-5232}:5232"
+
 configs:
   # Same as config/tailscale/serve.json in the repository: send HTTPS on your tailnet to Pixel Pals.
   tailscale-serve:
     content: |
-      {"TCP":{"443":{"HTTPS":true}},"Web":{"$${TS_CERT_DOMAIN}:443":{"Handlers":{"/":{"Proxy":"http://buddy-bot:8090"}}}}}
+      {"TCP":{"443":{"HTTPS":true},"5233":{"HTTPS":true}},"Web":{"$${TS_CERT_DOMAIN}:443":{"Handlers":{"/":{"Proxy":"http://buddy-bot:8090"}}},"$${TS_CERT_DOMAIN}:5233":{"Handlers":{"/":{"Proxy":"http://radicale:5232"}}}}}
 
 volumes:
   tailscale-state:
+  radicale-data:
   whisper-models:
   buddy-backups:
   buddy-data:

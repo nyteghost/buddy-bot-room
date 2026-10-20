@@ -7,6 +7,7 @@ import { startProviderTimer } from "./provider-feed.server";
 import { ollamaBase } from "./ollama.server";
 import { tickReminders } from "./reminders.server";
 import { tickUpdate } from "./update.server";
+import { tickCaldav } from "./reminders-sync.server";
 import { isReviewDay, sendWeekly, weeklyConfig } from "./weekly.server";
 import { tickSchedules } from "./schedules.server";
 import { startTelegram } from "./telegram.server";
@@ -46,6 +47,7 @@ async function tick(s: S): Promise<void> {
   await tickSchedules(now).catch(() => undefined);
   await tickReminders(now.getTime()).catch(() => undefined);
   await tickUpdate(now.getTime()).catch(() => undefined);
+  await tickCaldav(now.getTime()).catch(() => undefined);
   const review = weeklyConfig();
   if (review && isReviewDay(now, review) && isDue(now, review.tz, review.time, s.lastReviewDay ?? "")) {
     s.lastReviewDay = zonedParts(now, review.tz).day;

@@ -25,6 +25,15 @@ async function writeReminders(list: Reminder[]): Promise<void> {
   await f.rename(`${file()}.tmp`, file());
 }
 
+/** Read, change and save the reminder list as one step (used by the calendar-server sync so it can't race with firing). */
+export async function updateReminders<T>(fn: (list: Reminder[]) => Promise<{ list: Reminder[]; result: T }>): Promise<T> {
+  return locked(async () => {
+    const { list, result } = await fn(await readReminders());
+    await writeReminders(list);
+    return result;
+  });
+}
+
 /** Called by the scheduler every tick: push whatever is due, then forget it. */
 export async function tickReminders(now = Date.now()): Promise<void> {
   const due = dueReminders(await readReminders(), now);

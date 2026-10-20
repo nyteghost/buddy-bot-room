@@ -19,6 +19,8 @@ import { addPalMemory, promptContext, removePalMemory, type Workbench } from "@/
 import { BUILT_IN_PROMPTS, addPrompt, findPrompt, parsePromptArgs, promptList } from "@/lib/prompts";
 import { backupListText, pickBackup } from "@/lib/backup";
 import { isKnownBuild, parseCompare, updateText } from "@/lib/update";
+import { buildVtodo, fold, parseMultistatus, parseVtodo, patchVtodo, repeatFromRrule, rruleOf } from "@/lib/caldav";
+import { syncPlan } from "@/lib/task-sync";
 import { replyPrompt } from "@/lib/mail-reply";
 import { buildIcs, eventLinks, parseEventArgs, parseIcsQuery, icsQuery } from "@/lib/events";
 import { servicesReport } from "@/lib/status";
@@ -1972,5 +1974,105 @@ describe("update available", () => {
     expect(isKnownBuild("84af8a4")).toBe(true);
     expect(isKnownBuild("local")).toBe(false);
     expect(parseSlash("/update")).toEqual({ ok: true, action: { type: "update" } });
+  });
+});
+
+describe("CalDAV tasks", () => {
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "BEGIN:VTODO", "UID:abc-1", "SUMMARY:Pay rent\\, soon", "STATUS:NEEDS-ACTION",
+    "DUE;TZID=America/New_York:20261021T090000", "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+    "BEGIN:VALARM", "TRIGGER:-PT15M", "SUMMARY:alarm text", "ACTION:DISPLAY", "END:VALARM", "X-APPLE-SORT-ORDER:5", "END:VTODO", "END:VCALENDAR", "",
+  ].join("\r\n");
+  it("reads a phone-made VTODO, ignoring alarms", () => {
+    const t = parseVtodo(ics, "America/New_York")!;
+    expect(t.uid).toBe("abc-1");
+    expect(t.summary).toBe("Pay rent, soon");
+    expect(t.done).toBe(false);
+    expect(t.due).toBe(Date.UTC(2026, 9, 21, 13, 0));
+    expect(t.repeat).toBe("weekdays");
+    expect(parseVtodo("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nEND:VEVENT\r\nEND:VCALENDAR", "UTC")).toBeNull();
+  });
+  it("reads completed, UTC and date-only items", () => {
+    expect(parseVtodo("BEGIN:VTODO\nUID:1\nSTATUS:COMPLETED\nDUE:20261021T130000Z\nEND:VTODO", "UTC")!.done).toBe(true);
+    expect(parseVtodo("BEGIN:VTODO\nUID:1\nDUE:20261021T130000Z\nEND:VTODO", "UTC")!.due).toBe(Date.UTC(2026, 9, 21, 13, 0));
+    expect(parseVtodo("BEGIN:VTODO\nUID:1\nDUE;VALUE=DATE:20261021\nEND:VTODO", "UTC")!.due).toBe(Date.UTC(2026, 9, 21, 9, 0));
+  });
+  it("maps repeat rules both ways and ignores fancy ones", () => {
+    expect(repeatFromRrule("FREQ=DAILY")).toBe("daily");
+    expect(repeatFromRrule("FREQ=WEEKLY;BYDAY=MO")).toBe("weekly");
+    expect(repeatFromRrule("FREQ=MONTHLY")).toBe("monthly");
+    expect(repeatFromRrule("FREQ=WEEKLY;INTERVAL=2")).toBeUndefined();
+    expect(repeatFromRrule("FREQ=YEARLY")).toBeUndefined();
+    expect(repeatFromRrule("FREQ=DAILY;COUNT=3")).toBeUndefined();
+    expect(rruleOf("weekdays")).toBe("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
+  });
+  it("builds a resource that reads back", () => {
+    const raw = buildVtodo({ uid: "u1", summary: "Call; mom, now", done: false, due: Date.UTC(2026, 9, 21, 13, 0), repeat: "daily" }, NOW);
+    expect(raw).toContain("SUMMARY:Call\; mom\\, now");
+    expect(raw).toContain("DUE:20261021T130000Z");
+    const back = parseVtodo(raw, "UTC")!;
+    expect(back).toEqual({ uid: "u1", summary: "Call; mom, now", done: false, due: Date.UTC(2026, 9, 21, 13, 0), repeat: "daily" });
+    expect(parseVtodo(buildVtodo({ uid: "u2", summary: "x", done: true }, NOW), "UTC")!.done).toBe(true);
+  });
+  it("patches only what changed and keeps alarms", () => {
+    const patched = patchVtodo(ics, { done: true }, NOW);
+    expect(patched).toContain("BEGIN:VALARM");
+    expect(patched).toContain("X-APPLE-SORT-ORDER:5");
+    expect(patched).toContain("STATUS:COMPLETED");
+    expect(patched).not.toContain("NEEDS-ACTION");
+    expect(patched).toContain("SUMMARY:alarm text");
+    const t = parseVtodo(patched, "America/New_York")!;
+    expect(t.done).toBe(true);
+    expect(t.summary).toBe("Pay rent, soon");
+    expect(parseVtodo(patchVtodo(ics, { due: null }, NOW), "UTC")!.due).toBeNull();
+    expect(parseVtodo(patchVtodo(ics, { summary: "New title" }, NOW), "UTC")!.summary).toBe("New title");
+  });
+  it("reads a multistatus answer with any prefix", () => {
+    const xml = `<?xml version="1.0"?><multistatus xmlns="DAV:"><response><href>/u/tasks/a.ics</href><propstat><prop><getetag>"e1"</getetag><C:calendar-data xmlns:C="urn:ietf:params:xml:ns:caldav">BEGIN:VCALENDAR&#13;\nBEGIN:VTODO\nUID:a\nSUMMARY:A &amp; B\nEND:VTODO\nEND:VCALENDAR</C:calendar-data></prop></propstat></response><response><href>/u/tasks/</href></response></multistatus>`;
+    const r = parseMultistatus(xml);
+    expect(r.length).toBe(1);
+    expect(r[0]!.href).toBe("/u/tasks/a.ics");
+    expect(r[0]!.etag).toBe('"e1"');
+    expect(parseVtodo(r[0]!.data, "UTC")!.summary).toBe("A & B");
+    expect(fold("x".repeat(150)).split("\r\n").length).toBe(3);
+  });
+});
+
+describe("three-way sync", () => {
+  type T = { id: string; text: string; done: boolean };
+  const same = (a: T, b: T) => a.text === b.text && a.done === b.done;
+  const t = (id: string, text = id, done = false): T => ({ id, text, done });
+  it("copies new items both ways", () => {
+    const p = syncPlan([t("a")], [t("b")], {}, same);
+    expect(p.local.map((i) => i.id)).toEqual(["a", "b"]);
+    expect(p.push.map((i) => i.id)).toEqual(["a"]);
+    expect(Object.keys(p.base).sort()).toEqual(["a", "b"]);
+  });
+  it("sends a local change and takes a remote change", () => {
+    const base = { a: t("a"), b: t("b") };
+    const p = syncPlan([t("a", "a", true), t("b")], [t("a"), t("b", "b", true)], base, same);
+    expect(p.push.map((i) => i.id)).toEqual(["a"]);
+    expect(p.local.find((i) => i.id === "b")!.done).toBe(true);
+    expect(p.local.find((i) => i.id === "a")!.done).toBe(true);
+  });
+  it("lets the phone win a conflict", () => {
+    const base = { a: t("a") };
+    const p = syncPlan([t("a", "from app")], [t("a", "from phone")], base, same);
+    expect(p.local[0]!.text).toBe("from phone");
+    expect(p.push.length).toBe(0);
+  });
+  it("propagates deletes in both directions", () => {
+    const base = { a: t("a"), b: t("b") };
+    const p = syncPlan([t("a")], [t("b")], base, same);
+    expect(p.local).toEqual([]); // a was deleted on the phone; b was deleted here
+    expect(p.remoteDelete).toEqual(["b"]);
+    expect(p.base).toEqual({});
+  });
+  it("is stable when nothing changed", () => {
+    const base = { a: t("a") };
+    const p = syncPlan([t("a")], [t("a")], base, same);
+    expect(p.push).toEqual([]);
+    expect(p.remoteDelete).toEqual([]);
+    expect(p.local.length).toBe(1);
   });
 });

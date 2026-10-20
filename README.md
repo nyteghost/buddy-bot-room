@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-setup-search-capture-and-more)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-setup-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -526,6 +526,30 @@ I tested the date and time reading, the reminders logic, the brief and the `.ics
 
 I tested the logic of all of this with automated tests. I could not run it against real Plex, Seerr, Telegram, ntfy, IMAP or Tailscale, or look at the windows in a browser, so treat the first run as a shakedown.
 
+### 7.15 iPhone Reminders sync (Radicale)
+
+Tasks and reminders can sync **both ways** with the iPhone **Reminders** app. Pixel Pals runs a small CalDAV server (Radicale) next to it, and the iPhone connects to that. Tick something off on your phone and it's done in Pixel Pals, and the other way round; changes arrive within a minute or two without any Shortcut.
+
+**What syncs**
+- **Your to-do list** (Tasks window, `/todo`, Notes & tasks) ⇄ a Reminders list called **Pixel Pals Tasks**: add, finish and delete in either place.
+- **Reminders with a time** (`/remind …`) ⇄ a Reminders list called **Pixel Pals Reminders**, with the due time, so your iPhone also alerts at that time. Daily, weekday, weekly and monthly repeats carry over; fancier repeats made on the phone (every 2 weeks, yearly) are left as the phone has them. A one-time reminder you finish on the phone is dropped here, so it won't also push through ntfy.
+- If you edit the same item on both sides between syncs, **the phone's version wins**.
+
+**Set it up**
+1. In Portainer → your stack → *Environment variables*: add `radicale` to `COMPOSE_PROFILES` (for example `tailscale,radicale`) and set `RADICALE_PASSWORD` to a long password you'll use only for this (optionally `RADICALE_USER`, default `pixelpals`). Redeploy. Pixel Pals finds the server by itself.
+2. Make it reachable from your phone over Tailscale (never put it on the open internet):
+   - **Tailscale sidecar** (section 3, option 4): already done. The sidecar also serves Radicale at `https://<TS_HOSTNAME>.<your-tailnet>.ts.net:5233`.
+   - **Tailscale on the host:** run `sudo tailscale serve --bg --https=5233 http://localhost:5232`. Radicale is published on the host's `127.0.0.1:5232` only (change with `RADICALE_PORT`). Your address is then `https://<host>.<your-tailnet>.ts.net:5233`.
+3. Open **Setup** in Pixel Pals and press **Test** next to *Tasks & reminders sync*. It should say Connected.
+4. On the iPhone, with Tailscale connected: **Settings → Calendar → Accounts → Add Account → Other → Add CalDAV Account** (on newer iOS: Settings → Apps → Reminders → Accounts). Server: your Tailscale host name, User: `pixelpals` (or your `RADICALE_USER`), Password: your `RADICALE_PASSWORD`. If it can't find the account, open *Advanced* and set SSL on, port `5233`, and Account URL `https://<host>:5233/pixelpals/`. Make sure **Reminders** is switched on for the account. The two lists then appear in the Reminders app.
+
+**Good to know**
+- The iPhone syncs only while it can reach the server, so Tailscale must be connected on the phone. Pixel Pals and the server are always in step with each other.
+- The Radicale data is its own Docker volume (`radicale-data`) and is not part of Pixel Pals' nightly backup. The password is stored inside the container only, in plain text, which is fine because the server is reachable only through your tailnet.
+- Reminders can still push through ntfy or Telegram too. If your iPhone alerts are enough, leave `NTFY_URL` empty to avoid double alerts.
+- Items you create in the Reminders app need a **due date and time** to count as reminders in Pixel Pals; items without one appear only in the task list if they are in the *Pixel Pals Tasks* list.
+- I tested the format handling and the merge rules with automated tests and against a stand-in CalDAV server that behaves like Radicale. I could not run a real Radicale or an iPhone here, so the first connection is a shakedown. If something doesn't line up, the Setup test message and the `Task sync failed` / `Reminder sync failed` lines in the debug log say what the server answered.
+
 ## 8. Automatic jobs
 
 These run on the server at times in `BUDDY_TZ` (default `America/New_York`).
@@ -679,6 +703,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `UNRAID_CHECK_SECONDS` | `60` | How often it checks |
 | `NTFY_URL` | | Phone push address |
 | `BRIEF_TIME` | empty (off) | Morning brief time, `HH:MM` |
+| `RADICALE_PASSWORD` / `RADICALE_USER` | empty / `pixelpals` | Turns on the iPhone Reminders sync; also add `radicale` to `COMPOSE_PROFILES` ([7.15](#715-iphone-reminders-sync-radicale)) |
+| `RADICALE_URL` / `RADICALE_PORT` | `http://radicale:5232` / `5232` | Only if your calendar server is elsewhere / the host port it is published on |
 | `UPDATE_CHECK` | on | `0` turns off the "update available" bar and phone alert ([7.14](#714-setup-search-capture-and-more)) |
 | `REVIEW_DAY` / `REVIEW_TIME` | empty (off) | Weekly review: day (`sun`) and time (`18:00`) ([7.14](#714-setup-search-capture-and-more)) |
 | `BUDDY_BACKUP_PATH` | volume `buddy-backups` | Host folder for backups |

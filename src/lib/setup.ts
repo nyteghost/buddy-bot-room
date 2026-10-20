@@ -10,6 +10,7 @@ export const INTEGRATIONS: { id: string; name: string; what: string; env: string
   { id: "jellyfin", name: "Jellyfin", what: "Alternative media library", env: "JELLYFIN_URL", testable: true },
   { id: "trakt", name: "Trakt", what: "Watch lists and picks", env: "TRAKT_CLIENT_ID, TRAKT_USER", testable: true },
   { id: "unraid", name: "Unraid watcher", what: "Array health alerts", env: "UNRAID_URL, UNRAID_API_KEY", testable: true },
+  { id: "caldav", name: "Tasks & reminders sync (iPhone)", what: "Two-way sync with the iPhone Reminders app through Radicale", env: "RADICALE_PASSWORD, COMPOSE_PROFILES=radicale", testable: true },
   { id: "ntfy", name: "Phone alerts (ntfy)", what: "Brief, reminders and alerts on your phone", env: "NTFY_URL", testable: true },
   { id: "telegram", name: "Telegram bot", what: "Talk to your pals from your phone", env: "TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID", testable: true },
   { id: "whisper", name: "Dictation (Whisper)", what: "Speak instead of typing", env: "WHISPER_URL", testable: true },

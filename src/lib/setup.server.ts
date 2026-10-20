@@ -1,6 +1,7 @@
 import { currentUser } from "./accounts.server";
 import { backupConfig } from "./backup.server";
 import { briefConfig } from "./brief.server";
+import { caldavConfig, pingCaldav } from "./caldav.server";
 import { calendarData, mailData } from "./inbox.server";
 import { imapConfig } from "./imap.server";
 import { ollamaBase } from "./ollama.server";
@@ -19,6 +20,7 @@ const configured: Record<string, () => boolean> = {
   jellyfin: () => !!env("JELLYFIN_URL"),
   trakt: () => !!env("TRAKT_CLIENT_ID"),
   unraid: () => !!unraidConfig(),
+  caldav: () => !!caldavConfig(),
   ntfy: () => env("NTFY_URL").startsWith("http"),
   telegram: () => telegramEnabled(),
   whisper: () => !!env("WHISPER_URL"),
@@ -49,6 +51,7 @@ const tests: Record<string, () => Promise<SetupTest>> = {
   jellyfin: () => reach(env("JELLYFIN_URL"), "/System/Ping"),
   trakt: () => reach("https://api.trakt.tv", "/movies/trending?limit=1", { "trakt-api-version": "2", "trakt-api-key": env("TRAKT_CLIENT_ID") }),
   unraid: async () => { const u = unraidConfig(); return u ? reach(u.base) : { ok: false, note: "Not set up." }; },
+  caldav: async () => { const c = caldavConfig(); return c ? pingCaldav(c) : { ok: false, note: "Not set up." }; },
   ntfy: async () => {
     try {
       const res = await fetch(env("NTFY_URL"), { method: "POST", headers: { Title: "Pixel Pals test" }, body: "If you can read this, phone alerts work.", signal: AbortSignal.timeout(6000) });

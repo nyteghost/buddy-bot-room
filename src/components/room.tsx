@@ -142,6 +142,7 @@ import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
 import { SetupPanel } from "@/components/setup-panel";
+import { TaskSync } from "@/components/task-sync";
 import { BUILT_IN_PROMPTS, addPrompt, findPrompt, promptList, type SavedPrompt } from "@/lib/prompts";
 import { getPrompts, setPrompts, usePrompts } from "@/lib/prompts-store";
 import { mergeCaptures, type Capture } from "@/lib/capture";
@@ -1232,6 +1233,7 @@ export function Room() {
         {running && activeAgent ? `${agentName(activeAgent.id, hell, horror, characterMode)} ${bubbleText ? "is talking…" : "is thinking…"}` : "Pals are ready"}
         <span className="mobile-strip-hint">tap for the room</span>
       </button>
+      <TaskSync />
       {!desktopApp && <UpdateBanner />}
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
