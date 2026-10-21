@@ -41,12 +41,29 @@ export function parseReportTime(t: string): number {
 
 // ---------- Ungerboeck event functions ----------
 export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string };
-export type EventCode = "S" | "Exmi" | "MI" | "MO";
+export type EventCode = "S" | "Exmi" | "MI" | "MO" | "Food" | "MTG";
 export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string };
 
 /** Applies Mark's rules: skip Level 1 date headers; S = show events; Exmi = exhibitor move in; MI = other move in; MO = move out. */
+const FOOD_RE = /reception|dinner|lunch|breakfast|buffet|hosted bar|cash bar|wine service|food|concession|coffee|snack|banquet|luncheon|plated|boxed|brunch/;
+const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|client arrival|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat/;
+
+/** The "For Scheduling" report has no Usage column, so the code comes from the description alone. */
+export function classifyByDescription(description: string): EventCode | null {
+  const d = description.toLowerCase();
+  if (/service desk/.test(d)) return "Exmi";
+  if (/move.?out|tear ?down|load.?out|dismantle/.test(d)) return "MO";
+  if (/exhibitor/.test(d) && /move.?in|load.?in/.test(d)) return "Exmi";
+  if (/move.?in|march in|load.?in|set ?up|install/.test(d)) return "MI";
+  if (/\bmeeting\b|\bmtg\b/.test(d) && !/session/.test(d)) return "MTG";
+  if (FOOD_RE.test(d)) return "Food";
+  if (SKIP_RE.test(d)) return null;
+  return "S";
+}
+
 export function classifyEvent(row: EventRow): EventCode | null {
   if (row.level <= 1) return null;
+  if (!row.usage.trim()) return classifyByDescription(row.description);
   const usage = row.usage.toLowerCase(), desc = row.description.toLowerCase();
   if (usage.includes("move out")) return "MO";
   if (usage.includes("move in")) {
@@ -75,8 +92,15 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
       else map.set(key, { date: row.date, space, code, start, end, title: row.event || row.description });
     }
   }
-  const order: EventCode[] = ["MI", "Exmi", "S", "MO"];
-  return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
+  // A meal or meeting inside the same show's day is part of the show; only one after the show ends gets its own line.
+  const all = [...map.values()];
+  const kept = all.filter((e) => {
+    if (e.code !== "Food" && e.code !== "MTG") return true;
+    const show = all.find((x) => x.date === e.date && x.space === e.space && x.title === e.title && x.code === "S");
+    return !show || (e.code === "Food" && e.start >= show.end);
+  });
+  const order: EventCode[] = ["MI", "Exmi", "S", "Food", "MTG", "MO"];
+  return kept.sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
 }
 
 export function entryLabel(e: EventEntry) {
@@ -305,4 +329,30 @@ export function weekLayouts(entries: EventEntry[]): WeekLayout[] {
     });
     return { monday, dates, cgc, escalator, serviceDesk, rows, other };
   });
+}
+
+
+// ---------- task suggestions ----------
+export type TaskNote = { date: string; section: "HALLS" | "BALLROOM"; text: string };
+
+/** Stage builds and room turns found in the report, ready for the Tasks rows. The user's own text is never overwritten. */
+export function taskSuggestions(rows: EventRow[]): TaskNote[] {
+  const out = new Map<string, TaskNote>();
+  for (const row of rows) {
+    if (row.level <= 1) continue;
+    const d = row.description;
+    const stage = /\bstage\b|riser|platform|truss/i.test(d) && !/show office/i.test(d);
+    const turn = /room turn|room refresh|flip/i.test(d);
+    if (!stage && !turn) continue;
+    const spaces = expandSpace(row.space || "");
+    const first = spaces[0] ?? "";
+    const section = /^hall/i.test(first) ? "HALLS" : /^ballroom/i.test(first) ? "BALLROOM" : null;
+    if (!section) continue;
+    const room = spaces.length > 1 ? `${first.replace(/^(Hall|BallRoom) /, "")}–${spaces[spaces.length - 1]!.replace(/^(Hall|BallRoom) /, "")}` : first.replace(/^(Hall|BallRoom) /, "");
+    const where = section === "HALLS" ? `Hall ${room}` : `BR ${room}`;
+    const clean = d.replace(/\s+/g, " ").trim();
+    const text = `${turn ? (/^room/i.test(clean) ? "" : "Room turn: ") : "Stage: "}${clean} (${where} ${formatMinutes(parseReportTime(row.start))})`;
+    out.set(JSON.stringify([row.date, section, text]), { date: row.date, section, text });
+  }
+  return [...out.values()].sort((a, b) => a.date.localeCompare(b.date) || a.text.localeCompare(b.text));
 }

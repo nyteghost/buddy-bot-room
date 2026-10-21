@@ -1,5 +1,5 @@
 // Browser-only file readers for work tools. Libraries load on demand.
-import { BALLROOM_ROWS, ENGINEER_ROSTER, HALL_ROWS, weekLayouts, type WeekLayout, DEFAULT_SCHEDULE_NAME, parseShift, reportDateToIso, type EventEntry, type EventRow, type Shift } from "./work-tools";
+import { BALLROOM_ROWS, ENGINEER_ROSTER, HALL_ROWS, weekLayouts, type WeekLayout, type TaskNote, DEFAULT_SCHEDULE_NAME, parseShift, reportDateToIso, type EventEntry, type EventRow, type Shift } from "./work-tools";
 
 type Item = { str: string; x: number; y: number };
 
@@ -30,7 +30,7 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
     const sorted = [...lines.entries()].sort((a, b) => b[0] - a[0]).map(([, l]) => l.sort((a, b) => a.x - b.x));
     for (const line of sorted) {
       const text = line.map((i) => i.str).join(" ");
-      if (/^\s*Start Time\b/.test(text) && /\bLevel\b/.test(text) && /\bEvent\b/.test(text)) {
+      if (/^\s*Start Time\b/.test(text) && /\bEvent\b/.test(text) && (/\bLevel\b/.test(text) || (/\bDescription\b/.test(text) && /\bSpace\b/.test(text)))) {
         sched = line.map((i) => ({ name: i.str.trim(), x: i.x }));
         continue;
       }
@@ -51,6 +51,7 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
         const start = cell["Start Time"] ?? "";
         if (!/\d{1,2}:\d{2}\s*[AP]M/i.test(start)) {
           if (last && cell["Description"]) last.description += ` ${cell["Description"]}`;
+          if (last && cell["Space"] && !/^\d/.test(cell["Space"])) last.space += ` ${cell["Space"]}`;
           continue;
         }
         last = {
@@ -194,7 +195,7 @@ function unmergeEventSpaces(ws: XSheet, w: WeekLayout, byLabel: Map<string, numb
   }
 }
 
-function writeWeekSheet(ws: XSheet, w: WeekLayout) {
+function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = []) {
   const font = { name: "Aptos Narrow", size: 20, bold: true };
   const wrap = { wrapText: true, vertical: "middle" as const, horizontal: "center" as const };
   ws.columns = [{ width: 41 }, ...DAYS.map(() => ({ width: 32 })), { width: 30 }];
@@ -231,7 +232,9 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout) {
       (w.rows[label] ?? []).forEach((c, i) => { const cell = ws.getRow(r).getCell(i + 2); cell.value = c.text || null; cell.alignment = wrap; paint(cell, c.codes); });
       r++;
     }
-    put(r++, ["Tasks"]);
+    const notes = tasks.filter((t) => t.section === title);
+    put(r, ["Tasks", ...w.dates.map((d) => notes.filter((t) => t.date === d).map((t) => t.text).join("\n") || null)], false);
+    r++;
   };
   section("HALLS", HALL_ROWS);
   section("BALLROOM", BALLROOM_ROWS);
@@ -248,7 +251,7 @@ function cellDate(v: unknown): string | null {
 }
 
 /** Writes event rows into an existing weekly sheet, keeping engineer shifts untouched. Returns false if the week is not on this sheet. */
-function mergeWeekSheet(ws: XSheet, w: WeekLayout): boolean {
+function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = []): boolean {
   let dayRow = 0;
   ws.eachRow((row, n) => { if (!dayRow && String(row.getCell(2).value ?? "").trim().toUpperCase() === "MON") dayRow = n; });
   if (!dayRow) return false;
@@ -269,12 +272,25 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout): boolean {
     if (w.cgc[i] !== "DARK") write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!);
     for (const [label, cells] of Object.entries(w.rows)) write(label, i, cells[i]!.text, cells[i]!.codes);
   });
+  // Task suggestions go in the empty cells of the Tasks row under HALLS and BALLROOM; anything already typed there is kept.
+  for (const [section, lastRow] of [["HALLS", "hall d"], ["BALLROOM", "ballroom f"]] as const) {
+    const from = byLabel.get(lastRow);
+    if (!from) continue;
+    let tr = 0;
+    for (let n = from + 1; n <= from + 3 && !tr; n++) if (String(ws.getRow(n).getCell(1).value ?? "").trim().toLowerCase() === "tasks") tr = n;
+    if (!tr) continue;
+    for (const [date, c] of cols) {
+      const text = tasks.filter((t) => t.section === section && t.date === date).map((t) => t.text).join("\n");
+      const cell = ws.getRow(tr).getCell(c);
+      if (text && !String(cell.value ?? "").trim()) { cell.value = text; cell.alignment = { wrapText: true, vertical: "middle", horizontal: "center" }; }
+    }
+  }
   mergeEventSpaces(ws, w, byLabel, cols);
   return true;
 }
 
 /** Builds the weekly engineering workbook (Week #1, #2 …) or, given an existing schedule, fills its event rows. */
-export async function eventsWorkbook(entries: EventEntry[], existing?: File): Promise<Blob> {
+export async function eventsWorkbook(entries: EventEntry[], existing?: File, tasks: TaskNote[] = []): Promise<Blob> {
   const module = await import("exceljs");
   const ExcelJS = module.default ?? module;
   const wb: XWorkbook = new ExcelJS.Workbook();
@@ -283,8 +299,8 @@ export async function eventsWorkbook(entries: EventEntry[], existing?: File): Pr
   const sheets = wb.worksheets.filter((s) => /week/i.test(s.name));
   let n = sheets.length;
   for (const w of weeks) {
-    if (sheets.some((s) => mergeWeekSheet(s, w))) continue;
-    writeWeekSheet(wb.addWorksheet(`Week #${++n}`), w);
+    if (sheets.some((s) => mergeWeekSheet(s, w, tasks))) continue;
+    writeWeekSheet(wb.addWorksheet(`Week #${++n}`), w, tasks);
   }
   const out = await wb.xlsx.writeBuffer();
   return new Blob([out], { type: XLSX_MIME });

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, timeToMinutes, withShiftIds, type EventEntry, type Shift } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type Shift, type TaskNote } from "@/lib/work-tools";
 import { VendorsPanel } from "@/components/vendors-panel";
 import { FloorMapPanel } from "@/components/floor-map-panel";
 import { RepoWatch } from "@/components/repo-watch";
@@ -90,6 +90,7 @@ function EventsTab() {
   const [status, setStatus] = useState("");
   const [blob, setBlob] = useState<Blob | null>(null);
   const [merged, setMerged] = useState(false);
+  const [tasks, setTasks] = useState<TaskNote[]>([]);
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
     try {
@@ -98,17 +99,18 @@ function EventsTab() {
       const existing = files.find((f) => /\.xlsx?$/i.test(f.name));
       const rows = (await Promise.all(pdfs.map(readEventPdf))).flat();
       const list = summarizeEvents(rows);
-      setEntries(list); setMerged(!!existing);
-      setBlob(list.length ? await eventsWorkbook(list, existing) : null);
+      const notes = taskSuggestions(rows);
+      setEntries(list); setMerged(!!existing); setTasks(notes);
+      setBlob(list.length ? await eventsWorkbook(list, existing, notes) : null);
       const dates = new Set(list.map((e) => e.date)).size;
-      setStatus(list.length ? `${pdfs.length} PDF${pdfs.length > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${existing ? `Filled into ${existing.name} — engineer shifts kept.` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
+      setStatus(list.length ? `${pdfs.length} PDF${pdfs.length > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${existing ? `Filled into ${existing.name} — engineer shifts kept.${notes.length ? ` ${notes.length} task suggestions added to empty Tasks cells.` : ""}` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
     } catch (e) { setStatus(`Could not read that PDF: ${(e as Error).message}`); }
   }
   const { deliver } = useDeliver();
   return (
     <div className="space-y-3 pt-2">
       <FilePick accept="application/pdf,.xlsx" label="Drop Ungerboeck PDFs — add your monthly schedule .xlsx to fill it in" onFiles={load} />
-      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
+      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
       {entries.length === 0 && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop one or more Ungerboeck event PDFs.</li><li>Optional: drop your monthly schedule .xlsx in the same box to fill it in (engineer shifts are kept).</li><li>Download the Excel file.</li></ol>}
       {entries.length > 0 && (
@@ -121,6 +123,12 @@ function EventsTab() {
               ))}</tbody>
             </table>
           </div>
+          {tasks.length > 0 && (
+            <details className="rounded-md border border-border p-2 text-xs">
+              <summary className="cursor-pointer font-medium">{tasks.length} task suggestions (stage builds and room turns)</summary>
+              <ul className="mt-1 space-y-0.5">{tasks.map((t, i) => <li key={i}><span className="text-muted-foreground">{dayLabel(t.date)}:</span> {t.text}</li>)}</ul>
+            </details>
+          )}
           {blob && <Button size="sm" onClick={() => deliver(blob, merged ? "schedule-updated.xlsx" : "engineering-schedule.xlsx")}><Download className="size-4" /> Download Excel</Button>}
         </>
       )}
