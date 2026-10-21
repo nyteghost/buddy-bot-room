@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Briefcase, CalendarPlus, CalendarSync, Download, FileUp } from "lucide-react";
+import { Briefcase, CalendarClock, CalendarDays, CalendarPlus, CalendarSync, Download, ExternalLink, FileUp, GitBranch, Layers, Map as MapIcon, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -28,16 +28,38 @@ export function WorkTools() {
   );
 }
 
-export function ShowServicesTools() {
-  return <Tabs defaultValue="events">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="events">Events</TabsTrigger>
-            <TabsTrigger value="shifts">My shifts</TabsTrigger>
-            <TabsTrigger value="deck">Deck</TabsTrigger>
-            <TabsTrigger value="vendors">Vendors</TabsTrigger>
-            <TabsTrigger value="floor">Floor map</TabsTrigger>
-            <TabsTrigger value="repos">Repos</TabsTrigger>
+const TABS = [
+  { id: "events", label: "Events", Icon: CalendarDays, hint: "Turn Ungerboeck event PDFs into the engineering schedule workbook." },
+  { id: "shifts", label: "My shifts", Icon: CalendarClock, hint: "Pull your shifts from the monthly schedule and put them on your calendar." },
+  { id: "deck", label: "Deck", Icon: Layers, hint: "Plan a stage from the decks, stairs and rails in the warehouse." },
+  { id: "vendors", label: "Vendors", Icon: Store, hint: "Compare prices and rentals across your usual suppliers." },
+  { id: "floor", label: "Floor map", Icon: MapIcon, hint: "Color a floor plan from the work order: who ordered what power, where." },
+  { id: "repos", label: "Repos", Icon: GitBranch, hint: "Keep an eye on the code repositories you follow." },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+const TAB_KEY = "pixelpals:work-tab";
+const startTab = (): TabId => {
+  try {
+    const q = new URLSearchParams(location.search).get("tab") ?? localStorage.getItem(TAB_KEY);
+    return TABS.some((x) => x.id === q) ? (q as TabId) : "events";
+  } catch { return "events"; }
+};
+
+export function ShowServicesTools({ page = false }: { page?: boolean } = {}) {
+  const [tab, setTab] = useState<TabId>("events");
+  useEffect(() => { setTab(startTab()); }, []); // after mount so server and browser render the same first frame
+  const pick = (v: string) => { setTab(v as TabId); try { localStorage.setItem(TAB_KEY, v); } catch { /* private window */ } };
+  const cur = TABS.find((x) => x.id === tab) ?? TABS[0];
+  return <Tabs value={tab} onValueChange={pick}>
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+            {TABS.map(({ id, label, Icon }) => (
+              <TabsTrigger key={id} value={id} className="gap-1.5"><Icon className="size-4" aria-hidden />{label}</TabsTrigger>
+            ))}
           </TabsList>
+          <div className="flex items-start justify-between gap-3 pt-2">
+            <p className="text-sm text-muted-foreground">{cur.hint}</p>
+            {!page && <a href={`/work?tab=${tab}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs text-primary underline"><ExternalLink className="size-3.5" /> Open as its own page</a>}
+          </div>
           <TabsContent value="events"><EventsTab /></TabsContent>
           <TabsContent value="shifts"><ShiftsTab /></TabsContent>
           <TabsContent value="deck"><DeckTab /></TabsContent>
@@ -48,10 +70,17 @@ export function ShowServicesTools() {
 }
 
 function FilePick({ accept, label, onFile, onFiles }: { accept: string; label: string; onFile?: (f: File) => void; onFiles?: (f: File[]) => void }) {
+  const [over, setOver] = useState(false);
+  const take = (list: File[]) => { if (onFiles && list.length) onFiles(list); else if (list[0]) onFile?.(list[0]); };
   return (
-    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground hover:bg-muted">
-      <FileUp className="size-4" /> {label}
-      <input type="file" accept={accept} multiple={!!onFiles} className="sr-only" onChange={(e) => { const list = [...(e.target.files ?? [])]; if (onFiles && list.length) onFiles(list); else if (list[0]) onFile?.(list[0]); e.target.value = ""; }} />
+    <label
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); take([...e.dataTransfer.files]); }}
+      className={`flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center text-sm hover:bg-muted ${over ? "border-primary bg-muted text-foreground" : "border-border text-muted-foreground"}`}
+    >
+      <FileUp className="size-4 shrink-0" /> {label}
+      <input type="file" accept={accept} multiple={!!onFiles} className="sr-only" onChange={(e) => { take([...(e.target.files ?? [])]); e.target.value = ""; }} />
     </label>
   );
 }
@@ -80,7 +109,8 @@ function EventsTab() {
     <div className="space-y-3 pt-2">
       <FilePick accept="application/pdf,.xlsx" label="Drop Ungerboeck PDFs — add your monthly schedule .xlsx to fill it in" onFiles={load} />
       <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
-      {status && <p className="text-sm">{status}</p>}
+      {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
+      {entries.length === 0 && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop one or more Ungerboeck event PDFs.</li><li>Optional: drop your monthly schedule .xlsx in the same box to fill it in (engineer shifts are kept).</li><li>Download the Excel file.</li></ol>}
       {entries.length > 0 && (
         <>
           <div className="max-h-72 overflow-y-auto rounded-md border border-border">
@@ -150,7 +180,9 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
 }
 
 function ShiftsTab() {
-  const [name, setName] = useState(DEFAULT_SCHEDULE_NAME);
+  const [name, setNameRaw] = useState(DEFAULT_SCHEDULE_NAME);
+  useEffect(() => { try { const n = localStorage.getItem("pixelpals:work-name"); if (n) setNameRaw(n); } catch { /* ignore */ } }, []);
+  const setName = (n: string) => { setNameRaw(n); try { localStorage.setItem("pixelpals:work-name", n); } catch { /* ignore */ } };
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [status, setStatus] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -193,6 +225,7 @@ function ShiftsTab() {
   }
   return (
     <div className="space-y-3 pt-2">
+      <label className="grid gap-1 text-xs text-muted-foreground">Your name exactly as it appears on the schedule (remembered)</label>
       <div className="flex gap-2">
         <Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Name on schedule" />
         {file && <Button variant="outline" onClick={() => load(file)}>Re-read</Button>}
@@ -216,7 +249,7 @@ function ShiftsTab() {
           </div>
         </div>
       </details>
-      {status && <p className="text-sm">{status}</p>}
+      {status && <p className={`text-sm ${/^Could not|^No shifts/.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
       {(shifts.length > 0 || removed.length > 0) && (
         <>
           <div className="flex flex-wrap items-center gap-2">

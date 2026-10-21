@@ -26,6 +26,8 @@ export function FloorMapPanel() {
   const [zoom, setZoom] = useState(1);
   const [pageNo, setPageNo] = useState(1);
   const [files, setFiles] = useState<File[]>([]);
+  const [over, setOver] = useState(false);
+  const [rows, setRows] = useState(0);
   const view = useRef<HTMLCanvasElement>(null);
   const base = useRef<HTMLCanvasElement | null>(null);
   const geom = useRef({ s: 1, band: 0 });
@@ -48,7 +50,7 @@ export function FloorMapPanel() {
       if (!planFile || !lines.length) { setStatus(!planFile ? "I need the floor plan PDF too (drop both together)." : "I need the Better Work Order Items PDF too (drop both together)."); setFiles(fs); return; }
       const doc = await pdf.readPlan(planFile, page);
       const ents = buildEntries(parseWorkOrderLines(lines));
-      setPlan(doc); setName(planFile.name); setEntries(ents); setFiles(fs);
+      setRows(parseWorkOrderLines(lines).length); setPlan(doc); setName(planFile.name); setEntries(ents); setFiles(fs);
       setSaved(load(planKey(planFile.name, doc.prims)));
       const s = pdf.pickScale(doc.prims);
       const c = document.createElement("canvas");
@@ -146,14 +148,22 @@ export function FloorMapPanel() {
 
   return (
     <div className="space-y-3 pt-2">
-      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground hover:bg-muted">
-        <FileUp className="size-4" /> Drop the floor plan PDF and the Better Work Order Items PDF together
+      <label
+        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); const l = [...e.dataTransfer.files]; if (l.length) void read(l); }}
+        className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed p-4 text-center text-sm hover:bg-muted ${over ? "border-primary bg-muted text-foreground" : "border-border text-muted-foreground"}`}
+      >
+        <span className="flex items-center gap-2"><FileUp className="size-4" /> Drop the floor plan PDF and the Better Work Order Items PDF together</span>
+        <span className="text-xs">Either order is fine — I tell them apart by what's inside.</span>
         <input type="file" accept="application/pdf" multiple className="sr-only" onChange={(e) => { const l = [...(e.target.files ?? [])]; if (l.length) void read(l); e.target.value = ""; }} />
       </label>
       <p className="text-xs text-muted-foreground">10 amp = yellow · 20 amp = orange · both = split · more than one → x#. Small squares: red 30 amp, green 60 amp, blue water, purple compressed air. Showcase power is yellow (SCase xN), track lights show A / B xN. Runs in this browser; answers you give are remembered for the same plan.</p>
-      {status && <p className="text-sm">{status}</p>}
+      {status && <p className={`text-sm ${/^Couldn|^I need/.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
+      {!plan && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop the plan and the work order report.</li><li>Check the colored map — zoom in with the slider.</li><li>Answer anything under “Needs your answer” (pick the booth on the plan, or skip).</li><li>Download the picture or PDF.</li></ol>}
       {plan && resolved && (
         <>
+          <p className="text-xs text-muted-foreground">{name} · {rows} order lines read · {entries.length} exhibitors</p>
           <p className="text-sm font-medium">{resolved.placed.length} colored · {blocking.length} need your answer{checks.length ? ` · ${checks.length} to double-check` : ""}</p>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={() => void out("png")}><Download className="size-4" /> Picture (PNG)</Button>
