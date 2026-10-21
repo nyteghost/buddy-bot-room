@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { airwallTasks, sharedSpaces, classifyByDescription, classifyEvent, summarizeEvents, taskSuggestions, type EventRow } from "@/lib/work-tools";
+import { entryLabel, airwallTasks, sharedSpaces, classifyByDescription, classifyEvent, summarizeEvents, taskSuggestions, type EventRow } from "@/lib/work-tools";
 
 const row = (o: Partial<EventRow>): EventRow => ({ level: 2, usage: "", start: "08:00 AM", end: "05:00 PM", description: "", space: "Exhibit Hall A (EXA)", date: "2026-10-06", event: "Home Depot", ...o });
 
@@ -7,10 +7,10 @@ describe("For Scheduling report (no Usage column)", () => {
   it.each([
     ["Move In", "MI"], ["AV Move In", "MI"], ["Decorator Move In", "MI"], ["Exhibitor Move In", "Exmi"],
     ["Move In - Exhibitors", "Exmi"], ["Exhibitor Service Desk", "Exmi"], ["Engineering Service Desk", "Exmi"],
-    ["Move Out", "MO"], ["Exhibitor Move Out", "MO"], ["Load Out", "MO"], ["Reception", "Food"], ["Plated Dinner", "Food"],
+    ["Move Out", "MO"], ["Client Arrival", "Arr"], ["Exhibitor Move Out", "MO"], ["Load Out", "MO"], ["Reception", "Food"], ["Plated Dinner", "Dinner"], ["Buffet Breakfast", "Meal"],
     ["Meeting", "MTG"], ["General Session", "S"], ["Breakout Session", "S"], ["ARA SHOW OPEN", "S"],
   ])("%s is %s", (d, c) => expect(classifyByDescription(d)).toBe(c));
-  it.each(["Event Inspection Walk-Through", "Break", "Client Arrival", "Show Office", "Room Turn", "Exhibitor Early Access"])("%s is skipped", (d) => expect(classifyByDescription(d)).toBe(null));
+  it.each(["Event Inspection Walk-Through", "Break", "Show Office", "Room Turn", "Exhibitor Early Access"])("%s is skipped", (d) => expect(classifyByDescription(d)).toBe(null));
   it("uses the description when Usage is blank, and still uses Usage when present", () => {
     expect(classifyEvent(row({ description: "Move In" }))).toBe("MI");
     expect(classifyEvent(row({ usage: "Move Out (OUT)", description: "Whatever" }))).toBe("MO");
@@ -66,6 +66,21 @@ describe("For Scheduling report (no Usage column)", () => {
       r("2026-11-11", "Chattahoochee Ballroom (BRFULL)", "08:00 AM"),
       r("2026-11-11", "Ballroom ABE (BRABE)", "11:00 AM"),
     ]);
-    expect(t.map((x) => `${x.date} ${x.text}`).sort()).toEqual(["2026-11-09 Make full ballroom", "2026-11-11 Make Ballroom ABE"]);
+    expect(t.map((x) => `${x.date} ${x.text}`).sort()).toEqual(["2026-11-09 Make full ballroom", "2026-11-11 Make ABE"]);
+  });
+  it("end of show load-out stays part of the show, and a client arrival before everything else gets a line", () => {
+    const list = summarizeEvents([
+      row({ description: "General Admission Entry", start: "10:00 AM", end: "05:00 PM" }),
+      row({ description: "End of Show/Vendor Load-out", start: "05:00 PM", end: "06:00 PM" }),
+      row({ description: "Move Out - Chair Pickup", start: "07:00 PM", end: "10:00 PM" }),
+      row({ description: "Client Arrival", start: "06:15 AM", end: "06:15 AM", event: "Other", eventId: "9" }),
+      row({ description: "Buffet Breakfast", start: "07:00 AM", end: "09:00 AM", event: "Other", eventId: "9" }),
+    ]);
+    expect(list.filter((e) => e.eventId !== "9").map((e) => e.code)).toEqual(["S", "MO"]);
+    expect(list.find((e) => e.code === "S" && e.start === 600)!.end).toBe(1080);
+    expect(list.filter((e) => e.eventId === "9").map((e) => entryLabel(e))).toEqual(["Client Arr 6:15a", "S 7a-9a"]);
+  });
+  it("a dinner stays a dinner and joins air wall tasks on the same day with a slash", () => {
+    expect(summarizeEvents([row({ description: "Plated Dinner" })]).map((e) => entryLabel(e))).toEqual(["Dinner 8a-5p"]);
   });
 });

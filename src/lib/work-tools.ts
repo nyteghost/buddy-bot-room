@@ -41,21 +41,25 @@ export function parseReportTime(t: string): number {
 
 // ---------- Ungerboeck event functions ----------
 export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string; eventId?: string };
-export type EventCode = "S" | "Exmi" | "MI" | "MO" | "MO?" | "Food" | "MTG";
+export type EventCode = "S" | "Exmi" | "MI" | "MO" | "MO?" | "Food" | "Dinner" | "MTG" | "Arr" | "Meal";
 export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string; eventId?: string };
 
 /** Applies Mark's rules: skip Level 1 date headers; S = show events; Exmi = exhibitor move in; MI = other move in; MO = move out. */
 const FOOD_RE = /reception|dinner|lunch|breakfast|buffet|hosted bar|cash bar|wine service|food|concession|coffee|snack|banquet|luncheon|plated|boxed|brunch/;
-const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|client arrival|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat|on.?site/;
+const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat|on.?site/;
 
 /** The "For Scheduling" report has no Usage column, so the code comes from the description alone. */
 export function classifyByDescription(description: string): EventCode | null {
   const d = description.toLowerCase();
   if (/service desk/.test(d)) return "Exmi";
+  if (/end of show/.test(d)) return "S"; // vendors leaving at the end of the show is still the show
+  if (/client arrival/.test(d)) return "Arr";
   if (/move.?out|tear ?down|load.?out|dismantle/.test(d)) return "MO";
   if (/exhibitor/.test(d) && /move.?in|load.?in/.test(d)) return "Exmi";
   if (/move.?in|march in|load.?in|set ?up|install|decorator day/.test(d)) return "MI";
   if (/\bmeeting\b|\bmtg\b/.test(d) && !/session/.test(d)) return "MTG";
+  if (/dinner/.test(d)) return "Dinner";
+  if (/breakfast|lunch|brunch/.test(d)) return "Meal";
   if (FOOD_RE.test(d)) return "Food";
   if (SKIP_RE.test(d)) return null;
   return "S";
@@ -94,11 +98,25 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   }
   // A meal or meeting inside the same show's day is part of the show; only one after the show ends gets its own line.
   const all = [...map.values()];
-  const kept = all.filter((e) => {
-    if (e.code !== "Food" && e.code !== "MTG") return true;
-    const show = all.find((x) => x.date === e.date && x.space === e.space && x.title === e.title && x.eventId === e.eventId && x.code === "S");
-    return !show || (e.code === "Food" && e.start >= show.end);
-  });
+  const same = (a: EventEntry, b: EventEntry) => a.date === b.date && a.space === b.space && a.title === b.title && a.eventId === b.eventId;
+  const kept: EventEntry[] = [];
+  for (const e of all) {
+    const mates = all.filter((x) => same(x, e) && x !== e);
+    const show = mates.find((x) => x.code === "S");
+    if (e.code === "Arr") {
+      // only worth a line when the client arrives before anything else starts
+      const first = Math.min(...mates.filter((x) => x.code !== "Arr").map((x) => x.start), 1e9);
+      if (e.start < first && first < 1e9) kept.push({ ...e, end: e.start });
+      continue;
+    }
+    if (e.code === "Food" || e.code === "Dinner" || e.code === "MTG" || e.code === "Meal") {
+      if (show) { if (e.code !== "MTG" && e.start >= show.end) kept.push(e.code === "Meal" ? { ...e, code: "Food" } : e); continue; }
+      // a breakfast or lunch with nothing else going on is the whole event, so it reads as the show
+      kept.push(e.code === "Meal" ? { ...e, code: "S" } : e);
+      continue;
+    }
+    kept.push(e);
+  }
   // No move-out line for an event that had a move in: flag the last day with "MO?" so it gets checked by hand.
   const groups = new Map<string, EventEntry[]>();
   for (const e of kept) groups.set(JSON.stringify([e.eventId ?? "", e.title, e.space]), [...(groups.get(JSON.stringify([e.eventId ?? "", e.title, e.space])) ?? []), e]);
@@ -107,12 +125,13 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
     const last = list.reduce((a, b) => (b.date > a.date || (b.date === a.date && b.end > a.end) ? b : a));
     kept.push({ ...last, code: "MO?", start: last.end, end: last.end });
   }
-  const order: EventCode[] = ["MI", "Exmi", "S", "Food", "MTG", "MO", "MO?"];
+  const order: EventCode[] = ["Arr", "MI", "Exmi", "S", "Food", "Dinner", "MTG", "MO", "MO?"];
   return kept.sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
 }
 
 export function entryLabel(e: EventEntry) {
   if (e.code === "MO?") return "MO?";
+  if (e.code === "Arr") return `Client Arr ${formatMinutes(e.start)}`;
   return `${e.code} ${formatMinutes(e.start)}-${formatMinutes(e.end)}`;
 }
 
@@ -410,24 +429,32 @@ export function airwallTasks(rows: EventRow[]): TaskNote[] {
             for (const d of [...busy.keys()].sort()) if (d < date && [...g].some((c) => busy.get(d)!.has(c))) last = d;
             const monday = mondayOf(date);
             const free = last ? addDays(last, 1) : monday;
-            day = free >= date ? date : free < monday ? monday : free;
+            // free whole days before the show: use the first; otherwise the room's last busy day (after that event ends)
+            day = free >= date ? (last || date) : free < monday ? monday : free;
           }
-          const name = section === "BALLROOM" && g === "ABCDEFG" ? "full ballroom" : `${section === "HALLS" ? "Hall" : "Ballroom"} ${g}`;
-          out.set(JSON.stringify([day, section, g]), { date: day, section, text: `Make ${name}` });
+          out.set(JSON.stringify([day, section, g]), { date: day, section, text: g });
         }
         earlier.push(g);
         for (const c of g) config.set(c, g);
       }
     }
   }
-  return [...out.values()].sort((a, b) => a.date.localeCompare(b.date) || a.text.localeCompare(b.text));
+  // One line per day and section: "Make Hall AB", "Make ABE/CDFG", "Make full ballroom".
+  const merged = new Map<string, TaskNote>();
+  for (const t of [...out.values()].sort((a, b) => a.text.localeCompare(b.text))) {
+    const key = `${t.date}|${t.section}`;
+    const name = t.section === "BALLROOM" && t.text === "ABCDEFG" ? "full ballroom" : t.text;
+    const prev = merged.get(key);
+    merged.set(key, { date: t.date, section: t.section, text: prev ? `${prev.text}/${name}` : `Make ${t.section === "HALLS" ? "Hall " : ""}${name}` });
+  }
+  return [...merged.values()].sort((a, b) => a.date.localeCompare(b.date) || a.text.localeCompare(b.text));
 }
 
 /** Rooms with more than one event on the same day, so the person can see when shows share space. */
 export function sharedSpaces(entries: EventEntry[]): string[] {
   const map = new Map<string, Set<string>>();
   for (const e of entries) {
-    if (e.code === "MTG" || e.code === "Food" || e.code === "MO?") continue;
+    if (e.code === "MTG" || e.code === "Food" || e.code === "Dinner" || e.code === "Arr" || e.code === "MO?") continue;
     const key = `${e.date}|${e.space}`;
     map.set(key, new Set([...(map.get(key) ?? []), e.title]));
   }
