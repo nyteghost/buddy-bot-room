@@ -101,6 +101,46 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
   return rows;
 }
 
+const clock = (v: unknown): string => {
+  let min: number | null = null;
+  if (v instanceof Date) min = v.getUTCHours() * 60 + v.getUTCMinutes();
+  else if (typeof v === "number") min = Math.round((v % 1) * 1440);
+  else if (typeof v === "string" && /\d{1,2}:\d{2}\s*[AP]M/i.test(v)) return v.trim();
+  if (min === null) return "";
+  const h = Math.floor(min / 60) % 24, m = min % 60;
+  return `${String(h % 12 || 12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+};
+
+/** Reads the For Scheduling report exported to Excel. Returns null when the workbook is some other sheet (a monthly schedule). */
+export async function readEventSheet(file: File): Promise<EventRow[] | null> {
+  const module = await import("exceljs");
+  const ExcelJS = module.default ?? module;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  const ws = wb.worksheets[0];
+  if (!ws) return null;
+  const text = (v: unknown) => (v && typeof v === "object" && "result" in (v as object) ? String((v as { result: unknown }).result ?? "") : v === null || v === undefined ? "" : String(v)).trim();
+  if (!/^for scheduling$/i.test(text(ws.getRow(1).getCell(1).value))) return null;
+  const head = ws.getRow(2);
+  const col = (name: string) => { for (let c = 1; c <= 15; c++) if (text(head.getCell(c).value).toLowerCase() === name.toLowerCase()) return c; return 0; };
+  const [cStart, cEnd, cEvent, cDesc, cSpace, cId] = [col("Start Time"), col("End Time"), col("Event"), col("Description"), col("Space"), col("Event ID")];
+  if (!cStart || !cEnd || !cDesc || !cSpace) return null;
+  const months = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+  const rows: EventRow[] = [];
+  let day = "";
+  ws.eachRow((row, n) => {
+    if (n < 3) return;
+    const a = text(row.getCell(1).value);
+    const dm = a.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/);
+    if (dm) { day = `${dm[3]}-${String(months.indexOf((dm[1] ?? "").toLowerCase()) + 1).padStart(2, "0")}-${(dm[2] ?? "").padStart(2, "0")}`; return; }
+    const start = clock(row.getCell(cStart).value);
+    if (!day || !start) return;
+    const id = text(row.getCell(cId || 99).value).match(/\d{3,}/)?.[0];
+    rows.push({ level: 2, usage: "", start, end: clock(row.getCell(cEnd).value), description: text(row.getCell(cDesc).value), space: text(row.getCell(cSpace).value), event: cEvent ? text(row.getCell(cEvent).value) : "", ...(id ? { eventId: id } : {}), date: day });
+  });
+  return rows;
+}
+
 const serialToIso = (n: number) => new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0, 10);
 
 /** Reads every "Week #" sheet and returns the shifts in the named person's row. */
