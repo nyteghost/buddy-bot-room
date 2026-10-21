@@ -52,6 +52,7 @@ const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|g
 export function classifyByDescription(description: string): EventCode | null {
   const d = description.toLowerCase();
   if (/service desk/.test(d)) return "Exmi";
+  if (/registration/.test(d) && !/move.?out/.test(d)) return "S"; // registration is the start of the show
   if (/end of show/.test(d)) return "S"; // vendors leaving at the end of the show is still the show
   if (/client arrival/.test(d)) return "Arr";
   if (/move.?out|tear ?down|load.?out|dismantle/.test(d)) return "MO";

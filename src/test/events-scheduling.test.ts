@@ -8,7 +8,7 @@ describe("For Scheduling report (no Usage column)", () => {
     ["Move In", "MI"], ["AV Move In", "MI"], ["Decorator Move In", "MI"], ["Exhibitor Move In", "Exmi"],
     ["Move In - Exhibitors", "Exmi"], ["Exhibitor Service Desk", "Exmi"], ["Engineering Service Desk", "Exmi"],
     ["Move Out", "MO"], ["Client Arrival", "Arr"], ["Exhibitor Move Out", "MO"], ["Load Out", "MO"], ["Reception", "Food"], ["Plated Dinner", "Dinner"], ["Buffet Breakfast", "Meal"],
-    ["Meeting", "MTG"], ["General Session", "S"], ["Breakout Session", "S"], ["ARA SHOW OPEN", "S"],
+    ["Registration/Vendor Load-In", "S"], ["Registration - Exhibitors Only", "S"], ["Meeting", "MTG"], ["General Session", "S"], ["Breakout Session", "S"], ["ARA SHOW OPEN", "S"],
   ])("%s is %s", (d, c) => expect(classifyByDescription(d)).toBe(c));
   it.each(["Event Inspection Walk-Through", "Break", "Show Office", "Room Turn", "Exhibitor Early Access"])("%s is skipped", (d) => expect(classifyByDescription(d)).toBe(null));
   it("uses the description when Usage is blank, and still uses Usage when present", () => {
