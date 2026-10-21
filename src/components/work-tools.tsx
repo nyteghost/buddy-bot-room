@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type Shift, type TaskNote } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, airwallTasks, sharedSpaces, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type Shift, type TaskNote } from "@/lib/work-tools";
 import { VendorsPanel } from "@/components/vendors-panel";
 import { FloorMapPanel } from "@/components/floor-map-panel";
 import { RepoWatch } from "@/components/repo-watch";
@@ -91,6 +91,7 @@ function EventsTab() {
   const [blob, setBlob] = useState<Blob | null>(null);
   const [merged, setMerged] = useState(false);
   const [tasks, setTasks] = useState<TaskNote[]>([]);
+  const [shared, setShared] = useState<string[]>([]);
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
     try {
@@ -99,7 +100,8 @@ function EventsTab() {
       const existing = files.find((f) => /\.xlsx?$/i.test(f.name));
       const rows = (await Promise.all(pdfs.map(readEventPdf))).flat();
       const list = summarizeEvents(rows);
-      const notes = taskSuggestions(rows);
+      const notes = [...airwallTasks(rows), ...taskSuggestions(rows)].sort((a, b) => a.date.localeCompare(b.date));
+      setShared(sharedSpaces(list));
       setEntries(list); setMerged(!!existing); setTasks(notes);
       setBlob(list.length ? await eventsWorkbook(list, existing, notes) : null);
       const dates = new Set(list.map((e) => e.date)).size;
@@ -110,7 +112,7 @@ function EventsTab() {
   return (
     <div className="space-y-3 pt-2">
       <FilePick accept="application/pdf,.xlsx" label="Drop Ungerboeck PDFs — add your monthly schedule .xlsx to fill it in" onFiles={load} />
-      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
+      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting · MO? = no move-out line in the report, so check it. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
       {entries.length === 0 && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop one or more Ungerboeck event PDFs.</li><li>Optional: drop your monthly schedule .xlsx in the same box to fill it in (engineer shifts are kept).</li><li>Download the Excel file.</li></ol>}
       {entries.length > 0 && (
@@ -123,9 +125,15 @@ function EventsTab() {
               ))}</tbody>
             </table>
           </div>
+          {shared.length > 0 && (
+            <details className="rounded-md border border-amber-500 p-2 text-xs">
+              <summary className="cursor-pointer font-medium">{shared.length} rooms are shared by more than one event</summary>
+              <ul className="mt-1 space-y-0.5">{shared.map((t, i) => <li key={i}>{t}</li>)}</ul>
+            </details>
+          )}
           {tasks.length > 0 && (
             <details className="rounded-md border border-border p-2 text-xs">
-              <summary className="cursor-pointer font-medium">{tasks.length} task suggestions (stage builds and room turns)</summary>
+              <summary className="cursor-pointer font-medium">{tasks.length} task suggestions (air walls, stage builds, room turns)</summary>
               <ul className="mt-1 space-y-0.5">{tasks.map((t, i) => <li key={i}><span className="text-muted-foreground">{dayLabel(t.date)}:</span> {t.text}</li>)}</ul>
             </details>
           )}

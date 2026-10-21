@@ -143,7 +143,7 @@ const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
 function paint(cell: import("exceljs").Cell, codes: string[]) {
-  const show = codes.includes("S"), moveIn = codes.includes("MI") || codes.includes("Exmi"), moveOut = codes.includes("MO");
+  const show = codes.includes("S"), moveIn = codes.includes("MI") || codes.includes("Exmi"), moveOut = codes.includes("MO") || codes.includes("MO?");
   const code = show && moveIn && moveOut ? "allThree" : show && moveOut ? "MO" : show && moveIn ? "moveInShow" : show ? "S" : codes[0];
   const color = code ? FILL[code] : undefined;
   cell.fill = color ? { type: "pattern", pattern: "solid", fgColor: { argb: color } } : { type: "pattern", pattern: "none" };

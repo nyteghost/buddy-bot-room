@@ -41,7 +41,7 @@ export function parseReportTime(t: string): number {
 
 // ---------- Ungerboeck event functions ----------
 export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string; eventId?: string };
-export type EventCode = "S" | "Exmi" | "MI" | "MO" | "Food" | "MTG";
+export type EventCode = "S" | "Exmi" | "MI" | "MO" | "MO?" | "Food" | "MTG";
 export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string; eventId?: string };
 
 /** Applies Mark's rules: skip Level 1 date headers; S = show events; Exmi = exhibitor move in; MI = other move in; MO = move out. */
@@ -99,11 +99,20 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
     const show = all.find((x) => x.date === e.date && x.space === e.space && x.title === e.title && x.eventId === e.eventId && x.code === "S");
     return !show || (e.code === "Food" && e.start >= show.end);
   });
-  const order: EventCode[] = ["MI", "Exmi", "S", "Food", "MTG", "MO"];
+  // No move-out line for an event that had a move in: flag the last day with "MO?" so it gets checked by hand.
+  const groups = new Map<string, EventEntry[]>();
+  for (const e of kept) groups.set(JSON.stringify([e.eventId ?? "", e.title, e.space]), [...(groups.get(JSON.stringify([e.eventId ?? "", e.title, e.space])) ?? []), e]);
+  for (const list of groups.values()) {
+    if (list.some((e) => e.code === "MO") || !list.some((e) => e.code === "MI" || e.code === "Exmi")) continue;
+    const last = list.reduce((a, b) => (b.date > a.date || (b.date === a.date && b.end > a.end) ? b : a));
+    kept.push({ ...last, code: "MO?", start: last.end, end: last.end });
+  }
+  const order: EventCode[] = ["MI", "Exmi", "S", "Food", "MTG", "MO", "MO?"];
   return kept.sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
 }
 
 export function entryLabel(e: EventEntry) {
+  if (e.code === "MO?") return "MO?";
   return `${e.code} ${formatMinutes(e.start)}-${formatMinutes(e.end)}`;
 }
 
@@ -355,4 +364,53 @@ export function taskSuggestions(rows: EventRow[]): TaskNote[] {
     out.set(JSON.stringify([row.date, section, text]), { date: row.date, section, text });
   }
   return [...out.values()].sort((a, b) => a.date.localeCompare(b.date) || a.text.localeCompare(b.text));
+}
+
+// ---------- air walls ----------
+const letters = (space: string): { section: "HALLS" | "BALLROOM"; group: string } | null => {
+  const s = space.toLowerCase();
+  const hall = s.match(/exhibit hall ([a-d]+)\b/);
+  if (hall) return { section: "HALLS", group: (hall[1] ?? "").toUpperCase() };
+  if (/chattahoochee|brfull/.test(s)) return { section: "BALLROOM", group: "ABCDEFG" };
+  const ball = s.match(/ballroom ([a-g]+)\b/);
+  if (ball) return { section: "BALLROOM", group: (ball[1] ?? "").toUpperCase() };
+  return null;
+};
+const prevDay = (iso: string) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+
+/** "Make AB" tasks: air walls change when a room is used in a different combination than the last time. The task goes on the day before, or the same day when that room is busy the day before. */
+export function airwallTasks(rows: EventRow[]): TaskNote[] {
+  const used = rows.filter((r) => r.level > 1 && classifyEvent(r) && letters(r.space || ""));
+  const dates = [...new Set(used.map((r) => r.date))].sort();
+  const out = new Map<string, TaskNote>();
+  for (const section of ["HALLS", "BALLROOM"] as const) {
+    const config = new Map<string, string>(); // letter -> group it was last used in
+    const busy = new Map<string, Set<string>>(); // date -> letters in use
+    for (const r of used) { const l = letters(r.space); if (l?.section === section) busy.set(r.date, new Set([...(busy.get(r.date) ?? []), ...l.group])); }
+    for (const date of dates) {
+      const groups = new Set(used.filter((r) => r.date === date).map((r) => letters(r.space)).filter((l) => l?.section === section).map((l) => l!.group));
+      for (const g of [...groups].sort()) {
+        const known = [...g].filter((c) => config.has(c));
+        const changed = known.length > 0 && [...g].some((c) => config.get(c) !== g);
+        if (changed) {
+          const day = [...g].some((c) => busy.get(prevDay(date))?.has(c)) ? date : prevDay(date);
+          const name = section === "BALLROOM" && g === "ABCDEFG" ? "full ballroom" : `${section === "HALLS" ? "Hall" : "Ballroom"} ${g}`;
+          out.set(JSON.stringify([day, section, g]), { date: day, section, text: `Make ${name}` });
+        }
+        for (const c of g) config.set(c, g);
+      }
+    }
+  }
+  return [...out.values()].sort((a, b) => a.date.localeCompare(b.date) || a.text.localeCompare(b.text));
+}
+
+/** Rooms with more than one event on the same day, so the person can see when shows share space. */
+export function sharedSpaces(entries: EventEntry[]): string[] {
+  const map = new Map<string, Set<string>>();
+  for (const e of entries) {
+    if (e.code === "MTG" || e.code === "Food" || e.code === "MO?") continue;
+    const key = `${e.date}|${e.space}`;
+    map.set(key, new Set([...(map.get(key) ?? []), e.title]));
+  }
+  return [...map.entries()].filter(([, t]) => t.size > 1).sort(([a], [b]) => a.localeCompare(b)).map(([k, t]) => `${k.split("|")[0]} · ${k.split("|")[1]}: ${[...t].join(" + ")}`);
 }

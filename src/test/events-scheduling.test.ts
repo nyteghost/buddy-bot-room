@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyByDescription, classifyEvent, summarizeEvents, taskSuggestions, type EventRow } from "@/lib/work-tools";
+import { airwallTasks, sharedSpaces, classifyByDescription, classifyEvent, summarizeEvents, taskSuggestions, type EventRow } from "@/lib/work-tools";
 
 const row = (o: Partial<EventRow>): EventRow => ({ level: 2, usage: "", start: "08:00 AM", end: "05:00 PM", description: "", space: "Exhibit Hall A (EXA)", date: "2026-10-06", event: "Home Depot", ...o });
 
@@ -39,5 +39,24 @@ describe("For Scheduling report (no Usage column)", () => {
     const list = summarizeEvents([row({ description: "General Session", eventId: "111" }), row({ description: "General Session", eventId: "222" })]);
     expect(list.length).toBe(2);
     expect(list.map((e) => e.eventId)).toEqual(["111", "222"]);
+  });
+  it("flags MO? when an event moved in but has no move-out line", () => {
+    const list = summarizeEvents([row({ description: "Move In", date: "2026-10-05" }), row({ description: "General Session", date: "2026-10-06" })]);
+    const q = list.filter((e) => e.code === "MO?");
+    expect(q.length).toBe(1);
+    expect(q[0]!.date).toBe("2026-10-06");
+    expect(summarizeEvents([row({ description: "Move In" }), row({ description: "Move Out", date: "2026-10-07" })]).some((e) => e.code === "MO?")).toBe(false);
+  });
+  it("makes air wall tasks when a room changes shape", () => {
+    const t = airwallTasks([
+      row({ description: "General Session", date: "2026-10-05", space: "Exhibit Hall AB (EXAB)" }),
+      row({ description: "General Session", date: "2026-10-09", space: "Exhibit Hall A (EXA)" }),
+      row({ description: "General Session", date: "2026-10-10", space: "Exhibit Hall A (EXA)" }),
+    ]);
+    expect(t.map((x) => `${x.date} ${x.text}`)).toEqual(["2026-10-08 Make Hall A"]);
+  });
+  it("lists rooms shared by two events", () => {
+    const list = summarizeEvents([row({ description: "General Session", event: "One", eventId: "1" }), row({ description: "General Session", event: "Two", eventId: "2" })]);
+    expect(sharedSpaces(list).length).toBe(1);
   });
 });
