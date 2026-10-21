@@ -11,3 +11,8 @@ services:
       - "18092:8090"
     environment:
       BUDDY_TZ: America/New_York
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
