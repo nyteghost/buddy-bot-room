@@ -98,4 +98,14 @@ describe("For Scheduling report (no Usage column)", () => {
     expect(entryLabel(list.find((e) => e.code === "S")!)).toBe("S 9:15a-7p");
     expect(entryLabel(list.find((e) => e.code === "MO")!)).toBe("MO 7p-10p");
   });
+  it("a smaller move-out day does not move walls, a different event needs them made", () => {
+    const h = (d: string, sp: string, event: string, eventId: string) => row({ description: "General Session", date: d, space: sp, event, eventId });
+    const t = airwallTasks([
+      h("2026-10-26", "Exhibit Hall ABC (EXABC)", "Critical", "1"),
+      row({ description: "Move Out", date: "2026-10-30", space: "Exhibit Hall AB (EXAB)", event: "Critical", eventId: "1" }),
+      h("2026-11-05", "Exhibit Hall AB (EXAB)", "Front Row", "2"),
+      h("2026-11-05", "Exhibit Hall D (EXD)", "DECA", "3"),
+    ]);
+    expect(t.map((x) => `${x.date} ${x.text}`)).toEqual(["2026-11-02 Make Hall AB"]);
+  });
 });

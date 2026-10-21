@@ -411,13 +411,17 @@ export function airwallTasks(rows: EventRow[]): TaskNote[] {
   const dates = [...new Set(used.map((r) => r.date))].sort();
   const out = new Map<string, TaskNote>();
   for (const section of ["HALLS", "BALLROOM"] as const) {
-    const config = new Map<string, string>(); // letter -> group it was last used in
+    const config = new Map<string, { g: string; owner: string }>(); // letter -> shape its walls are in, and which event set it
+    const owners = new Map<string, string>(); // date|group -> the event using it
+    const sessions = new Set<string>(); // date|group where an actual session runs (not only move in/out)
     const busy = new Map<string, Set<string>>(); // date -> letters in use
     const first = new Map<string, number>(); // date|group -> earliest start that day
     for (const r of used) {
       const l = letters(r.space);
       if (l?.section !== section) continue;
       busy.set(r.date, new Set([...(busy.get(r.date) ?? []), ...l.group]));
+      if (!owners.has(`${r.date}|${l.group}`)) owners.set(`${r.date}|${l.group}`, r.eventId || r.event || "");
+      if (classifyEvent(r) === "S") sessions.add(`${r.date}|${l.group}`);
       const k = `${r.date}|${l.group}`;
       first.set(k, Math.min(first.get(k) ?? 1e9, parseReportTime(r.start)));
     }
@@ -426,8 +430,11 @@ export function airwallTasks(rows: EventRow[]): TaskNote[] {
         .sort((a, b) => (first.get(`${date}|${a}`) ?? 0) - (first.get(`${date}|${b}`) ?? 0) || a.localeCompare(b));
       const earlier: string[] = [];
       for (const g of groups) {
+        const owner = owners.get(`${date}|${g}`) ?? "";
         const known = [...g].filter((c) => config.has(c));
-        const changed = known.length > 0 && [...g].some((c) => config.get(c) !== g);
+        // Moving in or out of a smaller part of a room the same event already opened (ABC, then AB on move out day) does not move any wall; running a session there does.
+        const inherited = (c: string) => { const cfg = config.get(c); return !sessions.has(`${date}|${g}`) && !!cfg && cfg.owner !== "" && cfg.owner === owner && [...g].every((x) => cfg.g.includes(x)); };
+        const changed = known.length > 0 && [...g].some((c) => config.get(c)?.g !== g && !inherited(c));
         if (changed) {
           let day: string;
           if (earlier.some((h) => [...h].some((c) => g.includes(c)))) day = date; // after the earlier shape is done that day
@@ -442,7 +449,13 @@ export function airwallTasks(rows: EventRow[]): TaskNote[] {
           out.set(JSON.stringify([day, section, g]), { date: day, section, text: g });
         }
         earlier.push(g);
-        for (const c of g) config.set(c, g);
+        for (const c of g) {
+          if (inherited(c)) continue;
+          const old = config.get(c)?.g ?? "";
+          const rest = [...old].filter((x) => !g.includes(x)).join(""); // rooms that were joined to this one are now cut off from it
+          if (rest) for (const x of rest) config.set(x, { g: rest, owner: "" });
+          config.set(c, { g, owner });
+        }
       }
     }
   }
