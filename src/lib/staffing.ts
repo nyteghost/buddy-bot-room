@@ -112,8 +112,9 @@ export function planWeek(
       }
     }
     const deficit = () => need.map((n, i) => Math.max(0, n - cover[i]!));
-    for (let pass = 0; pass < 2; pass++) for (;;) {
-      const def = deficit();
+    // Pass -1 first covers anything running past midnight (only the late blocks can), then the rest of the day.
+    for (let pass = -1; pass < 2; pass++) for (;;) {
+      const def = deficit().map((x, i) => (pass < 0 && i < 48 ? 0 : x));
       if (!def.some((x) => x > 0)) break;
       let best: { name: string; p: { start: number; end: number }; gain: number; waste: number } | null = null;
       for (const s of staff) {
@@ -121,7 +122,7 @@ export function planWeek(
         const lastResort = !!s.lastResort?.includes(wd);
         if (busy.has(s.name) || avail[s.name]?.[date]?.off || s.offWeekdays?.includes(wd)) continue;
         if (s.baseline && !s.baseline.weekdays.includes(wd) && !lastResort) continue; // only works their usual days
-        if (lastResort && pass === 0) continue; // Mon/Sun only when nobody else can cover it
+        if (lastResort && pass <= 0) continue; // Mon/Sun only when nobody else can cover it
         if (worked.get(s.name)! >= MAX_DAYS && !lastResort) continue;
         for (const p of s.patterns ?? PATTERNS) {
           let gain = 0;

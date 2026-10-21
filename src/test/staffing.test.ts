@@ -29,7 +29,7 @@ describe("staffing", () => {
     expect(p.desk).toMatchObject({ start: 420, end: 930 });
   });
   it("keeps Alexis and Franck to their blocks and Edison takes a 1a close", () => {
-    const plans = planWeek(["2026-11-12"], [e("2026-11-12", "Hall A", 480, 1560), e("2026-11-12", "Hall B", 480, 1560)]);
+    const plans = planWeek(["2026-11-12"], [e("2026-11-12", "Hall A", 480, 1500), e("2026-11-12", "Hall B", 480, 1500)]);
     for (const a of plans[0]!.assignments) {
       if (a.name.startsWith("Alexis")) expect(a.start === 420 || a.start === 480 || a.start === 540).toBe(true);
       if (a.name.startsWith("Franck")) expect(a.start).toBeGreaterThanOrEqual(720);
