@@ -1,5 +1,5 @@
 // Browser-only file readers for work tools. Libraries load on demand.
-import { planWeek, needText, shiftText, workedHours } from "./staffing";
+import { planWeeks, needText, shiftText, workedHours, readAvail, SHOW_STAFF, ON_CALL, type Avail, type DayPlan } from "./staffing";
 import { BALLROOM_ROWS, ENGINEER_ROSTER, HALL_ROWS, weekLayouts, type WeekLayout, type TaskNote, DEFAULT_SCHEDULE_NAME, parseShift, reportDateToIso, type EventEntry, type EventRow, type Shift } from "./work-tools";
 
 type Item = { str: string; x: number; y: number };
@@ -245,7 +245,7 @@ function unmergeEventSpaces(ws: XSheet, w: WeekLayout, byLabel: Map<string, numb
   }
 }
 
-function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = []) {
+function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans: Map<string, DayPlan> = new Map()) {
   const font = { name: "Aptos Narrow", size: 20, bold: true };
   const wrap = { wrapText: true, vertical: "middle" as const, horizontal: "center" as const };
   ws.columns = [{ width: 41 }, ...DAYS.map(() => ({ width: 32 })), { width: 30 }];
@@ -265,8 +265,8 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = []) {
   put(6, ["CGC", ...w.cgc], false); put(7, ["CEPAC"]); put(8, ["CGC BARS", null, null, null, null, null, null, null, "CGC BARS"]);
   let r = 9;
   for (const p of ENGINEER_ROSTER) {
-    put(r, [p.name]);
-    put(r + 1, [/^\d+$/.test(p.badge) ? Number(p.badge) : p.badge, null, null, null, null, null, null, null, { formula: `SUM(B${r + 1}:H${r + 1})` }]);
+    put(r, [p.name, ...w.dates.map((d) => engineerCell(plans, p.name, d)?.top || null)]);
+    put(r + 1, [/^\d+$/.test(p.badge) ? Number(p.badge) : p.badge, ...w.dates.map((d) => engineerCell(plans, p.name, d)?.mid ?? null), { formula: `SUM(B${r + 1}:H${r + 1})` }]);
     put(r + 2, [p.title]);
     r += 3;
   }
@@ -301,7 +301,17 @@ function cellDate(v: unknown): string | null {
 }
 
 /** Writes event rows into an existing weekly sheet, keeping engineer shifts untouched. Returns false if the week is not on this sheet. */
-function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = []): boolean {
+/** An engineer's day, as in your sheets: shift on the name row, worked hours (or OFF) on the badge row below it. */
+function engineerCell(plans: Map<string, DayPlan>, name: string, date: string): { top: string; mid: string | number } | null {
+  const p = plans.get(date);
+  if (!p) return null;
+  const a = p.assignments.find((x) => x.name === name) ?? (p.desk?.name === name ? p.desk : undefined);
+  if (a) return { top: shiftText(a), mid: workedHours(a) };
+  const managed = name === "Jacquline Dixon" || [...SHOW_STAFF, ON_CALL].some((s) => s.name === name);
+  return managed ? { top: "", mid: "OFF" } : null;
+}
+
+function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans: Map<string, DayPlan> = new Map()): boolean {
   let dayRow = 0;
   ws.eachRow((row, n) => { if (!dayRow && String(row.getCell(2).value ?? "").trim().toUpperCase() === "MON") dayRow = n; });
   if (!dayRow) return false;
@@ -335,6 +345,18 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = []): bool
       if (text && !String(cell.value ?? "").trim()) { cell.value = text; cell.alignment = { wrapText: true, vertical: "middle", horizontal: "center" }; }
     }
   }
+  // Engineer shifts: only empty cells are filled; anything you typed (shift, PTO, OFF) stays.
+  for (const p of ENGINEER_ROSTER) {
+    const nr = byLabel.get(p.name.toLowerCase());
+    if (!nr) continue;
+    for (const [date, c] of cols) {
+      const top = ws.getRow(nr).getCell(c), mid = ws.getRow(nr + 1).getCell(c);
+      const e = engineerCell(plans, p.name, date);
+      if (!e || String(top.value ?? "").trim() || String(mid.value ?? "").toString().trim()) continue;
+      if (e.top) { top.value = e.top; top.alignment = { vertical: "middle", horizontal: "center" }; }
+      mid.value = e.mid; mid.alignment = { vertical: "middle", horizontal: "center" };
+    }
+  }
   mergeEventSpaces(ws, w, byLabel, cols);
   return true;
 }
@@ -347,21 +369,39 @@ export async function eventsWorkbook(entries: EventEntry[], existing?: File, tas
   const weeks = weekLayouts(entries);
   if (existing) await wb.xlsx.load(await existing.arrayBuffer());
   const sheets = wb.worksheets.filter((s) => /week/i.test(s.name));
+  // PTO and shifts you already typed into the engineer rows are read first, so the plan works around them.
+  const avail: Record<string, Record<string, Avail>> = {};
+  for (const ws of sheets) {
+    let dayRow = 0;
+    ws.eachRow((row, i) => { if (!dayRow && String(row.getCell(2).value ?? "").trim().toUpperCase() === "MON") dayRow = i; });
+    if (!dayRow) continue;
+    const cols = new Map<string, number>();
+    for (let c = 2; c <= 8; c++) { const d = cellDate(ws.getRow(dayRow + 1).getCell(c).value); if (d) cols.set(d, c); }
+    ws.eachRow((row, i) => {
+      const name = String(row.getCell(1).value ?? "").trim();
+      if (!ENGINEER_ROSTER.some((p) => p.name === name)) return;
+      for (const [d, c] of cols) {
+        const t = (x: { text?: string; value?: unknown }) => x.text ?? String(x.value ?? "");
+        const a = readAvail(t(row.getCell(c))) ?? (/^[a-z]/i.test(t(ws.getRow(i + 1).getCell(c)).trim()) && !/^off$/i.test(t(ws.getRow(i + 1).getCell(c)).trim()) ? readAvail(t(ws.getRow(i + 1).getCell(c))) : null);
+        if (a) (avail[name] ??= {})[d] = a;
+      }
+    });
+  }
+  const dates = [...new Set(entries.map((e) => e.date))].sort();
+  const plans = new Map(planWeeks(dates, entries, avail).map((p) => [p.date, p] as const));
   let n = sheets.length;
   for (const w of weeks) {
-    if (sheets.some((s) => mergeWeekSheet(s, w, tasks))) continue;
-    writeWeekSheet(wb.addWorksheet(`Week #${++n}`), w, tasks);
+    if (sheets.some((s) => mergeWeekSheet(s, w, tasks, plans))) continue;
+    writeWeekSheet(wb.addWorksheet(`Week #${++n}`), w, tasks, plans);
   }
-  addStaffingSheets(wb, entries);
+  addStaffingSheets(wb, [...plans.values()]);
   const out = await wb.xlsx.writeBuffer();
   return new Blob([out], { type: XLSX_MIME });
 }
 
 /** "Staffing" (who works when) and "Staffing Why" (the reasoning behind every pick) sheets. */
-function addStaffingSheets(wb: XWorkbook, entries: EventEntry[]) {
-  const dates = [...new Set(entries.map((e) => e.date))].sort();
-  if (!dates.length) return;
-  const plans = planWeek(dates, entries);
+function addStaffingSheets(wb: XWorkbook, plans: DayPlan[]) {
+  if (!plans.length) return;
   for (const name of ["Staffing", "Staffing Why"]) { const old = wb.getWorksheet(name); if (old) wb.removeWorksheet(old.id); }
   const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric", timeZone: "UTC" });
   const plan = wb.addWorksheet("Staffing");

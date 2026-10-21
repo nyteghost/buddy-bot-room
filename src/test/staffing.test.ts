@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planWeek, dayNeed, shiftText } from "@/lib/staffing";
+import { planWeek, planWeeks, dayNeed, shiftText } from "@/lib/staffing";
 import type { EventEntry } from "@/lib/work-tools";
 
 const e = (date: string, space: string, start: number, end: number, title = "Show", eventId = "1"): EventEntry =>
@@ -35,5 +35,14 @@ describe("staffing", () => {
       if (a.name.startsWith("Franck")) expect(a.start).toBeGreaterThanOrEqual(720);
     }
     expect(plans[0]!.assignments.some((a) => a.name.startsWith("Edison") && a.end === 1500)).toBe(true);
+  });
+  it("puts Madjid on Tuesday for a power-heavy show", () => {
+    const p = planWeek(["2026-11-10"], [e("2026-11-10", "Hall A", 480, 1000, "Gordon Food Service Show")])[0]!;
+    expect(p.assignments.some((a) => a.name.startsWith("Madjid"))).toBe(true);
+  });
+  it("plans whole weeks and fills the days nobody works with OFF-able people", () => {
+    const plans = planWeeks(["2026-11-10"], [e("2026-11-10", "Hall A", 480, 1000)]);
+    expect(plans).toHaveLength(7);
+    expect(plans[0]!.date).toBe("2026-11-09");
   });
 });

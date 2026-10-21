@@ -2,11 +2,11 @@
 // Rules: at least 1 engineer for any show, at least 2 at all times for a big show (2+ halls) on the days it is here.
 import { formatMinutes, parseShift, type EventEntry } from "./work-tools";
 
-export type Staff = { name: string; badge: string; title: string; patterns?: { start: number; end: number }[]; offWeekdays?: number[]; baseline?: { weekdays: number[]; pattern: { start: number; end: number } }; lastResort?: number[] };
+export type Staff = { name: string; badge: string; title: string; patterns?: { start: number; end: number }[]; offWeekdays?: number[]; baseline?: { weekdays: number[]; pattern: { start: number; end: number } }; lastResort?: number[]; powerDays?: number[] };
 const hours = (list: [number, number][]) => list.map(([a, b]) => ({ start: a * 60, end: b * 60 }));
 const EVENING = hours([[12, 20.5], [12.5, 21], [13, 21.5], [13.5, 22], [14, 22.5], [14.5, 23], [15, 23.5], [15.5, 24]]);
 export const SHOW_STAFF: Staff[] = [
-  { name: "Madjid Lakhdari", badge: "604", title: "Show Srvc Supervisor", patterns: hours([[6, 14.5]]), offWeekdays: [1, 2], baseline: { weekdays: [0, 3, 4, 5, 6], pattern: { start: 360, end: 870 } } }, // always 6a-2:30p, off Tue and Wed
+  { name: "Madjid Lakhdari", badge: "604", title: "Show Srvc Supervisor", patterns: hours([[6, 14.5]]), offWeekdays: [1, 2], powerDays: [1, 2], baseline: { weekdays: [0, 3, 4, 5, 6], pattern: { start: 360, end: 870 } } }, // always 6a-2:30p, off Tue and Wed
   { name: "Alemneh Teshome", badge: "608", title: "Show Srvc Eng", patterns: hours([[7, 15.5]]), baseline: { weekdays: [1, 2, 3, 4, 5], pattern: { start: 420, end: 930 } }, lastResort: [0, 6] }, // Tue-Sat 7a-3:30p; Mon or Sun only if really needed
   { name: "Alexis Albert", badge: "606", title: "Show Srvc Supervisor", patterns: hours([[7, 15.5], [8, 16.5], [9, 17.5]]) }, // only 7a-3:30p, 8a-4:30p or 9a-5:30p
   { name: "Edison Dunkley", badge: "605", title: "Show Srvc Supervisor", patterns: [...EVENING, ...hours([[16.5, 25], [19.5, 28]])], lastResort: [0, 1] }, // 12p-8:30p up to 3:30p-12a; takes the 1a / 4a close shifts; Mon and Tue off when possible
@@ -14,6 +14,8 @@ export const SHOW_STAFF: Staff[] = [
 ];
 export const ON_CALL: Staff = { name: "Jontee King", badge: "On-Call", title: "On-Call Show Srvc Eng", patterns: hours([[17, 22], [17, 23], [17, 24]]) }; // only 5p-10p, 5p-11p or 5p-12a
 export const OPS_ASSISTANT = { name: "Jacquline Dixon", badge: "615", title: "Ops Assistant" };
+/** Shows heavy on power (lots of 60 / 30 amp orders): Madjid works Tue and Wed for these. */
+export const POWER_HEAVY = /gordon|c-?store|convenience/i;
 /** Monday = 0 … Sunday = 6 */
 const weekday = (iso: string) => (new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7;
 
@@ -83,18 +85,23 @@ export function planWeek(
   dates: string[], entries: EventEntry[], staff: Staff[] = SHOW_STAFF, avail: Record<string, Record<string, Avail>> = {}, onCall: Staff | null = ON_CALL,
 ): DayPlan[] {
   const worked = new Map<string, number>(staff.map((s) => [s.name, 0]));
+  const days = new Map<string, Set<string>>(staff.map((s) => [s.name, new Set()]));
+  const prevDay = (d: string) => new Date(new Date(`${d}T12:00:00Z`).getTime() - 864e5).toISOString().slice(0, 10);
   for (const s of staff) for (const d of dates) if (avail[s.name]?.[d]?.fixed) worked.set(s.name, worked.get(s.name)! + 1);
   const plans: DayPlan[] = [];
   for (const date of dates) {
     const need = dayNeed(entries, date);
     const day = entries.filter((e) => e.date === date && e.code !== "MO?");
     const medium = mediumSlots(entries, date);
+    const powerDay = day.some((e) => POWER_HEAVY.test(e.title));
+    const offDay = (m: Staff) => !!m.offWeekdays?.includes(weekday(date)) && !(powerDay && m.powerDays?.includes(weekday(date)));
     const notes: string[] = [];
     const cover = new Array<number>(SLOTS).fill(0);
     const assignments: DayPlan["assignments"] = [];
     const busy = new Set<string>();
     const add = (name: string, start: number, end: number, fixed: boolean, reason: string) => {
       assignments.push({ name, start, end, fixed, reason });
+      days.get(name)?.add(date);
       busy.add(name);
       for (let i = 0; i < SLOTS; i++) if (start < (i + 1) * 30 && end > i * 30) cover[i]!++;
     };
@@ -106,8 +113,8 @@ export function planWeek(
     // Usual lines first: they work them whether or not a show needs them.
     for (const s of staff) {
       const b = s.baseline;
-      if (b && b.weekdays.includes(weekday(date)) && !busy.has(s.name) && !avail[s.name]?.[date]?.off) {
-        add(s.name, b.pattern.start, b.pattern.end, false, `Usual line (${shiftText(b.pattern)}, ${b.weekdays.length} days a week): works it whether or not a show needs them. ${coverNote(b.pattern)}`);
+      if (b && (b.weekdays.includes(weekday(date)) || (powerDay && s.powerDays?.includes(weekday(date)))) && !busy.has(s.name) && !avail[s.name]?.[date]?.off) {
+        add(s.name, b.pattern.start, b.pattern.end, false, `Usual line (${shiftText(b.pattern)}, ${b.weekdays.length} days a week): works it whether or not a show needs them. ${powerDay && !b.weekdays.includes(weekday(date)) ? "Normally off, but this is a power-heavy show (Gordon / C-store type). " : ""}${coverNote(b.pattern)}`);
         worked.set(s.name, worked.get(s.name)! + 1);
       }
     }
@@ -116,11 +123,11 @@ export function planWeek(
     for (let pass = -1; pass < 2; pass++) for (;;) {
       const def = deficit().map((x, i) => (pass < 0 && i < 48 ? 0 : x));
       if (!def.some((x) => x > 0)) break;
-      let best: { name: string; p: { start: number; end: number }; gain: number; waste: number } | null = null;
+      let best: { name: string; p: { start: number; end: number }; gain: number; waste: number; adj: number } | null = null;
       for (const s of staff) {
         const wd = weekday(date);
         const lastResort = !!s.lastResort?.includes(wd);
-        if (busy.has(s.name) || avail[s.name]?.[date]?.off || s.offWeekdays?.includes(wd)) continue;
+        if (busy.has(s.name) || avail[s.name]?.[date]?.off || offDay(s)) continue;
         if (s.baseline && !s.baseline.weekdays.includes(wd) && !lastResort) continue; // only works their usual days
         if (lastResort && pass <= 0) continue; // Mon/Sun only when nobody else can cover it
         if (worked.get(s.name)! >= MAX_DAYS && !lastResort) continue;
@@ -128,8 +135,9 @@ export function planWeek(
           let gain = 0;
           for (let i = 0; i < SLOTS; i++) if (def[i]! > 0 && p.start < (i + 1) * 30 && p.end > i * 30) gain++;
           const waste = (p.end - p.start) / 30 - gain;
-          const better = !best || gain > best.gain || (gain === best.gain && waste < best.waste) || (gain === best.gain && waste === best.waste && worked.get(s.name)! < worked.get(best.name)!);
-          if (gain > 0 && better) best = { name: s.name, p, gain, waste };
+          const adj = days.get(s.name)!.has(prevDay(date)) ? 1 : 0; // keeps work days together so days off land together
+          const better = !best || gain > best.gain || (gain === best.gain && waste < best.waste) || (gain === best.gain && waste === best.waste && (adj > best.adj || (adj === best.adj && worked.get(s.name)! < worked.get(best.name)!)));
+          if (gain > 0 && better) best = { name: s.name, p, gain, waste, adj };
         }
       }
       if (!best) break;
@@ -157,7 +165,7 @@ export function planWeek(
     for (const m of [...staff, ...(onCall ? [onCall] : [])]) {
       if (busy.has(m.name)) continue;
       const wd = weekday(date);
-      notUsed.push({ name: m.name, why: avail[m.name]?.[date]?.off ? "Marked off in the workbook." : m.offWeekdays?.includes(wd) ? "Always off this day." : m === onCall ? "On-call: only added for a single evening engineer with a medium show." : m.lastResort?.includes(wd) ? "Normally off this day; no absolute need." : m.baseline && !m.baseline.weekdays.includes(wd) ? "Not one of their usual days." : worked.get(m.name)! >= MAX_DAYS ? `Already at ${MAX_DAYS} days this week.` : "Not needed: coverage was already met." });
+      notUsed.push({ name: m.name, why: avail[m.name]?.[date]?.off ? "Marked off in the workbook." : offDay(m) ? "Always off this day." : m === onCall ? "On-call: only added for a single evening engineer with a medium show." : m.lastResort?.includes(wd) ? "Normally off this day; no absolute need." : m.baseline && !m.baseline.weekdays.includes(wd) ? "Not one of their usual days." : worked.get(m.name)! >= MAX_DAYS ? `Already at ${MAX_DAYS} days this week.` : "Not needed: coverage was already met." });
     }
     const gaps: DayPlan["gaps"] = [];
     const def = deficit();
@@ -180,7 +188,7 @@ export function planWeek(
 }
 
 /** Hours on the clock: a scheduled 8.5 hour shift is 8 worked because of lunch. */
-export const workedHours = (a: { start: number; end: number }) => (a.end - a.start) / 60 - ((a.end - a.start) >= 510 ? 0.5 : 0);
+export const workedHours = (a: { start: number; end: number }) => (a.end - a.start === 510 ? 8 : (a.end - a.start) / 60);
 
 /** "2: 6a-11p, 1: 11p-12a" style summary of a day's needs. */
 export function needText(need: number[]): string {
@@ -200,7 +208,26 @@ export function needText(need: number[]): string {
 export function readAvail(text: string): Avail | null {
   const t = text.trim();
   if (!t) return null;
-  if (/^(off|pto|sick|vac)/i.test(t)) return { off: true };
+  if (/^off$/i.test(t)) return null; // OFF is what the planner writes for a day not worked; only PTO-type entries block a day
+  if (/^(pto|sick|vac|fmla|bereave)/i.test(t)) return { off: true };
   const s = parseShift(t.split("\n")[0] ?? "");
   return s ? { off: false, fixed: { start: s.start, end: s.end } } : null;
+}
+
+/** Plans whole Mon-Sun weeks (so the five-day limit and days off are per week) and notes anyone without two days off in a row. */
+export function planWeeks(dates: string[], entries: EventEntry[], avail: Record<string, Record<string, Avail>> = {}, staff: Staff[] = SHOW_STAFF): DayPlan[] {
+  const mondays = [...new Set(dates.map((d) => { const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() - weekday(d)); return t.toISOString().slice(0, 10); }))].sort();
+  const out: DayPlan[] = [];
+  for (const m of mondays) {
+    const week = Array.from({ length: 7 }, (_, i) => { const t = new Date(`${m}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + i); return t.toISOString().slice(0, 10); });
+    const plans = planWeek(week, entries, staff, avail);
+    for (const s of staff) {
+      const on = plans.map((p) => p.assignments.some((a) => a.name === s.name));
+      if (!on.some(Boolean)) continue;
+      const pairOff = on.some((x, i) => i > 0 && !x && !on[i - 1]);
+      if (!pairOff) plans[6]!.notes.push(`${s.name.split(" ")[0]} has no two days off in a row this week (coverage needed it).`);
+    }
+    out.push(...plans);
+  }
+  return out;
 }
