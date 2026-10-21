@@ -118,6 +118,12 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
     }
     kept.push(e);
   }
+  // The show ends where the move out begins, so the two never overlap in a cell.
+  for (const e of kept) {
+    if (e.code !== "S") continue;
+    const mo = kept.find((x) => x.code === "MO" && same(x, e));
+    if (mo && mo.start > e.start && mo.start < e.end) e.end = mo.start;
+  }
   // No move-out line for an event that had a move in: flag the last day with "MO?" so it gets checked by hand.
   const groups = new Map<string, EventEntry[]>();
   for (const e of kept) groups.set(JSON.stringify([e.eventId ?? "", e.title, e.space]), [...(groups.get(JSON.stringify([e.eventId ?? "", e.title, e.space])) ?? []), e]);

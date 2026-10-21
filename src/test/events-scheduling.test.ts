@@ -89,4 +89,13 @@ describe("For Scheduling report (no Usage column)", () => {
     expect(isPendingRow({})).toBe(false);
     expect(isCancelledRow({ event: "CANCELLED - The COBB Tradeshow" })).toBe(true);
   });
+  it("ends the show where the move out starts", () => {
+    const list = summarizeEvents([
+      row({ description: "General Admission Entry", start: "09:15 AM", end: "05:00 PM" }),
+      row({ description: "End of Show/Vendor Load-out", start: "05:00 PM", end: "08:00 PM" }),
+      row({ description: "Move Out - Chair Pickup", start: "07:00 PM", end: "10:00 PM" }),
+    ]);
+    expect(entryLabel(list.find((e) => e.code === "S")!)).toBe("S 9:15a-7p");
+    expect(entryLabel(list.find((e) => e.code === "MO")!)).toBe("MO 7p-10p");
+  });
 });
