@@ -124,6 +124,7 @@ export async function readEventSheet(file: File): Promise<EventRow[] | null> {
   const head = ws.getRow(2);
   const col = (name: string) => { for (let c = 1; c <= 15; c++) if (text(head.getCell(c).value).toLowerCase() === name.toLowerCase()) return c; return 0; };
   const [cStart, cEnd, cEvent, cDesc, cSpace, cId] = [col("Start Time"), col("End Time"), col("Event"), col("Description"), col("Space"), col("Event ID")];
+  const cStatus = col("Status - Event");
   if (!cStart || !cEnd || !cDesc || !cSpace) return null;
   const months = ["january","february","march","april","may","june","july","august","september","october","november","december"];
   const rows: EventRow[] = [];
@@ -136,7 +137,7 @@ export async function readEventSheet(file: File): Promise<EventRow[] | null> {
     const start = clock(row.getCell(cStart).value);
     if (!day || !start) return;
     const id = text(row.getCell(cId || 99).value).match(/\d{3,}/)?.[0];
-    rows.push({ level: 2, usage: "", start, end: clock(row.getCell(cEnd).value), description: text(row.getCell(cDesc).value), space: text(row.getCell(cSpace).value), event: cEvent ? text(row.getCell(cEvent).value) : "", ...(id ? { eventId: id } : {}), date: day });
+    rows.push({ level: 2, usage: "", start, end: clock(row.getCell(cEnd).value), description: text(row.getCell(cDesc).value), space: text(row.getCell(cSpace).value), event: cEvent ? text(row.getCell(cEvent).value) : "", ...(id ? { eventId: id } : {}), ...(cStatus && text(row.getCell(cStatus).value) ? { status: text(row.getCell(cStatus).value) } : {}), date: day });
   });
   return rows;
 }

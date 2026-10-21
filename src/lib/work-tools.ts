@@ -40,7 +40,7 @@ export function parseReportTime(t: string): number {
 }
 
 // ---------- Ungerboeck event functions ----------
-export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string; eventId?: string };
+export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string; eventId?: string; status?: string };
 export type EventCode = "S" | "Exmi" | "MI" | "MO" | "MO?" | "Food" | "Dinner" | "MTG" | "Arr" | "Meal";
 export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string; eventId?: string };
 
@@ -460,3 +460,7 @@ export function sharedSpaces(entries: EventEntry[]): string[] {
   }
   return [...map.entries()].filter(([, t]) => t.size > 1).sort(([a], [b]) => a.localeCompare(b)).map(([k, t]) => `${k.split("|")[0]} · ${k.split("|")[1]}: ${[...t].join(" + ")}`);
 }
+
+/** Pending, tentative or hold events are not guaranteed yet; PDFs carry no status, so those rows count as confirmed. */
+export const isPendingRow = (r: { status?: string }): boolean => !!r.status && !/^definite/i.test(r.status.trim());
+export const isCancelledRow = (r: { event?: string }): boolean => /^\s*cancel/i.test(r.event ?? "");

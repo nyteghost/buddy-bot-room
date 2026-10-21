@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, airwallTasks, sharedSpaces, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type EventRow, type Shift, type TaskNote } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, airwallTasks, isCancelledRow, isPendingRow, sharedSpaces, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type EventRow, type Shift, type TaskNote } from "@/lib/work-tools";
 import { VendorsPanel } from "@/components/vendors-panel";
 import { FloorMapPanel } from "@/components/floor-map-panel";
 import { RepoWatch } from "@/components/repo-watch";
@@ -92,10 +92,26 @@ function EventsTab() {
   const [merged, setMerged] = useState(false);
   const [tasks, setTasks] = useState<TaskNote[]>([]);
   const [shared, setShared] = useState<string[]>([]);
+  const [source, setSource] = useState<{ rows: EventRow[]; existing?: File; sources: number } | null>(null);
+  const [withPending, setWithPending] = useState(false);
+  const [pending, setPending] = useState<string[]>([]);
+  async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean) {
+    const { eventsWorkbook } = await import("@/lib/work-files");
+    const live = src.rows.filter((r) => !isCancelledRow(r));
+    setPending([...new Set(live.filter(isPendingRow).map((r) => `${r.event || r.description} (${r.status})`))].sort());
+    const rows = includePending ? live : live.filter((r) => !isPendingRow(r));
+    const list = summarizeEvents(rows);
+    const notes = [...airwallTasks(rows), ...taskSuggestions(rows)].sort((a, b) => a.date.localeCompare(b.date));
+    setShared(sharedSpaces(list));
+    setEntries(list); setMerged(!!src.existing); setTasks(notes);
+    setBlob(list.length ? await eventsWorkbook(list, src.existing, notes) : null);
+    const dates = new Set(list.map((e) => e.date)).size;
+    setStatus(list.length ? `${src.sources} report${src.sources > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${src.existing ? `Filled into ${src.existing.name} — engineer shifts kept.${notes.length ? ` ${notes.length} task suggestions added to empty Tasks cells.` : ""}` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
+  }
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
     try {
-      const { readEventPdf, readEventSheet, eventsWorkbook } = await import("@/lib/work-files");
+      const { readEventPdf, readEventSheet } = await import("@/lib/work-files");
       const pdfs = files.filter((f) => /\.pdf$/i.test(f.name));
       // An .xlsx is either the For Scheduling report exported from Ungerboeck or your monthly schedule to fill in.
       const sheets = files.filter((f) => /\.xlsx?$/i.test(f.name));
@@ -106,14 +122,9 @@ function EventsTab() {
         if (r) reports.push(r); else existing = f;
       }
       const rows = [...(await Promise.all(pdfs.map(readEventPdf))).flat(), ...reports.flat()];
-      const sources = pdfs.length + reports.length;
-      const list = summarizeEvents(rows);
-      const notes = [...airwallTasks(rows), ...taskSuggestions(rows)].sort((a, b) => a.date.localeCompare(b.date));
-      setShared(sharedSpaces(list));
-      setEntries(list); setMerged(!!existing); setTasks(notes);
-      setBlob(list.length ? await eventsWorkbook(list, existing, notes) : null);
-      const dates = new Set(list.map((e) => e.date)).size;
-      setStatus(list.length ? `${sources} report${sources > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${existing ? `Filled into ${existing.name} — engineer shifts kept.${notes.length ? ` ${notes.length} task suggestions added to empty Tasks cells.` : ""}` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
+      const src = { rows, sources: pdfs.length + reports.length, ...(existing ? { existing } : {}) };
+      setSource(src);
+      await build(src, withPending);
     } catch (e) { setStatus(`Could not read that PDF: ${(e as Error).message}`); }
   }
   const { deliver } = useDeliver();
@@ -122,6 +133,12 @@ function EventsTab() {
       <FilePick accept="application/pdf,.xlsx" label="Drop the For Scheduling report (.xlsx or PDF) — add your monthly schedule .xlsx to fill it in" onFiles={load} />
       <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting · MO? = no move-out line in the report, so check it. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
+      {pending.length > 0 && (
+        <label className="flex items-start gap-2 rounded-md border border-amber-500 p-2 text-xs">
+          <input type="checkbox" className="mt-0.5" checked={withPending} onChange={(e) => { setWithPending(e.target.checked); if (source) build(source, e.target.checked).catch((err) => setStatus(`Could not read that PDF: ${(err as Error).message}`)); }} />
+          <span><span className="font-medium">Include {pending.length} not-yet-definite events</span> (left out unless checked): {pending.slice(0, 8).join("; ")}{pending.length > 8 ? ` +${pending.length - 8} more` : ""}</span>
+        </label>
+      )}
       {entries.length === 0 && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop one or more Ungerboeck event PDFs.</li><li>Optional: drop your monthly schedule .xlsx in the same box to fill it in (engineer shifts are kept).</li><li>Download the Excel file.</li></ol>}
       {entries.length > 0 && (
         <>

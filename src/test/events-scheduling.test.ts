@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryLabel, airwallTasks, sharedSpaces, classifyByDescription, classifyEvent, summarizeEvents, taskSuggestions, type EventRow } from "@/lib/work-tools";
+import { isCancelledRow, isPendingRow, entryLabel, airwallTasks, sharedSpaces, classifyByDescription, classifyEvent, summarizeEvents, taskSuggestions, type EventRow } from "@/lib/work-tools";
 
 const row = (o: Partial<EventRow>): EventRow => ({ level: 2, usage: "", start: "08:00 AM", end: "05:00 PM", description: "", space: "Exhibit Hall A (EXA)", date: "2026-10-06", event: "Home Depot", ...o });
 
@@ -82,5 +82,11 @@ describe("For Scheduling report (no Usage column)", () => {
   });
   it("a dinner stays a dinner and joins air wall tasks on the same day with a slash", () => {
     expect(summarizeEvents([row({ description: "Plated Dinner" })]).map((e) => entryLabel(e))).toEqual(["Dinner 8a-5p"]);
+  });
+  it("treats anything but Definite as pending, and PDF rows with no status as confirmed", () => {
+    expect(isPendingRow({ status: "Pending Contract (32)" })).toBe(true);
+    expect(isPendingRow({ status: "Definite (30)" })).toBe(false);
+    expect(isPendingRow({})).toBe(false);
+    expect(isCancelledRow({ event: "CANCELLED - The COBB Tradeshow" })).toBe(true);
   });
 });
