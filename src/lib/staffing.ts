@@ -4,12 +4,13 @@ import { formatMinutes, parseShift, type EventEntry } from "./work-tools";
 
 export type Staff = { name: string; badge: string; title: string; patterns?: { start: number; end: number }[]; offWeekdays?: number[]; baseline?: { weekdays: number[]; pattern: { start: number; end: number } }; lastResort?: number[] };
 const hours = (list: [number, number][]) => list.map(([a, b]) => ({ start: a * 60, end: b * 60 }));
+const EVENING = hours([[12, 20.5], [12.5, 21], [13, 21.5], [13.5, 22], [14, 22.5], [14.5, 23], [15, 23.5], [15.5, 24]]);
 export const SHOW_STAFF: Staff[] = [
   { name: "Madjid Lakhdari", badge: "604", title: "Show Srvc Supervisor", patterns: hours([[6, 14.5]]), offWeekdays: [1, 2], baseline: { weekdays: [0, 3, 4, 5, 6], pattern: { start: 360, end: 870 } } }, // always 6a-2:30p, off Tue and Wed
-  { name: "Alemneh Teshome", badge: "608", title: "Show Srvc Eng", baseline: { weekdays: [1, 2, 3, 4, 5], pattern: { start: 420, end: 930 } }, lastResort: [0, 6] }, // Tue-Sat 7a-3:30p; Mon or Sun only if really needed
-  { name: "Alexis Albert", badge: "606", title: "Show Srvc Supervisor" },
-  { name: "Edison Dunkley", badge: "605", title: "Show Srvc Supervisor" },
-  { name: "Franck Pierre-Louis", badge: "607", title: "Show Srvc Eng" },
+  { name: "Alemneh Teshome", badge: "608", title: "Show Srvc Eng", patterns: hours([[7, 15.5]]), baseline: { weekdays: [1, 2, 3, 4, 5], pattern: { start: 420, end: 930 } }, lastResort: [0, 6] }, // Tue-Sat 7a-3:30p; Mon or Sun only if really needed
+  { name: "Alexis Albert", badge: "606", title: "Show Srvc Supervisor", patterns: hours([[7, 15.5], [8, 16.5], [9, 17.5]]) }, // only 7a-3:30p, 8a-4:30p or 9a-5:30p
+  { name: "Edison Dunkley", badge: "605", title: "Show Srvc Supervisor", patterns: [...EVENING, ...hours([[16.5, 25], [19.5, 28]])], lastResort: [0, 1] }, // 12p-8:30p up to 3:30p-12a; takes the 1a / 4a close shifts; Mon and Tue off when possible
+  { name: "Franck Pierre-Louis", badge: "607", title: "Show Srvc Eng", patterns: EVENING }, // 12p-8:30p up to 3:30p-12a
 ];
 export const ON_CALL: Staff = { name: "Jontee King", badge: "On-Call", title: "On-Call Show Srvc Eng", patterns: hours([[17, 22], [17, 23], [17, 24]]) }; // only 5p-10p, 5p-11p or 5p-12a
 export const OPS_ASSISTANT = { name: "Jacquline Dixon", badge: "615", title: "Ops Assistant" };
@@ -21,7 +22,8 @@ export const PATTERNS: { start: number; end: number }[] = [
   [6, 14.5], [7, 15.5], [8, 16.5], [9, 18], [10, 18.5], [12, 20.5], [14, 22.5], [15, 23.5],
 ].map(([a, b]) => ({ start: a! * 60, end: b! * 60 }));
 export const MAX_DAYS = 5;
-const SLOTS = 48; // half hours
+const SLOTS = 56; // half hours from midnight to 4a the next morning
+const endOf = (e: EventEntry) => (e.end <= e.start ? e.end + 1440 : e.end); // a show running past midnight
 
 export type Avail = { off: boolean; fixed?: { start: number; end: number } };
 export type DayPlan = {
@@ -34,7 +36,7 @@ export type DayPlan = {
   desk: { name: string; start: number; end: number; reason: string } | null; // Ops Assistant on Service Desk hours; not counted as coverage
 };
 
-const label = (m: number) => (m >= 1440 ? "12a" : formatMinutes(m));
+const label = (m: number) => formatMinutes(m);
 export const shiftText = (a: { start: number; end: number }) => `${label(a.start)}-${label(a.end)}`;
 
 /** People needed per half hour on one day. */
@@ -45,13 +47,13 @@ export function dayNeed(entries: EventEntry[], date: string): number[] {
     const e = Math.max(end, start + 1);
     for (let i = 0; i < SLOTS; i++) if (start < (i + 1) * 30 && e > i * 30) need[i] = Math.max(need[i]!, n);
   };
-  for (const e of day) mark(e.start, e.code === "Arr" ? e.start + 30 : e.end, 1);
+  for (const e of day) mark(e.start, e.code === "Arr" ? e.start + 30 : endOf(e), 1);
   // A big show (2+ halls) needs two people for the whole stretch it is here that day.
   const byEvent = new Map<string, EventEntry[]>();
   for (const e of day) byEvent.set(e.eventId ?? e.title, [...(byEvent.get(e.eventId ?? e.title) ?? []), e]);
   for (const list of byEvent.values()) {
     const halls = new Set(list.filter((e) => /^Hall /.test(e.space)).map((e) => e.space));
-    if (halls.size >= 2) mark(Math.min(...list.map((e) => e.start)), Math.max(...list.map((e) => (e.code === "Arr" ? e.start + 30 : e.end))), 2);
+    if (halls.size >= 2) mark(Math.min(...list.map((e) => e.start)), Math.max(...list.map((e) => (e.code === "Arr" ? e.start + 30 : endOf(e)))), 2);
   }
   return need;
 }
@@ -64,7 +66,7 @@ export function mediumSlots(entries: EventEntry[], date: string): boolean[] {
   for (const list of byEvent.values()) {
     if (new Set(list.filter((e) => /^Hall /.test(e.space)).map((e) => e.space)).size >= 2) continue; // big
     if (new Set(list.map((e) => e.space)).size < 2) continue; // small
-    const a = Math.min(...list.map((e) => e.start)), b = Math.max(...list.map((e) => e.end));
+    const a = Math.min(...list.map((e) => e.start)), b = Math.max(...list.map(endOf));
     for (let i = 0; i < SLOTS; i++) if (a < (i + 1) * 30 && b > i * 30) out[i] = true;
   }
   return out;
@@ -133,7 +135,7 @@ export function planWeek(
       {
         const slots = def.map((x, i) => (x > 0 && best!.p.start < (i + 1) * 30 && best!.p.end > i * 30 ? i : -1)).filter((i) => i >= 0);
         const why = (staff.find((x) => x.name === best!.name)?.lastResort?.includes(weekday(date)))
-          ? `${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][weekday(date)]} is normally off, but nobody else could cover ${range(slots)}, so this is the absolute-need exception. `
+          ? `${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][weekday(date)]} is normally off (or only if needed), and nobody else could cover ${range(slots)}, so this is the exception. `
           : "";
         add(best.name, best.p.start, best.p.end, false, `${why}Still short ${range(slots)} (need ${Math.max(...slots.map((i) => need[i]!))}, had ${Math.min(...slots.map((i) => cover[i]!))}). ${shiftText(best.p)} closes the most of that gap (${slots.length / 2}h); ${best.name.split(" ")[0]} has worked ${worked.get(best.name)} day(s) so far this week. ${coverNote(best.p)}`);
       }
@@ -175,6 +177,9 @@ export function planWeek(
   }
   return plans;
 }
+
+/** Hours on the clock: a scheduled 8.5 hour shift is 8 worked because of lunch. */
+export const workedHours = (a: { start: number; end: number }) => (a.end - a.start) / 60 - ((a.end - a.start) >= 510 ? 0.5 : 0);
 
 /** "2: 6a-11p, 1: 11p-12a" style summary of a day's needs. */
 export function needText(need: number[]): string {

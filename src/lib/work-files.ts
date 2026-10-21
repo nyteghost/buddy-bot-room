@@ -1,5 +1,5 @@
 // Browser-only file readers for work tools. Libraries load on demand.
-import { planWeek, needText, shiftText } from "./staffing";
+import { planWeek, needText, shiftText, workedHours } from "./staffing";
 import { BALLROOM_ROWS, ENGINEER_ROSTER, HALL_ROWS, weekLayouts, type WeekLayout, type TaskNote, DEFAULT_SCHEDULE_NAME, parseShift, reportDateToIso, type EventEntry, type EventRow, type Shift } from "./work-tools";
 
 type Item = { str: string; x: number; y: number };
@@ -377,6 +377,11 @@ function addStaffingSheets(wb: XWorkbook, entries: EventEntry[]) {
     for (const n of p.notUsed) why.addRow([day(p.date), n.name, "Off", n.why]);
     for (const n of p.notes) why.addRow([day(p.date), "Note", "", n]);
   }
+  const total = new Map<string, { days: number; hours: number }>();
+  for (const p of plans) for (const a of p.assignments) { const t = total.get(a.name) ?? { days: 0, hours: 0 }; t.days++; t.hours += workedHours(a); total.set(a.name, t); }
+  plan.addRow([]);
+  plan.addRow(["Totals", "Days", "Worked hrs (8.5 scheduled = 8 after lunch)"]).font = { bold: true };
+  for (const [name, t] of total) plan.addRow([name, t.days, t.hours]);
   plan.columns = [{ width: 12 }, { width: 34 }, { width: 28 }, { width: 22 }, { width: 30 }];
   why.columns = [{ width: 12 }, { width: 22 }, { width: 14 }, { width: 110 }];
   why.eachRow((r) => { r.alignment = { wrapText: true, vertical: "top" }; });
