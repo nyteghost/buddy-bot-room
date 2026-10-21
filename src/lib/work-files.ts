@@ -31,7 +31,14 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
     for (const line of sorted) {
       const text = line.map((i) => i.str).join(" ");
       if (/^\s*Start Time\b/.test(text) && /\bEvent\b/.test(text) && (/\bLevel\b/.test(text) || (/\bDescription\b/.test(text) && /\bSpace\b/.test(text)))) {
-        sched = line.map((i) => ({ name: i.str.trim(), x: i.x }));
+        // The newer report adds an "Event ID" column at the far right: keep it apart from the Event column.
+        const heads: { name: string; x: number }[] = [];
+        for (const i of line) {
+          const name = i.str.trim();
+          if (/^ID$/i.test(name)) continue;
+          heads.push({ name: name === "Event" && heads.some((h) => h.name === "Event") ? "Event ID" : name, x: i.x });
+        }
+        sched = heads;
         continue;
       }
       if (sched) {
@@ -62,6 +69,7 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
           description: cell["Description"] ?? "",
           space: cell["Space"] ?? "",
           event: cell["Event"] ?? "",
+          eventId: (cell["Event ID"] ?? "").match(/\d{3,}/)?.[0],
           date: day,
         };
         rows.push(last);

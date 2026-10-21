@@ -35,4 +35,9 @@ describe("For Scheduling report (no Usage column)", () => {
     expect(t.some((x) => x.text.startsWith("Stage: Set Stage"))).toBe(true);
     expect(t.some((x) => x.text.startsWith("Room Turn (BR F"))).toBe(true);
   });
+  it("keeps two events with the same name but different Event IDs apart", () => {
+    const list = summarizeEvents([row({ description: "General Session", eventId: "111" }), row({ description: "General Session", eventId: "222" })]);
+    expect(list.length).toBe(2);
+    expect(list.map((e) => e.eventId)).toEqual(["111", "222"]);
+  });
 });

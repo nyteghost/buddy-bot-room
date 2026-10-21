@@ -40,9 +40,9 @@ export function parseReportTime(t: string): number {
 }
 
 // ---------- Ungerboeck event functions ----------
-export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string };
+export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string; eventId?: string };
 export type EventCode = "S" | "Exmi" | "MI" | "MO" | "Food" | "MTG";
-export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string };
+export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string; eventId?: string };
 
 /** Applies Mark's rules: skip Level 1 date headers; S = show events; Exmi = exhibitor move in; MI = other move in; MO = move out. */
 const FOOD_RE = /reception|dinner|lunch|breakfast|buffet|hosted bar|cash bar|wine service|food|concession|coffee|snack|banquet|luncheon|plated|boxed|brunch/;
@@ -86,17 +86,17 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
     if (!code) continue;
     const start = parseReportTime(row.start), end = parseReportTime(row.end);
     for (const space of expandSpace(row.space || "Unassigned")) {
-      const key = JSON.stringify([row.date, space, row.event || row.description, code]);
+      const key = JSON.stringify([row.date, space, row.eventId ?? "", row.event || row.description, code]);
       const prev = map.get(key);
       if (prev) { prev.start = Math.min(prev.start, start); prev.end = Math.max(prev.end, end); }
-      else map.set(key, { date: row.date, space, code, start, end, title: row.event || row.description });
+      else map.set(key, { date: row.date, space, code, start, end, title: row.event || row.description, ...(row.eventId ? { eventId: row.eventId } : {}) });
     }
   }
   // A meal or meeting inside the same show's day is part of the show; only one after the show ends gets its own line.
   const all = [...map.values()];
   const kept = all.filter((e) => {
     if (e.code !== "Food" && e.code !== "MTG") return true;
-    const show = all.find((x) => x.date === e.date && x.space === e.space && x.title === e.title && x.code === "S");
+    const show = all.find((x) => x.date === e.date && x.space === e.space && x.title === e.title && x.eventId === e.eventId && x.code === "S");
     return !show || (e.code === "Food" && e.start >= show.end);
   });
   const order: EventCode[] = ["MI", "Exmi", "S", "Food", "MTG", "MO"];
