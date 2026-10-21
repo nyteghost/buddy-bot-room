@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planWeek, planWeeks, dayNeed, shiftText } from "@/lib/staffing";
+import { airwallMinutes, planWeek, planWeeks, dayNeed, shiftText } from "@/lib/staffing";
 import type { EventEntry } from "@/lib/work-tools";
 
 const e = (date: string, space: string, start: number, end: number, title = "Show", eventId = "1"): EventEntry =>
@@ -47,5 +47,10 @@ describe("staffing", () => {
     const plans = planWeeks(["2026-11-10"], [e("2026-11-10", "Hall A", 480, 1000)]);
     expect(plans).toHaveLength(7);
     expect(plans[0]!.date).toBe("2026-11-09");
+  });
+  it("sizes air wall jobs: ballroom 20-90 min, a hall wall at least 90", () => {
+    expect(airwallMinutes("BALLROOM", "Make ABE")).toBe(40);
+    expect(airwallMinutes("BALLROOM", "Make full ballroom")).toBe(90);
+    expect(airwallMinutes("HALLS", "Make Hall AB")).toBe(90);
   });
 });

@@ -29,7 +29,11 @@ const endOf = (e: EventEntry) => (e.end <= e.start ? e.end + 1440 : e.end); // a
 
 /** Air wall work always needs at least 2 people for its window. */
 export type Hold = { date: string; start: number; end: number; n: number; text: string };
-export const AIRWALL_MINUTES = 60; // assumed length of an air wall job
+/** Length of an air wall job for 2 people: ballroom walls go quickly (about 20 min a wall, 90 at most); a hall wall takes at least 90 min. */
+export function airwallMinutes(section: string, text: string): number {
+  const walls = Math.max(1, spacesOf(section, text).length - 1);
+  return section === "HALLS" ? 90 * walls : Math.min(90, Math.max(20, 20 * walls));
+}
 const spacesOf = (section: string, text: string): string[] => {
   if (/full ballroom/i.test(text)) return "ABCDEFG".split("").map((c) => `BallRoom ${c}`);
   const letters = new Set(text.replace(/make|hall|ballroom/gi, "").replace(/[^A-G]/g, "").split(""));
@@ -49,7 +53,7 @@ export function airwallStart(task: { date: string; section: string; text: string
   return { start: endOf(last), latest: endOf(last), why: `Rooms are in use until ${formatMinutes(endOf(last))}.` };
 }
 export function airwallHolds(tasks: { date: string; section: string; text: string }[], entries: EventEntry[]): Hold[] {
-  return tasks.filter((t) => /^make /i.test(t.text)).map((t) => { const w = airwallStart(t, entries); return { date: t.date, start: w.start, end: w.start + AIRWALL_MINUTES, n: 2, text: t.text }; });
+  return tasks.filter((t) => /^make /i.test(t.text)).map((t) => { const w = airwallStart(t, entries); return { date: t.date, start: w.start, end: w.start + airwallMinutes(t.section, t.text), n: 2, text: t.text }; });
 }
 
 export type Avail = { off: boolean; fixed?: { start: number; end: number } };
