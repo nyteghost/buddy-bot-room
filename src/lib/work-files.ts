@@ -69,7 +69,7 @@ export async function readEventPdf(file: File): Promise<EventRow[]> {
           description: cell["Description"] ?? "",
           space: cell["Space"] ?? "",
           event: cell["Event"] ?? "",
-          eventId: (cell["Event ID"] ?? "").match(/\d{3,}/)?.[0],
+          ...((cell["Event ID"] ?? "").match(/\d{3,}/) ? { eventId: (cell["Event ID"] ?? "").match(/\d{3,}/)![0] } : {}),
           date: day,
         };
         rows.push(last);
