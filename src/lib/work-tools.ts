@@ -46,7 +46,7 @@ export type EventEntry = { date: string; space: string; code: EventCode; start: 
 
 /** Applies Mark's rules: skip Level 1 date headers; S = show events; Exmi = exhibitor move in; MI = other move in; MO = move out. */
 const FOOD_RE = /reception|dinner|lunch|breakfast|buffet|hosted bar|cash bar|wine service|food|concession|coffee|snack|banquet|luncheon|plated|boxed|brunch/;
-const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|client arrival|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat/;
+const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|client arrival|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat|on.?site/;
 
 /** The "For Scheduling" report has no Usage column, so the code comes from the description alone. */
 export function classifyByDescription(description: string): EventCode | null {
@@ -54,7 +54,7 @@ export function classifyByDescription(description: string): EventCode | null {
   if (/service desk/.test(d)) return "Exmi";
   if (/move.?out|tear ?down|load.?out|dismantle/.test(d)) return "MO";
   if (/exhibitor/.test(d) && /move.?in|load.?in/.test(d)) return "Exmi";
-  if (/move.?in|march in|load.?in|set ?up|install/.test(d)) return "MI";
+  if (/move.?in|march in|load.?in|set ?up|install|decorator day/.test(d)) return "MI";
   if (/\bmeeting\b|\bmtg\b/.test(d) && !/session/.test(d)) return "MTG";
   if (FOOD_RE.test(d)) return "Food";
   if (SKIP_RE.test(d)) return null;
@@ -380,7 +380,7 @@ const prevDay = (iso: string) => { const d = new Date(`${iso}T12:00:00Z`); d.set
 
 /** "Make AB" tasks: air walls change when a room is used in a different combination than the last time. The task goes on the day before, or the same day when that room is busy the day before. */
 export function airwallTasks(rows: EventRow[]): TaskNote[] {
-  const used = rows.filter((r) => r.level > 1 && classifyEvent(r) && letters(r.space || ""));
+  const used = rows.filter((r) => { const c = r.level > 1 ? classifyEvent(r) : null; return (c === "S" || c === "MI" || c === "Exmi" || c === "MO") && letters(r.space || ""); });
   const dates = [...new Set(used.map((r) => r.date))].sort();
   const out = new Map<string, TaskNote>();
   for (const section of ["HALLS", "BALLROOM"] as const) {
