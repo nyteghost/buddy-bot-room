@@ -48,6 +48,20 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Production (self-hosted) only: start the background jobs at boot instead of waiting for the first web request,
+// so playtest checks, backups and reminders keep running after a restart. The dev server does this in vite-self-hosted.ts.
+if (typeof process !== "undefined" && process.env["NODE_ENV"] === "production" && process.env["BUDDY_SELF_HOSTED"] === "1") {
+  void (async () => {
+    try {
+      await (await import("./lib/settings.server")).ensureSettings();
+      if (process.env["UNRAID_URL"]) startWatcher();
+      startScheduler();
+    } catch (e) {
+      console.error("Background jobs did not start:", e);
+    }
+  })();
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -58,7 +72,7 @@ export default {
       if (stopped) return stopped;
       if (typeof process !== "undefined") await (await import("./lib/settings.server")).ensureSettings();
       if (typeof process !== "undefined" && process.env["UNRAID_URL"]) startWatcher();
-      if (typeof process !== "undefined" && (process.env["BUDDY_BACKUP_DIR"] || process.env["BRIEF_TIME"])) startScheduler();
+      if (typeof process !== "undefined" && (process.env["BUDDY_BACKUP_DIR"] || process.env["BRIEF_TIME"] || process.env["BUDDY_DATA_DIR"])) startScheduler();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

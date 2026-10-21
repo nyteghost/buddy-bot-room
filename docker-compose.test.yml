@@ -1,0 +1,13 @@
+# Throwaway production-build test on port 18092 (nothing shared with the real stack). Delete the stack when done.
+services:
+  buddy-bot-test-prod:
+    build:
+      context: .
+      target: prod
+    image: buddy-bot-room:test-prod
+    pull_policy: build
+    container_name: buddy-bot-test-prod
+    ports:
+      - "18092:8090"
+    environment:
+      BUDDY_TZ: America/New_York
