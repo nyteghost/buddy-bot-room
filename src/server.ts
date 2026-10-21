@@ -48,17 +48,37 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Production (self-hosted) only: start the background jobs without waiting for a visitor, so playtest checks, backups
+// and reminders keep running after a restart. The module can load lazily, so the container's own health check
+// (/__health) calls this too. The dev server does the same in vite-self-hosted.ts.
+let booted = false;
+function bootJobs(): void {
+  if (booted || typeof process === "undefined") return;
+  if (process.env["NODE_ENV"] !== "production" || process.env["BUDDY_SELF_HOSTED"] !== "1") return;
+  booted = true;
+  void (async () => {
+    try {
+      await (await import("./lib/settings.server")).ensureSettings();
+      if (process.env["UNRAID_URL"]) startWatcher();
+      startScheduler();
+    } catch (e) {
+      console.error("Background jobs did not start:", e);
+    }
+  })();
+}
+bootJobs();
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       // Self-hosted only: BUDDY_PASSWORD turns on a shared-password gate (no-op when unset).
       const url = new URL(request.url);
-      if (url.pathname === "/__health") return new Response("ok");
+      if (url.pathname === "/__health") { bootJobs(); return new Response("ok"); }
       const stopped = await gate(request, typeof process !== "undefined" ? process.env["BUDDY_PASSWORD"] : undefined);
       if (stopped) return stopped;
       if (typeof process !== "undefined") await (await import("./lib/settings.server")).ensureSettings();
       if (typeof process !== "undefined" && process.env["UNRAID_URL"]) startWatcher();
-      if (typeof process !== "undefined" && (process.env["BUDDY_BACKUP_DIR"] || process.env["BRIEF_TIME"])) startScheduler();
+      if (typeof process !== "undefined" && (process.env["BUDDY_BACKUP_DIR"] || process.env["BRIEF_TIME"] || process.env["BUDDY_DATA_DIR"])) startScheduler();
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

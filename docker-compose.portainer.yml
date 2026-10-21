@@ -9,7 +9,7 @@ services:
   buddy-bot:
     build:
       context: .
-      target: dev
+      target: prod
     image: buddy-bot-room:local
     pull_policy: build   # Portainer: rebuild the image on every redeploy
     container_name: buddy-bot-room
