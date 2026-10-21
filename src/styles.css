@@ -2101,6 +2101,11 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
 .layout-holder-3 { stroke: var(--layout-holder-three); }
 .print-stage-body > * { min-width: 0; }
 .print-only { display: none; }
+/* Bigger tap targets for phones and tablets on the floor. */
+@media (pointer: coarse) {
+  .deck-planner button, .deck-planner select, .deck-planner input:not([type="checkbox"]):not([type="radio"]), .deck-planner .deck-tap { min-height: 44px; }
+  .deck-planner button { padding-left: 14px; padding-right: 14px; }
+}
 .layout-view-swap.hidden { display: none; }
 
 /* Printing the planner: everything else in the app is hidden, the planner prints from the top-left. */

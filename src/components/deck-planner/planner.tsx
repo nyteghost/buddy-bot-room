@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { createPortal } from "react-dom";
 import { StageLayout, type LayoutStage } from "@/components/deck-planner/stage-layout";
 import { allocateSingleDeckStages } from "@/lib/single-deck-allocation";
+import { EDGE_MODES, NO_EXTRAS, NO_PARTS, DEFAULT_HAVE, OPENING_FT, addParts, checkParts, parseHave, rampRunFt, stageParts } from "@/lib/stage-extras";
 import { INVENTORY, FULL_STOCK, STAIR_TYPES, DEFAULT_PREFS, planStage, type Deck, type Holder, type Bridge, type Result, type Stock, type PlanPrefs } from "@/lib/deck-solver";
 
 
@@ -21,6 +22,18 @@ const HEIGHT_PRESETS = [32, 34, 36, 38, 40, 42, 44];
 // ---------- persisted stage settings (survive rebuilds, remounts, reloads) ----------
 const STAGE_STORE_KEY = "stage-planner:stages";
 const APP_STORE_KEY = "stage-planner:app";
+const EXTRAS_STORE_KEY = "stage-planner:extras"; // per stage: stairs + rails/skirts/ramp choices
+const HAVE_STORE_KEY = "stage-planner:have"; // warehouse counts for rails/skirts/ramp
+const PLANS_STORE_KEY = "stage-planner:plans"; // named saved plans
+type Snapshot = { stages: any; app: any; extras: any };
+function takeSnapshot(): Snapshot {
+  return { stages: readStored(STAGE_STORE_KEY, {}), app: readStored(APP_STORE_KEY, {}), extras: readStored(EXTRAS_STORE_KEY, {}) };
+}
+function writeSnapshot(snap: Snapshot) {
+  writeStored(STAGE_STORE_KEY, snap.stages ?? {});
+  writeStored(APP_STORE_KEY, snap.app ?? {});
+  writeStored(EXTRAS_STORE_KEY, snap.extras ?? {});
+}
 const stageQuantitySchema = z.number().int().min(1).max(INVENTORY.totalDecks);
 
 type SavedStage = {
@@ -245,6 +258,7 @@ function StagePanel({
   stock = FULL_STOCK,
   onUsage,
   onLayoutChange,
+  onParts,
   rebuildKey = 0,
 }: {
   stageId: string;
@@ -255,6 +269,7 @@ function StagePanel({
   stock?: Stock;
   onUsage?: (u: Stock) => void;
   onLayoutChange?: (stage: LayoutStage) => void;
+  onParts?: (p: ReturnType<typeof stageParts>) => void;
   rebuildKey?: number;
 }) {
   const [width, setWidth] = useState(defaultWidth);
@@ -560,6 +575,25 @@ function StagePanel({
     onUsage?.(usage);
   }, [usage, onUsage]);
 
+  // Rails / skirts / ADA ramp, remembered per stage.
+  const [extras, setExtras] = useState(NO_EXTRAS);
+  const skipExtraSave = useRef(true);
+  useEffect(() => {
+    const s = readStored<Record<string, any>>(EXTRAS_STORE_KEY, {})[stageId];
+    if (s?.stairs) setStairs({ s5: s.stairs.s5 | 0, s6: s.stairs.s6 | 0, s7: s.stairs.s7 | 0 });
+    if (s?.extras) setExtras({ ...NO_EXTRAS, ...s.extras });
+    skipExtraSave.current = true;
+  }, [stageId]);
+  useEffect(() => {
+    if (skipExtraSave.current) { skipExtraSave.current = false; return; }
+    const all = readStored<Record<string, any>>(EXTRAS_STORE_KEY, {});
+    all[stageId] = { stairs, extras };
+    writeStored(EXTRAS_STORE_KEY, all);
+  }, [stageId, stairs, extras]);
+  const stairTotal = stairs.s5 + stairs.s6 + stairs.s7;
+  const parts = useMemo(() => stageParts(extras, width, length, stairTotal, stageQuantity), [extras, width, length, stairTotal, stageQuantity]);
+  useEffect(() => { onParts?.(parts); }, [parts, onParts]);
+
   const maxPx = 480;
   const scale = Math.min(maxPx / Math.max(width, 1), maxPx / Math.max(length, 1), 32);
   const canvasW = width * scale;
@@ -645,6 +679,36 @@ function StagePanel({
                       </label>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-border p-2">
+                <div className="block text-sm font-medium">Rails, skirts &amp; ramp</div>
+                <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                  <label>
+                    <span className="text-muted-foreground">Rails</span>
+                    <select value={extras.rails} onChange={(e) => setExtras((x) => ({ ...x, rails: e.target.value }))}
+                      className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm">
+                      {EDGE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="text-muted-foreground">Skirts</span>
+                    <select value={extras.skirts} onChange={(e) => setExtras((x) => ({ ...x, skirts: e.target.value }))}
+                      className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm">
+                      {EDGE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="col-span-2">
+                    <span className="text-muted-foreground">ADA ramps</span>
+                    <input type="number" min={0} max={9} step={1} value={extras.ramps}
+                      onChange={(e) => setExtras((x) => ({ ...x, ramps: Math.max(0, Math.min(9, Math.floor(Number(e.target.value) || 0))) }))}
+                      className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+                  </label>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Stairs and ramps each leave a {OPENING_FT} ft gap in the front rail.
+                  {extras.ramps > 0 && ` Ramp needs about ${rampRunFt(heightIn)} ft of run at ${heightIn}″ high (1:12).`}
                 </div>
               </div>
 
@@ -1171,6 +1235,24 @@ export function DeckPlanner() {
     }
     return cb;
   };
+  const [partsByStage, setPartsByStage] = useState<Record<number, any>>({});
+  const partsCallbacks = useRef(new Map<number, (p: any) => void>());
+  const setPartsFor = (index: number) => {
+    let cb = partsCallbacks.current.get(index);
+    if (!cb) {
+      cb = (p: any) => setPartsByStage((prev) => ({ ...prev, [index]: p }));
+      partsCallbacks.current.set(index, cb);
+    }
+    return cb;
+  };
+  const [haveText, setHaveText] = useState<Record<string, string>>({ rail8: "", rail4: "", skirt8: "", ramp: "1" });
+  useEffect(() => {
+    const h = readStored<Record<string, string> | null>(HAVE_STORE_KEY, null);
+    if (h) setHaveText((prev) => ({ ...prev, ...h }));
+  }, []);
+  const updateHave = (key: string, text: string) => {
+    setHaveText((prev) => { const next = { ...prev, [key]: text }; writeStored(HAVE_STORE_KEY, next); return next; });
+  };
   const [rebuildKey, setRebuildKey] = useState(0);
   const [eventName, setEventName] = useState("");
   const [eventNameDraft, setEventNameDraft] = useState("");
@@ -1259,6 +1341,7 @@ export function DeckPlanner() {
       next[index] = { decks: 0, one: 0, two: 0, three: 0 };
       return next;
     });
+    setPartsByStage((previous) => ({ ...previous, [index]: NO_PARTS }));
     setLayoutStages((previous) => {
       const next = { ...previous };
       delete next[`s${index + 1}`];
@@ -1279,6 +1362,64 @@ export function DeckPlanner() {
     [remainingFinal],
   );
 
+  const totalParts = enabledIndexes.reduce((acc, i) => addParts(acc, partsByStage[i] ?? NO_PARTS), NO_PARTS);
+  const have = { rail8: parseHave(haveText.rail8), rail4: parseHave(haveText.rail4), skirt8: parseHave(haveText.skirt8), ramp: parseHave(haveText.ramp) };
+  const partLines = checkParts(totalParts, have);
+  const shortLines = partLines.filter((l) => l.status === "short");
+  const unknownLines = partLines.filter((l) => l.status === "unknown");
+  const badStages = enabledIndexes.filter((i) => layoutStages[`s${i + 1}`] && layoutStages[`s${i + 1}`].valid === false);
+
+  // ---- saved plans, undo / redo ----
+  const [plans, setPlans] = useState<{ name: string; savedAt: number; snap: Snapshot }[]>([]);
+  const [planName, setPlanName] = useState("");
+  useEffect(() => { setPlans(readStored(PLANS_STORE_KEY, [])); }, []);
+  const persistPlans = (next: typeof plans) => { setPlans(next); writeStored(PLANS_STORE_KEY, next); };
+  const lastSnap = useRef<string>("");
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
+  const [, bump] = useState(0);
+  const applySnapshot = (snap: Snapshot) => {
+    writeSnapshot(snap);
+    lastSnap.current = JSON.stringify(takeSnapshot());
+    const a = snap.app ?? {};
+    setStageCount(typeof a.stageCount === "number" && a.stageCount >= 1 && a.stageCount <= 10 ? Math.floor(a.stageCount) : 1);
+    setEventName(typeof a.eventName === "string" ? a.eventName : "");
+    skipAppSave.current = true;
+    setUsedByStage([]);
+    setPartsByStage({});
+    setRemovedIndexes([]);
+    setLayoutStages({});
+    setRebuildKey((k) => k + 1);
+    setClearKey((k) => k + 1);
+  };
+  useEffect(() => {
+    lastSnap.current = JSON.stringify(takeSnapshot());
+    const t = window.setInterval(() => {
+      const cur = JSON.stringify(takeSnapshot());
+      if (cur !== lastSnap.current) {
+        undoStack.current.push(lastSnap.current);
+        if (undoStack.current.length > 50) undoStack.current.shift();
+        redoStack.current = [];
+        lastSnap.current = cur;
+        bump((n) => n + 1);
+      }
+    }, 700);
+    return () => window.clearInterval(t);
+  }, []);
+  const undo = () => {
+    const prev = undoStack.current.pop();
+    if (!prev) return;
+    redoStack.current.push(JSON.stringify(takeSnapshot()));
+    applySnapshot(JSON.parse(prev));
+    bump((n) => n + 1);
+  };
+  const redo = () => {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    undoStack.current.push(JSON.stringify(takeSnapshot()));
+    applySnapshot(JSON.parse(next));
+    bump((n) => n + 1);
+  };
 
   return (
     <div className="deck-planner bg-background text-foreground">
@@ -1319,6 +1460,65 @@ export function DeckPlanner() {
           </div>
         </div>
 
+        <div className="no-print mb-6 rounded-md border border-border bg-card p-4 text-sm shadow-sm">
+          <div className="font-semibold">Rails, skirts &amp; ramp (all stages)</div>
+          <div className="mt-2 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+            {partLines.map((l) => (
+              <label key={l.key} className="block">
+                <span className="text-muted-foreground">{l.label}: need {l.need}</span>
+                <input type="number" min={0} inputMode="numeric" placeholder="how many do we have?"
+                  value={haveText[l.key]} onChange={(e) => updateHave(l.key, e.target.value)}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+                <span className={l.status === "short" ? "font-medium text-destructive" : "text-muted-foreground"}>
+                  {l.status === "short" ? `SHORT by ${l.short}` : l.status === "unknown" ? "set the count" : l.status === "ok" ? "enough" : "not used"}
+                </span>
+              </label>
+            ))}
+          </div>
+          {(shortLines.length > 0 || badStages.length > 0) && (
+            <div role="alert" className="mt-3 rounded-md border border-destructive p-2 text-xs font-medium text-destructive">
+              {shortLines.map((l) => `Not enough ${l.label}: need ${l.need}, have ${l.have}.`).join(" ")}
+              {badStages.length > 0 && ` ${badStages.map((i) => `Stage ${enabledIndexes.indexOf(i) + 1}`).join(", ")} can't be built from what's left in stock.`}
+            </div>
+          )}
+          {unknownLines.length > 0 && (
+            <div className="mt-2 text-xs text-muted-foreground">Fill in the counts you know; blank means not counted yet, so no shortage is shown.</div>
+          )}
+        </div>
+
+        <div className="no-print mb-6 rounded-md border border-border bg-card p-4 text-sm shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-semibold">Saved plans</div>
+            <button type="button" onClick={undo} disabled={undoStack.current.length === 0} className="deck-tap rounded-md border border-border bg-card px-3 py-1 text-sm font-medium hover:bg-muted disabled:opacity-40">↶ Undo</button>
+            <button type="button" onClick={redo} disabled={redoStack.current.length === 0} className="deck-tap rounded-md border border-border bg-card px-3 py-1 text-sm font-medium hover:bg-muted disabled:opacity-40">↷ Redo</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="Name, e.g. Main stage, Oct show"
+              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            <button type="button" disabled={!planName.trim()} onClick={() => {
+              const name = planName.trim();
+              const entry = { name, savedAt: Date.now(), snap: takeSnapshot() };
+              persistPlans([entry, ...plans.filter((x) => x.name !== name)]);
+              setPlanName("");
+            }} className="deck-tap rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40">Save</button>
+          </div>
+          {plans.length === 0 ? (
+            <div className="mt-2 text-xs text-muted-foreground">Nothing saved yet. Saving the same name again replaces it. Hand-placed pieces are not saved, only sizes, heights, stairs, rails and the like.</div>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {plans.map((pl) => (
+                <li key={pl.name} className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1">
+                  <span className="min-w-0 flex-1 truncate font-medium">{pl.name}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(pl.savedAt).toLocaleDateString()}</span>
+                  <button type="button" onClick={() => { undoStack.current.push(JSON.stringify(takeSnapshot())); redoStack.current = []; applySnapshot(pl.snap); bump((n) => n + 1); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted">Open</button>
+                  <button type="button" onClick={() => { const n = window.prompt("New name", pl.name)?.trim(); if (n) persistPlans(plans.map((x) => (x === pl ? { ...x, name: n } : x))); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted">Rename</button>
+                  <button type="button" onClick={() => { if (window.confirm(`Delete "${pl.name}"?`)) persistPlans(plans.filter((x) => x !== pl)); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium text-destructive hover:bg-muted">Delete</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <div className="print-only mb-6">
           <h1 className="text-3xl font-bold tracking-tight">
             {eventName.trim() || "Stage Deck Planner"}
@@ -1334,6 +1534,27 @@ export function DeckPlanner() {
                 <div key={key}><dt>{label}</dt><dd className="mt-1 font-semibold">{totalUsed[key] ?? 0}</dd></div>
               ))}
             </dl>
+          </section>
+          <section className="mt-3 break-inside-avoid">
+            <h2 className="text-sm font-semibold">Crew parts list vs. warehouse</h2>
+            <table className="mt-1 w-full border-y border-border text-xs">
+              <thead><tr className="text-left"><th>Part</th><th>Need</th><th>In warehouse</th><th>Check</th></tr></thead>
+              <tbody>
+                {[
+                  { label: "4′ × 8′ decks", need: totalUsed.decks, have: FULL_STOCK.decks },
+                  { label: "3-deck holders", need: totalUsed.three, have: FULL_STOCK.three },
+                  { label: "2-deck holders", need: totalUsed.two, have: FULL_STOCK.two },
+                  { label: "1-deck holders", need: totalUsed.one, have: FULL_STOCK.one },
+                  ...STAIR_TYPES.map(({ key, label }) => ({ label, need: totalUsed[key] ?? 0, have: FULL_STOCK[key] ?? 0 })),
+                  ...partLines.filter((l) => l.status !== "unused").map((l) => ({ label: l.label, need: l.need, have: l.have })),
+                ].map((r) => (
+                  <tr key={r.label}>
+                    <td>{r.label}</td><td>{r.need}</td><td>{r.have === null ? "not counted" : r.have}</td>
+                    <td>{r.have === null ? "COUNT IT" : r.need > r.have ? `SHORT ${r.need - r.have}` : "ok"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
         </div>
 
@@ -1364,7 +1585,7 @@ export function DeckPlanner() {
           }}
           className="no-print mb-6 ml-3 rounded-md border border-border bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
         >
-          Print stages side by side
+          Print crew sheet
         </button>
 
         {enabledIndexes.length > 1 && (
@@ -1436,6 +1657,7 @@ export function DeckPlanner() {
                 labelPrefix={i === 0 ? undefined : `S${i + 1}-`}
                 stock={stock}
                 onUsage={setUsedFor(i)}
+                onParts={setPartsFor(i)}
                 rebuildKey={rebuildKey}
               />
             </div>
@@ -1510,6 +1732,8 @@ export function DeckPlanner() {
                     setShowClearModal(false);
                     window.localStorage.removeItem(STAGE_STORE_KEY);
                     window.localStorage.removeItem(APP_STORE_KEY);
+                    window.localStorage.removeItem(EXTRAS_STORE_KEY);
+                    setPartsByStage({});
                     skipAppSave.current = true;
                     setUsedByStage([]);
                     setRemovedIndexes([]);
