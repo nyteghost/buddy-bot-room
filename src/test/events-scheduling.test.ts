@@ -53,10 +53,19 @@ describe("For Scheduling report (no Usage column)", () => {
       row({ description: "General Session", date: "2026-10-09", space: "Exhibit Hall A (EXA)" }),
       row({ description: "General Session", date: "2026-10-10", space: "Exhibit Hall A (EXA)" }),
     ]);
-    expect(t.map((x) => `${x.date} ${x.text}`)).toEqual(["2026-10-08 Make Hall A"]);
+    expect(t.map((x) => `${x.date} ${x.text}`)).toEqual(["2026-10-06 Make Hall A"]);
   });
   it("lists rooms shared by two events", () => {
     const list = summarizeEvents([row({ description: "General Session", event: "One", eventId: "1" }), row({ description: "General Session", event: "Two", eventId: "2" })]);
     expect(sharedSpaces(list).length).toBe(1);
+  });
+  it("makes the later shape the same day when one day needs two overlapping shapes", () => {
+    const r = (d: string, sp: string, start: string) => row({ description: "General Session", date: d, space: sp, start });
+    const t = airwallTasks([
+      r("2026-11-02", "Ballroom ABE (BRABE)", "08:00 AM"),
+      r("2026-11-11", "Chattahoochee Ballroom (BRFULL)", "08:00 AM"),
+      r("2026-11-11", "Ballroom ABE (BRABE)", "11:00 AM"),
+    ]);
+    expect(t.map((x) => `${x.date} ${x.text}`).sort()).toEqual(["2026-11-09 Make full ballroom", "2026-11-11 Make Ballroom ABE"]);
   });
 });

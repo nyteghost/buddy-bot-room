@@ -376,9 +376,10 @@ const letters = (space: string): { section: "HALLS" | "BALLROOM"; group: string 
   if (ball) return { section: "BALLROOM", group: (ball[1] ?? "").toUpperCase() };
   return null;
 };
-const prevDay = (iso: string) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
 
-/** "Make AB" tasks: air walls change when a room is used in a different combination than the last time. The task goes on the day before, or the same day when that room is busy the day before. */
+/** "Make AB" tasks: air walls change when a room is used in a different combination than last time.
+ * The task goes as early as the room is free (the day after it was last used, but not before that week's Monday).
+ * When one day needs two overlapping shapes (full ballroom, then ABE), the later one is made that same day. */
 export function airwallTasks(rows: EventRow[]): TaskNote[] {
   const used = rows.filter((r) => { const c = r.level > 1 ? classifyEvent(r) : null; return (c === "S" || c === "MI" || c === "Exmi" || c === "MO") && letters(r.space || ""); });
   const dates = [...new Set(used.map((r) => r.date))].sort();
@@ -386,17 +387,35 @@ export function airwallTasks(rows: EventRow[]): TaskNote[] {
   for (const section of ["HALLS", "BALLROOM"] as const) {
     const config = new Map<string, string>(); // letter -> group it was last used in
     const busy = new Map<string, Set<string>>(); // date -> letters in use
-    for (const r of used) { const l = letters(r.space); if (l?.section === section) busy.set(r.date, new Set([...(busy.get(r.date) ?? []), ...l.group])); }
+    const first = new Map<string, number>(); // date|group -> earliest start that day
+    for (const r of used) {
+      const l = letters(r.space);
+      if (l?.section !== section) continue;
+      busy.set(r.date, new Set([...(busy.get(r.date) ?? []), ...l.group]));
+      const k = `${r.date}|${l.group}`;
+      first.set(k, Math.min(first.get(k) ?? 1e9, parseReportTime(r.start)));
+    }
     for (const date of dates) {
-      const groups = new Set(used.filter((r) => r.date === date).map((r) => letters(r.space)).filter((l) => l?.section === section).map((l) => l!.group));
-      for (const g of [...groups].sort()) {
+      const groups = [...new Set(used.map((r) => (r.date === date ? letters(r.space) : null)).filter((l) => l?.section === section).map((l) => l!.group))]
+        .sort((a, b) => (first.get(`${date}|${a}`) ?? 0) - (first.get(`${date}|${b}`) ?? 0) || a.localeCompare(b));
+      const earlier: string[] = [];
+      for (const g of groups) {
         const known = [...g].filter((c) => config.has(c));
         const changed = known.length > 0 && [...g].some((c) => config.get(c) !== g);
         if (changed) {
-          const day = [...g].some((c) => busy.get(prevDay(date))?.has(c)) ? date : prevDay(date);
+          let day: string;
+          if (earlier.some((h) => [...h].some((c) => g.includes(c)))) day = date; // after the earlier shape is done that day
+          else {
+            let last = ""; // last day before this one that any of these rooms was in use
+            for (const d of [...busy.keys()].sort()) if (d < date && [...g].some((c) => busy.get(d)!.has(c))) last = d;
+            const monday = mondayOf(date);
+            const free = last ? addDays(last, 1) : monday;
+            day = free >= date ? date : free < monday ? monday : free;
+          }
           const name = section === "BALLROOM" && g === "ABCDEFG" ? "full ballroom" : `${section === "HALLS" ? "Hall" : "Ballroom"} ${g}`;
           out.set(JSON.stringify([day, section, g]), { date: day, section, text: `Make ${name}` });
         }
+        earlier.push(g);
         for (const c of g) config.set(c, g);
       }
     }
