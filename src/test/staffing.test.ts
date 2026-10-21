@@ -17,11 +17,14 @@ describe("staffing", () => {
     expect(plans[1]!.assignments.some((a) => a.name.startsWith("Madjid"))).toBe(false);
     expect(plans[1]!.assignments.some((a) => a.name.startsWith("Alemneh") && shiftText(a) === "7a-3:30p")).toBe(true);
   });
-  it("uses Jontee only for a single evening engineer with a medium show", () => {
-    const small = planWeek(["2026-11-12"], [e("2026-11-12", "Hall A", 480, 1260)]);
-    expect(small[0]!.assignments.some((a) => a.name.startsWith("Jontee"))).toBe(false);
-    const medium = planWeek(["2026-11-12"], [e("2026-11-12", "Hall A", 480, 1260), e("2026-11-12", "BallRoom A", 480, 1260)]);
-    expect(medium[0]!.assignments.some((a) => a.name.startsWith("Jontee"))).toBe(true);
+  it("never schedules Jontee, only suggests him", () => {
+    const big = [e("2026-11-12", "Hall A", 480, 1380), e("2026-11-12", "Hall B", 480, 1380)];
+    const p = planWeek(["2026-11-12"], big, undefined, { "Edison Dunkley": { "2026-11-12": { off: true } }, "Franck Pierre-Louis": { "2026-11-12": { off: true } } })[0]!;
+    expect(p.assignments.some((a) => a.name.startsWith("Jontee"))).toBe(false);
+  });
+  it("holds 2 people for air wall work", () => {
+    const p = planWeek(["2026-11-12"], [e("2026-11-12", "Hall A", 480, 600)], undefined, {}, undefined, [{ date: "2026-11-12", start: 1020, end: 1080, n: 2, text: "Make Hall AB" }])[0]!;
+    expect(p.need[34]).toBe(2);
   });
   it("gives every assignment a reason and Jacquline default hours", () => {
     const p = planWeek(["2026-11-10"], [e("2026-11-10", "Hall A", 480, 1000)])[0]!;

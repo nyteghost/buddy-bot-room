@@ -27,6 +27,31 @@ export const MAX_DAYS = 5;
 const SLOTS = 56; // half hours from midnight to 4a the next morning
 const endOf = (e: EventEntry) => (e.end <= e.start ? e.end + 1440 : e.end); // a show running past midnight
 
+/** Air wall work always needs at least 2 people for its window. */
+export type Hold = { date: string; start: number; end: number; n: number; text: string };
+export const AIRWALL_MINUTES = 60; // assumed length of an air wall job
+const spacesOf = (section: string, text: string): string[] => {
+  if (/full ballroom/i.test(text)) return "ABCDEFG".split("").map((c) => `BallRoom ${c}`);
+  const letters = new Set(text.replace(/make|hall|ballroom/gi, "").replace(/[^A-G]/g, "").split(""));
+  return [...letters].filter(Boolean).sort().map((c) => `${section === "HALLS" ? "Hall" : "BallRoom"} ${c}`);
+};
+/** When an air wall job can start: 30-90 min after a ballroom move-out begins, right after a show ends, or mid-morning when the rooms are unused that day. */
+export function airwallStart(task: { date: string; section: string; text: string }, entries: EventEntry[]): { start: number; latest: number; why: string } {
+  const sp = spacesOf(task.section, task.text);
+  const use = entries.filter((e) => e.date === task.date && sp.includes(e.space) && e.code !== "MO?");
+  if (!use.length) return { start: 8 * 60, latest: 8 * 60, why: "Rooms are not used that day, so any time; mid-morning default." };
+  const last = use.reduce((a, b) => (endOf(b) > endOf(a) ? b : a));
+  const mo = use.filter((e) => e.code === "MO");
+  if (mo.length && endOf(last) === Math.max(...mo.map(endOf))) {
+    const m = Math.min(...mo.map((e) => e.start));
+    return { start: m + 30, latest: m + 90, why: `Move out starts ${formatMinutes(m)}; the walls can go in 30-90 min after that.` };
+  }
+  return { start: endOf(last), latest: endOf(last), why: `Rooms are in use until ${formatMinutes(endOf(last))}.` };
+}
+export function airwallHolds(tasks: { date: string; section: string; text: string }[], entries: EventEntry[]): Hold[] {
+  return tasks.filter((t) => /^make /i.test(t.text)).map((t) => { const w = airwallStart(t, entries); return { date: t.date, start: w.start, end: w.start + AIRWALL_MINUTES, n: 2, text: t.text }; });
+}
+
 export type Avail = { off: boolean; fixed?: { start: number; end: number } };
 export type DayPlan = {
   date: string;
@@ -82,7 +107,7 @@ const range = (slots: number[]) => {
 
 /** Fills each day's needs from the staff, keeping fixed shifts and days off, 5 working days each. */
 export function planWeek(
-  dates: string[], entries: EventEntry[], staff: Staff[] = SHOW_STAFF, avail: Record<string, Record<string, Avail>> = {}, onCall: Staff | null = ON_CALL,
+  dates: string[], entries: EventEntry[], staff: Staff[] = SHOW_STAFF, avail: Record<string, Record<string, Avail>> = {}, onCall: Staff | null = ON_CALL, holds: Hold[] = [],
 ): DayPlan[] {
   const worked = new Map<string, number>(staff.map((s) => [s.name, 0]));
   const days = new Map<string, Set<string>>(staff.map((s) => [s.name, new Set()]));
@@ -91,6 +116,7 @@ export function planWeek(
   const plans: DayPlan[] = [];
   for (const date of dates) {
     const need = dayNeed(entries, date);
+    for (const h of holds) if (h.date === date) for (let i = 0; i < SLOTS; i++) if (h.start < (i + 1) * 30 && h.end > i * 30) need[i] = Math.max(need[i]!, h.n);
     const day = entries.filter((e) => e.date === date && e.code !== "MO?");
     const medium = mediumSlots(entries, date);
     const powerDay = day.some((e) => POWER_HEAVY.test(e.title));
@@ -150,22 +176,25 @@ export function planWeek(
       }
       worked.set(best.name, worked.get(best.name)! + 1);
     }
-    // On-call (5p-10p, 5p-11p or 5p-12a) only when exactly one regular engineer is on in the evening and the show is medium.
-    if (onCall && !busy.has(onCall.name) && !avail[onCall.name]?.[date]?.off) {
+    // Jontee is never scheduled automatically. He is suggested only for a busy evening that is still short
+    // on a day Edison or Franck is off; the person decides.
+    if (onCall) {
+      const left = deficit();
+      const worksToday = (n: string) => assignments.some((a) => a.name === n);
+      const someoneOff = ["Edison Dunkley", "Franck Pierre-Louis"].filter((n) => !worksToday(n));
       let pick: { start: number; end: number } | null = null, top = 0;
       for (const p of onCall.patterns ?? []) {
         let gain = 0;
-        for (let i = 0; i < SLOTS; i++) if (medium[i] && cover[i] === 1 && need[i]! <= 1 && p.start < (i + 1) * 30 && p.end > i * 30) gain++;
+        for (let i = 34; i < SLOTS; i++) if (left[i]! > 0 && p.start < (i + 1) * 30 && p.end > i * 30) gain++;
         if (gain > top) { top = gain; pick = p; }
       }
-      if (pick) add(onCall.name, pick.start, pick.end, false, `Only one regular engineer is on in the evening while a medium-sized show is here (2+ rooms), so on-call is added ${shiftText(pick)}.`);
-      else notes.push("On-call not needed: no evening with a single engineer and a medium show.");
+      if (pick && someoneOff.length && !avail[onCall.name]?.[date]?.off) notes.push(`Suggestion: ${onCall.name.split(" ")[0]} ${shiftText(pick)} would close the evening gap (${someoneOff.map((n) => n.split(" ")[0]).join(" and ")} off today). Not scheduled.`);
     }
     const notUsed: DayPlan["notUsed"] = [];
     for (const m of [...staff, ...(onCall ? [onCall] : [])]) {
       if (busy.has(m.name)) continue;
       const wd = weekday(date);
-      notUsed.push({ name: m.name, why: avail[m.name]?.[date]?.off ? "Marked off in the workbook." : offDay(m) ? "Always off this day." : m === onCall ? "On-call: only added for a single evening engineer with a medium show." : m.lastResort?.includes(wd) ? "Normally off this day; no absolute need." : m.baseline && !m.baseline.weekdays.includes(wd) ? "Not one of their usual days." : worked.get(m.name)! >= MAX_DAYS ? `Already at ${MAX_DAYS} days this week.` : "Not needed: coverage was already met." });
+      notUsed.push({ name: m.name, why: avail[m.name]?.[date]?.off ? "Marked off in the workbook." : offDay(m) ? "Always off this day." : m === onCall ? "On-call: never scheduled automatically; suggested in the notes when an evening is short." : m.lastResort?.includes(wd) ? "Normally off this day; no absolute need." : m.baseline && !m.baseline.weekdays.includes(wd) ? "Not one of their usual days." : worked.get(m.name)! >= MAX_DAYS ? `Already at ${MAX_DAYS} days this week.` : "Not needed: coverage was already met." });
     }
     const gaps: DayPlan["gaps"] = [];
     const def = deficit();
@@ -215,16 +244,16 @@ export function readAvail(text: string): Avail | null {
 }
 
 /** Plans whole Mon-Sun weeks (so the five-day limit and days off are per week) and notes anyone without two days off in a row. */
-export function planWeeks(dates: string[], entries: EventEntry[], avail: Record<string, Record<string, Avail>> = {}, staff: Staff[] = SHOW_STAFF): DayPlan[] {
+export function planWeeks(dates: string[], entries: EventEntry[], avail: Record<string, Record<string, Avail>> = {}, staff: Staff[] = SHOW_STAFF, holds: Hold[] = []): DayPlan[] {
   const mondays = [...new Set(dates.map((d) => { const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() - weekday(d)); return t.toISOString().slice(0, 10); }))].sort();
   const out: DayPlan[] = [];
   for (const m of mondays) {
     const week = Array.from({ length: 7 }, (_, i) => { const t = new Date(`${m}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + i); return t.toISOString().slice(0, 10); });
-    const plans = planWeek(week, entries, staff, avail);
+    const plans = planWeek(week, entries, staff, avail, ON_CALL, holds);
     for (const s of staff) {
       const on = plans.map((p) => p.assignments.some((a) => a.name === s.name));
       if (!on.some(Boolean)) continue;
-      const pairOff = on.some((x, i) => i > 0 && !x && !on[i - 1]);
+      const pairOff = on.some((x, i) => !x && !on[(i + 1) % 7]); // Sunday + the following Monday count as a pair
       if (!pairOff) plans[6]!.notes.push(`${s.name.split(" ")[0]} has no two days off in a row this week (coverage needed it).`);
     }
     out.push(...plans);

@@ -1,5 +1,5 @@
 // Browser-only file readers for work tools. Libraries load on demand.
-import { planWeeks, needText, shiftText, workedHours, readAvail, SHOW_STAFF, ON_CALL, type Avail, type DayPlan } from "./staffing";
+import { planWeeks, airwallHolds, needText, shiftText, workedHours, readAvail, SHOW_STAFF, ON_CALL, type Avail, type DayPlan } from "./staffing";
 import { BALLROOM_ROWS, ENGINEER_ROSTER, HALL_ROWS, weekLayouts, type WeekLayout, type TaskNote, DEFAULT_SCHEDULE_NAME, parseShift, reportDateToIso, type EventEntry, type EventRow, type Shift } from "./work-tools";
 
 type Item = { str: string; x: number; y: number };
@@ -388,7 +388,7 @@ export async function eventsWorkbook(entries: EventEntry[], existing?: File, tas
     });
   }
   const dates = [...new Set(entries.map((e) => e.date))].sort();
-  const plans = new Map(planWeeks(dates, entries, avail).map((p) => [p.date, p] as const));
+  const plans = new Map(planWeeks(dates, entries, avail, undefined, airwallHolds(tasks, entries)).map((p) => [p.date, p] as const));
   let n = sheets.length;
   for (const w of weeks) {
     if (sheets.some((s) => mergeWeekSheet(s, w, tasks, plans))) continue;
