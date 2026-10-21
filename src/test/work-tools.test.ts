@@ -44,6 +44,22 @@ describe("@deck staging", () => {
   it("24x24 uses 18 decks", () => { const r = planStage(24, 24); expect(r.ok && r.decks.length).toBe(18); });
   it("rejects sizes not a multiple of 4", () => expect(planStage(10, 8).ok).toBe(false));
   it("stairs by height", () => { expect(stairsFor(32)).toBe("5-step"); expect(stairsFor(36)).toBe("6-step"); expect(stairsFor(42)).toBe("7-step"); });
+  it("refuses a stage that needs more decks than exist, with the real reason", () => {
+    const r = planStage(20, 120);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.reason).toContain("needs 75 decks");
+  });
+  it("does not build or crash on huge or non-numeric sizes", () => {
+    expect(planStage(5000, 5000).ok).toBe(false);
+    expect(planStage(Number.NaN, 8).ok).toBe(false);
+    expect(planStage(Number.POSITIVE_INFINITY, 8).ok).toBe(false);
+  });
+  it("a normal 24x24 stage plans cleanly with no holder warning", () => { const r = planStage(24, 24); expect(r.ok && !r.holderError).toBe(true); });
+  it("chat reply points to the Deck tab, not the old Lovable site", () => {
+    const reply = deckReply("@deck 24x24x32") ?? "";
+    expect(reply).toContain("Deck** tab");
+    expect(reply).not.toContain("lovable");
+  });
   it("answers @deck 24x24x32", () => expect(deckReply("@deck, 24x24x32")).toContain("18 of 72"));
 });
 
