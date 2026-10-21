@@ -47,7 +47,12 @@ jobs:
           for i in $(seq 1 40); do curl -fsS http://localhost:8090/__health >/dev/null && exit 0; sleep 1; done
           cat server.log; exit 1
       - name: Smoke test
-        run: node tools/smoke/smoke.mjs
+        run: |
+          node tools/smoke/smoke.mjs > smoke.log 2>&1 && { cat smoke.log; exit 0; }
+          cat smoke.log
+          msg=$(tail -n 30 smoke.log | cut -c1-260 | awk '{printf "%s | ", $0}')
+          echo "::error title=Smoke test failed::${msg}"
+          exit 1
         env:
           PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
           SMOKE_URL: http://localhost:8090
