@@ -1,5 +1,5 @@
 import { currentUser } from "./accounts.server";
-import { alertText, cleanSources, cleanStore, DEFAULT_SOURCES, keepByWords, listingId, mergeListings, parseFeed, parseLinks, MAX_SOURCES, type Found, type Source, type Store } from "./playtests";
+import { alertText, cleanSources, cleanStore, DEFAULT_SOURCES, keepByWords, listingId, mergeListings, parseFeed, parseJsonListings, parseLinks, MAX_SOURCES, type Found, type Source, type Store } from "./playtests";
 import { safeProductUrl } from "./vendors";
 import { logServer } from "./server-log.server";
 
@@ -36,7 +36,7 @@ async function read(src: Source): Promise<{ found: Found[] } | { error: string }
     const safe = safeProductUrl(url);
     if (!safe) return { error: "That isn't a public web address." };
     let res: Response;
-    try { res = await fetch(safe, { redirect: "manual", headers: { "user-agent": UA, accept: src.kind === "rss" ? "application/atom+xml,application/rss+xml,application/xml,text/xml,*/*" : "text/html,*/*", "accept-language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(15_000) }); }
+    try { res = await fetch(safe, { redirect: "manual", headers: { "user-agent": UA, accept: src.kind === "json" ? "application/json,*/*" : src.kind === "rss" ? "application/atom+xml,application/rss+xml,application/xml,text/xml,*/*" : "text/html,*/*", "accept-language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(15_000) }); }
     catch (e) { return { error: e instanceof Error && e.name === "TimeoutError" ? "The site didn't answer in time." : "Couldn't reach the site." }; }
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
@@ -54,8 +54,8 @@ async function read(src: Source): Promise<{ found: Found[] } | { error: string }
     while (size < 1_500_000) { const { done, value } = await reader.read(); if (done || !value) break; chunks.push(value); size += value.length; }
     void reader.cancel().catch(() => undefined);
     const text = Buffer.concat(chunks).toString("utf8");
-    const raw = src.kind === "rss" ? parseFeed(text) : parseLinks(text, safe, src.match ?? "");
-    if (!raw.length) return { error: src.kind === "rss" ? "No entries found in that feed." : "No listings found. The page may load them with JavaScript, which can't be read." };
+    const raw = src.kind === "rss" ? parseFeed(text) : src.kind === "json" ? parseJsonListings(text) : parseLinks(text, safe, src.match ?? "");
+    if (!raw.length) return { error: src.kind === "rss" ? "No entries found in that feed." : src.kind === "json" ? "No listings found in that data." : "No listings found. The page may load them with JavaScript, which can't be read." };
     return { found: keepByWords(raw, src.keywords, src.skip) };
   }
   return { error: "Too many redirects." };

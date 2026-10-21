@@ -3,7 +3,7 @@ import { Bell, BellOff, ExternalLink, FlaskConical, Plus, RefreshCw, Trash2 } fr
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ago } from "@/lib/repos";
-import type { Listing, Source, SourceStatus } from "@/lib/playtests";
+import { SUGGESTED_SOURCES, type Listing, type Source, type SourceStatus } from "@/lib/playtests";
 
 type Reply = { sources?: Source[]; items?: Listing[]; status?: Record<string, SourceStatus>; lastRun?: string; alerts?: boolean; newCount?: number; error?: string };
 const call = async (body: object): Promise<Reply> => {
@@ -52,7 +52,7 @@ export function PlaytestsPanel() {
             return (
               <div key={s.id} className="flex items-start justify-between gap-2 text-xs">
                 <div className="min-w-0">
-                  <a className="font-medium text-primary underline" href={s.url} target="_blank" rel="noreferrer">{s.name}</a> <span className="text-muted-foreground">· {s.kind === "rss" ? "feed" : "web page"}{s.keywords ? ` · words: ${s.keywords}` : ""}{s.skip ? ` · skips: ${s.skip}` : ""}</span>
+                  <a className="font-medium text-primary underline" href={s.url} target="_blank" rel="noreferrer">{s.name}</a> <span className="text-muted-foreground">· {s.kind === "rss" ? "feed" : s.kind === "json" ? "data feed" : "web page"}{s.keywords ? ` · words: ${s.keywords}` : ""}{s.skip ? ` · skips: ${s.skip}` : ""}</span>
                   <div className={st && !st.ok ? "text-destructive" : "text-muted-foreground"}>{!st ? "Not checked yet" : st.ok ? `${st.count} listing${st.count === 1 ? "" : "s"} read ${ago(st.at)}` : `${st.error ?? "Failed"} (${ago(st.at)})`}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -62,9 +62,20 @@ export function PlaytestsPanel() {
               </div>
             );
           })}
+          {SUGGESTED_SOURCES.filter((g) => !(data.sources ?? []).some((s) => s.url === g.url)).length > 0 && (
+            <div className="border-t border-border pt-2 text-xs">
+              <p className="font-medium">Suggested sources</p>
+              {SUGGESTED_SOURCES.filter((g) => !(data.sources ?? []).some((s) => s.url === g.url)).map((g) => (
+                <div key={g.id} className="mt-1 flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">{g.name}</span>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ op: "addSource", source: { name: g.name, url: g.url, kind: g.kind, keywords: g.keywords ?? "", skip: g.skip ?? "" } }, `Added ${g.name}. Its first check sets a baseline, so only later listings count as new.`)}><Plus className="size-4" /> Add</Button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="grid gap-2 border-t border-border pt-2 sm:grid-cols-2">
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name" aria-label="Source name" />
-            <select className="rounded-md border border-border bg-background px-2 text-sm" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} aria-label="Source type"><option value="rss">Feed (RSS/Atom, like a subreddit .rss)</option><option value="page">Web page (links on it)</option></select>
+            <select className="rounded-md border border-border bg-background px-2 text-sm" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} aria-label="Source type"><option value="rss">Feed (RSS/Atom, like a subreddit .rss)</option><option value="page">Web page (links on it)</option><option value="json">Data feed (JSON list)</option></select>
             <Input className="sm:col-span-2" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://… (for Reddit add /new/.rss to the subreddit)" aria-label="Source address" />
             <Input className="sm:col-span-2" value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} placeholder="Only keep titles with these words (optional): beta, playtest, alpha" aria-label="Keywords" />
             <Input className="sm:col-span-2" value={form.skip} onChange={(e) => setForm({ ...form, skip: e.target.value })} placeholder="Skip titles starting with (optional): sponsored, giveaway" aria-label="Skip titles" />

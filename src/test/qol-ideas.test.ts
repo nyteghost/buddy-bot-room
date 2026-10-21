@@ -2543,7 +2543,7 @@ describe("repo watch", () => {
   });
 });
 
-import { alertText as pAlert, keepByWords as pKeep, listingId as pId, mergeListings as pMerge, parseFeed as pFeed, parseLinks as pLinks } from "@/lib/playtests";
+import { alertText as pAlert, keepByWords as pKeep, listingId as pId, mergeListings as pMerge, parseFeed as pFeed, parseLinks as pLinks, parseJsonListings as pJson, SUGGESTED_SOURCES as pSuggest, cleanSources as pClean } from "@/lib/playtests";
 describe("playtest watch", () => {
   it("reads Atom and RSS feeds", () => {
     const atom = `<feed><entry><title>[Closed Beta] Cool &amp; Game</title><link href="https://www.reddit.com/r/BetaTests/comments/1/x/"/><updated>2026-10-20</updated></entry><entry><title>Second</title><link href="https://example.com/2?a=1&amp;b=2"/></entry></feed>`;
@@ -2588,5 +2588,34 @@ describe("playtest watch", () => {
     const a = pAlert([{ id: "1", title: "Game X beta", url: "https://x", source: "s", found: "t", fresh: true }], { s: "Steam" });
     expect(a.title).toBe("1 new playtest or beta");
     expect(a.body.includes("Game X beta")).toBe(true);
+  });
+});
+
+describe("playtest data feeds and suggestions", () => {
+  it("reads a JSON list of giveaways", () => {
+    const json = JSON.stringify([
+      { id: 1, title: "Cool Game Closed Beta Key", open_giveaway_url: "https://www.gamerpower.com/open/cool-game", type: "Beta" },
+      { id: 2, title: "No link", open_giveaway_url: "" },
+      { name: "Other Game", url: "https://example.com/other" },
+    ]);
+    const f = pJson(json);
+    expect(f.length).toBe(2);
+    expect(f[0]!.url).toBe("https://www.gamerpower.com/open/cool-game");
+    expect(f[1]!.title).toBe("Other Game");
+  });
+  it("finds the list under results and ignores bad data", () => {
+    expect(pJson(JSON.stringify({ results: [{ title: "A", link: "https://a.test/x" }] })).length).toBe(1);
+    expect(pJson("not json").length).toBe(0);
+    expect(pJson(JSON.stringify({ status: "ok" })).length).toBe(0);
+  });
+  it("keeps the json kind when cleaning sources", () => {
+    const s = pClean([{ name: "G", kind: "json", url: "https://www.gamerpower.com/api/giveaways?type=beta" }, { name: "P", kind: "weird", url: "https://x.test" }]);
+    expect(s[0]!.kind).toBe("json");
+    expect(s[1]!.kind).toBe("page");
+  });
+  it("suggested sources are valid public addresses", () => {
+    expect(pSuggest.length > 0).toBe(true);
+    for (const g of pSuggest) expect(/^https:\/\//.test(g.url)).toBe(true);
+    expect(pClean(pSuggest).length).toBe(pSuggest.length);
   });
 });

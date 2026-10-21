@@ -61,6 +61,7 @@ function bootJobs(): void {
       await (await import("./lib/settings.server")).ensureSettings();
       if (process.env["UNRAID_URL"]) startWatcher();
       startScheduler();
+      await (await import("./lib/deploy-notice.server")).announceVersion();
     } catch (e) {
       console.error("Background jobs did not start:", e);
     }

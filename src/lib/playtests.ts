@@ -2,7 +2,7 @@
  * Playtest and beta watch: the pure parts (reading feeds and web pages for listings, spotting new ones).
  * The server file fetches the sources on a timer, keeps what it found and alerts your phone.
  */
-export type SourceKind = "rss" | "page";
+export type SourceKind = "rss" | "page" | "json";
 export type Source = {
   id: string;
   name: string;
@@ -33,6 +33,13 @@ export const DEFAULT_SOURCES: Source[] = [
 const clean = (s: unknown, max = 200): string => (typeof s === "string" ? s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
 
 /** Short stable id from a link, so the same listing is never counted twice. */
+/** One-click extras in the Sources panel. Not added automatically; each one's first check sets a baseline. */
+export const SUGGESTED_SOURCES: Source[] = [
+  { id: "reddit-playtesters", name: "Reddit r/playtesters", kind: "rss", url: "https://www.reddit.com/r/playtesters/new/.rss", enabled: true },
+  { id: "mmorpg-gg", name: "MMORPG.gg news (betas and playtests)", kind: "rss", url: "https://mmorpg.gg/feed/", keywords: "beta, playtest, alpha, closed test, test weekend, stress test", enabled: true },
+  { id: "gamerpower-beta", name: "GamerPower beta key giveaways", kind: "json", url: "https://www.gamerpower.com/api/giveaways?type=beta", enabled: true },
+];
+
 export function listingId(url: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < url.length; i++) { h ^= url.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
@@ -61,6 +68,22 @@ export function parseFeed(xml: string): Found[] {
 }
 
 /** Links on a web page with their visible text (the first line of it). Only server-rendered pages show anything here. */
+/** A JSON list of items (a top-level array, or under items/results/data), each with a title/name and a web address. */
+export function parseJsonListings(text: string): Found[] {
+  let data: unknown;
+  try { data = JSON.parse(text.slice(0, 1_500_000)); } catch { return []; }
+  const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const list = Array.isArray(data) ? data : [o["items"], o["results"], o["data"], o["giveaways"]].find(Array.isArray) as unknown[] | undefined;
+  const out: Found[] = [];
+  for (const r of (list ?? []).slice(0, 300)) {
+    const x = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
+    const title = clean(decode(String(x["title"] ?? x["name"] ?? "")), 200);
+    const url = clean(String(x["open_giveaway_url"] ?? x["gamerpower_url"] ?? x["url"] ?? x["link"] ?? ""), 500);
+    if (title && /^https?:\/\//i.test(url)) out.push({ title, url });
+  }
+  return out;
+}
+
 export function parseLinks(html: string, base: string, match = ""): Found[] {
   const out: Found[] = [];
   const seen = new Set<string>();
@@ -116,7 +139,7 @@ export function cleanSources(raw: unknown): Source[] {
     const name = clean(o["name"], 60);
     if (!name || !/^https?:\/\//i.test(url)) continue;
     out.push({
-      id: clean(o["id"], 40) || listingId(url), name, kind: o["kind"] === "rss" ? "rss" : "page", url,
+      id: clean(o["id"], 40) || listingId(url), name, kind: o["kind"] === "rss" ? "rss" : o["kind"] === "json" ? "json" : "page", url,
       keywords: clean(o["keywords"], 200) || undefined, skip: clean(o["skip"], 200) || undefined, match: clean(o["match"], 100) || undefined, enabled: o["enabled"] !== false,
     });
   }

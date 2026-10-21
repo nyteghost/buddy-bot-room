@@ -3,8 +3,14 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$HOME/.config/pixelpals" "$HOME/.config/systemd/user" "$HOME/.local/bin"
-read -rsp "Paste the Portainer webhook URL, then press Enter: " u; echo
-umask 077; printf '%s\n' "$u" > "$HOME/.config/pixelpals/webhook"
+if [ -s "$HOME/.config/pixelpals/webhook" ]; then
+  echo "Keeping the saved Portainer webhook URL."
+else
+  read -rsp "Paste the Portainer webhook URL, then press Enter: " u; echo
+  umask 077; printf '%s\n' "$u" > "$HOME/.config/pixelpals/webhook"
+fi
+read -rsp "Paste your ntfy topic link for failure alerts (or just press Enter to skip / keep the saved one): " n; echo
+if [ -n "$n" ]; then umask 077; printf '%s\n' "$n" > "$HOME/.config/pixelpals/ntfy"; fi
 install -m 755 "$here/pixelpals-autodeploy.sh" "$HOME/.local/bin/pixelpals-autodeploy"
 cat > "$HOME/.config/systemd/user/pixelpals-autodeploy.service" <<S
 [Unit]
