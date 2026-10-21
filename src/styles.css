@@ -207,6 +207,12 @@ button {
   width: 34px;
   height: 42px;
 }
+.brand-icon .brand-mascot {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
 .brand-chat {
   color: var(--muted-foreground);
   font-size: 19px;
@@ -1701,6 +1707,7 @@ h1 {
 .workspace-rest { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 18px; color: var(--muted-foreground); }
 .workspace-rest h1 { font-size: 24px; }
 .workspace-rest .pixel-character { width: 70px; height: 90px; }
+.workspace-rest .brand-mascot-big { width: 96px; height: 96px; image-rendering: pixelated; object-fit: contain; }
 @media (max-width: 1050px) {
   .modular-workspace .brand-chat { display: none; }
   .modular-workspace .app-header { flex-wrap: wrap; }

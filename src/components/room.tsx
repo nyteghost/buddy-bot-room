@@ -112,6 +112,7 @@ import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
+import mascot from "@/assets/mascot.png";
 import { LinuxActions } from "./linux-actions";
 import { UpdatePopup } from "./update-popup";
 import { UpdateBanner } from "./update-banner";
@@ -1646,7 +1647,7 @@ export function Room() {
       <header className="app-header">
         <a href="/" className="brand">
           <span className="brand-icon">
-            <PixelCharacter id="nova" />
+            <img src={mascot} width={34} height={34} alt="Pixel Pals mascot" draggable={false} className="brand-mascot" />
           </span>
           <span>
             pixel<span className="text-primary">pals</span>
@@ -1946,7 +1947,7 @@ export function Room() {
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />
             </WorkspaceWindow>
-            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><PixelCharacter id="nova" /><h1>Pixel Pals</h1></div>}
+            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
           </main>
         </div>
       </div>
