@@ -1,14 +1,3 @@
-<!-- LOVABLE:BEGIN -->
-> [!IMPORTANT]
-> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
-> published git history — force pushing, or rebasing/amending/squashing commits
-> that are already pushed — as it rewrites history on Lovable's side and the
-> user will likely lose their project history.
->
-> Commits you push to the connected branch sync back to Lovable and show up in
-> the editor, so keep the branch in a working state.
-<!-- LOVABLE:END -->
-
 ## Application rules
 - Settings belong in the app: any setting that doesn't have to exist before the server starts is a field in `SETTING_FIELDS` (`src/lib/settings.ts`) and is edited from the Setup window, not only through an environment variable. Saved values live in `BUDDY_DATA_DIR` (`app-settings.json`; secrets in `app-secrets.json`, mode 600, skipped by backups, never returned to the browser) and are laid over `process.env` by `settings.server.ts`, so modules keep reading `process.env` lazily (no module-level caching of those values). A real environment variable always wins. New integrations: add the fields, give the card its `group` id, and restart any timer or bot that reads its config once (`restartAfter`). Only stack-level settings (COMPOSE_PROFILES, Tailscale, Radicale password, Ollama runtime, accounts, data and backup folders) stay in Portainer. Server modules reachable from `vite.config.ts` must use relative imports (the config loader can't resolve `@/`).
 - Keep window movement, visibility and layout persistence in browser-only workspace components; hiding windows must preserve mounted chat, tools and recorder state so work is not discarded.

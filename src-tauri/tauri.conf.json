@@ -5,7 +5,7 @@
   "identifier": "app.lovable.pixelpals",
   "build": {
     "devUrl": "http://localhost:8080",
-    "frontendDist": "https://buddy-bot-room.lovable.app",
+    "frontendDist": "http://localhost:8090",
     "beforeDevCommand": "bun run dev"
   },
   "app": {
