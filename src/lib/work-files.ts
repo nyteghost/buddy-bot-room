@@ -1,4 +1,5 @@
 // Browser-only file readers for work tools. Libraries load on demand.
+import { planWeek, needText, shiftText } from "./staffing";
 import { BALLROOM_ROWS, ENGINEER_ROSTER, HALL_ROWS, weekLayouts, type WeekLayout, type TaskNote, DEFAULT_SCHEDULE_NAME, parseShift, reportDateToIso, type EventEntry, type EventRow, type Shift } from "./work-tools";
 
 type Item = { str: string; x: number; y: number };
@@ -351,8 +352,34 @@ export async function eventsWorkbook(entries: EventEntry[], existing?: File, tas
     if (sheets.some((s) => mergeWeekSheet(s, w, tasks))) continue;
     writeWeekSheet(wb.addWorksheet(`Week #${++n}`), w, tasks);
   }
+  addStaffingSheets(wb, entries);
   const out = await wb.xlsx.writeBuffer();
   return new Blob([out], { type: XLSX_MIME });
+}
+
+/** "Staffing" (who works when) and "Staffing Why" (the reasoning behind every pick) sheets. */
+function addStaffingSheets(wb: XWorkbook, entries: EventEntry[]) {
+  const dates = [...new Set(entries.map((e) => e.date))].sort();
+  if (!dates.length) return;
+  const plans = planWeek(dates, entries);
+  for (const name of ["Staffing", "Staffing Why"]) { const old = wb.getWorksheet(name); if (old) wb.removeWorksheet(old.id); }
+  const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric", timeZone: "UTC" });
+  const plan = wb.addWorksheet("Staffing");
+  plan.addRow(["Date", "Needed (people: hours)", "Engineers", "Service Desk (Jacquline)", "Gaps"]).font = { bold: true };
+  const why = wb.addWorksheet("Staffing Why");
+  why.addRow(["Date", "Who", "Shift", "Why"]).font = { bold: true };
+  for (const p of plans) {
+    const row = plan.addRow([day(p.date), needText(p.need), p.assignments.map((a) => `${a.name.split(" ")[0]} ${shiftText(a)}`).join("\n"), p.desk ? shiftText(p.desk) : "", p.gaps.map((g) => `${shiftText(g)} short ${g.short}`).join(", ")]);
+    row.alignment = { wrapText: true, vertical: "top" };
+    if (p.gaps.length) row.getCell(5).font = { bold: true, color: { argb: "FFC00000" } };
+    for (const a of p.assignments) why.addRow([day(p.date), a.name, shiftText(a), a.reason]);
+    if (p.desk) why.addRow([day(p.date), p.desk.name, shiftText(p.desk), p.desk.reason]);
+    for (const n of p.notUsed) why.addRow([day(p.date), n.name, "Off", n.why]);
+    for (const n of p.notes) why.addRow([day(p.date), "Note", "", n]);
+  }
+  plan.columns = [{ width: 12 }, { width: 34 }, { width: 28 }, { width: 22 }, { width: 30 }];
+  why.columns = [{ width: 12 }, { width: 22 }, { width: 14 }, { width: 110 }];
+  why.eachRow((r) => { r.alignment = { wrapText: true, vertical: "top" }; });
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
