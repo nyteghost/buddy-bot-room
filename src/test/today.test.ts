@@ -51,7 +51,7 @@ describe("today planner logic", () => {
   });
 });
 
-import { parseWhen, zonedEpoch, addParsed, dueRoutines, addRoutine, parseWeek, fallbackWeek, weekStats } from "@/lib/today";
+import { closeDay, parseWhen, zonedEpoch, addParsed, dueRoutines, addRoutine, parseWeek, fallbackWeek, weekStats } from "@/lib/today";
 
 describe("times, routines and the week", () => {
   it("reads a time and a length out of a capture line", () => {
@@ -106,5 +106,13 @@ describe("times, routines and the week", () => {
   });
   it("keeps old saved lists loading (no routines field)", () => {
     expect(parseState({ tasks: [{ id: "a", title: "x" }] }).routines).toEqual([]);
+  });
+  it("closing the day clears the pick and past times but keeps later ones", () => {
+    let s = addTask(EMPTY, "old", "manual", "a", 1, { at: 100 });
+    s = addTask(s, "later", "manual", "b", 1, { at: 900 });
+    const c = closeDay({ ...s, pick: { id: "a", reason: "", fallback: false, at: 0 } }, 500);
+    expect(c.pick).toBe(null);
+    expect(c.tasks.find((t) => t.id === "a")!.at).toBe(undefined);
+    expect(c.tasks.find((t) => t.id === "b")!.at).toBe(900);
   });
 });

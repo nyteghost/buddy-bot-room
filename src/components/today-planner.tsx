@@ -3,7 +3,7 @@ import { Check, Copy, Mic, Plus, Shrink, SkipForward, Sparkles, X } from "lucide
 import { Button } from "@/components/ui/button";
 import { agents } from "@/lib/agents";
 import { PACE_LABELS, TIERS, type Tier, type TodayState, type TodayTask } from "@/lib/today";
-import { RoutinesPanel, Schedule, WeekPanel, hhmm, type Cal, type Stats } from "@/components/today-week";
+import { EndOfDay, MorningStart, RoutinesPanel, Schedule, WeekPanel, hhmm, type Cal, type Stats } from "@/components/today-week";
 
 type View = Omit<TodayState, "nudged"> & { stats?: Stats };
 type Reply = { state?: View; error?: string; warning?: string; today?: string; stepId?: string; cal?: Cal; weekNote?: string };
@@ -105,6 +105,8 @@ export function TodayPlanner() {
       {msg && <p role="status" className="rounded-md border border-border bg-muted px-3 py-2 text-sm">{msg}</p>}
       {state?.day?.opening && <p className="rounded-md bg-primary/10 px-3 py-2 text-sm">{state.day.opening}</p>}
 
+      <MorningStart cal={cal} tasks={tasks} planned={state?.day?.date === today} today={today} onDump={() => setShowDump(true)} onStart={() => void run("whatnow", { op: "whatnow" })} />
+
       <Schedule cal={cal} tasks={tasks} today={today} />
 
       <div className="grid gap-2 rounded-lg border border-border bg-card p-4">
@@ -161,6 +163,7 @@ export function TodayPlanner() {
         </section>
       )}
 
+      <EndOfDay cal={cal} tasks={tasks} today={today} busy={!!busy} run={run} />
       <WeekPanel cal={cal} tasks={tasks} stats={state?.stats} today={today} note={weekNote} busy={!!busy} run={run} />
       <RoutinesPanel routines={state?.routines ?? []} busy={!!busy} run={run} />
 

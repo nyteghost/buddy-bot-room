@@ -170,6 +170,11 @@ export function addRoutine(s: TodayState, r: Omit<Routine, "id" | "last">, id: s
 }
 export const removeRoutine = (s: TodayState, id: string): TodayState => ({ ...s, routines: s.routines.filter((r) => r.id !== id) });
 
+/** End of day: clears the "do this now" pick and any times that already passed, so tomorrow doesn't open with yesterday's clock. */
+export function closeDay(s: TodayState, now: number): TodayState {
+  return { ...s, pick: null, tasks: s.tasks.map((t) => { if (t.status !== "open" || !t.at || t.at >= now) return t; const { at: _a, ...rest } = t; void _a; return rest; }) };
+}
+
 // ---------- the week ----------
 const mondayOf = (dateKey: string) => { const d = new Date(`${dateKey}T12:00:00Z`); const dow = (d.getUTCDay() + 6) % 7; return d.getTime() - dow * 86400_000; };
 /** Counts for the Friday wrap-up. `weekStart` is the epoch ms of Monday 00:00 local. */

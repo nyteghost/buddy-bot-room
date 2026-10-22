@@ -136,3 +136,68 @@ export function RoutinesPanel({ routines, busy, run }: { routines: Routine[]; bu
     </div>
   );
 }
+
+const hourIn = (tz: string) => Number(new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+const flag = (key: string) => { try { return localStorage.getItem(key) === "1"; } catch { return false; } };
+const setFlag = (key: string) => { try { localStorage.setItem(key, "1"); } catch { /* optional */ } };
+
+/** First open of the morning: what's on, and one question. */
+export function MorningStart({ cal, tasks, planned, today, onDump, onStart }: { cal: Cal | null; tasks: TodayTask[]; planned: boolean; today: string; onDump: () => void; onStart: () => void }) {
+  const tz = cal?.tz ?? "UTC";
+  const [hidden, setHidden] = useState(false);
+  if (!today || hidden || flag(`today:start:${today}`) || planned || hourIn(tz) >= 12) return null;
+  const hide = () => { setFlag(`today:start:${today}`); setHidden(true); };
+  const open = tasks.filter((t) => t.status === "open");
+  const clock = open.filter((t) => t.at && dayKeyOf(t.at, tz) === today).length + (cal?.events ?? []).filter((e) => !e.allDay && dayKeyOf(e.start, tz) === today).length;
+  const focus = open.filter((t) => t.week);
+  return (
+    <section aria-label="Good morning" className="grid gap-3 rounded-lg border border-primary bg-primary/10 p-4">
+      <div>
+        <h2 className="text-lg font-semibold">Good morning</h2>
+        <p className="text-sm">{clock ? `${clock} thing${clock === 1 ? "" : "s"} on the clock today.` : "Nothing on the clock today."} {open.length ? `${open.length} open.` : "Your list is empty."}{focus.length ? ` This week's focus: ${focus.map((t) => t.title).join(", ")}.` : ""}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button className="h-12" onClick={() => { hide(); onDump(); }}>Brain dump</Button>
+        <Button variant="outline" className="h-12" disabled={!open.length} onClick={() => { hide(); onStart(); }}>Just start</Button>
+      </div>
+      <button type="button" className="justify-self-start text-sm text-muted-foreground underline" onClick={hide}>Not now</button>
+    </section>
+  );
+}
+
+/** Evening: what got done, what carries over, and a clean close. Open by default after 5pm. */
+export function EndOfDay({ cal, tasks, today, busy, run }: { cal: Cal | null; tasks: TodayTask[]; today: string; busy: boolean; run: Run }) {
+  const tz = cal?.tz ?? "UTC";
+  const [open, setOpen] = useState<boolean | null>(null);
+  if (!today) return null;
+  const evening = hourIn(tz) >= 17;
+  const closed = flag(`today:closed:${today}`);
+  const show = open ?? (evening && !closed);
+  const done = tasks.filter((t) => t.status === "done" && t.doneAt && dayKeyOf(t.doneAt, tz) === today);
+  const left = tasks.filter((t) => t.status === "open");
+  return (
+    <div className="rounded-lg border border-border bg-card">
+      <button type="button" className="flex min-h-12 w-full items-center justify-between px-4 text-left font-semibold" aria-expanded={show} onClick={() => setOpen(!show)}>
+        <span>End of day{done.length ? ` · ${done.length} done` : ""}</span><span className="text-muted-foreground">{show ? "▾" : "▸"}</span>
+      </button>
+      {show && (
+        <div className="grid gap-3 border-t border-border p-4 text-sm">
+          <p>{done.length ? `You finished ${done.length} thing${done.length === 1 ? "" : "s"} today.` : "Nothing checked off today, and that's okay. Some days are for other things."}</p>
+          {done.length > 0 && <ul className="ml-5 list-disc text-muted-foreground">{done.slice(0, 10).map((t) => <li key={t.id}>{t.title}</li>)}</ul>}
+          {left.length > 0 ? (
+            <div className="grid gap-1">
+              <b>Still open · they carry over unless you drop them</b>
+              {left.slice(0, 12).map((t) => (
+                <div key={t.id} className="flex items-center gap-2"><span className="min-w-0 flex-1 break-words">{t.title}</span>
+                  <Button size="sm" variant="ghost" className="h-9 text-muted-foreground" disabled={busy} onClick={() => void run("drop", { op: "drop", id: t.id })}>Drop</Button></div>
+              ))}
+              {left.length > 12 && <span className="text-muted-foreground">and {left.length - 12} more</span>}
+            </div>
+          ) : <p className="text-muted-foreground">Nothing open. Clean slate for tomorrow.</p>}
+          <Button className="h-12" disabled={busy} onClick={() => { void run("closeday", { op: "closeday" }).then(() => { setFlag(`today:closed:${today}`); setOpen(false); }); }}>Close the day</Button>
+          <p className="text-xs text-muted-foreground">Closing clears the "do this now" pick and any times that already passed. Nothing is deleted.</p>
+        </div>
+      )}
+    </div>
+  );
+}
