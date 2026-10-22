@@ -7,6 +7,14 @@ const e = (date: string, space: string, start: number, end: number, title = "Sho
 const dates = ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"];
 
 describe("staffing", () => {
+  it("covers a Monday/Tuesday evening with Mark (9-hour shift) so Edison keeps the day off", () => {
+    const plans = planWeek(dates, [e("2026-11-10", "Hall A", 480, 1200)]); // Tue 8a-8p show
+    const tue = plans.find((p) => p.date === "2026-11-10")!;
+    expect(tue.assignments.some((a) => a.name === "Mark Brown")).toBe(true);
+    expect(tue.assignments.some((a) => a.name === "Edison Dunkley")).toBe(false);
+    const mark = tue.assignments.find((a) => a.name === "Mark Brown")!;
+    expect(mark.end - mark.start).toBe(540);
+  });
   it("treats a zero-length marker (7:30a move-in) as a point, not an all-day run", () => {
     const need = dayNeed([e("2026-11-10", "Hall A", 450, 450), e("2026-11-10", "Hall A", 585, 780)], "2026-11-10");
     expect(need[40]).toBe(0); // 8p: nothing needed

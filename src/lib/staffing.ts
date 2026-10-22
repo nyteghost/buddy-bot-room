@@ -2,7 +2,7 @@
 // Rules: at least 1 engineer for any show, at least 2 at all times for a big show (2+ halls) on the days it is here.
 import { formatMinutes, parseShift, type EventEntry } from "./work-tools";
 
-export type Staff = { name: string; badge: string; title: string; patterns?: { start: number; end: number }[]; offWeekdays?: number[]; baseline?: { weekdays: number[]; pattern: { start: number; end: number } }; lastResort?: number[]; powerDays?: number[]; /** Never the only engineer on during a show. */ notAlone?: boolean };
+export type Staff = { name: string; badge: string; title: string; patterns?: { start: number; end: number }[]; offWeekdays?: number[]; baseline?: { weekdays: number[]; pattern: { start: number; end: number } }; lastResort?: number[]; powerDays?: number[]; /** Never the only engineer on during a show. */ notAlone?: boolean; /** Weekdays (Mon = 0) this person can take a later shift to cover a gap, instead of pulling in someone on a day they like off. Only used as a fallback. */ flexDays?: number[] };
 const hours = (list: [number, number][]) => list.map(([a, b]) => ({ start: a * 60, end: b * 60 }));
 const EVENING = hours([[12, 20.5], [12.5, 21], [13, 21.5], [13.5, 22], [14, 22.5], [14.5, 23], [15, 23.5], [15.5, 24]]);
 export const SHOW_STAFF: Staff[] = [
@@ -12,6 +12,8 @@ export const SHOW_STAFF: Staff[] = [
   { name: "Edison Dunkley", badge: "605", title: "Show Srvc Supervisor", patterns: [...EVENING, ...hours([[16.5, 25], [19.5, 28]])], lastResort: [0, 1] }, // 12p-8:30p up to 3:30p-12a; takes the 1a / 4a close shifts; Mon and Tue off when possible
   { name: "Franck Pierre-Louis", badge: "607", title: "Show Srvc Eng", patterns: EVENING, notAlone: true }, // 12p-8:30p up to 3:30p-12a; never works a show alone (until told otherwise)
 ];
+/** Mark (manager, 9-hour days, usually 9a-6p) takes a later 9-hour shift on Mon/Tue so Edison can keep those days off. */
+export const MARK_FLEX: Staff = { name: "Mark Brown", badge: "603", title: "Show Srvc Manager", patterns: hours([[9, 18], [10, 19], [11, 20], [12, 21], [13, 22], [14, 23], [15, 24]]), flexDays: [0, 1] };
 export const ON_CALL: Staff = { name: "Jontee King", badge: "On-Call", title: "On-Call Show Srvc Eng", patterns: hours([[17, 22], [17, 23], [17, 24]]) }; // only 5p-10p, 5p-11p or 5p-12a
 export const OPS_ASSISTANT = { name: "Jacquline Dixon", badge: "615", title: "Ops Assistant" };
 /** Shows heavy on power (lots of 60 / 30 amp orders): Madjid works Tue and Wed for these. */
@@ -123,8 +125,9 @@ const range = (slots: number[]) => {
 export function planWeek(
   dates: string[], entries: EventEntry[], staff: Staff[] = SHOW_STAFF, avail: Record<string, Record<string, Avail>> = {}, onCall: Staff | null = ON_CALL, holds: Hold[] = [],
 ): DayPlan[] {
-  const worked = new Map<string, number>(staff.map((s) => [s.name, 0]));
-  const days = new Map<string, Set<string>>(staff.map((s) => [s.name, new Set()]));
+  const pool = staff === SHOW_STAFF ? [...staff, MARK_FLEX] : staff; // Mark is only a fallback for gaps
+  const worked = new Map<string, number>(pool.map((s) => [s.name, 0]));
+  const days = new Map<string, Set<string>>(pool.map((s) => [s.name, new Set()]));
   const prevDay = (d: string) => new Date(new Date(`${d}T12:00:00Z`).getTime() - 864e5).toISOString().slice(0, 10);
   for (const s of staff) for (const d of dates) if (avail[s.name]?.[d]?.fixed || avail[s.name]?.[d]?.off) worked.set(s.name, worked.get(s.name)! + 1); // paid leave counts as one of the 5 days
   const plans: DayPlan[] = [];
@@ -165,9 +168,10 @@ export function planWeek(
       const def = deficit().map((x, i) => (pass < 0 && i < 48 ? 0 : x));
       if (!def.some((x) => x > 0)) break;
       const oth = othersAt(assignments);
-      let best: { name: string; p: { start: number; end: number }; gain: number; waste: number; adj: number } | null = null;
-      for (const s of staff) {
+      let best: { name: string; p: { start: number; end: number }; gain: number; waste: number; adj: number; rank: number } | null = null;
+      for (const s of pool) {
         const wd = weekday(date);
+        if (s.flexDays && (pass < 1 || !s.flexDays.includes(wd))) continue; // fallback only, after everyone else has been tried
         const lastResort = !!s.lastResort?.includes(wd);
         if (busy.has(s.name) || banned.has(s.name) || avail[s.name]?.[date]?.off || offDay(s)) continue;
         if (s.baseline && !s.baseline.weekdays.includes(wd) && !lastResort) continue; // only works their usual days
@@ -178,14 +182,17 @@ export function planWeek(
           for (let i = 0; i < SLOTS; i++) if (def[i]! > 0 && p.start < (i + 1) * 30 && p.end > i * 30 && (!s.notAlone || oth[i]! > 0)) gain++;
           const waste = (p.end - p.start) / 30 - gain;
           const adj = days.get(s.name)!.has(prevDay(date)) ? 1 : 0; // keeps work days together so days off land together
-          const better = !best || gain > best.gain || (gain === best.gain && waste < best.waste) || (gain === best.gain && waste === best.waste && (adj > best.adj || (adj === best.adj && worked.get(s.name)! < worked.get(best.name)!)));
-          if (gain > 0 && better) best = { name: s.name, p, gain, waste, adj };
+          const rank = s.flexDays ? 1 : 0; // Mark before Edison's last-resort Mon/Tue
+          const better = !best || rank > best.rank || (rank === best.rank && (gain > best.gain || (gain === best.gain && waste < best.waste) || (gain === best.gain && waste === best.waste && (adj > best.adj || (adj === best.adj && worked.get(s.name)! < worked.get(best.name)!)))));
+          if (gain > 0 && better) best = { name: s.name, p, gain, waste, adj, rank };
         }
       }
       if (!best) break;
       {
         const slots = def.map((x, i) => (x > 0 && best!.p.start < (i + 1) * 30 && best!.p.end > i * 30 ? i : -1)).filter((i) => i >= 0);
-        const why = (staff.find((x) => x.name === best!.name)?.lastResort?.includes(weekday(date)))
+        const why = pool.find((x) => x.name === best!.name)?.flexDays
+          ? `${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][weekday(date)]} is Edison's usual day off, so Mark takes a later 9-hour shift to cover ${range(slots)} instead. `
+          : (staff.find((x) => x.name === best!.name)?.lastResort?.includes(weekday(date)))
           ? `${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][weekday(date)]} is normally off (or only if needed), and nobody else could cover ${range(slots)}, so this is the exception. `
           : "";
         add(best.name, best.p.start, best.p.end, false, `${why}Still short ${range(slots)} (need ${Math.max(...slots.map((i) => need[i]!))}, had ${Math.min(...slots.map((i) => cover()[i]!))}). ${shiftText(best.p)} closes the most of that gap (${slots.length / 2}h); ${best.name.split(" ")[0]} has worked ${worked.get(best.name)} day(s) so far this week. ${coverNote(best.p)}`);
