@@ -66,6 +66,12 @@ export async function handleTodayCapture(request: Request): Promise<Response> {
   return Response.json({ text: await captureToday(String(body.text ?? "")) });
 }
 
+/** GET check for Shortcuts: says whether the server is reachable and the token is accepted. Adds nothing. */
+export async function handleTodayCapturePing(request: Request): Promise<Response> {
+  const user = (await currentUser(request)) ?? (await tokenUser(request));
+  return Response.json({ ok: true, tokenAccepted: !!user?.owner });
+}
+
 export async function handleToday(request: Request): Promise<Response> {
   const user = await currentUser(request);
   if (!user?.owner) return Response.json({ error: "Sign in as the owner to use Today." }, { status: 403 });
