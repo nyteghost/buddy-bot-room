@@ -7,6 +7,11 @@ const e = (date: string, space: string, start: number, end: number, title = "Sho
 const dates = ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"];
 
 describe("staffing", () => {
+  it("treats a zero-length marker (7:30a move-in) as a point, not an all-day run", () => {
+    const need = dayNeed([e("2026-11-10", "Hall A", 450, 450), e("2026-11-10", "Hall A", 585, 780)], "2026-11-10");
+    expect(need[40]).toBe(0); // 8p: nothing needed
+    expect(need[2 * 11]).toBe(1); // 11a: the show
+  });
   it("needs 2 all day for a show in 2+ halls", () => {
     const need = dayNeed([e("2026-11-10", "Hall A", 480, 600), e("2026-11-10", "Hall B", 900, 1020)], "2026-11-10");
     expect(need[16]).toBe(2);

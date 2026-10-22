@@ -34,7 +34,8 @@ const effCover = (list: Shift[]): number[] => {
   return others.map((o, i) => o + (o > 0 ? na[i]! : 0));
 };
 const othersAt = (list: Shift[]): number[] => { const o = new Array<number>(SLOTS).fill(0); for (const a of list) if (!aloneOnly(a.name)) for (let i = 0; i < SLOTS; i++) if (a.start < (i + 1) * 30 && a.end > i * 30) o[i]!++; return o; };
-const endOf = (e: EventEntry) => (e.end <= e.start ? e.end + 1440 : e.end); // a show running past midnight
+// An end before the start means it runs past midnight; an end equal to the start is a point in time (e.g. a 7:30a move-in marker), worth half an hour, not a whole day.
+const endOf = (e: EventEntry) => (e.end < e.start ? e.end + 1440 : e.end === e.start ? e.end + 30 : e.end);
 
 /** Air wall work always needs at least 2 people for its window. */
 export type Hold = { date: string; start: number; end: number; n: number; text: string };
