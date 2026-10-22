@@ -102,4 +102,18 @@ describe("staffing", () => {
     const plans = planWeeks(dates, [e("2026-11-10", "Hall A", 480, 1000), e("2026-11-10", "Hall B", 480, 1000), e("2026-11-14", "Hall A", 480, 1300)]);
     for (const s of SHOW_STAFF) expect(plans.filter((p) => p.assignments.some((a) => a.name === s.name)).length <= 5).toBe(true);
   });
+
+  it("never leaves Franck as the only engineer during a show", () => {
+    const shows = [e("2026-11-10", "Hall A", 480, 1000), e("2026-11-12", "Hall A", 480, 1300), e("2026-11-14", "Hall A", 480, 1380), e("2026-11-14", "Hall B", 480, 1380)];
+    const plans = planWeeks(dates, shows);
+    for (const p of plans) for (let i = 0; i < 56; i++) {
+      if (!p.need[i]) continue;
+      const on = p.assignments.filter((a) => a.start < (i + 1) * 30 && a.end > i * 30);
+      if (on.some((a) => a.name.startsWith("Franck"))) expect(on.length >= 2).toBe(true);
+    }
+  });
+  it("Franck still counts as the second person when someone else is on", () => {
+    const p = planWeek(["2026-11-14"], [e("2026-11-14", "Hall A", 480, 1260), e("2026-11-14", "Hall B", 480, 1260)])[0]!;
+    expect(p.assignments.some((a) => a.name.startsWith("Franck"))).toBe(true);
+  });
 });
