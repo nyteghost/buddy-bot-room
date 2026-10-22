@@ -45,6 +45,8 @@ describe("For Scheduling report (no Usage column)", () => {
     const q = list.filter((e) => e.code === "MO?");
     expect(q.length).toBe(1);
     expect(q[0]!.date).toBe("2026-10-06");
+    expect(q[0]!.end - q[0]!.start).toBe(180);
+    expect(entryLabel(q[0]!)).toMatch(/^MO\? .+-.+$/);
     expect(summarizeEvents([row({ description: "Move In" }), row({ description: "Move Out", date: "2026-10-07" })]).some((e) => e.code === "MO?")).toBe(false);
   });
   it("makes air wall tasks when a room changes shape", () => {

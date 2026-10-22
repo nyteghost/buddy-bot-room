@@ -131,7 +131,7 @@ function EventsTab() {
   return (
     <div className="space-y-3 pt-2">
       <FilePick accept="application/pdf,.xlsx" label="Drop the For Scheduling report (.xlsx or PDF) — add your monthly schedule .xlsx to fill it in" onFiles={load} />
-      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting · MO? = no move-out line in the report, so check it. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
+      <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting · MO? = no move-out line in the report; guessed as 3 hours after the show ends, so check it. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
       {pending.length > 0 && (
         <label className="flex items-start gap-2 rounded-md border border-amber-500 p-2 text-xs">

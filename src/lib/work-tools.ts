@@ -27,6 +27,9 @@ export function parseShift(cell: string): { start: number; end: number } | null 
   return { start, end };
 }
 
+/** When an event has no move-out line, the guessed move out runs this long after the show ends. */
+export const MO_GUESS_MIN = 180;
+
 export function formatMinutes(min: number): string {
   const m = min % 1440, h = Math.floor(m / 60), mm = m % 60;
   return `${h % 12 || 12}${mm ? `:${String(mm).padStart(2, "0")}` : ""}${h < 12 ? "a" : "p"}`;
@@ -130,14 +133,14 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   for (const list of groups.values()) {
     if (list.some((e) => e.code === "MO") || !list.some((e) => e.code === "MI" || e.code === "Exmi")) continue;
     const last = list.reduce((a, b) => (b.date > a.date || (b.date === a.date && b.end > a.end) ? b : a));
-    kept.push({ ...last, code: "MO?", start: last.end, end: last.end });
+    kept.push({ ...last, code: "MO?", start: last.end, end: Math.min(last.end + MO_GUESS_MIN, 1440) }); // guess: move out runs 3 h after the show
   }
   const order: EventCode[] = ["Arr", "MI", "Exmi", "S", "Food", "Dinner", "MTG", "MO", "MO?"];
   return kept.sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
 }
 
 export function entryLabel(e: EventEntry) {
-  if (e.code === "MO?") return "MO?";
+  if (e.code === "MO?") return `MO? ${formatMinutes(e.start)}-${formatMinutes(e.end)}`;
   if (e.code === "Arr") return `Client Arr ${formatMinutes(e.start)}`;
   return `${e.code} ${formatMinutes(e.start)}-${formatMinutes(e.end)}`;
 }
