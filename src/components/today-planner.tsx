@@ -116,7 +116,7 @@ export function TodayPlanner() {
           <div className="grid gap-3 border-t border-border p-4">
             <textarea value={dump} onChange={(e) => setDump(e.target.value)} rows={6} placeholder="Everything on your mind, in whatever words come out. Messy is fine." aria-label="Brain dump" className="w-full rounded-md border border-input bg-background p-3 text-base" />
             <label className="grid gap-1 text-sm"><span>Pace today: <b>{PACE_LABELS[pace - 1]}</b></span>
-              <input type="range" min={1} max={5} value={pace} onChange={(e) => setPace(Number(e.target.value))} className="h-8 w-full" aria-label="Pace" />
+              <input type="range" min={1} max={5} value={pace} onChange={(e) => setPace(Number(e.target.value))} className="h-8 w-full accent-primary" aria-label="Pace" />
               <span className="flex justify-between text-xs text-muted-foreground"><span>running on fumes</span><span>go hard</span></span>
             </label>
             <input value={mood} onChange={(e) => setMood(e.target.value)} placeholder="How are you feeling? (optional)" aria-label="How you feel" className="h-11 rounded-md border border-input bg-background px-3 text-base" />
@@ -126,7 +126,9 @@ export function TodayPlanner() {
                 {agents.map((a) => <option key={a.id} value={a.id}>{a.name}: {a.role}</option>)}
               </select>
             </label>
-            <Button className="h-12" disabled={!!busy || !dump.trim()} onClick={async () => { await run("dump", { op: "dump", text: dump, pace, mood }); setDump(""); setShowDump(false); }}>{busy === "dump" ? "Sorting…" : "Make my plan"}</Button>
+            <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-border bg-card/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+              <Button className="h-12 w-full" disabled={!!busy || !dump.trim()} onClick={async () => { await run("dump", { op: "dump", text: dump, pace, mood }); setDump(""); setShowDump(false); }}>{busy === "dump" ? "Sorting…" : "Make my plan"}</Button>
+            </div>
           </div>
         )}
       </div>
