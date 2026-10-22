@@ -242,9 +242,104 @@ export function readAvail(text: string): Avail | null {
   const t = text.trim();
   if (!t) return null;
   if (/^off$/i.test(t)) return null; // OFF is what the planner writes for a day not worked; only PTO-type entries block a day
-  if (/^(pto|sick|vac|fmla|bereave)/i.test(t)) return { off: true };
+  if (/^(pto|sick|vac|fmla|bereave|holiday)/i.test(t)) return { off: true };
   const s = parseShift(t.split("\n")[0] ?? "");
   return s ? { off: false, fixed: { start: s.start, end: s.end } } : null;
+}
+
+export const WEEK_HOURS = 40;
+const isOffDay = (m: Staff, date: string, entries: EventEntry[]) => {
+  const powerDay = entries.some((e) => e.date === date && e.code !== "MO?" && POWER_HEAVY.test(e.title));
+  return !!m.offWeekdays?.includes(weekday(date)) && !(powerDay && m.powerDays?.includes(weekday(date)));
+};
+const combos = <T,>(list: T[], k: number): T[][] => (k <= 0 ? [[]] : list.flatMap((x, i) => combos(list.slice(i + 1), k - 1).map((rest) => [x, ...rest])));
+const coverOf = (p: DayPlan) => { const c = new Array<number>(SLOTS).fill(0); for (const a of p.assignments) for (let i = 0; i < SLOTS; i++) if (a.start < (i + 1) * 30 && a.end > i * 30) c[i]!++; return c; };
+const gapsOf = (p: DayPlan): DayPlan["gaps"] => {
+  const cover = coverOf(p), out: DayPlan["gaps"] = [];
+  for (let i = 0; i < SLOTS; i++) {
+    const short = Math.max(0, p.need[i]! - cover[i]!);
+    if (!short) continue;
+    const last = out[out.length - 1];
+    if (last && last.end === i * 30 && last.short === short) last.end = (i + 1) * 30; else out.push({ start: i * 30, end: (i + 1) * 30, short });
+  }
+  return out;
+};
+
+/**
+ * Everyone needs 40 hours a week, show or no show. After coverage is planned, anyone under 40 (paid leave and holidays count as 8)
+ * gets extra shifts on their usual days, keeping two days off in a row and avoiding the days they are normally off.
+ */
+function topUp(plans: DayPlan[], staff: Staff[], avail: Record<string, Record<string, Avail>>, entries: EventEntry[]) {
+  for (const s of staff) {
+    const mine = (p: DayPlan) => p.assignments.filter((a) => a.name === s.name).reduce((t, a) => t + workedHours(a), 0);
+    const leave = plans.map((p) => (avail[s.name]?.[p.date]?.off ? 8 : 0));
+    const have = plans.map((p, i) => mine(p) + leave[i]!);
+    const total = have.reduce((a, b) => a + b, 0);
+    if (total >= WEEK_HOURS) continue;
+    const cand = plans.map((p, i) => i).filter((i) => {
+      const wd = weekday(plans[i]!.date);
+      return have[i] === 0 && !avail[s.name]?.[plans[i]!.date]?.off && !isOffDay(s, plans[i]!.date, entries) && (!s.baseline || s.baseline.weekdays.includes(wd) || !!s.lastResort?.includes(wd));
+    });
+    const k = Math.min(cand.length, Math.ceil((WEEK_HOURS - total) / 8));
+    if (k <= 0) continue;
+    let best: { pick: number[]; score: number } | null = null;
+    for (const pick of combos(cand, k)) {
+      const busy = plans.map((_, i) => have[i]! > 0 || pick.includes(i));
+      const offs = busy.filter((b) => !b).length;
+      const pairOff = busy.some((b, i) => !b && !busy[(i + 1) % 7]);
+      let score = offs >= 2 && !pairOff ? 60 : 0;
+      for (const i of pick) {
+        const wd = weekday(plans[i]!.date);
+        if (s.lastResort?.includes(wd)) score += 100;
+        if ((i > 0 && have[i - 1]! > 0) || (i < 6 && have[i + 1]! > 0)) score -= 2; // keeps work days together
+        score -= plans[i]!.need.filter((n) => n > 0).length / 20; // lean toward the busier days
+      }
+      if (!best || score < best.score - 1e-9) best = { pick, score };
+    }
+    if (!best) continue;
+    let running = total;
+    for (const i of best.pick.sort((a, b) => a - b)) {
+      const p = plans[i]!;
+      const cover = coverOf(p);
+      const pats = s.patterns ?? PATTERNS;
+      let choice = pats[0]!, top = -1, waste = Infinity;
+      for (const pat of pats) {
+        let gain = 0;
+        for (let j = 0; j < SLOTS; j++) if (p.need[j]! > cover[j]! && pat.start < (j + 1) * 30 && pat.end > j * 30) gain++;
+        const w = (pat.end - pat.start) / 30 - gain;
+        if (gain > top || (gain === top && w < waste)) { top = gain; waste = w; choice = pat; }
+      }
+      running += workedHours(choice);
+      p.assignments.push({ name: s.name, start: choice.start, end: choice.end, fixed: false, reason: `Hours top-up: nothing more was needed for coverage ${top > 0 ? "(this also closes part of a gap)" : "this day"}, but everyone needs ${WEEK_HOURS} hours a week. ${s.name.split(" ")[0]} had ${total} hours (paid leave counts as 8), so this ${shiftText(choice)} shift brings the week to ${Math.min(running, WEEK_HOURS + 8)}. Picked ${weekdayName(p.date)} so the days off stay together${s.lastResort?.includes(weekday(p.date)) ? ", though it is normally a day off for them" : ""}.` });
+      p.assignments.sort((a, b) => a.start - b.start);
+      p.notUsed = p.notUsed.filter((n) => n.name !== s.name);
+      p.gaps = gapsOf(p);
+      p.notes = p.notes.filter((n) => !n.startsWith("Short-staffed"));
+      if (p.gaps.length) p.notes.push(`Short-staffed ${p.gaps.map((g) => `${shiftText(g)} (${g.short} more)`).join(", ")}: nobody left who can legally or sensibly cover it.`);
+    }
+    if (running < WEEK_HOURS) plans[6]!.notes.push(`${s.name.split(" ")[0]} only reaches ${running} hours this week: no allowed day was left (usual days, PTO or days off).`);
+  }
+}
+const weekdayName = (d: string) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][weekday(d)]!;
+
+/** Jacquline: Service Desk hours can be short, so a short weekday is extended earlier (to 8 worked hours) when that is what gets her to 40. */
+function topUpDesk(plans: DayPlan[], avail: Record<string, Record<string, Avail>>) {
+  const name = OPS_ASSISTANT.name;
+  const leave = plans.reduce((t, p) => t + (avail[name]?.[p.date]?.off ? 8 : 0), 0);
+  const hrs = (p: DayPlan) => (p.desk ? workedHours(p.desk) : 0);
+  let total = leave + plans.reduce((t, p) => t + hrs(p), 0);
+  for (const p of plans) {
+    if (total >= WEEK_HOURS) break;
+    const d = p.desk;
+    if (!d || weekday(p.date) > 4) continue;
+    const len = d.end - d.start;
+    if (len >= 510) continue;
+    const start = Math.max(360, d.end - 510);
+    const before = hrs(p);
+    p.desk = { ...d, start, reason: `${d.reason} Extended earlier to ${shiftText({ start, end: d.end })} so she reaches ${WEEK_HOURS} hours this week.` };
+    total += hrs(p) - before;
+  }
+  if (total < WEEK_HOURS) plans[6]!.notes.push(`Jacquline only reaches ${total} hours this week from her Service Desk / Mon-Fri hours.`);
 }
 
 /** Plans whole Mon-Sun weeks (so the five-day limit and days off are per week) and notes anyone without two days off in a row. */
@@ -254,6 +349,8 @@ export function planWeeks(dates: string[], entries: EventEntry[], avail: Record<
   for (const m of mondays) {
     const week = Array.from({ length: 7 }, (_, i) => { const t = new Date(`${m}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + i); return t.toISOString().slice(0, 10); });
     const plans = planWeek(week, entries, staff, avail, ON_CALL, holds);
+    topUp(plans, staff, avail, entries);
+    topUpDesk(plans, avail);
     for (const s of staff) {
       const on = plans.map((p) => p.assignments.some((a) => a.name === s.name));
       if (!on.some(Boolean)) continue;

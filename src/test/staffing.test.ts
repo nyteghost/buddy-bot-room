@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { airwallMinutes, planWeek, planWeeks, dayNeed, shiftText } from "@/lib/staffing";
+import { airwallMinutes, planWeek, planWeeks, dayNeed, shiftText, workedHours, SHOW_STAFF, WEEK_HOURS } from "@/lib/staffing";
 import type { EventEntry } from "@/lib/work-tools";
 
 const e = (date: string, space: string, start: number, end: number, title = "Show", eventId = "1"): EventEntry =>
@@ -52,5 +52,34 @@ describe("staffing", () => {
     expect(airwallMinutes("BALLROOM", "Make ABE")).toBe(40);
     expect(airwallMinutes("BALLROOM", "Make full ballroom")).toBe(90);
     expect(airwallMinutes("HALLS", "Make Hall AB")).toBe(90);
+  });
+
+  const weekHours = (plans: ReturnType<typeof planWeeks>, name: string, avail: Record<string, Record<string, { off: boolean }>> = {}) =>
+    plans.reduce((t, p) => t + (p.assignments.filter((a) => a.name === name).reduce((x, a) => x + workedHours(a), 0)) + (avail[name]?.[p.date]?.off ? 8 : 0), 0);
+  it("gives everyone 40 hours in a week with no shows at all", () => {
+    const plans = planWeeks(dates, []);
+    for (const s of SHOW_STAFF) expect(weekHours(plans, s.name)).toBe(WEEK_HOURS);
+    const desk = plans.reduce((t, p) => t + (p.desk ? workedHours(p.desk) : 0), 0);
+    expect(desk).toBe(WEEK_HOURS);
+  });
+  it("keeps two days off in a row and Madjid off Tue/Wed when topping up", () => {
+    const plans = planWeeks(dates, [e("2026-11-10", "Hall A", 480, 1000)]);
+    for (const s of SHOW_STAFF) {
+      const on = plans.map((p) => p.assignments.some((a) => a.name === s.name));
+      expect(on.some((x, i) => !x && !on[(i + 1) % 7])).toBe(true);
+    }
+    expect(plans[1]!.assignments.some((a) => a.name.startsWith("Madjid"))).toBe(false);
+    expect(plans[2]!.assignments.some((a) => a.name.startsWith("Madjid"))).toBe(false);
+  });
+  it("counts holidays and PTO as 8 hours toward the 40", () => {
+    const avail = { "Alexis Albert": { "2026-11-09": { off: true }, "2026-11-10": { off: true } } };
+    const plans = planWeeks(dates, [], avail);
+    expect(weekHours(plans, "Alexis Albert", avail)).toBe(WEEK_HOURS);
+    expect(plans[0]!.assignments.some((a) => a.name.startsWith("Alexis"))).toBe(false);
+  });
+  it("tops up Edison without using his usual Mon/Tue off days when other days work", () => {
+    const plans = planWeeks(dates, []);
+    expect(plans[0]!.assignments.some((a) => a.name.startsWith("Edison"))).toBe(false);
+    expect(plans[1]!.assignments.some((a) => a.name.startsWith("Edison"))).toBe(false);
   });
 });
