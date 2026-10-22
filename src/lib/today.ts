@@ -19,11 +19,13 @@ export type Repeat = "daily" | "weekdays" | "weekly";
 export type Routine = { id: string; title: string; repeat: Repeat; dow: number; time: number | null; mins: number | null; last: string; area: Area | null };
 export type Pick = { id: string; reason: string; fallback: boolean; at: number };
 export type TodayDay = { date: string; pace: number; mood: string; opening: string };
-export type TodayState = { tasks: TodayTask[]; day: TodayDay | null; pick: Pick | null; nudged: string[]; routines: Routine[] };
+/** A focus session on one task: when it started and how long it is. Check-ins go out at the halfway point and at the end. */
+export type Focus = { id: string; title: string; start: number; mins: number };
+export type TodayState = { tasks: TodayTask[]; day: TodayDay | null; pick: Pick | null; nudged: string[]; routines: Routine[]; focus: Focus | null };
 
 export const PACE_LABELS = ["running on fumes", "gentle", "steady", "full steam", "go hard"] as const;
 export const paceLabel = (p: number) => PACE_LABELS[Math.min(5, Math.max(1, Math.round(p))) - 1]!;
-export const EMPTY: TodayState = { tasks: [], day: null, pick: null, nudged: [], routines: [] };
+export const EMPTY: TodayState = { tasks: [], day: null, pick: null, nudged: [], routines: [], focus: null };
 
 const clip = (v: unknown, n: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 const oneOf = <T extends string>(v: unknown, list: readonly T[]): T | null => (list.includes(v as T) ? (v as T) : null);
@@ -64,7 +66,9 @@ export function parseState(raw: unknown): TodayState {
     const mins = Number(q["mins"]) > 0 ? Math.min(960, Math.round(Number(q["mins"]))) : null;
     return [{ id, title, repeat, dow: Math.min(6, Math.max(0, Math.round(Number(q["dow"]) || 0))), time: Number.isFinite(time) ? time : null, mins, last: /^\d{4}-\d{2}-\d{2}$/.test(String(q["last"])) ? String(q["last"]) : "", area: oneOf(q["area"], AREAS) }];
   }).slice(0, 40);
-  return { tasks, day, pick, nudged, routines };
+  const f = r["focus"] as Record<string, unknown> | null | undefined;
+  const focus = f && f["id"] && Number(f["start"]) > 0 && Number(f["mins"]) > 0 ? { id: clip(f["id"], 24), title: clip(f["title"], 200), start: Number(f["start"]), mins: Math.min(180, Math.max(1, Math.round(Number(f["mins"])))) } : null;
+  return { tasks, day, pick, nudged, routines, focus };
 }
 
 export const openTasks = (s: TodayState) => s.tasks.filter((t) => t.status === "open");
@@ -78,11 +82,23 @@ export function addTask(s: TodayState, title: string, source: TodayTask["source"
 }
 
 export function setStatus(s: TodayState, id: string, status: Status, now: number): TodayState {
-  return { ...s, pick: s.pick?.id === id ? null : s.pick, tasks: s.tasks.map((t) => (t.id === id ? { ...t, status, ...(status === "done" ? { doneAt: now } : {}) } : t)) };
+  return { ...s, pick: s.pick?.id === id ? null : s.pick, focus: s.focus?.id === id && status !== "open" ? null : s.focus, tasks: s.tasks.map((t) => (t.id === id ? { ...t, status, ...(status === "done" ? { doneAt: now } : {}) } : t)) };
 }
 export function setTier(s: TodayState, id: string, tier: Tier | null): TodayState {
   return { ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, tier } : t)) };
 }
+
+// ---------- focus timer ----------
+export const FOCUS_CHOICES = [15, 25, 45] as const;
+export function startFocus(s: TodayState, id: string, mins: number, now: number): TodayState {
+  const t = s.tasks.find((x) => x.id === id && x.status === "open");
+  if (!t) return s;
+  return { ...s, pick: { id, reason: s.pick?.id === id ? s.pick.reason : "You're on this one.", fallback: false, at: now }, focus: { id, title: t.title, start: now, mins: Math.min(180, Math.max(1, Math.round(mins) || 25)) } };
+}
+export const stopFocus = (s: TodayState): TodayState => ({ ...s, focus: null });
+/** More time: moves the end out and lets the end-of-session check-in fire again. */
+export const extendFocus = (s: TodayState, add: number): TodayState => (s.focus ? { ...s, focus: { ...s.focus, mins: Math.min(180, s.focus.mins + Math.max(1, Math.round(add))) } } : s);
+export const focusLeftMs = (f: Focus, now: number) => f.start + f.mins * 60_000 - now;
 
 // ---------- work / home ----------
 const WORK_WORDS = /\b(show|shows|crew|stage|schedule|engineer|ungerboeck|ballroom|hall|invoice|client|vendor|meeting|cobb|airwalls?|power order|work order|timesheet|pto|exhibitor|load[- ]?in|move[- ]?out|rigging)\b/i;
@@ -326,6 +342,13 @@ export function nudgesDue(opts: { now: number; localMinutes: number; dateKey: st
     const mins = (t.at - opts.now) / 60_000;
     const key = `tk:${t.id}:${t.at}`;
     if (mins > 0 && mins <= opts.leadMin && !done.has(key)) out.push({ key, title: `${t.title} in ${Math.ceil(mins)} min`, body: t.mins ? `About ${t.mins} min. Start winding down what you're on.` : "Start winding down what you're on." });
+  }
+  const f = opts.s.focus;
+  if (f) {
+    const halfAt = f.start + (f.mins * 60_000) / 2, endAt = f.start + f.mins * 60_000;
+    const hk = `fh:${f.start}`, ek = `fe:${f.start}:${f.mins}`;
+    if (f.mins >= 10 && opts.now >= halfAt && opts.now < endAt && !done.has(hk)) out.push({ key: hk, title: "Still on it?", body: `Halfway through "${f.title}". If you drifted, no problem. Just come back to it.` });
+    if (opts.now >= endAt && opts.now < endAt + 20 * 60_000 && !done.has(ek)) out.push({ key: ek, title: "Time's up", body: `"${f.title}": done, need more time, or switching? Open Today and pick.` });
   }
   for (const c of opts.checkins) {
     const key = `ci:${opts.dateKey}:${c}`;

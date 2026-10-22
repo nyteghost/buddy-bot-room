@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Copy, Mic, Plus, Shrink, SkipForward, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Copy, Mic, Plus, Shrink, SkipForward, Sparkles, Timer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agents } from "@/lib/agents";
 import { PACE_LABELS, TIERS, inArea, type Area, type Tier, type TodayState, type TodayTask } from "@/lib/today";
+import { FocusCard, FocusStart } from "@/components/today-focus";
 import { EndOfDay, MorningStart, RoutinesPanel, Schedule, WeekPanel, hhmm, type Cal, type Stats } from "@/components/today-week";
 
 type View = Omit<TodayState, "nudged"> & { stats?: Stats };
@@ -20,7 +21,7 @@ async function call(body: Record<string, unknown>): Promise<Reply> {
   } catch { return { error: "Couldn't reach the server." }; }
 }
 
-function TaskRow({ t, busy, tz, onDone, onSmaller, onTier, onDrop, onWhen, onWeek, onArea, isPick }: { t: TodayTask; busy: boolean; tz: string; onDone: () => void; onSmaller: () => void; onTier: (x: Tier) => void; onDrop: () => void; onWhen: (hhmm: string) => void; onWeek: () => void; onArea: () => void; isPick: boolean }) {
+function TaskRow({ t, busy, tz, onDone, onSmaller, onTier, onDrop, onWhen, onWeek, onArea, onFocus, isPick }: { t: TodayTask; busy: boolean; tz: string; onDone: () => void; onSmaller: () => void; onTier: (x: Tier) => void; onDrop: () => void; onWhen: (hhmm: string) => void; onWeek: () => void; onArea: () => void; onFocus: () => void; isPick: boolean }) {
   return (
     <li className={`rounded-lg border p-3 ${isPick ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
       <div className="flex items-start gap-3">
@@ -37,6 +38,7 @@ function TaskRow({ t, busy, tz, onDone, onSmaller, onTier, onDrop, onWhen, onWee
           </div>
           {t.notes && <div className="mt-1 text-xs text-muted-foreground">{t.notes}</div>}
           <div className="mt-2 flex flex-wrap gap-1">
+            <Button size="sm" variant="outline" className="h-9" disabled={busy} onClick={onFocus}><Timer className="size-4" /> Focus</Button>
             <Button size="sm" variant="outline" className="h-9" disabled={busy} onClick={onSmaller}><Shrink className="size-4" /> Make it smaller</Button>
             {TIERS.filter((x) => x !== t.tier).map((x) => <Button key={x} size="sm" variant="ghost" className="h-9" disabled={busy} onClick={() => onTier(x)}>→ {TIER_LABEL[x]}</Button>)}
             <Button size="sm" variant="ghost" className="h-9" disabled={busy} onClick={onWeek}>{t.week ? "Not this week" : "→ This week"}</Button>
@@ -67,7 +69,18 @@ export function TodayPlanner() {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
 
   const apply = useCallback((r: Reply) => { if (r.state) setState(r.state); if (r.cal) setCal(r.cal); if (r.today) setToday(r.today); if (r.weekNote !== undefined) setWeekNote(r.weekNote); setMsg(r.error ?? r.warning ?? ""); }, []);
-  const run = useCallback(async (label: string, body: Record<string, unknown>) => { setBusy(label); apply(await call({ ...body, coach })); setBusy(""); }, [apply, coach]);
+  const tasksRef = useRef<TodayTask[]>([]);
+  const [undo, setUndo] = useState<{ id: string; title: string; verb: string } | null>(null);
+  const run = useCallback(async (label: string, body: Record<string, unknown>) => {
+    const op = String(body["op"] ?? "");
+    const was = op === "done" || op === "drop" ? tasksRef.current.find((t) => t.id === body["id"]) : undefined;
+    setBusy(label);
+    const r = await call({ ...body, coach });
+    apply(r);
+    setBusy("");
+    if (was && !r.error) setUndo({ id: was.id, title: was.title, verb: op === "done" ? "Done" : "Dropped" });
+  }, [apply, coach]);
+  useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo(null), 8000); return () => clearTimeout(t); }, [undo]);
 
   useEffect(() => {
     try { setCoach(localStorage.getItem(COACH_KEY) ?? ""); const a = localStorage.getItem(AREA_KEY); if (a === "work" || a === "home") setArea(a); } catch { /* optional */ }
@@ -83,6 +96,7 @@ export function TodayPlanner() {
   useEffect(() => { try { localStorage.setItem(AREA_KEY, area); } catch { /* optional */ } }, [area]);
 
   const tasks = state?.tasks ?? [];
+  tasksRef.current = tasks;
   const open = tasks.filter((t) => t.status === "open");
   const done = tasks.filter((t) => t.status === "done");
   const pick = useMemo(() => open.find((t) => t.id === state?.pick?.id) ?? null, [open, state?.pick?.id]);
@@ -93,6 +107,7 @@ export function TodayPlanner() {
     t, busy: !!busy, tz: cal?.tz ?? "UTC", isPick: pick?.id === t.id,
     onWhen: (time: string) => void run("when", { op: "when", id: t.id, time }),
     onWeek: () => void run("weekflag", { op: "weekflag", id: t.id }),
+    onFocus: () => void run("focus", { op: "focus_start", id: t.id, mins: t.mins && t.mins >= 5 && t.mins <= 90 ? t.mins : 25 }),
     onArea: () => void run("area", { op: "area", id: t.id, area: t.area === "work" ? "home" : t.area === "home" ? "" : "work" }),
     onDone: () => void run("done", { op: "done", id: t.id }),
     onDrop: () => void run("drop", { op: "drop", id: t.id }),
@@ -115,6 +130,8 @@ export function TodayPlanner() {
         {([["", "All"], ["work", "Work"], ["home", "Home"]] as const).map(([v, label]) => <button key={v} type="button" aria-pressed={area === v} onClick={() => setArea(v)} className={`h-10 flex-1 rounded-full border text-sm font-medium ${area === v ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}>{label}</button>)}
       </div>
 
+      <FocusCard focus={state?.focus ?? null} busy={!!busy} run={run} />
+
       <MorningStart cal={cal} tasks={tasks} planned={state?.day?.date === today} today={today} onDump={() => setShowDump(true)} onStart={() => void run("whatnow", { op: "whatnow", area })} />
 
       <Schedule cal={cal} tasks={tasks} today={today} />
@@ -126,6 +143,7 @@ export function TodayPlanner() {
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Do this now</div>
             <div className="text-lg font-semibold leading-snug">{pick.title}</div>
             {state?.pick?.reason && <div className="text-sm">{state.pick.reason}</div>}
+            {state?.focus?.id !== pick.id && <FocusStart id={pick.id} mins={pick.mins} busy={!!busy} run={run} />}
             <div className="flex flex-wrap gap-2">
               <Button className="h-11" disabled={!!busy} onClick={() => void run("done", { op: "done", id: pick.id })}><Check className="size-4" /> Done</Button>
               <Button variant="outline" className="h-11" disabled={!!busy} onClick={() => void run("whatnow", { op: "whatnow", id: pick.id, area })}><SkipForward className="size-4" /> Not this one</Button>
@@ -197,6 +215,12 @@ export function TodayPlanner() {
           </div>
         )}
       </div>
+      {undo && (
+        <div role="status" className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-xl items-center gap-3 rounded-lg border border-border bg-popover px-4 py-3 text-popover-foreground shadow-lg">
+          <span className="min-w-0 flex-1 truncate text-sm">{undo.verb}: {undo.title}</span>
+          <Button size="sm" variant="outline" className="h-10" onClick={() => { const u = undo; setUndo(null); void run("reopen", { op: "reopen", id: u.id }); }}>Undo</Button>
+        </div>
+      )}
     </div>
   );
 }

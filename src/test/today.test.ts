@@ -117,7 +117,7 @@ describe("times, routines and the week", () => {
   });
 });
 
-import { guessArea, inArea, inAreaState, setArea } from "@/lib/today";
+import { startFocus, stopFocus, extendFocus, guessArea, inArea, inAreaState, setArea } from "@/lib/today";
 describe("work and home", () => {
   it("guesses from the words, and stays unsure when mixed", () => {
     expect(guessArea("Order cables for the ballroom show")).toBe("work");
@@ -140,5 +140,34 @@ describe("work and home", () => {
     let s = addRoutine(EMPTY, { title: "Build the weekly schedule", repeat: "daily", dow: 0, time: null, mins: null }, "r");
     s = dueRoutines(s, "2026-10-22", 4, 1, "UTC", () => "x");
     expect(s.tasks[0]!.area).toBe("work");
+  });
+});
+
+describe("focus timer", () => {
+  const base = addTask(EMPTY, "Write the report", "manual", "a", 1);
+  it("starts on an open task, picks it, and finishing it ends the session", () => {
+    const s = startFocus(base, "a", 25, 1000);
+    expect(s.focus).toEqual({ id: "a", title: "Write the report", start: 1000, mins: 25 });
+    expect(s.pick!.id).toBe("a");
+    expect(setStatus(s, "a", "done", 2000).focus).toBe(null);
+    expect(startFocus(base, "zzz", 25, 1)).toBe(base);
+    expect(stopFocus(s).focus).toBe(null);
+  });
+  it("checks in at halfway and at the end, once each, and extends cleanly", () => {
+    const s = startFocus(base, "a", 20, 0);
+    const at = (min: number, st = s) => nudgesDue({ now: min * 60_000, localMinutes: 0, dateKey: "x", events: [], leadMin: 10, checkins: [], s: st });
+    expect(at(5)).toHaveLength(0);
+    const half = at(10);
+    expect(half.map((n) => n.title)).toEqual(["Still on it?"]);
+    expect(at(10, markNudged(s, [half[0]!.key]))).toHaveLength(0);
+    expect(at(20).map((n) => n.title)).toContain("Time's up");
+    const more = extendFocus(markNudged(s, ["fe:0:20"]), 10);
+    expect(more.focus!.mins).toBe(30);
+    expect(at(30, more).map((n) => n.title)).toContain("Time's up");
+    expect(at(60, more)).toHaveLength(0);
+  });
+  it("loads a saved session and ignores junk", () => {
+    expect(parseState({ focus: { id: "a", title: "x", start: 5, mins: 25 } }).focus).toEqual({ id: "a", title: "x", start: 5, mins: 25 });
+    expect(parseState({ focus: { id: "a" } }).focus).toBe(null);
   });
 });

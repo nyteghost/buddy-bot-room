@@ -1,7 +1,7 @@
 import { currentUser, tokenUser } from "./accounts.server";
 import { askPals } from "./ask.server";
 import { agents } from "./agents";
-import { applyDump, addParsed, closeDay, inAreaState, setArea, type Area, addRoutine, addTask, dueRoutines, dumpPrompt, extractJson, fallbackPick, fallbackWeek, keepTask, markNudged, nudgesDue, parseCheckins, parseDump, parsePick, parseSmaller, parseState, parseWeek, pickPrompt, removeRoutine, setStatus, setTier, setWhen, smallerPrompt, toggleWeek, weekPrompt, weekStartKey, weekStats, zonedEpoch, openTasks, EMPTY, type Coach, type Repeat, type Tier, type TodayState } from "./today";
+import { applyDump, addParsed, closeDay, extendFocus, startFocus, stopFocus, inAreaState, setArea, type Area, addRoutine, addTask, dueRoutines, dumpPrompt, extractJson, fallbackPick, fallbackWeek, keepTask, markNudged, nudgesDue, parseCheckins, parseDump, parsePick, parseSmaller, parseState, parseWeek, pickPrompt, removeRoutine, setStatus, setTier, setWhen, smallerPrompt, toggleWeek, weekPrompt, weekStartKey, weekStats, zonedEpoch, openTasks, EMPTY, type Coach, type Repeat, type Tier, type TodayState } from "./today";
 import { calendarData } from "./inbox.server";
 import { pushNotice } from "./schedules.server";
 import { validZone } from "./schedule";
@@ -98,6 +98,9 @@ export async function handleToday(request: Request): Promise<Response> {
       return Response.json({ state: view(await update((s) => { const t = s.tasks.find((x) => x.id === id); if (!t) return s; const dk = t.at ? new Intl.DateTimeFormat("en-CA", { timeZone: tz(), year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(t.at)) : dayKey(now); return setWhen(s, id, m === null ? null : zonedEpoch(dk, m, tz())); })) });
     }
     case "area": { const v = b["area"] === "work" || b["area"] === "home" ? (b["area"] as Area) : null; return Response.json({ state: view(await update((s) => setArea(s, id, v))) }); }
+    case "focus_start": return Response.json({ state: view(await update((s) => startFocus(s, id, Number(b["mins"]) || s.tasks.find((t) => t.id === id)?.mins || 25, now))) });
+    case "focus_stop": return Response.json({ state: view(await update((s) => stopFocus(s))) });
+    case "focus_more": return Response.json({ state: view(await update((s) => extendFocus(s, Number(b["mins"]) || 10))) });
     case "closeday": return Response.json({ state: view(await update((s) => closeDay(s, now))) });
     case "weekflag": return Response.json({ state: view(await update((s) => toggleWeek(s, id))) });
     case "keep": return Response.json({ state: view(await update((s) => keepTask(s, id, now))) });
