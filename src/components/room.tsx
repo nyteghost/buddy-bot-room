@@ -1709,6 +1709,7 @@ export function Room() {
               </DialogHeader>
             </DialogContent>
           </Dialog>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => window.location.assign("/work")}><Wrench className="size-4" /> Work tools</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
