@@ -1557,12 +1557,13 @@ export function DeckPlanner() {
         </div>
 
         <div className="print-only mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">
-            {eventName.trim() || "Stage Deck Planner"}
-          </h1>
+          <div className="crew-head">
+            <h1 className="text-3xl font-bold tracking-tight">{eventName.trim() || "Stage Deck Planner"}</h1>
+            <div className="crew-sub">Crew sheet · printed {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div>
+          </div>
           <section className="mt-4 break-inside-avoid" aria-labelledby="print-items-title">
             <h2 id="print-items-title" className="text-sm font-semibold">All items used (all stages)</h2>
-            <dl className="mt-2 grid grid-cols-4 gap-3 border-y border-border py-2 text-xs">
+            <dl className="crew-totals mt-2 grid grid-cols-4 gap-3 py-2 text-xs">
               <div><dt>4′ × 8′ decks</dt><dd className="mt-1 font-semibold">{totalUsed.decks}</dd></div>
               <div><dt>3-deck holders</dt><dd className="mt-1 font-semibold">{totalUsed.three}</dd></div>
               <div><dt>2-deck holders</dt><dd className="mt-1 font-semibold">{totalUsed.two}</dd></div>
@@ -1574,8 +1575,8 @@ export function DeckPlanner() {
           </section>
           <section className="mt-3 break-inside-avoid">
             <h2 className="text-sm font-semibold">Crew parts list vs. warehouse</h2>
-            <table className="mt-1 w-full border-y border-border text-xs">
-              <thead><tr className="text-left"><th>Part</th><th>Need</th><th>In warehouse</th><th>Check</th></tr></thead>
+            <table className="crew-table mt-1 w-full text-xs">
+              <thead><tr className="text-left"><th>Part</th><th>Need</th><th>In warehouse</th><th>Check</th><th>Pulled</th></tr></thead>
               <tbody>
                 {[
                   { label: "4′ × 8′ decks", need: totalUsed.decks, have: FULL_STOCK.decks },
@@ -1587,7 +1588,8 @@ export function DeckPlanner() {
                 ].map((r) => (
                   <tr key={r.label}>
                     <td>{r.label}</td><td>{r.need}</td><td>{r.have === null ? "not counted" : r.have}</td>
-                    <td>{r.have === null ? "COUNT IT" : r.need > r.have ? `SHORT ${r.need - r.have}` : "ok"}</td>
+                    <td className={r.have === null || r.need > r.have ? "crew-flag" : ""}>{r.have === null ? "COUNT IT" : r.need > r.have ? `SHORT ${r.need - r.have}` : "ok"}</td>
+                    <td className="crew-box">☐</td>
                   </tr>
                 ))}
               </tbody>
