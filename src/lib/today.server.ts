@@ -1,7 +1,7 @@
 import { currentUser, tokenUser } from "./accounts.server";
 import { askPals } from "./ask.server";
 import { agents } from "./agents";
-import { applyDump, addParsed, closeDay, addRoutine, addTask, dueRoutines, dumpPrompt, extractJson, fallbackPick, fallbackWeek, keepTask, markNudged, nudgesDue, parseCheckins, parseDump, parsePick, parseSmaller, parseState, parseWeek, pickPrompt, removeRoutine, setStatus, setTier, setWhen, smallerPrompt, toggleWeek, weekPrompt, weekStartKey, weekStats, zonedEpoch, openTasks, EMPTY, type Coach, type Repeat, type Tier, type TodayState } from "./today";
+import { applyDump, addParsed, closeDay, inAreaState, setArea, type Area, addRoutine, addTask, dueRoutines, dumpPrompt, extractJson, fallbackPick, fallbackWeek, keepTask, markNudged, nudgesDue, parseCheckins, parseDump, parsePick, parseSmaller, parseState, parseWeek, pickPrompt, removeRoutine, setStatus, setTier, setWhen, smallerPrompt, toggleWeek, weekPrompt, weekStartKey, weekStats, zonedEpoch, openTasks, EMPTY, type Coach, type Repeat, type Tier, type TodayState } from "./today";
 import { calendarData } from "./inbox.server";
 import { pushNotice } from "./schedules.server";
 import { validZone } from "./schedule";
@@ -97,13 +97,15 @@ export async function handleToday(request: Request): Promise<Response> {
       const m = timeToMin(b["time"]);
       return Response.json({ state: view(await update((s) => { const t = s.tasks.find((x) => x.id === id); if (!t) return s; const dk = t.at ? new Intl.DateTimeFormat("en-CA", { timeZone: tz(), year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(t.at)) : dayKey(now); return setWhen(s, id, m === null ? null : zonedEpoch(dk, m, tz())); })) });
     }
+    case "area": { const v = b["area"] === "work" || b["area"] === "home" ? (b["area"] as Area) : null; return Response.json({ state: view(await update((s) => setArea(s, id, v))) }); }
     case "closeday": return Response.json({ state: view(await update((s) => closeDay(s, now))) });
     case "weekflag": return Response.json({ state: view(await update((s) => toggleWeek(s, id))) });
     case "keep": return Response.json({ state: view(await update((s) => keepTask(s, id, now))) });
     case "routine_add": {
       const repeat = (["daily", "weekdays", "weekly"].includes(String(b["repeat"])) ? b["repeat"] : "daily") as Repeat;
       const mins = Number(b["mins"]) > 0 ? Math.min(960, Math.round(Number(b["mins"]))) : null;
-      const next = await update((s) => withRoutines(addRoutine(s, { title: String(b["title"] ?? ""), repeat, dow: Math.round(Number(b["dow"]) || 0), time: timeToMin(b["time"]), mins }, newId()), now));
+      const area = b["area"] === "work" || b["area"] === "home" ? (b["area"] as Area) : undefined;
+      const next = await update((s) => withRoutines(addRoutine(s, { title: String(b["title"] ?? ""), repeat, dow: Math.round(Number(b["dow"]) || 0), time: timeToMin(b["time"]), mins, ...(area ? { area } : {}) }, newId()), now));
       return Response.json({ state: view(next) });
     }
     case "routine_del": return Response.json({ state: view(await update((s) => removeRoutine(s, id))) });
@@ -139,16 +141,21 @@ export async function handleToday(request: Request): Promise<Response> {
     }
     case "whatnow": {
       const exclude = id || null;
-      const cur = await read();
+      const full = await read();
+      const area = b["area"] === "work" || b["area"] === "home" ? (b["area"] as Area) : null;
+      const cur = inAreaState(full, area);
+      const lt = new Date(now).toLocaleString("en-US", { timeZone: tz(), weekday: "short", hour: "numeric", hourCycle: "h23" });
+      const workHours = !area && /^(Mon|Tue|Wed|Thu|Fri)/.test(lt) && +(/(\d+)$/.exec(lt)?.[1] ?? 0) >= 7 && +(/(\d+)$/.exec(lt)?.[1] ?? 0) < 17;
+      const hint = area ? `They are only looking at their ${area} tasks right now.` : workHours ? "It's their usual work hours, so lean toward work tasks unless something personal is urgent or has a time soon." : "";
       const ev = await nextEvent(now, cur);
       let pick = null as ReturnType<typeof fallbackPick>;
       let warning = "";
       if (openTasks(cur).some((t) => t.id !== exclude)) {
-        const r = await ask(pickPrompt(cur, new Date(now), ev, exclude, coach), 400);
+        const r = await ask(pickPrompt(cur, new Date(now), ev, exclude, coach, hint), 400);
         pick = r.json ? parsePick(r.json, cur, exclude) : null;
         if (!pick) { pick = fallbackPick(cur, exclude); if (r.error) warning = r.error; }
       }
-      if (!pick) return Response.json({ state: view(cur), error: "Nothing open to pick from. Add something first." });
+      if (!pick) return Response.json({ state: view(full), error: "Nothing open to pick from. Add something first." });
       const saved = { ...pick, at: now };
       return Response.json({ state: view(await update((s) => ({ ...s, pick: saved }))), ...(warning ? { warning } : {}) });
     }

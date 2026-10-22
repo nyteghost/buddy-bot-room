@@ -106,6 +106,7 @@ export function RoutinesPanel({ routines, busy, run }: { routines: Routine[]; bu
   const [dow, setDow] = useState(1);
   const [time, setTime] = useState("");
   const [mins, setMins] = useState("");
+  const [area, setArea] = useState("");
   return (
     <div className="rounded-lg border border-border bg-card">
       <button type="button" className="flex min-h-12 w-full items-center justify-between px-4 text-left font-semibold" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
@@ -116,16 +117,17 @@ export function RoutinesPanel({ routines, busy, run }: { routines: Routine[]; bu
         <div className="grid gap-3 border-t border-border p-4 text-sm">
           <p className="text-muted-foreground">Things that come back on their own. They show up in your list that morning, with a time if you give one (you'll get a nudge before it).</p>
           {routines.length > 0 && <ul className="grid gap-1">{routines.map((r) => (
-            <li key={r.id} className="flex items-center gap-2"><span className="min-w-0 flex-1 break-words">{r.title} <span className="text-muted-foreground">· {repeatText(r)}{minText(r.time)}{r.mins ? ` · ${r.mins} min` : ""}</span></span>
+            <li key={r.id} className="flex items-center gap-2"><span className="min-w-0 flex-1 break-words">{r.title} <span className="text-muted-foreground">· {r.area ? `${r.area === "work" ? "Work" : "Home"} · ` : ""}{repeatText(r)}{minText(r.time)}{r.mins ? ` · ${r.mins} min` : ""}</span></span>
               <Button size="sm" variant="ghost" className="h-9" aria-label={`Remove routine: ${r.title}`} disabled={busy} onClick={() => void run("routine_del", { op: "routine_del", id: r.id })}><Trash2 className="size-4" /></Button></li>
           ))}</ul>}
-          <form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); if (!title.trim()) return; void run("routine_add", { op: "routine_add", title, repeat, dow, time, mins: Number(mins) || 0 }).then(() => { setTitle(""); setTime(""); setMins(""); }); }}>
+          <form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); if (!title.trim()) return; void run("routine_add", { op: "routine_add", title, repeat, dow, time, mins: Number(mins) || 0, area }).then(() => { setTitle(""); setTime(""); setMins(""); }); }}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Build the weekly schedule" aria-label="Routine" className="h-11 rounded-md border border-input bg-background px-3 text-base" />
             <div className="grid grid-cols-2 gap-2">
               <select value={repeat} onChange={(e) => setRepeat(e.target.value)} aria-label="How often" className="h-11 rounded-md border border-input bg-background px-2 text-base">
                 <option value="daily">Every day</option><option value="weekdays">Weekdays</option><option value="weekly">Once a week</option>
               </select>
               {repeat === "weekly" ? <select value={dow} onChange={(e) => setDow(Number(e.target.value))} aria-label="Which day" className="h-11 rounded-md border border-input bg-background px-2 text-base">{DOW.map((d, i) => <option key={d} value={i}>{d}</option>)}</select> : <span />}
+              <select value={area} onChange={(e) => setArea(e.target.value)} aria-label="Work or home" className="col-span-2 h-11 rounded-md border border-input bg-background px-2 text-base"><option value="">Work or home: guess</option><option value="work">Work</option><option value="home">Home</option></select>
               <label className="grid gap-0.5 text-xs text-muted-foreground">Time (optional)<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="h-11 rounded-md border border-input bg-background px-2 text-base text-foreground" /></label>
               <label className="grid gap-0.5 text-xs text-muted-foreground">Minutes (optional)<input inputMode="numeric" value={mins} onChange={(e) => setMins(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="30" className="h-11 rounded-md border border-input bg-background px-2 text-base text-foreground" /></label>
             </div>

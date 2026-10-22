@@ -116,3 +116,29 @@ describe("times, routines and the week", () => {
     expect(c.tasks.find((t) => t.id === "b")!.at).toBe(900);
   });
 });
+
+import { guessArea, inArea, inAreaState, setArea } from "@/lib/today";
+describe("work and home", () => {
+  it("guesses from the words, and stays unsure when mixed", () => {
+    expect(guessArea("Order cables for the ballroom show")).toBe("work");
+    expect(guessArea("Pick up prescription")).toBe("home");
+    expect(guessArea("Call Sam")).toBe(null);
+    expect(guessArea("Pay rent before the show")).toBe(null);
+  });
+  it("tags on capture, lets one tap change it, and untagged shows everywhere", () => {
+    let s = addParsed(EMPTY, "send invoice to client", "capture", "a", 1, "2026-10-22", "UTC");
+    s = addTask(s, "Call Sam", "manual", "b", 1);
+    expect(s.tasks[0]!.area).toBe("work");
+    expect(inAreaState(s, "home").tasks.map((t) => t.id)).toEqual(["b"]);
+    expect(inAreaState(s, "work").tasks).toHaveLength(2);
+    expect(inArea(s.tasks[1]!, "home")).toBe(true);
+    s = setArea(s, "b", "home");
+    expect(inAreaState(s, "work").tasks.map((t) => t.id)).toEqual(["a"]);
+    expect(setArea(s, "b", null).tasks[1]!.area).toBe(undefined);
+  });
+  it("routines carry the tag onto each day's task", () => {
+    let s = addRoutine(EMPTY, { title: "Build the weekly schedule", repeat: "daily", dow: 0, time: null, mins: null }, "r");
+    s = dueRoutines(s, "2026-10-22", 4, 1, "UTC", () => "x");
+    expect(s.tasks[0]!.area).toBe("work");
+  });
+});

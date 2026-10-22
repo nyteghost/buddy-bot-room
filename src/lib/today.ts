@@ -5,16 +5,18 @@ export const TIERS: Tier[] = ["must", "should", "could"];
 export type Size = "S" | "M" | "L";
 export type Energy = "low" | "med" | "high";
 export type Status = "open" | "done" | "dropped";
+export type Area = "work" | "home";
+export const AREAS: Area[] = ["work", "home"];
 
 export type TodayTask = {
   id: string; title: string; notes: string; tier: Tier | null; size: Size | null; energy: Energy | null; feeling: string;
   status: Status; source: "capture" | "dump" | "manual" | "smaller" | "routine"; createdAt: number; doneAt?: number; parentId?: string;
   /** Optional start time (epoch ms), rough length in minutes, and "this week" focus flag. */
-  at?: number; mins?: number; week?: boolean;
+  at?: number; mins?: number; week?: boolean; area?: Area;
 };
 export type Repeat = "daily" | "weekdays" | "weekly";
 /** A thing that comes back by itself. `time` is minutes since midnight (local); `last` is the date it was last added. */
-export type Routine = { id: string; title: string; repeat: Repeat; dow: number; time: number | null; mins: number | null; last: string };
+export type Routine = { id: string; title: string; repeat: Repeat; dow: number; time: number | null; mins: number | null; last: string; area: Area | null };
 export type Pick = { id: string; reason: string; fallback: boolean; at: number };
 export type TodayDay = { date: string; pace: number; mood: string; opening: string };
 export type TodayState = { tasks: TodayTask[]; day: TodayDay | null; pick: Pick | null; nudged: string[]; routines: Routine[] };
@@ -39,6 +41,8 @@ export function parseTask(raw: unknown): TodayTask | null {
   if (Number(t["at"]) > 0) task.at = Number(t["at"]);
   if (Number(t["mins"]) > 0) task.mins = Math.min(960, Math.round(Number(t["mins"])));
   if (t["week"] === true) task.week = true;
+  const area = oneOf(t["area"], AREAS);
+  if (area) task.area = area;
   if (Number(t["doneAt"])) task.doneAt = Number(t["doneAt"]);
   if (t["parentId"]) task.parentId = clip(t["parentId"], 24);
   return task;
@@ -58,7 +62,7 @@ export function parseState(raw: unknown): TodayState {
     if (!title || !id || !repeat) return [];
     const time = q["time"] === null || q["time"] === undefined || q["time"] === "" ? null : Math.min(1439, Math.max(0, Math.round(Number(q["time"]))));
     const mins = Number(q["mins"]) > 0 ? Math.min(960, Math.round(Number(q["mins"]))) : null;
-    return [{ id, title, repeat, dow: Math.min(6, Math.max(0, Math.round(Number(q["dow"]) || 0))), time: Number.isFinite(time) ? time : null, mins, last: /^\d{4}-\d{2}-\d{2}$/.test(String(q["last"])) ? String(q["last"]) : "" }];
+    return [{ id, title, repeat, dow: Math.min(6, Math.max(0, Math.round(Number(q["dow"]) || 0))), time: Number.isFinite(time) ? time : null, mins, last: /^\d{4}-\d{2}-\d{2}$/.test(String(q["last"])) ? String(q["last"]) : "", area: oneOf(q["area"], AREAS) }];
   }).slice(0, 40);
   return { tasks, day, pick, nudged, routines };
 }
@@ -79,6 +83,19 @@ export function setStatus(s: TodayState, id: string, status: Status, now: number
 export function setTier(s: TodayState, id: string, tier: Tier | null): TodayState {
   return { ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, tier } : t)) };
 }
+
+// ---------- work / home ----------
+const WORK_WORDS = /\b(show|shows|crew|stage|schedule|engineer|ungerboeck|ballroom|hall|invoice|client|vendor|meeting|cobb|airwalls?|power order|work order|timesheet|pto|exhibitor|load[- ]?in|move[- ]?out|rigging)\b/i;
+const HOME_WORDS = /\b(meds?|prescription|pharmacy|vet|dentist|doctor|groceries|laundry|dishes|cat|mom|dad|kids?|gym|dinner|birthday|rent|bills?)\b/i;
+/** A best guess from the words alone; null when it isn't clear (the person can tag it with one tap). */
+export function guessArea(title: string): Area | null {
+  const w = WORK_WORDS.test(title), h = HOME_WORDS.test(title);
+  return w && !h ? "work" : h && !w ? "home" : null;
+}
+/** Untagged items show under every filter, so nothing gets hidden. */
+export const inArea = (t: TodayTask, area: Area | null) => !area || !t.area || t.area === area;
+export const setArea = (s: TodayState, id: string, area: Area | null): TodayState => ({ ...s, tasks: s.tasks.map((t) => { if (t.id !== id) return t; const { area: _a, ...rest } = t; void _a; return area ? { ...rest, area } : rest; }) });
+export const inAreaState = (s: TodayState, area: Area | null): TodayState => (area ? { ...s, tasks: s.tasks.filter((t) => inArea(t, area)) } : s);
 
 // ---------- times ----------
 const to24 = (h: number, ap: string | undefined): number | null => {
@@ -146,6 +163,8 @@ export function addParsed(s: TodayState, text: string, source: TodayTask["source
     if (at < now - 30 * 60_000) at += 24 * 3600_000;
     extra.at = at;
   }
+  const area = guessArea(w.title);
+  if (area) extra.area = area;
   return addTask(s, w.title, source, id, now, extra);
 }
 export const setWhen = (s: TodayState, id: string, at: number | null): TodayState => ({ ...s, tasks: s.tasks.map((t) => { if (t.id !== id) return t; const { at: _a, ...rest } = t; void _a; return at ? { ...rest, at } : rest; }) });
@@ -160,13 +179,13 @@ export function dueRoutines(s: TodayState, dateKey: string, dow: number, now: nu
   const due = s.routines.filter((r) => r.last !== dateKey && applies(r, dow));
   if (!due.length) return s;
   let next = { ...s, routines: s.routines.map((r) => (due.includes(r) ? { ...r, last: dateKey } : r)) };
-  for (const r of due) next = addTask(next, r.title, "routine", ids(), now, { ...(r.time !== null ? { at: zonedEpoch(dateKey, r.time, zone) } : {}), ...(r.mins ? { mins: r.mins } : {}) });
+  for (const r of due) next = addTask(next, r.title, "routine", ids(), now, { ...(r.time !== null ? { at: zonedEpoch(dateKey, r.time, zone) } : {}), ...(r.mins ? { mins: r.mins } : {}), ...(r.area ? { area: r.area } : {}) });
   return next;
 }
-export function addRoutine(s: TodayState, r: Omit<Routine, "id" | "last">, id: string): TodayState {
+export function addRoutine(s: TodayState, r: Omit<Routine, "id" | "last" | "area"> & { area?: Area | null }, id: string): TodayState {
   const title = clip(r.title, 200);
   if (!title) return s;
-  return { ...s, routines: [...s.routines, { id, title, repeat: r.repeat, dow: Math.min(6, Math.max(0, r.dow)), time: r.time, mins: r.mins, last: "" }].slice(0, 40) };
+  return { ...s, routines: [...s.routines, { id, title, repeat: r.repeat, dow: Math.min(6, Math.max(0, r.dow)), time: r.time, mins: r.mins, last: "", area: r.area ?? guessArea(title) }].slice(0, 40) };
 }
 export const removeRoutine = (s: TodayState, id: string): TodayState => ({ ...s, routines: s.routines.filter((r) => r.id !== id) });
 
@@ -225,13 +244,14 @@ const persona = (c?: Coach) => `You help someone with ADHD get through their day
 export function dumpPrompt(text: string, pace: number, mood: string, open: TodayTask[], today: string, coach?: Coach): { system: string; prompt: string } {
   const have = open.map((t) => `#${t.id} ${t.title}${t.tier ? ` [${t.tier}]` : ""}`).join("\n") || "(none)";
   return {
-    system: `${persona(coach)}\n\nSomeone just dumped everything on their mind. Turn it into clean tasks and sort them. Reply ONLY with JSON: {"opening": string, "tasks": [{"title": string, "notes": string, "tier": "must"|"should"|"could", "size": "S"|"M"|"L"|"", "energy": "low"|"med"|"high"|"", "feeling": string, "time": string, "minutes": number}]}.\n- must: it really has to happen today. should: it matters and today is a good day. could: worth doing if there's room.\n- Fit the plan to their pace. At a low pace keep must very short. At a high pace plan more.\n- title: short and concrete, in their words. One task per thing; split run-on items.\n- size: S under 30 minutes, M a few hours, L most of a day. energy: the mental effort. feeling: how they feel about it, only if they said. Never invent feelings.\n- time: "HH:MM" in 24-hour time ONLY if they gave a clock time for it ("dentist at 3" is "15:00"); otherwise "". minutes: how long it will take if they said, else 0.
+    system: `${persona(coach)}\n\nSomeone just dumped everything on their mind. Turn it into clean tasks and sort them. Reply ONLY with JSON: {"opening": string, "tasks": [{"title": string, "notes": string, "tier": "must"|"should"|"could", "size": "S"|"M"|"L"|"", "energy": "low"|"med"|"high"|"", "feeling": string, "time": string, "minutes": number, "area": "work"|"home"|""}]}.\n- must: it really has to happen today. should: it matters and today is a good day. could: worth doing if there's room.\n- Fit the plan to their pace. At a low pace keep must very short. At a high pace plan more.\n- title: short and concrete, in their words. One task per thing; split run-on items.\n- size: S under 30 minutes, M a few hours, L most of a day. energy: the mental effort. feeling: how they feel about it, only if they said. Never invent feelings.\n- time: "HH:MM" in 24-hour time ONLY if they gave a clock time for it ("dentist at 3" is "15:00"); otherwise "". minutes: how long it will take if they said, else 0.
+- area: "work" for their job, "home" for personal and household things, "" if you can't tell.
 - Don't repeat anything already on their list; leave it out.\n- opening: two or three kind sentences in your voice. Don't list the tasks.`,
     prompt: `Today is ${today}. Pace: ${pace}/5 (${paceLabel(pace)}).${mood ? ` How I feel: ${mood}.` : ""}\n\nAlready on my list:\n${have}\n\nMy brain dump:\n${text}`,
   };
 }
 
-export type DumpResult = { opening: string; tasks: { title: string; notes: string; tier: Tier; size: Size | null; energy: Energy | null; feeling: string; time: number | null; minutes: number | null }[] };
+export type DumpResult = { opening: string; tasks: { title: string; notes: string; tier: Tier; size: Size | null; energy: Energy | null; feeling: string; time: number | null; minutes: number | null; area: Area | null }[] };
 export function parseDump(raw: unknown): DumpResult | null {
   const r = raw as { opening?: unknown; tasks?: unknown } | null;
   if (!r || !Array.isArray(r.tasks)) return null;
@@ -239,7 +259,7 @@ export function parseDump(raw: unknown): DumpResult | null {
     const t = (x ?? {}) as Record<string, unknown>;
     const title = clip(t["title"], 200);
     if (!title) return [];
-    return [{ title, notes: clip(t["notes"], 600), tier: oneOf(t["tier"], TIERS) ?? "could", size: oneOf(t["size"], ["S", "M", "L"] as const), energy: oneOf(t["energy"], ["low", "med", "high"] as const), feeling: clip(t["feeling"], 80), time: (() => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(t["time"] ?? "")); return m && +m[1]! < 24 && +m[2]! < 60 ? +m[1]! * 60 + +m[2]! : null; })(), minutes: Number(t["minutes"]) > 0 ? Math.min(960, Math.round(Number(t["minutes"]))) : null }];
+    return [{ title, notes: clip(t["notes"], 600), tier: oneOf(t["tier"], TIERS) ?? "could", size: oneOf(t["size"], ["S", "M", "L"] as const), energy: oneOf(t["energy"], ["low", "med", "high"] as const), feeling: clip(t["feeling"], 80), time: (() => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(t["time"] ?? "")); return m && +m[1]! < 24 && +m[2]! < 60 ? +m[1]! * 60 + +m[2]! : null; })(), minutes: Number(t["minutes"]) > 0 ? Math.min(960, Math.round(Number(t["minutes"]))) : null, area: oneOf(t["area"], AREAS) ?? guessArea(title) }];
   }).slice(0, 40);
   return { opening: clip(r.opening, 600), tasks };
 }
@@ -248,7 +268,7 @@ export function applyDump(s: TodayState, d: DumpResult, ids: () => string, now: 
   let next: TodayState = { ...s, day: { ...day, opening: d.opening } };
   for (const t of d.tasks) {
     const before = next.tasks.length;
-    next = addTask(next, t.title, "dump", ids(), now, { notes: t.notes, tier: t.tier, size: t.size, energy: t.energy, feeling: t.feeling, ...(t.time !== null ? { at: ((a) => (a < now - 30 * 60_000 ? a + 24 * 3600_000 : a))(zonedEpoch(day.date, t.time, zone)) } : {}), ...(t.minutes ? { mins: t.minutes } : {}) });
+    next = addTask(next, t.title, "dump", ids(), now, { notes: t.notes, tier: t.tier, size: t.size, energy: t.energy, feeling: t.feeling, ...(t.time !== null ? { at: ((a) => (a < now - 30 * 60_000 ? a + 24 * 3600_000 : a))(zonedEpoch(day.date, t.time, zone)) } : {}), ...(t.minutes ? { mins: t.minutes } : {}), ...(t.area ? { area: t.area } : {}) });
     void before;
   }
   return next;
@@ -261,10 +281,10 @@ export function fallbackPick(s: TodayState, exclude: string | null): Pick | null
   return best ? { id: best.id, reason: "Next up from your list (no AI answered, so I picked by priority).", fallback: true, at: 0 } : null;
 }
 
-export function pickPrompt(s: TodayState, now: Date, nextEvent: { title: string; minutes: number } | null, exclude: string | null, coach?: Coach): { system: string; prompt: string } {
-  const lines = openTasks(s).filter((t) => t.id !== exclude).map((t) => `#${t.id} ${t.title}${t.tier ? ` [${t.tier}]` : " [unplanned]"}${t.size ? ` size ${t.size}` : ""}${t.energy ? ` energy ${t.energy}` : ""}${t.feeling ? ` feels: ${t.feeling}` : ""}`).join("\n");
+export function pickPrompt(s: TodayState, now: Date, nextEvent: { title: string; minutes: number } | null, exclude: string | null, coach?: Coach, hint = ""): { system: string; prompt: string } {
+  const lines = openTasks(s).filter((t) => t.id !== exclude).map((t) => `#${t.id} ${t.title}${t.tier ? ` [${t.tier}]` : " [unplanned]"}${t.size ? ` size ${t.size}` : ""}${t.energy ? ` energy ${t.energy}` : ""}${t.feeling ? ` feels: ${t.feeling}` : ""}${t.area ? ` (${t.area})` : ""}`).join("\n");
   return {
-    system: `${persona(coach)}\n\nThey asked "what now?". Pick the ONE task they should start right now from their open tasks. Reply ONLY with JSON: {"task_id": string, "reason": string}.\n- Weigh the tiers, the free time before their next event, their pace and how they feel. A short gap before a meeting suits a small task. A low pace or rough mood suits something lighter.\n- reason: one or two sentences, to them, concrete and kind.`,
+    system: `${persona(coach)}${hint ? `\n\n${hint}` : ""}\n\nThey asked "what now?". Pick the ONE task they should start right now from their open tasks. Reply ONLY with JSON: {"task_id": string, "reason": string}.\n- Weigh the tiers, the free time before their next event, their pace and how they feel. A short gap before a meeting suits a small task. A low pace or rough mood suits something lighter.\n- reason: one or two sentences, to them, concrete and kind.`,
     prompt: `It's ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}. Pace: ${s.day ? `${s.day.pace}/5 (${paceLabel(s.day.pace)})` : "not set"}.${s.day?.mood ? ` Mood: ${s.day.mood}.` : ""}${nextEvent ? ` Next event: ${nextEvent.title} in ${nextEvent.minutes} minutes.` : " Nothing is scheduled soon."}${exclude ? ` I just passed on #${exclude}.` : ""}\n\nOpen tasks:\n${lines}`,
   };
 }

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, Mic, Plus, Shrink, SkipForward, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agents } from "@/lib/agents";
-import { PACE_LABELS, TIERS, type Tier, type TodayState, type TodayTask } from "@/lib/today";
+import { PACE_LABELS, TIERS, inArea, type Area, type Tier, type TodayState, type TodayTask } from "@/lib/today";
 import { EndOfDay, MorningStart, RoutinesPanel, Schedule, WeekPanel, hhmm, type Cal, type Stats } from "@/components/today-week";
 
 type View = Omit<TodayState, "nudged"> & { stats?: Stats };
 type Reply = { state?: View; error?: string; warning?: string; today?: string; stepId?: string; cal?: Cal; weekNote?: string };
 
 const COACH_KEY = "today:coach";
+const AREA_KEY = "today:area";
 const TIER_LABEL: Record<Tier | "none", string> = { must: "Must", should: "Should", could: "Could", none: "Not sorted yet" };
 
 async function call(body: Record<string, unknown>): Promise<Reply> {
@@ -19,7 +20,7 @@ async function call(body: Record<string, unknown>): Promise<Reply> {
   } catch { return { error: "Couldn't reach the server." }; }
 }
 
-function TaskRow({ t, busy, tz, onDone, onSmaller, onTier, onDrop, onWhen, onWeek, isPick }: { t: TodayTask; busy: boolean; tz: string; onDone: () => void; onSmaller: () => void; onTier: (x: Tier) => void; onDrop: () => void; onWhen: (hhmm: string) => void; onWeek: () => void; isPick: boolean }) {
+function TaskRow({ t, busy, tz, onDone, onSmaller, onTier, onDrop, onWhen, onWeek, onArea, isPick }: { t: TodayTask; busy: boolean; tz: string; onDone: () => void; onSmaller: () => void; onTier: (x: Tier) => void; onDrop: () => void; onWhen: (hhmm: string) => void; onWeek: () => void; onArea: () => void; isPick: boolean }) {
   return (
     <li className={`rounded-lg border p-3 ${isPick ? "border-primary bg-primary/10" : "border-border bg-card"}`}>
       <div className="flex items-start gap-3">
@@ -28,6 +29,7 @@ function TaskRow({ t, busy, tz, onDone, onSmaller, onTier, onDrop, onWhen, onWee
           <div className="break-words font-medium leading-snug">{t.title}</div>
           <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
             {t.at && <span className="rounded bg-primary/15 px-1.5 py-0.5 font-medium text-foreground">{new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(t.at))}{t.mins ? ` · ${t.mins} min` : ""}</span>}
+            <button type="button" onClick={onArea} disabled={busy} aria-label={`Tag: ${t.area ?? "none"}. Tap to change`} className={`rounded px-1.5 py-0.5 ${t.area === "work" ? "bg-primary/20 text-foreground" : t.area === "home" ? "bg-accent text-accent-foreground" : "border border-dashed border-muted-foreground/50"}`}>{t.area === "work" ? "Work" : t.area === "home" ? "Home" : "+ tag"}</button>
             {t.week && <span className="rounded bg-muted px-1.5 py-0.5">this week</span>}
             {t.size && <span className="rounded bg-muted px-1.5 py-0.5">size {t.size}</span>}
             {t.energy && <span className="rounded bg-muted px-1.5 py-0.5">{t.energy} energy</span>}
@@ -61,13 +63,14 @@ export function TodayPlanner() {
   const [cal, setCal] = useState<Cal | null>(null);
   const [today, setToday] = useState("");
   const [weekNote, setWeekNote] = useState("");
+  const [area, setArea] = useState<"" | Area>("");
   const origin = typeof window === "undefined" ? "" : window.location.origin;
 
   const apply = useCallback((r: Reply) => { if (r.state) setState(r.state); if (r.cal) setCal(r.cal); if (r.today) setToday(r.today); if (r.weekNote !== undefined) setWeekNote(r.weekNote); setMsg(r.error ?? r.warning ?? ""); }, []);
   const run = useCallback(async (label: string, body: Record<string, unknown>) => { setBusy(label); apply(await call({ ...body, coach })); setBusy(""); }, [apply, coach]);
 
   useEffect(() => {
-    try { setCoach(localStorage.getItem(COACH_KEY) ?? ""); } catch { /* optional */ }
+    try { setCoach(localStorage.getItem(COACH_KEY) ?? ""); const a = localStorage.getItem(AREA_KEY); if (a === "work" || a === "home") setArea(a); } catch { /* optional */ }
     // Install as its own home-screen app, and fill the box from the Share menu (it never saves by itself).
     document.querySelector('link[rel="manifest"]')?.setAttribute("href", "/today.webmanifest");
     document.title = "Today";
@@ -77,17 +80,20 @@ export function TodayPlanner() {
     void call({ op: "get" }).then((r) => { apply(r); if (r.state && !r.state.day && r.state.tasks.length === 0) setShowDump(true); });
   }, [apply]);
   useEffect(() => { try { localStorage.setItem(COACH_KEY, coach); } catch { /* optional */ } }, [coach]);
+  useEffect(() => { try { localStorage.setItem(AREA_KEY, area); } catch { /* optional */ } }, [area]);
 
   const tasks = state?.tasks ?? [];
   const open = tasks.filter((t) => t.status === "open");
   const done = tasks.filter((t) => t.status === "done");
   const pick = useMemo(() => open.find((t) => t.id === state?.pick?.id) ?? null, [open, state?.pick?.id]);
-  const groups = useMemo(() => ([...TIERS, "none"] as (Tier | "none")[]).map((k) => ({ k, list: open.filter((t) => (k === "none" ? !t.tier : t.tier === k)) })).filter((g) => g.list.length), [open]);
+  const shown = useMemo(() => open.filter((t) => inArea(t, area || null)), [open, area]);
+  const groups = useMemo(() => ([...TIERS, "none"] as (Tier | "none")[]).map((k) => ({ k, list: shown.filter((t) => (k === "none" ? !t.tier : t.tier === k)) })).filter((g) => g.list.length), [shown]);
 
   const rowProps = (t: TodayTask) => ({
     t, busy: !!busy, tz: cal?.tz ?? "UTC", isPick: pick?.id === t.id,
     onWhen: (time: string) => void run("when", { op: "when", id: t.id, time }),
     onWeek: () => void run("weekflag", { op: "weekflag", id: t.id }),
+    onArea: () => void run("area", { op: "area", id: t.id, area: t.area === "work" ? "home" : t.area === "home" ? "" : "work" }),
     onDone: () => void run("done", { op: "done", id: t.id }),
     onDrop: () => void run("drop", { op: "drop", id: t.id }),
     onTier: (x: Tier) => void run("tier", { op: "tier", id: t.id, tier: x }),
@@ -105,12 +111,16 @@ export function TodayPlanner() {
       {msg && <p role="status" className="rounded-md border border-border bg-muted px-3 py-2 text-sm">{msg}</p>}
       {state?.day?.opening && <p className="rounded-md bg-primary/10 px-3 py-2 text-sm">{state.day.opening}</p>}
 
-      <MorningStart cal={cal} tasks={tasks} planned={state?.day?.date === today} today={today} onDump={() => setShowDump(true)} onStart={() => void run("whatnow", { op: "whatnow" })} />
+      <div role="group" aria-label="Show" className="flex gap-2">
+        {([["", "All"], ["work", "Work"], ["home", "Home"]] as const).map(([v, label]) => <button key={v} type="button" aria-pressed={area === v} onClick={() => setArea(v)} className={`h-10 flex-1 rounded-full border text-sm font-medium ${area === v ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"}`}>{label}</button>)}
+      </div>
+
+      <MorningStart cal={cal} tasks={tasks} planned={state?.day?.date === today} today={today} onDump={() => setShowDump(true)} onStart={() => void run("whatnow", { op: "whatnow", area })} />
 
       <Schedule cal={cal} tasks={tasks} today={today} />
 
       <div className="grid gap-2 rounded-lg border border-border bg-card p-4">
-        <Button className="h-14 text-lg" disabled={!!busy || open.length === 0} onClick={() => void run("whatnow", { op: "whatnow" })}><Sparkles className="size-5" /> {busy === "whatnow" ? "Thinking…" : "What now?"}</Button>
+        <Button className="h-14 text-lg" disabled={!!busy || open.length === 0} onClick={() => void run("whatnow", { op: "whatnow", area })}><Sparkles className="size-5" /> {busy === "whatnow" ? "Thinking…" : "What now?"}</Button>
         {pick && (
           <div className="grid gap-2 rounded-md border border-primary bg-primary/10 p-3">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Do this now</div>
@@ -118,7 +128,7 @@ export function TodayPlanner() {
             {state?.pick?.reason && <div className="text-sm">{state.pick.reason}</div>}
             <div className="flex flex-wrap gap-2">
               <Button className="h-11" disabled={!!busy} onClick={() => void run("done", { op: "done", id: pick.id })}><Check className="size-4" /> Done</Button>
-              <Button variant="outline" className="h-11" disabled={!!busy} onClick={() => void run("whatnow", { op: "whatnow", id: pick.id })}><SkipForward className="size-4" /> Not this one</Button>
+              <Button variant="outline" className="h-11" disabled={!!busy} onClick={() => void run("whatnow", { op: "whatnow", id: pick.id, area })}><SkipForward className="size-4" /> Not this one</Button>
               <Button variant="outline" className="h-11" disabled={!!busy} onClick={() => void run("smaller", { op: "smaller", id: pick.id })}><Shrink className="size-4" /> Make it smaller</Button>
             </div>
           </div>
@@ -148,7 +158,7 @@ export function TodayPlanner() {
         )}
       </div>
 
-      {groups.length === 0 && state && <p className="text-center text-sm text-muted-foreground">Nothing open. Capture something above, or do a brain dump.</p>}
+      {groups.length === 0 && state && <p className="text-center text-sm text-muted-foreground">{open.length ? `Nothing ${area} right now. Switch to All to see the rest.` : "Nothing open. Capture something above, or do a brain dump."}</p>}
       {groups.map((g) => (
         <section key={g.k} aria-label={TIER_LABEL[g.k as Tier | "none"]}>
           <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">{TIER_LABEL[g.k as Tier | "none"]} · {g.list.length}</h2>
