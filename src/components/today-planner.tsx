@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Copy, Plus, Shrink, SkipForward, Sparkles, X } from "lucide-react";
+import { Check, Copy, Mic, Plus, Shrink, SkipForward, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agents } from "@/lib/agents";
 import { PACE_LABELS, TIERS, type Tier, type TodayState, type TodayTask } from "@/lib/today";
@@ -88,6 +88,7 @@ export function TodayPlanner() {
     <div className="grid gap-4">
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (quick.trim()) { const t = quick; setQuick(""); void run("add", { op: "add", text: t }); } }}>
         <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Capture anything…" aria-label="Capture a task" enterKeyHint="done" className="h-12 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-base" />
+        <Button type="button" variant="outline" className="h-12 px-3" aria-label="Dictate with the Add to Today Shortcut" title="Runs your 'Add to Today' Shortcut" onClick={() => window.location.assign("shortcuts://run-shortcut?name=" + encodeURIComponent("Add to Today"))}><Mic className="size-5" /></Button>
         <Button type="submit" className="h-12 px-4" disabled={!quick.trim() || !!busy}><Plus className="size-5" /> Add</Button>
       </form>
 
