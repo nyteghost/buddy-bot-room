@@ -1421,6 +1421,25 @@ export function DeckPlanner() {
     bump((n) => n + 1);
   };
 
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  // Why a stage is flagged: it can't be built from what is left, or it uses a part the warehouse is short of.
+  const problem = (i: number): string => {
+    if (badStages.includes(i)) return "can't be built from what's left in stock";
+    const sp = partsByStage[i] ?? NO_PARTS;
+    const hit = shortLines.filter((l) => (sp[l.key] ?? 0) > 0).map((l) => l.label);
+    return hit.length ? `uses ${hit.join(", ")} (short overall)` : "";
+  };
+  // Copies a stage's saved sizes, stairs and rails/skirts/ramp into a new stage at the end. Hand-placed pieces are not copied.
+  const duplicateStage = (i: number) => {
+    if (stageCount >= 10) return;
+    const from = `s${i + 1}`, to = `s${stageCount + 1}`;
+    for (const key of [STAGE_STORE_KEY, EXTRAS_STORE_KEY]) {
+      const all = readStored<Record<string, any>>(key, {});
+      if (all[from]) { all[to] = JSON.parse(JSON.stringify(all[from])); writeStored(key, all); }
+    }
+    setStageCount(stageCount + 1);
+  };
+
   return (
     <div className="deck-planner bg-background text-foreground">
       <div className="print-document mx-auto max-w-5xl px-1 py-2">
@@ -1431,6 +1450,20 @@ export function DeckPlanner() {
             A <span className="font-medium" style={{ color: BRIDGE_COLOR }}>bridge</span> is a single deck spanning between two holders — adds coverage without using another holder.
           </p>
         </header>
+
+        <div className="no-print sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-card/95 px-3 py-2 text-xs shadow-sm backdrop-blur" role="status">
+          <span><span className="text-muted-foreground">Decks: </span><b>{totalUsed.decks}</b> used / {remainingFinal.decks} left</span>
+          <span><span className="text-muted-foreground">Rails 8′/4′: </span><b>{totalParts.rail8}</b> / <b>{totalParts.rail4}</b></span>
+          <span><span className="text-muted-foreground">Skirts: </span><b>{totalParts.skirt8}</b></span>
+          <span><span className="text-muted-foreground">Ramps: </span><b>{totalParts.ramp}</b></span>
+          {shortLines.length + badStages.length > 0
+            ? <span className="font-semibold text-destructive">⚠ {shortLines.map((l) => `${l.label} short ${l.short}`).concat(badStages.map((i) => `Stage ${enabledIndexes.indexOf(i) + 1} won't fit stock`)).join(" · ")}</span>
+            : <span className="text-muted-foreground">✓ nothing short</span>}
+          <span className="ml-auto flex gap-1">
+            <button type="button" onClick={undo} disabled={undoStack.current.length === 0} className="deck-tap rounded-md border border-border bg-card px-3 py-1 font-medium hover:bg-muted disabled:opacity-40">↶ Undo</button>
+            <button type="button" onClick={redo} disabled={redoStack.current.length === 0} className="deck-tap rounded-md border border-border bg-card px-3 py-1 font-medium hover:bg-muted disabled:opacity-40">↷ Redo</button>
+          </span>
+        </div>
 
         <div className="no-print mb-6 rounded-md border border-border bg-card p-4 text-sm shadow-sm">
           <div className="font-semibold">Total inventory (all stages)</div>
@@ -1489,8 +1522,6 @@ export function DeckPlanner() {
         <div className="no-print mb-6 rounded-md border border-border bg-card p-4 text-sm shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
             <div className="font-semibold">Saved plans</div>
-            <button type="button" onClick={undo} disabled={undoStack.current.length === 0} className="deck-tap rounded-md border border-border bg-card px-3 py-1 text-sm font-medium hover:bg-muted disabled:opacity-40">↶ Undo</button>
-            <button type="button" onClick={redo} disabled={redoStack.current.length === 0} className="deck-tap rounded-md border border-border bg-card px-3 py-1 text-sm font-medium hover:bg-muted disabled:opacity-40">↷ Redo</button>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <input value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="Name, e.g. Main stage, Oct show"
@@ -1505,14 +1536,20 @@ export function DeckPlanner() {
           {plans.length === 0 ? (
             <div className="mt-2 text-xs text-muted-foreground">Nothing saved yet. Saving the same name again replaces it. Hand-placed pieces are not saved, only sizes, heights, stairs, rails and the like.</div>
           ) : (
-            <ul className="mt-2 space-y-1">
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2">
               {plans.map((pl) => (
-                <li key={pl.name} className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1">
-                  <span className="min-w-0 flex-1 truncate font-medium">{pl.name}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(pl.savedAt).toLocaleDateString()}</span>
-                  <button type="button" onClick={() => { undoStack.current.push(JSON.stringify(takeSnapshot())); redoStack.current = []; applySnapshot(pl.snap); bump((n) => n + 1); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted">Open</button>
-                  <button type="button" onClick={() => { const n = window.prompt("New name", pl.name)?.trim(); if (n) persistPlans(plans.map((x) => (x === pl ? { ...x, name: n } : x))); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted">Rename</button>
-                  <button type="button" onClick={() => { if (window.confirm(`Delete "${pl.name}"?`)) persistPlans(plans.filter((x) => x !== pl)); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium text-destructive hover:bg-muted">Delete</button>
+                <li key={pl.name} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold">{pl.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {pl.snap.app?.stageCount ?? 1} stage{(pl.snap.app?.stageCount ?? 1) === 1 ? "" : "s"}{pl.snap.app?.eventName ? ` · ${pl.snap.app.eventName}` : ""} · saved {new Date(pl.savedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { undoStack.current.push(JSON.stringify(takeSnapshot())); redoStack.current = []; applySnapshot(pl.snap); bump((n) => n + 1); }} className="deck-tap flex-1 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">Open</button>
+                    <button type="button" onClick={() => { const n = window.prompt("New name", pl.name)?.trim(); if (n) persistPlans(plans.map((x) => (x === pl ? { ...x, name: n } : x))); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted">Rename</button>
+                    <button type="button" onClick={() => { if (window.confirm(`Delete "${pl.name}"?`)) persistPlans(plans.filter((x) => x !== pl)); }} className="deck-tap rounded-md border border-border px-3 py-1 text-xs font-medium text-destructive hover:bg-muted">Delete</button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1588,6 +1625,30 @@ export function DeckPlanner() {
           Print crew sheet
         </button>
 
+        <button
+          type="button"
+          onClick={async () => {
+            const { crewWorkbook } = await import("@/lib/stage-crew-sheet");
+            const rows = [
+              { label: "4′ × 8′ decks", need: totalUsed.decks, have: FULL_STOCK.decks },
+              { label: "3-deck holders", need: totalUsed.three, have: FULL_STOCK.three },
+              { label: "2-deck holders", need: totalUsed.two, have: FULL_STOCK.two },
+              { label: "1-deck holders", need: totalUsed.one, have: FULL_STOCK.one },
+              ...STAIR_TYPES.map(({ key, label }) => ({ label, need: totalUsed[key] ?? 0, have: FULL_STOCK[key] ?? 0 })),
+              ...partLines.filter((l) => l.status !== "unused").map((l) => ({ label: l.label, need: l.need, have: l.have })),
+            ];
+            const stagesOut = enabledIds.flatMap((id) => { const st = layoutStages[id]; return st ? [{ name: st.name, width: st.width, length: st.length, heightIn: st.heightIn, quantity: st.quantity ?? 1, valid: st.valid }] : []; });
+            const blob = await crewWorkbook(eventName, rows, stagesOut);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `${(eventName.trim() || "Stage plan").replace(/[^\w -]+/g, "")} crew parts.xlsx`;
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+          }}
+          className="no-print mb-6 ml-3 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted"
+        >
+          Crew sheet (Excel)
+        </button>
+
         {enabledIndexes.length > 1 && (
           <button
             type="button"
@@ -1639,15 +1700,17 @@ export function DeckPlanner() {
                   </div>
                 </div>
               )}
-              <div className="no-print mb-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => removeStage(i)}
-                  className="rounded-md border border-border bg-card px-3 py-1 text-xs font-medium text-destructive shadow-sm hover:bg-muted"
-                >
-                  Remove stage
-                </button>
+              <div className={`no-print mb-2 flex flex-wrap items-center gap-2 rounded-md border px-3 py-1 ${problem(i) ? "border-destructive bg-destructive/5" : "border-border bg-card"}`}>
+                <button type="button" onClick={() => setCollapsed((c) => ({ ...c, [i]: !c[i] }))} aria-expanded={!collapsed[i]}
+                  className="deck-tap text-sm font-semibold">{collapsed[i] ? "▸" : "▾"} {layoutStages[id]?.name ?? (enabledIndexes.length > 1 ? `Stage ${n}` : "Stage")}</button>
+                <span className="text-xs text-muted-foreground">{layoutStages[id] ? `${layoutStages[id].width}′ × ${layoutStages[id].length}′ at ${layoutStages[id].heightIn}″` : ""}</span>
+                {problem(i) && <span className="text-xs font-semibold text-destructive">⚠ {problem(i)}</span>}
+                <span className="ml-auto flex gap-2">
+                  <button type="button" disabled={stageCount >= 10} onClick={() => duplicateStage(i)} className="deck-tap rounded-md border border-border bg-card px-3 py-1 text-xs font-medium shadow-sm hover:bg-muted disabled:opacity-40">Duplicate</button>
+                  <button type="button" onClick={() => removeStage(i)} className="deck-tap rounded-md border border-border bg-card px-3 py-1 text-xs font-medium text-destructive shadow-sm hover:bg-muted">Remove stage</button>
+                </span>
               </div>
+              <div className={collapsed[i] ? "hidden print:block" : problem(i) ? "rounded-lg ring-2 ring-destructive/60" : ""}>
               <StagePanel
                 stageId={id}
                 onLayoutChange={handleLayoutChange}
@@ -1660,6 +1723,7 @@ export function DeckPlanner() {
                 onParts={setPartsFor(i)}
                 rebuildKey={rebuildKey}
               />
+              </div>
             </div>
           );
         })}
