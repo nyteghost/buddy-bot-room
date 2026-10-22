@@ -291,6 +291,43 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
   section("LOCATION", ["CEPAC", "Theatre", "Ballroom", ...w.other.filter((o) => !/^(cepac|theatre|ballroom)$/i.test(o)), "OTHER"]);
   for (let i = 3; i < r; i++) ws.getRow(i).height = 54;
   mergeEventSpaces(ws, w, byLabel, new Map(w.dates.map((d, i) => [d, i + 2])));
+  fitRows(ws);
+}
+
+/** Grows row heights so wrapped event text is never cut off (merged cells share their height across the rows they cover). Heights only grow. */
+export function fitRows(ws: XSheet) {
+  let start = 0;
+  ws.eachRow((row, n) => { if (!start && String(row.getCell(1).value ?? "").trim().toLowerCase() === "halls") start = n; });
+  if (!start) return;
+  const px = (c: number) => (ws.getColumn(c).width ?? 13) * 7 + 5;
+  const merges = new Map<string, { top: number; bottom: number }>();
+  const covered = new Set<string>();
+  for (const range of ws.model.merges ?? []) {
+    const [a, b] = range.split(":");
+    if (!a || !b) continue;
+    const from = ws.getCell(a), to = ws.getCell(b);
+    if (Number(from.col) !== Number(to.col) || Number(from.row) < start) continue;
+    merges.set(`${from.row},${from.col}`, { top: Number(from.row), bottom: Number(to.row) });
+    for (let r = Number(from.row) + 1; r <= Number(to.row); r++) covered.add(`${r},${from.col}`);
+  }
+  const last = ws.rowCount;
+  const height = new Map<number, number>();
+  for (let r = start; r <= last; r++) height.set(r, ws.getRow(r).height ?? 15);
+  const lines = (text: string, size: number, width: number) => text.split("\n").reduce((t, par) => t + Math.max(1, Math.ceil((par.length * size * 0.62) / Math.max(40, width - 10))), 0);
+  for (let r = start; r <= last; r++) {
+    for (let c = 2; c <= 8; c++) {
+      if (covered.has(`${r},${c}`)) continue;
+      const v = ws.getCell(r, c).value;
+      if (typeof v !== "string" || !v) continue;
+      const size = ws.getCell(r, c).font?.size ?? 11;
+      const need = lines(v, size, px(c)) * size * 1.3 + 6;
+      const m = merges.get(`${r},${c}`);
+      const rows = Array.from({ length: (m ? m.bottom : r) - r + 1 }, (_, i) => r + i);
+      const have = rows.reduce((t, x) => t + (height.get(x) ?? 15), 0);
+      if (need > have) for (const x of rows) height.set(x, (height.get(x) ?? 15) + (need - have) / rows.length);
+    }
+  }
+  for (const [r, h] of height) if (h > (ws.getRow(r).height ?? 15)) ws.getRow(r).height = Math.round(h * 10) / 10;
 }
 
 function cellDate(v: unknown): string | null {
@@ -358,6 +395,7 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
     }
   }
   mergeEventSpaces(ws, w, byLabel, cols);
+  fitRows(ws);
   return true;
 }
 
