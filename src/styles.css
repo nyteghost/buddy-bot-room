@@ -2158,4 +2158,14 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .deck-planner .crew-flag { font-weight: 800; text-decoration: underline; }
   .deck-planner .crew-box { font-size: 16px; text-align: center; width: 16mm; }
   .deck-planner .print-stage h2 { border-bottom: 2px solid #000; padding-bottom: 1mm; }
+  /* Each stage reads as its own card; tables match the crew sheet; layout key is easier to scan */
+  .deck-planner .print-grid > * > .print-stage { border: 1.5px solid #000; border-radius: 3mm; padding: 3mm; background: #fff; }
+  .deck-planner .print-stage h2 { font-size: 15px; font-weight: 800; letter-spacing: 0.01em; }
+  .deck-planner .print-stage table { border-collapse: collapse; width: 100%; }
+  .deck-planner .print-stage table th { background: #e5e5e5 !important; border-bottom: 1.5px solid #000; padding: 1mm 1.5mm; text-align: left; }
+  .deck-planner .print-stage table td { padding: 1mm 1.5mm; border-bottom: 1px solid #ccc; }
+  .deck-planner .print-stage table tbody tr:nth-child(even) td { background: #f5f5f5 !important; }
+  .deck-planner .print-layout-key th { background: #e5e5e5 !important; border-bottom: 2px solid #000; }
+  .deck-planner .print-layout-key tbody tr:nth-child(even) td { background: #f5f5f5 !important; }
+  .deck-planner .print-document { font-family: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif; }
 }
