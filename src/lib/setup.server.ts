@@ -24,6 +24,7 @@ const configured: Record<string, () => boolean> = {
   unraid: () => !!unraidConfig(),
   caldav: () => !!caldavConfig(),
   ntfy: () => env("NTFY_URL").startsWith("http"),
+  today: () => (env("TODAY_NUDGES") || "on") !== "off" && (env("NTFY_URL").startsWith("http") || telegramEnabled()),
   telegram: () => telegramEnabled(),
   whisper: () => !!env("WHISPER_URL"),
   weather: () => weatherConfigured(),

@@ -33,7 +33,7 @@ button{background:#7c6cf0;border:0;cursor:pointer}.err{color:#ff8a8a;margin:0}</
 }
 
 /** Icons and the app manifest are public: the browser fetches them without cookies when installing the app. */
-export const PUBLIC_FILES = new Set(["/manifest.webmanifest", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/favicon.svg", "/robots.txt"]);
+export const PUBLIC_FILES = new Set(["/manifest.webmanifest", "/today.webmanifest", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/favicon.svg", "/robots.txt"]);
 
 export function isGateOn(password: string | undefined): password is string {
   return typeof password === "string" && password.length > 0;
@@ -59,6 +59,7 @@ export async function gate(
     // The iPhone Shortcut has no cookie: it sends an access token, accepted for the note sync only.
     if (url.pathname === "/api/notes-sync" && (await tokenUser(request))) return null;
     if (url.pathname === "/api/capture" && request.method === "POST" && (await tokenUser(request))) return null;
+    if (url.pathname === "/api/today-capture" && request.method === "POST" && (await tokenUser(request))) return null;
     if (url.pathname.startsWith("/api/")) return Response.json({ error: "Sign in required." }, { status: 401 });
     return authPage();
   }

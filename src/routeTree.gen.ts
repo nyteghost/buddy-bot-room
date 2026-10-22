@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkRouteImport } from './routes/work'
+import { Route as TodayRouteImport } from './routes/today'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
@@ -27,6 +28,8 @@ import { Route as ApiTasksRouteImport } from './routes/api.tasks'
 import { Route as ApiUpdateRouteImport } from './routes/api.update'
 import { Route as ApiWeeklyRouteImport } from './routes/api.weekly'
 import { Route as ApiCaptureRouteImport } from './routes/api.capture'
+import { Route as ApiTodayRouteImport } from './routes/api.today'
+import { Route as ApiTodayCaptureRouteImport } from './routes/api.today-capture'
 import { Route as ApiSetupRouteImport } from './routes/api.setup'
 import { Route as ApiIcsRouteImport } from './routes/api.ics'
 import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
@@ -58,6 +61,11 @@ import { Route as ApiTranscribeRouteImport } from './routes/api.transcribe'
 const WorkRoute = WorkRouteImport.update({
   id: '/work',
   path: '/work',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TodayRoute = TodayRouteImport.update({
+  id: '/today',
+  path: '/today',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -143,6 +151,16 @@ const ApiWeeklyRoute = ApiWeeklyRouteImport.update({
 const ApiCaptureRoute = ApiCaptureRouteImport.update({
   id: '/api/capture',
   path: '/api/capture',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTodayRoute = ApiTodayRouteImport.update({
+  id: '/api/today',
+  path: '/api/today',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTodayCaptureRoute = ApiTodayCaptureRouteImport.update({
+  id: '/api/today-capture',
+  path: '/api/today-capture',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSetupRoute = ApiSetupRouteImport.update({
@@ -284,6 +302,7 @@ const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/work': typeof WorkRoute
+  '/today': typeof TodayRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
@@ -300,6 +319,8 @@ export interface FileRoutesByFullPath {
   '/api/update': typeof ApiUpdateRoute
   '/api/weekly': typeof ApiWeeklyRoute
   '/api/capture': typeof ApiCaptureRoute
+  '/api/today': typeof ApiTodayRoute
+  '/api/today-capture': typeof ApiTodayCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -331,6 +352,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/work': typeof WorkRoute
+  '/today': typeof TodayRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
@@ -347,6 +369,8 @@ export interface FileRoutesByTo {
   '/api/update': typeof ApiUpdateRoute
   '/api/weekly': typeof ApiWeeklyRoute
   '/api/capture': typeof ApiCaptureRoute
+  '/api/today': typeof ApiTodayRoute
+  '/api/today-capture': typeof ApiTodayCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -379,6 +403,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/work': typeof WorkRoute
+  '/today': typeof TodayRoute
   '/api/chat': typeof ApiChatRoute
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
@@ -395,6 +420,8 @@ export interface FileRoutesById {
   '/api/update': typeof ApiUpdateRoute
   '/api/weekly': typeof ApiWeeklyRoute
   '/api/capture': typeof ApiCaptureRoute
+  '/api/today': typeof ApiTodayRoute
+  '/api/today-capture': typeof ApiTodayCaptureRoute
   '/api/setup': typeof ApiSetupRoute
   '/api/ics': typeof ApiIcsRoute
   '/api/reminders': typeof ApiRemindersRoute
@@ -428,6 +455,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/work'
+    | '/today'
     | '/api/chat'
     | '/api/speech'
     | '/api/search'
@@ -444,6 +472,8 @@ export interface FileRouteTypes {
     | '/api/update'
     | '/api/weekly'
     | '/api/capture'
+    | '/api/today'
+    | '/api/today-capture'
     | '/api/setup'
     | '/api/ics'
     | '/api/reminders'
@@ -475,6 +505,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/work'
+    | '/today'
     | '/api/chat'
     | '/api/speech'
     | '/api/search'
@@ -491,6 +522,8 @@ export interface FileRouteTypes {
     | '/api/update'
     | '/api/weekly'
     | '/api/capture'
+    | '/api/today'
+    | '/api/today-capture'
     | '/api/setup'
     | '/api/ics'
     | '/api/reminders'
@@ -522,6 +555,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/work'
+    | '/today'
     | '/api/chat'
     | '/api/speech'
     | '/api/search'
@@ -538,6 +572,8 @@ export interface FileRouteTypes {
     | '/api/update'
     | '/api/weekly'
     | '/api/capture'
+    | '/api/today'
+    | '/api/today-capture'
     | '/api/setup'
     | '/api/ics'
     | '/api/reminders'
@@ -570,6 +606,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   WorkRoute: typeof WorkRoute
+  TodayRoute: typeof TodayRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
@@ -586,6 +623,8 @@ export interface RootRouteChildren {
   ApiUpdateRoute: typeof ApiUpdateRoute
   ApiWeeklyRoute: typeof ApiWeeklyRoute
   ApiCaptureRoute: typeof ApiCaptureRoute
+  ApiTodayRoute: typeof ApiTodayRoute
+  ApiTodayCaptureRoute: typeof ApiTodayCaptureRoute
   ApiSetupRoute: typeof ApiSetupRoute
   ApiIcsRoute: typeof ApiIcsRoute
   ApiRemindersRoute: typeof ApiRemindersRoute
@@ -629,6 +668,13 @@ declare module '@tanstack/react-router' {
       path: '/work'
       fullPath: '/work'
       preLoaderRoute: typeof WorkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/today': {
+      id: '/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof TodayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -741,6 +787,20 @@ declare module '@tanstack/react-router' {
       path: '/api/capture'
       fullPath: '/api/capture'
       preLoaderRoute: typeof ApiCaptureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/today': {
+      id: '/api/today'
+      path: '/api/today'
+      fullPath: '/api/today'
+      preLoaderRoute: typeof ApiTodayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/today-capture': {
+      id: '/api/today-capture'
+      path: '/api/today-capture'
+      fullPath: '/api/today-capture'
+      preLoaderRoute: typeof ApiTodayCaptureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/setup': {
@@ -938,6 +998,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   WorkRoute: WorkRoute,
+  TodayRoute: TodayRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
@@ -954,6 +1015,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateRoute: ApiUpdateRoute,
   ApiWeeklyRoute: ApiWeeklyRoute,
   ApiCaptureRoute: ApiCaptureRoute,
+  ApiTodayRoute: ApiTodayRoute,
+  ApiTodayCaptureRoute: ApiTodayCaptureRoute,
   ApiSetupRoute: ApiSetupRoute,
   ApiIcsRoute: ApiIcsRoute,
   ApiRemindersRoute: ApiRemindersRoute,

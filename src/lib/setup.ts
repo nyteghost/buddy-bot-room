@@ -12,6 +12,7 @@ export const INTEGRATIONS: { id: string; name: string; what: string; env: string
   { id: "unraid", name: "Unraid watcher", what: "Array health alerts", env: "UNRAID_URL, UNRAID_API_KEY", testable: true },
   { id: "caldav", name: "Tasks & reminders sync (iPhone)", what: "Two-way sync with the iPhone Reminders app through Radicale", env: "RADICALE_PASSWORD, COMPOSE_PROFILES=radicale", testable: true },
   { id: "ntfy", name: "Phone alerts (ntfy)", what: "Brief, reminders and alerts on your phone", env: "NTFY_URL", testable: true },
+  { id: "today", name: "Today planner nudges", what: "Nudges before events and at check-ins", env: "TODAY_NUDGES, TODAY_NUDGE_LEAD, TODAY_CHECKINS", testable: false },
   { id: "telegram", name: "Telegram bot", what: "Talk to your pals from your phone", env: "TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID", testable: true },
   { id: "whisper", name: "Dictation (Whisper)", what: "Speak instead of typing", env: "WHISPER_URL", testable: true },
   { id: "weather", name: "Weather", what: "Forecast in Today and the brief", env: "WEATHER_LOCATION", testable: true },
@@ -38,7 +39,7 @@ export function setupSummary(items: SetupItem[]): string {
 export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: string[] }[] = [
   { id: "basics", name: "Basics", blurb: "Time zone, your local AI, search and dictation", ids: ["general", "ollama", "searxng", "whisper"] },
   { id: "calendar-mail", name: "Calendar & mail", blurb: "Calendar feeds, Google Calendar, email", ids: ["calendar", "gcal", "imap", "m365"] },
-  { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "telegram", "brief", "caldav"] },
+  { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "today", "telegram", "brief", "caldav"] },
   { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
   { id: "home", name: "Home & server", blurb: "Weather and your Unraid server", ids: ["weather", "unraid"] },
   { id: "code", name: "Code", blurb: "GitHub repos you keep an eye on", ids: ["github"] },
