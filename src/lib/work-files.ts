@@ -313,14 +313,29 @@ export function fitRows(ws: XSheet) {
   const last = ws.rowCount;
   const height = new Map<number, number>();
   for (let r = start; r <= last; r++) height.set(r, ws.getRow(r).height ?? 15);
-  const lines = (text: string, size: number, width: number) => text.split("\n").reduce((t, par) => t + Math.max(1, Math.ceil((par.length * size * 0.62) / Math.max(40, width - 10))), 0);
+  // Word-wrap estimate (generous: wide letters, bold wider) so text is never cut off.
+  const lines = (text: string, size: number, width: number, bold: boolean) => {
+    const ch = size * (bold ? 0.72 : 0.64);
+    const avail = Math.max(40, width - 14);
+    let total = 0;
+    for (const par of text.split("\n")) {
+      let cur = 0, n = 1;
+      for (const word of par.split(" ")) {
+        const w = word.length * ch;
+        if (cur && cur + ch + w > avail) { n++; cur = w; } else cur += (cur ? ch : 0) + w;
+        while (cur > avail) { n++; cur -= avail; }
+      }
+      total += n;
+    }
+    return total;
+  };
   for (let r = start; r <= last; r++) {
     for (let c = 2; c <= 8; c++) {
       if (covered.has(`${r},${c}`)) continue;
       const v = ws.getCell(r, c).value;
       if (typeof v !== "string" || !v) continue;
       const size = ws.getCell(r, c).font?.size ?? 11;
-      const need = lines(v, size, px(c)) * size * 1.3 + 6;
+      const need = lines(v, size, px(c), !!ws.getCell(r, c).font?.bold) * size * 1.4 + size * 0.7 + 8;
       const m = merges.get(`${r},${c}`);
       const rows = Array.from({ length: (m ? m.bottom : r) - r + 1 }, (_, i) => r + i);
       const have = rows.reduce((t, x) => t + (height.get(x) ?? 15), 0);
