@@ -82,4 +82,24 @@ describe("staffing", () => {
     expect(plans[0]!.assignments.some((a) => a.name.startsWith("Edison"))).toBe(false);
     expect(plans[1]!.assignments.some((a) => a.name.startsWith("Edison"))).toBe(false);
   });
+
+  it("keeps Jacquline to 5 days and off weekends unless the Service Desk is open, and still gives her 40", () => {
+    const desk = { ...e("2026-11-14", "Hall A", 480, 700, "Show", "2"), code: "Exmi" } as EventEntry; // Saturday desk day
+    const plans = planWeeks(dates, [desk]);
+    const days = plans.filter((p) => p.desk).map((p) => p.date);
+    expect(days.length).toBe(5);
+    expect(days).toContain("2026-11-14");
+    expect(days).not.toContain("2026-11-15");
+    expect(plans.reduce((t, p) => t + (p.desk ? workedHours(p.desk) : 0), 0)).toBe(WEEK_HOURS);
+  });
+  it("keeps Madjid to 5 days even when a power-heavy show brings him in on Tuesday", () => {
+    const plans = planWeeks(dates, [e("2026-11-10", "Hall A", 480, 1000, "Gordon Food Service Show")]);
+    expect(plans[1]!.assignments.some((a) => a.name.startsWith("Madjid"))).toBe(true);
+    expect(plans.filter((p) => p.assignments.some((a) => a.name.startsWith("Madjid"))).length).toBe(5);
+    expect(weekHours(plans, "Madjid Lakhdari")).toBe(WEEK_HOURS);
+  });
+  it("never has anyone past 5 days across ordinary weeks", () => {
+    const plans = planWeeks(dates, [e("2026-11-10", "Hall A", 480, 1000), e("2026-11-10", "Hall B", 480, 1000), e("2026-11-14", "Hall A", 480, 1300)]);
+    for (const s of SHOW_STAFF) expect(plans.filter((p) => p.assignments.some((a) => a.name === s.name)).length <= 5).toBe(true);
+  });
 });
