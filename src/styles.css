@@ -2113,6 +2113,18 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   body.printing-deck * { visibility: hidden !important; }
   body.printing-deck .deck-planner, body.printing-deck .deck-planner * { visibility: visible !important; }
   body.printing-deck .deck-planner { position: absolute !important; left: 0; top: 0; width: 100%; background: #fff !important; color: #000 !important; }
+  /* Always print in light colours, whatever theme the app is using on screen. */
+  body.printing-deck .deck-planner {
+    --background: #fff; --foreground: #000; --card: #fff; --card-foreground: #000;
+    --muted: #f3f3f3; --muted-foreground: #333; --border: #000; --primary: #fff; --primary-foreground: #000;
+    --layout-deck: #fff; --layout-bridge: #e0e0e0;
+    color-scheme: light;
+  }
+  .deck-planner .print-stage, .deck-planner .print-stage [class*="bg-card"], .deck-planner .print-stage [class*="bg-muted"] { background: #fff !important; color: #000 !important; }
+  .deck-planner .print-stage .text-muted-foreground { color: #333 !important; }
+  .deck-planner .print-stage .stage-diagram .holder-badge { background: #fff !important; color: #000 !important; border: 1.5px solid #000 !important; }
+  .deck-planner .print-stage .stage-diagram .pointer-events-none span { color: #000 !important; text-shadow: none !important; filter: none !important; }
+  .deck-planner .print-stage .deck-cell[title^="Bridge"] { background: #e0e0e0 !important; }
   @page { margin: 12mm; }
   body.printing-deck { print-color-adjust: exact; -webkit-print-color-adjust: exact; background: #fff !important; }
   .deck-planner .layout-view-swap.hidden { display: block !important; }
