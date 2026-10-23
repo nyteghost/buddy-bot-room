@@ -2097,8 +2097,8 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
 .layout-bridge { fill: var(--layout-bridge); stroke: var(--foreground); }
 .layout-holder { fill: none; }
 .layout-holder-1 { stroke: var(--layout-holder-one); }
-.layout-holder-2 { stroke: var(--layout-holder-two); }
-.layout-holder-3 { stroke: var(--layout-holder-three); }
+.layout-holder-2 { stroke: var(--layout-holder-two); stroke-dasharray: 6 3; }
+.layout-holder-3 { stroke: var(--layout-holder-three); stroke-dasharray: 1 2; stroke-linecap: round; }
 .print-stage-body > * { min-width: 0; }
 .print-only { display: none; }
 /* Bigger tap targets for phones and tablets on the floor. */
@@ -2134,6 +2134,14 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .deck-planner .print-layout { margin-bottom: 0 !important; break-after: page; }
   .deck-planner .print-layout-diagram { display: block; width: 100%; height: 145mm; overflow: visible; break-inside: avoid-page; }
   .deck-planner .print-layout-outline { fill: #fff; stroke: #000; stroke-width: 0.2; }
+  /* Black and white: holders are told apart by line style (solid 1, dashed 2, dotted 3) and a "N×" count. */
+  .deck-planner .layout-holder { stroke: #000 !important; }
+  .deck-planner .layout-holder-1 { stroke-dasharray: none; }
+  .deck-planner .layout-holder-2 { stroke-dasharray: 5 2.5; }
+  .deck-planner .layout-holder-3 { stroke-dasharray: 0.5 2; }
+  .deck-planner .print-stage .stage-diagram { background: #fff !important; border-color: #000 !important; }
+  .deck-planner .print-stage .stage-diagram div[style*="border"] { border-color: #000 !important; }
+  .deck-planner .print-stage .holder-badge { background: #fff !important; color: #000 !important; border: 1.5px solid #000; }
   .deck-planner .print-layout-number { fill: #000; stroke: #fff; stroke-width: 0.15; paint-order: stroke; font-weight: 700; }
   .deck-planner .print-layout-key { border-collapse: collapse; table-layout: fixed; }
   .deck-planner .print-layout-key th, .deck-planner .print-layout-key td { padding: 2mm 1mm; border-bottom: 1px solid #999; overflow-wrap: anywhere; }

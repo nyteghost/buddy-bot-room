@@ -189,7 +189,7 @@ export function StageLayout({ stages: sourceStages }: { stages: LayoutStage[] })
                   <rect x={holder.x} y={holder.y} width={holder.w} height={holder.h}
                     className={`layout-holder layout-holder-${holder.capacity}`} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
                   <text x={holder.x + holder.w / 2} y={holder.y + holder.h / 2} textAnchor="middle" dominantBaseline="middle"
-                    fontSize={holderTextSize} className="print-layout-number">{stage.heightIn}&quot; high</text>
+                    fontSize={holderTextSize} className="print-layout-number">{holder.capacity}× · {stage.heightIn}&quot; high</text>
                 </g>;
               })}
               <text x={stage.width / 2} y={stage.length / 2} textAnchor="middle" dominantBaseline="middle"

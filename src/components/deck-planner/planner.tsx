@@ -14,6 +14,12 @@ const HOLDER_COLORS: Record<1 | 2 | 3, string> = {
   2: "rgba(16, 185, 129, 0.85)",   // green
   3: "rgba(234, 88, 12, 0.85)",    // orange
 };
+// Line styles repeat the colour so 1-, 2- and 3-deck holders still differ on a black-and-white printout.
+const HOLDER_LINE: Record<1 | 2 | 3, { style: "solid" | "dashed" | "double"; width: number }> = {
+  1: { style: "solid", width: 3 },
+  2: { style: "dashed", width: 4 },
+  3: { style: "double", width: 7 },
+};
 const BRIDGE_COLOR = "rgba(234, 179, 8, 0.95)"; // yellow
 const MIN_HEIGHT_IN = 32;
 const MAX_HEIGHT_IN = 44;
@@ -963,8 +969,8 @@ function StagePanel({
                     {([3, 2, 1] as const).map((c) => (
                       <div key={c} className="flex items-center gap-2">
                         <span
-                          className="inline-block h-3 w-3 rounded-sm"
-                          style={{ background: HOLDER_COLORS[c] }}
+                          className="inline-block h-4 w-8 rounded-sm bg-white"
+                          style={{ border: `${HOLDER_LINE[c].width}px ${HOLDER_LINE[c].style} ${HOLDER_COLORS[c]}`, boxSizing: "border-box" }}
                         />
                         <span>{c}-deck holder ({c * 4}&#39;×8&#39;)</span>
                       </div>
@@ -988,7 +994,7 @@ function StagePanel({
                 <>
                   <div className="mb-1 text-sm font-semibold">Top view (plan)</div>
                   <div className="mb-3 text-xs text-muted-foreground">
-                    Each thin rectangle is one 4&#39;×8&#39; deck. Coloured outlines show holders.
+                    Each thin rectangle is one 4&#39;×8&#39; deck. Holders are outlined: solid = 1-deck, dashed = 2-deck, double line = 3-deck.
                   </div>
 
                   <div
@@ -1045,16 +1051,16 @@ function StagePanel({
                             top: h.y * scale,
                             width: h.w * scale,
                             height: h.h * scale,
-                            border: `3px solid ${HOLDER_COLORS[h.capacity]}`,
+                            border: `${HOLDER_LINE[h.capacity].width}px ${HOLDER_LINE[h.capacity].style} ${HOLDER_COLORS[h.capacity]}`,
                             boxSizing: "border-box",
                           }}
                           title={`${h.label}: ${h.capacity}-deck holder`}
                         >
                           <span
-                            className="m-0.5 rounded px-1 text-[10px] font-bold text-white"
+                            className="holder-badge m-0.5 rounded px-1 text-[10px] font-bold text-white"
                             style={{ background: HOLDER_COLORS[h.capacity] }}
                           >
-                            {h.label}
+                            {h.label} · {h.capacity}×
                           </span>
                           <div className="flex w-full flex-1 flex-col items-center justify-center px-1 text-center leading-tight">
                             <span className="text-[10px] font-semibold text-white drop-shadow">
@@ -1152,8 +1158,8 @@ function StagePanel({
                       <tr key={h.label} className="border-b border-border/60 last:border-0">
                         <td className="py-2 pr-3 font-semibold">
                           <span
-                            className="mr-2 inline-block h-2.5 w-2.5 rounded-sm align-middle"
-                            style={{ background: HOLDER_COLORS[h.capacity] }}
+                            className="mr-2 inline-block h-3 w-6 rounded-sm bg-white align-middle"
+                            style={{ border: `${Math.min(HOLDER_LINE[h.capacity].width, 5)}px ${HOLDER_LINE[h.capacity].style} ${HOLDER_COLORS[h.capacity]}`, boxSizing: "border-box" }}
                           />
                           {h.label}
                         </td>
