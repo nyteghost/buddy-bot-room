@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ListChecks, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { dailyPicks } from "@/lib/brief";
 import { watchQueue } from "@/lib/pick-reason";
@@ -117,7 +117,10 @@ export function TodayPanel({ open }: { open: boolean }) {
   const queue = watchQueue(trakt.data?.items ?? [], 6);
   return (
     <div className="grid gap-3 p-3 text-sm">
-      <div className="font-medium">{dayLabel(Date.now(), tz)} · {new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(Date.now())}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-medium">{dayLabel(Date.now(), tz)} · {new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(Date.now())}</div>
+        <Button size="sm" variant="outline" title="Open the full /today planner: your plan, times, week and focus timer" onClick={() => window.location.assign("/today")}><ListChecks className="size-4" /> /today</Button>
+      </div>
       <Block title="Weather">
         {weather.data?.weather ? <p>{describeCode(weather.data.weather.now.code).icon} {weather.data.weather.place}: {weatherLine(weather.data.weather)}</p> : <Quiet>{weather.error || "Loading…"}</Quiet>}
       </Block>
