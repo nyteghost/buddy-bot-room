@@ -1373,6 +1373,53 @@ export function DeckPlanner() {
   const partLines = checkParts(totalParts, have);
   const shortLines = partLines.filter((l) => l.status === "short");
   const unknownLines = partLines.filter((l) => l.status === "unknown");
+  const buildCrewBlob = async () => {
+            const { crewWorkbook } = await import("@/lib/stage-crew-sheet");
+            const rows = [
+              { label: "4′ × 8′ decks", need: totalUsed.decks, have: FULL_STOCK.decks },
+              { label: "3-deck holders", need: totalUsed.three, have: FULL_STOCK.three },
+              { label: "2-deck holders", need: totalUsed.two, have: FULL_STOCK.two },
+              { label: "1-deck holders", need: totalUsed.one, have: FULL_STOCK.one },
+              ...STAIR_TYPES.map(({ key, label }) => ({ label, need: totalUsed[key] ?? 0, have: FULL_STOCK[key] ?? 0 })),
+              ...partLines.filter((l) => l.status !== "unused").map((l) => ({ label: l.label, need: l.need, have: l.have })),
+            ];
+            const stagesOut = enabledIds.flatMap((id) => { const st = layoutStages[id]; return st ? [{ name: st.name, width: st.width, length: st.length, heightIn: st.heightIn, quantity: st.quantity ?? 1, valid: st.valid }] : []; });
+    return crewWorkbook(eventName, rows, stagesOut);
+  };
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState(() => { try { return localStorage.getItem("deckCrewEmailTo") ?? ""; } catch { return ""; } });
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNote, setEmailNote] = useState("");
+  const sendCrewEmail = async () => {
+    setEmailBusy(true); setEmailNote("");
+    try { localStorage.setItem("deckCrewEmailTo", emailTo); } catch { /* ignore */ }
+    try {
+      const blob = await buildCrewBlob();
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const title = eventName.trim() || "Stage plan";
+      // The printed crew sheet, as a self-contained page: the planner as it prints (light, black and white), openable and printable anywhere.
+      let printHtml = "";
+      try {
+        const root = document.querySelector(".deck-planner");
+        if (root) {
+          const clone = root.cloneNode(true) as HTMLElement;
+          clone.querySelectorAll(".no-print, script, dialog").forEach((n) => n.remove());
+          const css = Array.from(document.styleSheets).map((ss) => { try { return Array.from(ss.cssRules).map((r) => r.cssText).join("\n"); } catch { return ""; } }).join("\n").replace(/@media print/g, "@media all");
+          printHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title.replace(/[<>&]/g, "")} crew sheet</title><style>${css}</style></head><body class="printing-deck" style="margin:0;background:#fff">${clone.outerHTML}</body></html>`;
+        }
+      } catch { printHtml = ""; }
+      const htmlBytes = new TextEncoder().encode(printHtml);
+      let hbin = ""; for (let i = 0; i < htmlBytes.length; i += 0x8000) hbin += String.fromCharCode(...htmlBytes.subarray(i, i + 0x8000));
+      const stagesOut = enabledIds.flatMap((id) => { const st = layoutStages[id]; return st ? [`- ${st.name}: ${st.width}' x ${st.length}' x ${st.heightIn}" high${(st.quantity ?? 1) > 1 ? ` (x${st.quantity})` : ""}${st.valid ? "" : " - CANNOT BUILD FROM STOCK"}`] : []; });
+      const need = partLines.filter((l) => l.status !== "unused").map((l) => `- ${l.label}: need ${l.need}, have ${l.have ?? "not counted"}${l.status === "short" ? "  ** SHORT **" : ""}`);
+      const text = [`Crew sheet: ${title}`, "", "Stages:", ...stagesOut, "", "Parts (need vs warehouse):", ...need, "", "Attached: the printable crew sheet (open it and print) and the parts list as an Excel file."].join("\n");
+      const res = await fetch("/api/mailbox", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "send", to: emailTo, subject: `Crew sheet - ${title}`, text, attachments: [...(printHtml ? [{ name: `${title.replace(/[^\w -]+/g, "")} crew sheet.html`, type: "text/html", data: btoa(hbin) }] : []), { name: `${title.replace(/[^\w -]+/g, "")} crew parts.xlsx`, type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: btoa(bin) }] }) });
+      const j = (await res.json().catch(() => ({}))) as { error?: string; to?: string[] };
+      setEmailNote(res.ok ? `Sent to ${j.to?.join(", ") ?? emailTo}.` : j.error ?? "Couldn't send.");
+    } catch { setEmailNote("Couldn't send."); }
+    setEmailBusy(false);
+  };
   const badStages = enabledIndexes.filter((i) => layoutStages[`s${i + 1}`] && layoutStages[`s${i + 1}`].valid === false);
 
   // ---- saved plans, undo / redo ----
@@ -1635,18 +1682,32 @@ export function DeckPlanner() {
 
         <button
           type="button"
+          onClick={() => { setEmailNote(""); setEmailOpen((o) => !o); }}
+          className="no-print mb-6 ml-3 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted"
+        >
+          Email crew
+        </button>
+        {emailOpen && (
+          <span className="no-print mb-6 ml-3 inline-flex flex-wrap items-center gap-2 align-middle">
+            <input
+              type="text"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              placeholder="crew@example.com, another@example.com"
+              aria-label="Email crew to"
+              className="w-72 rounded-md border border-border bg-background px-2 py-2 text-sm"
+            />
+            <button type="button" disabled={emailBusy || !emailTo.trim()} onClick={sendCrewEmail} className="rounded-md border border-border bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 disabled:opacity-50">
+              {emailBusy ? "Sending…" : "Send"}
+            </button>
+            {emailNote && <span role="status" className="text-xs">{emailNote}</span>}
+          </span>
+        )}
+
+        <button
+          type="button"
           onClick={async () => {
-            const { crewWorkbook } = await import("@/lib/stage-crew-sheet");
-            const rows = [
-              { label: "4′ × 8′ decks", need: totalUsed.decks, have: FULL_STOCK.decks },
-              { label: "3-deck holders", need: totalUsed.three, have: FULL_STOCK.three },
-              { label: "2-deck holders", need: totalUsed.two, have: FULL_STOCK.two },
-              { label: "1-deck holders", need: totalUsed.one, have: FULL_STOCK.one },
-              ...STAIR_TYPES.map(({ key, label }) => ({ label, need: totalUsed[key] ?? 0, have: FULL_STOCK[key] ?? 0 })),
-              ...partLines.filter((l) => l.status !== "unused").map((l) => ({ label: l.label, need: l.need, have: l.have })),
-            ];
-            const stagesOut = enabledIds.flatMap((id) => { const st = layoutStages[id]; return st ? [{ name: st.name, width: st.width, length: st.length, heightIn: st.heightIn, quantity: st.quantity ?? 1, valid: st.valid }] : []; });
-            const blob = await crewWorkbook(eventName, rows, stagesOut);
+            const blob = await buildCrewBlob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url; a.download = `${(eventName.trim() || "Stage plan").replace(/[^\w -]+/g, "")} crew parts.xlsx`;

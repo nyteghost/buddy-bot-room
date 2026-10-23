@@ -266,13 +266,16 @@ export function encodeHeaderText(s: string): string {
   return `=?UTF-8?B?${b64(new TextEncoder().encode(clean))}?=`;
 }
 
-export type Outgoing = { from: string; fromName?: string; to: string[]; cc?: string[]; subject: string; text: string; inReplyTo?: string; references?: string; messageId: string; date?: Date };
+export type Outgoing = { from: string; fromName?: string; to: string[]; cc?: string[]; subject: string; text: string; inReplyTo?: string; references?: string; messageId: string; date?: Date; attachments?: { name: string; type: string; data: string }[] };
+/** data is base64. */
 
 /** A plain-text UTF-8 message with CRLF line ends. Header values can't carry line breaks, so nothing typed in the form can add headers. */
 export function buildMessage(o: Outgoing): string {
   const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
   const name = oneLine(o.fromName ?? "").replace(/["\\<>]/g, "");
   const fromHdr = name ? `${encodeHeaderText(name).includes("=?") ? encodeHeaderText(name) : `"${name}"`} <${o.from}>` : o.from;
+  const atts = (o.attachments ?? []).slice(0, 5);
+  const boundary = `pp_${b64(new TextEncoder().encode(o.messageId)).replace(/[^A-Za-z0-9]/g, "").slice(0, 24)}`;
   const lines = [
     `From: ${fromHdr}`,
     `To: ${o.to.join(", ")}`,
@@ -283,11 +286,20 @@ export function buildMessage(o: Outgoing): string {
     ...(o.inReplyTo ? [`In-Reply-To: ${oneLine(o.inReplyTo).slice(0, 200)}`] : []),
     ...(o.references ? [`References: ${oneLine(o.references).slice(0, 600)}`] : []),
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
+    ...(atts.length ? [`Content-Type: multipart/mixed; boundary="${boundary}"`] : ["Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64"]),
   ];
   const body = wrap76(b64(new TextEncoder().encode(o.text.replace(/\r\n?|\n/g, "\r\n"))));
-  return `${lines.join("\r\n")}\r\n\r\n${body}\r\n`;
+  if (!atts.length) return `${lines.join("\r\n")}\r\n\r\n${body}\r\n`;
+  const parts = [
+    `--${boundary}`, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", body,
+    ...atts.flatMap((a) => {
+      const fname = a.name.replace(/[^\w. -]+/g, "").slice(0, 100) || "attachment";
+      const type = /^[\w.+-]+\/[\w.+-]+$/.test(a.type) ? a.type : "application/octet-stream";
+      return [`--${boundary}`, `Content-Type: ${type}; name="${fname}"`, "Content-Transfer-Encoding: base64", `Content-Disposition: attachment; filename="${fname}"`, "", wrap76(a.data.replace(/[^A-Za-z0-9+/=]/g, ""))];
+    }),
+    `--${boundary}--`,
+  ];
+  return `${lines.join("\r\n")}\r\n\r\n${parts.join("\r\n")}\r\n`;
 }
 
 export const replySubject = (s: string): string => (/^\s*re:/i.test(s) ? s.trim() : `Re: ${s.trim()}`).slice(0, 300);

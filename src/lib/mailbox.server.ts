@@ -110,7 +110,7 @@ export async function deleteMessage(cfg: ImapConfig, folderName: string, uid: un
 
 let sentTimes: number[] = [];
 
-export type SendInput = { to: string; cc?: string; subject: string; text: string; inReplyTo?: string; references?: string };
+export type SendInput = { to: string; cc?: string; subject: string; text: string; inReplyTo?: string; references?: string; attachments?: { name: string; type: string; data: string }[] };
 
 export async function sendMail(cfg: SmtpConfig, input: SendInput, now = Date.now()): Promise<{ to: string[] }> {
   const to = parseRecipients(input.to ?? "");
@@ -121,10 +121,12 @@ export async function sendMail(cfg: SmtpConfig, input: SendInput, now = Date.now
   const text = String(input.text ?? "");
   if (!subject && !text.trim()) throw new Error("Write a subject or a message first.");
   if (text.length > 100_000) throw new Error("That message is too long.");
+  const attachments = (input.attachments ?? []).slice(0, 5);
+  if (attachments.reduce((n, a) => n + String(a.data ?? "").length, 0) > 7_000_000) throw new Error("The attachments are too big to email.");
   const gate = allowSend(sentTimes, now);
   if (!gate.ok) throw new Error("That's 20 emails in the past hour, which is the limit. Try again later.");
   const messageId = `<${crypto.randomUUID()}@${cfg.from.split("@")[1] ?? "pixelpals.local"}>`;
-  const raw = buildMessage({ from: cfg.from, fromName: cfg.name, to, cc, subject: subject || "(no subject)", text, messageId, ...(input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}), ...(input.references ? { references: input.references } : {}) });
+  const raw = buildMessage({ from: cfg.from, fromName: cfg.name, to, cc, subject: subject || "(no subject)", text, messageId, ...(attachments.length ? { attachments } : {}), ...(input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}), ...(input.references ? { references: input.references } : {}) });
   await smtpSend(cfg, { to: [...to, ...cc], raw }, hooks.smtp);
   sentTimes = gate.times;
   logServer("info", `Mail sent to ${to.length + cc.length} recipient(s)`);
@@ -166,7 +168,7 @@ export async function handleMailbox(request: Request): Promise<Response> {
       case "send": {
         const smtp = smtpConfig();
         if (!smtp) return fail("Sending isn't set up. Your mail username must be your full address.", 409);
-        const sent = await sendMail(smtp, { to: String(b["to"] ?? ""), cc: String(b["cc"] ?? ""), subject: String(b["subject"] ?? ""), text: String(b["text"] ?? ""), ...(b["inReplyTo"] ? { inReplyTo: String(b["inReplyTo"]) } : {}), ...(b["references"] ? { references: String(b["references"]) } : {}) });
+        const sent = await sendMail(smtp, { to: String(b["to"] ?? ""), cc: String(b["cc"] ?? ""), subject: String(b["subject"] ?? ""), text: String(b["text"] ?? ""), ...(b["inReplyTo"] ? { inReplyTo: String(b["inReplyTo"]) } : {}), ...(b["references"] ? { references: String(b["references"]) } : {}), ...(Array.isArray(b["attachments"]) ? { attachments: (b["attachments"] as Record<string, unknown>[]).map((a) => ({ name: String(a["name"] ?? ""), type: String(a["type"] ?? ""), data: String(a["data"] ?? "") })) } : {}) });
         return Response.json({ ok: true, to: sent.to });
       }
       case "delete": { const r = await deleteMessage(cfg, folder, b["uid"]); clearMailCache(); return Response.json({ ok: true, ...r }); }
