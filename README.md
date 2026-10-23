@@ -14,7 +14,7 @@
 
 1. [What is Pixel Pals?](#1-what-is-pixel-pals)
 2. [Quick start](#2-quick-start)
-   - [Docker (recommended)](#docker-recommended) · [Portainer](#portainer) · [Without Docker](#without-docker) · [Updating](#updating)
+   - [Docker (recommended)](#docker-recommended) · [Portainer](#portainer) · [Unraid](#unraid) · [Without Docker](#without-docker) · [Updating](#updating)
 3. [First run: accounts and HTTPS](#3-first-run-accounts-and-https)
 4. [The room](#4-the-room)
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
@@ -87,6 +87,22 @@ Open `http://<this-machine>:8090`. Change the port with `BUDDY_PORT=9000 docker 
 5. **Deploy the stack**, then open `http://<host>:8090`.
 
 Newer Portainer versions ask for a **Source** first: choose *Create new source*, name it, enter the repository URL, and add a token only if the repo is private.
+
+### Unraid
+
+Two ready-made ways, both pull prebuilt images from GitHub (`ghcr.io/nyteghost/buddy-bot-room`), so nothing is built on your server and installing takes a couple of minutes.
+
+**One-time setup on GitHub:** after the first *Publish images* run finishes (Actions tab), open your profile → **Packages** → `buddy-bot-room` → **Package settings** → **Change visibility → Public**. Do the same for `pixelpals-radicale` if you want iPhone Reminders sync. Without this Unraid cannot download the image.
+
+**A. Whole stack with Docker Compose Manager (recommended)** — app, voice input, and optional Tailscale, Radicale and Ollama:
+1. **Apps** → install **Docker Compose Manager**.
+2. **Docker** tab → **Compose** → **Add New Stack**, name it `pixelpals`.
+3. Gear icon → **Edit Stack** → paste `docker-compose.unraid.yml`. Gear → **Edit Env File** → paste `unraid.env.example` and fill in only what you use.
+4. **Compose Up**, then open `http://<unraid-ip>:8090`.
+
+Data lives in `/mnt/user/appdata/pixelpals` (change `APPDATA` in the env file). Turn on extras with `COMPOSE_PROFILES`, for example `tailscale,radicale`. For local AI either add `ollama` to `COMPOSE_PROFILES` and set `OLLAMA_URL=http://ollama:11434` (add `OLLAMA_RUNTIME=nvidia` with the Nvidia Driver plugin for a GPU), or point `OLLAMA_URL` at Ollama on another machine, such as a gaming PC with a GPU. To update: **Compose Pull**, then **Compose Up**.
+
+**B. Single container from the Docker tab** — just the app. **Docker** → **Add Container** → **Template** dropdown, or add `https://raw.githubusercontent.com/nyteghost/buddy-bot-room/main/unraid/pixelpals.xml` under **Template repositories** in the Docker settings. Everything else (Plex, Trakt, mail, weather…) can be added later in **Settings** inside Pixel Pals.
 
 ### Without Docker
 
