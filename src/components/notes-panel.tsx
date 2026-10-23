@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { FileText, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FileText, RefreshCw, Smartphone, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { agents, agentName } from "@/lib/agents";
@@ -12,6 +12,98 @@ import {
   updateWorkbench,
   useWorkbench,
 } from "@/lib/workbench";
+
+
+type PhoneNote = { uid: number; uuid: string; title: string; text: string; date: string };
+type Edit = { uid: number; uuid: string; title: string; text: string };
+
+async function notesCall<T>(url: string, body?: unknown): Promise<T & { error?: string }> {
+  try {
+    const res = await fetch(url, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : undefined);
+    return (await res.json()) as T & { error?: string };
+  } catch { return { error: "Couldn't reach the server." } as T & { error?: string }; }
+}
+
+/** iPhone Notes kept in your Gmail account (turn on Notes for Gmail on the phone). Changes here show up there and back. */
+function PhoneNotes() {
+  const [notes, setNotes] = useState<PhoneNote[] | null>(null);
+  const [found, setFound] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState<Edit | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    const res = await notesCall<{ notes: PhoneNote[]; found: boolean }>("/api/mailbox?op=notes");
+    if (res.error) setError(res.error); else { setError(""); setNotes(res.notes); setFound(res.found); }
+    setBusy(false);
+  }, []);
+  useEffect(() => {
+    void load();
+    const onFocus = () => { if (!edit) void load(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load]);
+
+  async function save() {
+    if (!edit) return;
+    setBusy(true);
+    const res = await notesCall<{ ok?: boolean }>("/api/mailbox", { op: "note-save", ...(edit.uid ? { uid: edit.uid, uuid: edit.uuid } : {}), title: edit.title, text: edit.text });
+    if (res.error) { setError(res.error); setBusy(false); return; }
+    setEdit(null);
+    await load();
+  }
+  async function del() {
+    if (!edit?.uid) { setEdit(null); return; }
+    setBusy(true);
+    const res = await notesCall<{ ok?: boolean }>("/api/mailbox", { op: "note-delete", uid: edit.uid });
+    if (res.error) { setError(res.error); setBusy(false); return; }
+    setEdit(null); setConfirmDel(false);
+    await load();
+  }
+
+  return (
+    <section>
+      <h3><Smartphone size={12} className="inline mr-1" />iPhone notes <span>synced through Gmail</span></h3>
+      {error && <p className="docs-note" role="alert">{error}</p>}
+      {!edit && (
+        <>
+          <ul>
+            {(notes ?? []).map((n) => (
+              <li key={n.uid}>
+                <button type="button" className="text-left" onClick={() => { setConfirmDel(false); setEdit({ uid: n.uid, uuid: n.uuid, title: n.title, text: n.text }); }}>
+                  <strong>{n.title}</strong>{n.text ? <small className="block opacity-70">{n.text.split("\n")[0]?.slice(0, 80)}</small> : null}
+                </button>
+              </li>
+            ))}
+            {notes && notes.length === 0 && <li className="empty">{found ? "No notes in the Gmail section yet." : "No Gmail notes folder yet. On the iPhone: Settings → Notes → Accounts → Gmail → Notes on, then make a note. Or add one here to create it."}</li>}
+            {!notes && !error && <li className="empty">Loading…</li>}
+          </ul>
+          <div className="docs-actions">
+            <Button type="button" size="sm" onClick={() => { setConfirmDel(false); setEdit({ uid: 0, uuid: "", title: "", text: "" }); }}>New note</Button>{" "}
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void load()}><RefreshCw size={12} className="inline mr-1" />{busy ? "…" : "Refresh"}</Button>
+          </div>
+        </>
+      )}
+      {edit && (
+        <div className="grid gap-2">
+          <Input aria-label="Note title" placeholder="Title" value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
+          <textarea aria-label="Note text" className="pal-note" maxLength={15000} placeholder="Write the note…" value={edit.text} onChange={(e) => setEdit({ ...edit, text: e.target.value })} />
+          <div className="docs-actions">
+            <Button type="button" size="sm" disabled={busy || (!edit.title.trim() && !edit.text.trim())} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>{" "}
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setEdit(null)}>Cancel</Button>{" "}
+            {edit.uid > 0 && (confirmDel
+              ? <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void del()}>Really delete?</Button>
+              : <Button type="button" size="sm" variant="outline" onClick={() => setConfirmDel(true)}><Trash2 size={12} className="inline mr-1" />Delete</Button>)}
+          </div>
+          <p className="docs-note">Saved notes appear in the Notes app on your iPhone within a minute or so. Formatting and checklists aren't kept.</p>
+        </div>
+      )}
+    </section>
+  );
+}
 
 /** Memories and notes. Memories are shared with the pals; notes stay private. To-dos live in the Tasks window. */
 export function NotesPanel() {
@@ -35,6 +127,8 @@ export function NotesPanel() {
 
   return (
     <div className="notes-panel">
+      <PhoneNotes />
+
       <section>
         <h3>Pals remember <span>shared with every pal</span></h3>
         <ul>

@@ -107,7 +107,7 @@ export const addressOf = (header: string): string => {
   return /^[^\s<>,;"]+@[^\s<>,;"]+$/.test(d) ? d : "";
 };
 
-function headerGet(unfolded: string, name: string): string {
+export function headerGet(unfolded: string, name: string): string {
   return new RegExp(`^${name}:[ \\t]*(.*)$`, "im").exec(unfolded)?.[1]?.trim() ?? "";
 }
 export const unfold = (block: string): string => block.replace(/\r?\n[ \t]+/g, " ");
@@ -349,4 +349,40 @@ export function guessSmtpHost(imapHost: string): string {
   if (/^imap\./.test(h)) return h.replace(/^imap\./, "smtp.");
   if (/^imap-/.test(h)) return h.replace(/^imap-/, "smtp-");
   return h;
+}
+
+// ---------- phone notes (Apple Notes stored in a Gmail "Notes" label) ----------
+
+const esc = (t: string): string => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** An Apple-Notes-style message: HTML, one <div> per line, the first line is the title. */
+export function buildNoteMessage(o: { from: string; title: string; text: string; uuid: string; messageId: string; date?: Date }): string {
+  const title = o.title.replace(/[\r\n]+/g, " ").trim().slice(0, 200) || "New note";
+  const lines = [title, ...o.text.replace(/\r\n?/g, "\n").split("\n")];
+  const html = `<html><head></head><body style="overflow-wrap: break-word; -webkit-nbsp-mode: space; line-break: after-white-space;">${lines.map((l, i) => (i === 0 ? `<div><h1>${esc(l)}</h1></div>` : l.trim() ? `<div>${esc(l)}</div>` : "<div><br></div>")).join("")}</body></html>`;
+  const head = [
+    `From: ${o.from}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    `Subject: ${encodeHeaderText(title)}`,
+    `Date: ${(o.date ?? new Date()).toUTCString().replace("GMT", "+0000")}`,
+    `Message-ID: ${o.messageId.replace(/[\r\n]+/g, "")}`,
+    "MIME-Version: 1.0 (Pixel Pals)",
+    "X-Uniform-Type-Identifier: com.apple.mail-note",
+    `X-Universally-Unique-Identifier: ${o.uuid}`,
+  ];
+  return `${head.join("\r\n")}\r\n\r\n${wrap76(b64(new TextEncoder().encode(html)))}\r\n`;
+}
+
+export type PhoneNote = { uid: number; uuid: string; title: string; text: string; date: string };
+
+/** A stored note → title, body (without the repeated title line), UUID. */
+export function parseNote(uid: number, raw: string): PhoneNote {
+  const { headers } = splitMessage(raw);
+  const h = unfold(headers);
+  const title = decodeMimeWords(headerGet(h, "Subject")).trim();
+  let text = extractBody(raw, 20_000).text;
+  const first = text.split("\n")[0]?.trim() ?? "";
+  if (first && (first === title || title.startsWith(first) || first.startsWith(title))) text = text.split("\n").slice(1).join("\n").replace(/^\n+/, "");
+  return { uid, uuid: headerGet(h, "X-Universally-Unique-Identifier").trim().slice(0, 64), title: title || first || "Untitled", text, date: headerGet(h, "Date").slice(0, 60) };
 }
