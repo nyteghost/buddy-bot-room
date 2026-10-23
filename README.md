@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale) · [iPhone Notes via Gmail](#716-iphone-notes-via-gmail)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -560,6 +560,25 @@ Tasks and reminders can sync **both ways** with the iPhone **Reminders** app. Pi
 - Reminders can still push through ntfy or Telegram too. If your iPhone alerts are enough, leave `NTFY_URL` empty to avoid double alerts.
 - Items you create in the Reminders app need a **due date and time** to count as reminders in Pixel Pals; items without one appear only in the task list if they are in the *Pixel Pals Tasks* list.
 - I tested the format handling and the merge rules with automated tests and against a stand-in CalDAV server that behaves like Radicale. I could not run a real Radicale or an iPhone here, so the first connection is a shakedown. If something doesn't line up, the Setup test message and the `Task sync failed` / `Reminder sync failed` lines in the debug log say what the server answered.
+
+### 7.16 iPhone Notes via Gmail
+
+The **iPhone notes** section at the top of the *Notes* window shows the notes in your Gmail account's **Notes** label and lets you add, edit and delete them. The iPhone keeps those notes in Gmail, so changes go both ways with no Shortcut.
+
+**Set up (once)**
+1. Make sure the mail account in Pixel Pals (**Settings → Mail**, the `IMAP_*` values) is the same Gmail account you use on the iPhone. It needs an app password, and sending/reading must already work in the Mail window.
+2. On the iPhone: **Settings → Notes → Accounts → Gmail** (or **Settings → Apps → Mail → Mail Accounts → Gmail**) and turn **Notes** on. A **Gmail** section appears in the Notes app.
+3. In the Notes app, open the Gmail section and make a note. It is saved to Gmail's *Notes* label.
+4. Open the *Notes* window in Pixel Pals. The note appears (press **Refresh** if not). Add a note there and it shows up on the phone within a minute or so.
+
+**Limits**
+- Only notes in the **Gmail** section sync this way, not iCloud notes. Move or copy a note into the Gmail section to share it.
+- Plain text only: formatting, checklists, drawings and attachments are not kept, and editing a note in Pixel Pals drops any it had.
+- The list shows the 40 most recent notes. Notes up to 15,000 characters.
+- Deleting moves the note to Gmail's Trash (recoverable).
+- Only the owner account can use it (it uses the mailbox). Added in commit d4ec51b; written without a real Gmail account to test on, so try it with a throwaway note first.
+
+**If it doesn't work:** the section says "No Gmail notes folder yet" until the iPhone has created at least one note with Gmail Notes switched on (or you add one from Pixel Pals, which creates the folder). A sign-in error means the Mail settings or app password are wrong.
 
 ## 8. Automatic jobs
 
