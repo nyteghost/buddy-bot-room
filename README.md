@@ -219,7 +219,7 @@ Compare models only uses the free keys, so it never spends Claude credit.
 
 Chat with your files uses `nomic-embed-text` (pulled with the first-start models) to find passages by meaning, so a question can match a document that uses different words. If it isn't there, search quietly falls back to keywords.
 
-First-start models come from `OLLAMA_MODELS` (default `qwen2.5:7b`; space-separated list for more). `OLLAMA_PORT` changes the published port, which you only need if something outside the stack wants to reach Ollama. Switching models makes the first reply after a switch slower, because it has to load.
+First-start models come from `OLLAMA_MODELS` (default `qwen2.5:7b`; space-separated list for more). `OLLAMA_PORT` changes the published port (default 11435, so it does not collide with an Ollama already running on the host at 11434); you only need it if something outside the stack wants to reach this Ollama. Switching models makes the first reply after a switch slower, because it has to load.
 
 **Pointing at another Ollama:** set `OLLAMA_URL` (for example `http://10.200.1.40:11434`) and use the same engine.
 
@@ -710,7 +710,7 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `OLLAMA_URL` | `http://ollama:11434` (Portainer stack) | Ollama used by the Local AI engine; empty turns it off |
 | `OLLAMA_MODELS` | `qwen2.5:7b nomic-embed-text` | Models downloaded on first start |
 | `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
-| `OLLAMA_PORT` | `11434` | Published Ollama port |
+| `OLLAMA_PORT` | `11435` | Published Ollama port (the host's own Ollama keeps 11434) |
 | `ALLOW_PRIVATE_CUSTOM` | empty | `1` lets the Custom provider use private/LAN addresses (http allowed) |
 | `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
