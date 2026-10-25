@@ -126,7 +126,7 @@ export function SetupPanel({ open }: { open: boolean }) {
                     <label key={f.key} className="grid gap-1 text-xs">
                       <span className="flex items-center gap-2">
                         <span className="font-medium">{f.label}</span>
-                        {locked && <span className="text-muted-foreground">set in Portainer, change it there</span>}
+                        {locked && <span className="text-muted-foreground">set in the stack settings (.env), change it there</span>}
                         {!locked && f.secret && f.source === "app" && draft === undefined && <span className="text-muted-foreground">saved ✓ (hidden)</span>}
                         {!locked && f.secret && f.source === "app" && draft !== null && <button type="button" className="ml-auto text-destructive underline" onClick={() => set(null)}>Clear</button>}
                         {draft === null && <span className="text-destructive">will be cleared</span>}
@@ -193,7 +193,7 @@ export function SetupPanel({ open }: { open: boolean }) {
           </section>
         );
       })}
-      <p className="text-xs text-muted-foreground">Settings you save here are kept on the server and take effect right away. A value set in Portainer wins and is locked here. Keys and passwords are write-only and are left out of backups. Things the stack itself needs (COMPOSE_PROFILES, Tailscale, the Radicale password, the Ollama runtime) stay in Portainer.</p>
+      <p className="text-xs text-muted-foreground">Settings you save here are kept on the server and take effect right away. A value set in the stack settings (.env) wins and is locked here. Keys and passwords are write-only and are left out of backups. Things the stack itself needs (COMPOSE_PROFILES, Tailscale, the Radicale password, the Ollama runtime) stay in the stack settings.</p>
     </div>
   );
 }

@@ -30,7 +30,7 @@ services:
       BUDDY_ACCOUNTS: ${BUDDY_ACCOUNTS:-1}
       TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
       TRAKT_USER: ${TRAKT_USER:-}
-      TRAKT_LIST: ${TRAKT_LIST:-watchlist}
+      TRAKT_LIST: ${TRAKT_LIST:-}   # empty = your watchlist; editable in Settings
       TRAKT_ACCESS_TOKEN: ${TRAKT_ACCESS_TOKEN:-}
       TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}   # only for /trakt connect (adding to your watchlist)
       UNRAID_URL: ${UNRAID_URL:-}

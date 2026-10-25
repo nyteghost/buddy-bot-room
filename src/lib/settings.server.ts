@@ -91,7 +91,7 @@ export async function saveSettings(changes: Record<string, unknown>): Promise<{ 
     for (const [key, raw] of Object.entries(changes)) {
       const field = fieldByKey(key);
       if (!field) { errors[key] = "Unknown setting."; continue; }
-      if (fromEnvironment(key)) { errors[key] = `${field.label} is set in Portainer. Change or remove it there.`; continue; }
+      if (fromEnvironment(key)) { errors[key] = `${field.label} is set in the stack settings (.env). Change or remove it there.`; continue; }
       const clean = raw === null ? ({ ok: true, value: "" } as const) : cleanSetting(field, raw);
       if (!clean.ok) { errors[key] = clean.error; continue; }
       const target = field.secret ? secrets : values;
