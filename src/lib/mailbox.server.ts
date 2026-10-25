@@ -3,6 +3,7 @@ import { clearMailCache } from "./inbox.server";
 import { imapConfig, type ImapConfig } from "./imap.server";
 import { withImap, type ImapClient, type TlsOverrides } from "./imap-client.server";
 import { allowSend, buildMessage, buildNoteMessage, parseNote, type PhoneNote, folderQuote, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSummary, parseUidSearch, type Folder, type MailMessage, type MailSummary } from "./mailbox";
+import { ackAlert, addAlertRule, alertState, removeAlertRule } from "./mail-alerts.server";
 import { logServer } from "./server-log.server";
 import { smtpCheck, smtpConfig, smtpSend, type SmtpConfig, type SmtpTlsOverrides } from "./smtp.server";
 
@@ -214,6 +215,7 @@ export async function handleMailbox(request: Request): Promise<Response> {
     if (request.method === "GET") {
       const u = new URL(request.url);
       const folder = u.searchParams.get("folder") ?? "INBOX";
+      if (u.searchParams.get("op") === "alerts") return Response.json(await alertState());
       if (u.searchParams.get("op") === "notes") return Response.json(await listNotes(cfg));
       if (u.searchParams.get("op") === "read") {
         const message = await readMessage(cfg, folder, u.searchParams.get("uid"), u.searchParams.get("keep") !== "1");
@@ -232,6 +234,9 @@ export async function handleMailbox(request: Request): Promise<Response> {
         const sent = await sendMail(smtp, { to: String(b["to"] ?? ""), cc: String(b["cc"] ?? ""), subject: String(b["subject"] ?? ""), text: String(b["text"] ?? ""), ...(b["inReplyTo"] ? { inReplyTo: String(b["inReplyTo"]) } : {}), ...(b["references"] ? { references: String(b["references"]) } : {}), ...(Array.isArray(b["attachments"]) ? { attachments: (b["attachments"] as Record<string, unknown>[]).map((a) => ({ name: String(a["name"] ?? ""), type: String(a["type"] ?? ""), data: String(a["data"] ?? "") })) } : {}) });
         return Response.json({ ok: true, to: sent.to });
       }
+      case "alert-rule-add": return Response.json({ ok: true, rules: await addAlertRule(String(b["kind"] ?? ""), String(b["value"] ?? "")) });
+      case "alert-rule-remove": return Response.json({ ok: true, rules: await removeAlertRule(String(b["id"] ?? "")) });
+      case "alert-ack": await ackAlert(String(b["id"] ?? "")); return Response.json({ ok: true });
       case "note-save": return Response.json({ ok: true, ...(await saveNote(cfg, { uid: b["uid"], uuid: String(b["uuid"] ?? ""), title: String(b["title"] ?? ""), text: String(b["text"] ?? "") })) });
       case "note-delete": { await deleteNote(cfg, b["uid"]); return Response.json({ ok: true }); }
       case "delete": { const r = await deleteMessage(cfg, folder, b["uid"]); clearMailCache(); return Response.json({ ok: true, ...r }); }

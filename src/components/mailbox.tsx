@@ -43,6 +43,24 @@ export function Mailbox({ open }: { open: boolean }) {
     setLoading(false);
   }, [folder, q, unread]);
 
+  const openByRef = useCallback(async (f: string, uid: number) => {
+    setBusy(`open${uid}`); setNote("");
+    const res = await call<{ message: MailMessage }>(`/api/mailbox?op=read&folder=${encodeURIComponent(f)}&uid=${uid}`);
+    setBusy("");
+    if (res.error || !res.message) { setError(res.error ?? "Couldn't open it."); return; }
+    setFolder(f); setMsg(res.message); setView("read"); setConfirm(""); setMoveTo(""); setIntent(null);
+  }, []);
+  useEffect(() => {
+    // An email alert's Read button asks for one message; it may arrive before this window is mounted, so it is also parked on window.
+    const take = () => {
+      const w = window as unknown as { __ppOpenMail?: { folder: string; uid: number } | undefined };
+      const want = w.__ppOpenMail;
+      if (want) { w.__ppOpenMail = undefined; void openByRef(want.folder, want.uid); }
+    };
+    take();
+    window.addEventListener("pixelpals:open-mail", take);
+    return () => window.removeEventListener("pixelpals:open-mail", take);
+  }, [openByRef, open]);
   useEffect(() => { if (open) void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open]);
 
   const openMessage = async (m: MailSummary) => {

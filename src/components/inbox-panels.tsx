@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Mailbox } from "@/components/mailbox";
+import { MailAlertRules } from "@/components/mail-alerts";
 
 type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
 type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean; mode?: string }; items: CalItem[]; errors: string[]; error?: string };
@@ -121,6 +122,7 @@ export function MailPanel({ open }: { open: boolean }) {
   return (
     <div className="grid gap-3 p-3 text-sm">
       {failed && <p className="text-destructive">{failed}</p>}
+      {data?.imap && <MailAlertRules />}
       {data?.imap && <Mailbox open={open} />}
       {data && !data.configured && (
         <Setup>

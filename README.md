@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale) · [iPhone Notes via Gmail](#716-iphone-notes-via-gmail)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale) · [iPhone Notes via Gmail](#716-iphone-notes-via-gmail) · [Email alerts](#717-email-alerts)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -579,6 +579,15 @@ The **iPhone notes** section at the top of the *Notes* window shows the notes in
 - Only the owner account can use it (it uses the mailbox). Added in commit d4ec51b; written without a real Gmail account to test on, so try it with a throwaway note first.
 
 **If it doesn't work:** the section says "No Gmail notes folder yet" until the iPhone has created at least one note with Gmail Notes switched on (or you add one from Pixel Pals, which creates the folder). A sign-in error means the Mail settings or app password are wrong.
+
+### 7.17 Email alerts
+
+Pixel Pals can watch your mailbox and make a fuss when something you care about arrives. In the **Mail** window, open **Email alerts** to manage the rules. A rule is either a **sender** (`@company.com` for anyone at a company, or a full address) or **words** (found in the subject or the start of the message). Out of the box there is one rule: anything from `@gskill.com`.
+
+- It checks about once a minute, in **All Mail** (so every label and folder) **and Spam**. Plain IMAP accounts get the Inbox and Junk. Only mail that arrives after the first check can alert, so old mail never does.
+- A match opens a large pop-up in Pixel Pals, **Email from <sender>**, with the subject and a short preview, and **Read** (opens the message in the Mail window) and **Close** buttons. It stays until you press one. No sound. Mail found in Spam says so.
+- Every match also goes to your phone through ntfy or Telegram, even when no Pixel Pals page is open.
+- The pop-up only shows while a Pixel Pals page is open in a browser (it checks every 20 seconds while the tab is visible). Needs the mail account from Settings → Mail, the owner account, and `BUDDY_DATA_DIR` so the rules and "already alerted" list survive restarts.
 
 ## 8. Automatic jobs
 
