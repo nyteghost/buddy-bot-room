@@ -302,7 +302,7 @@ Type `/` for an autocomplete menu (Tab completes). `Ctrl+K` opens the command pa
 
 ## 7. Connecting other things
 
-Every integration is **optional**. **Most can be set up inside the app:** open **Settings** (top menu or `/setup`), press **Set up** or **Edit** on a card, fill in the details and **Save**. It takes effect right away, with no redeploy. Values are saved in your data folder; keys and passwords go in a separate file that is write-only (the app never shows them back) and is left out of backups. A value set as an environment variable (Portainer → stack → *Environment variables*, or `.env.local`) wins and shows as locked in the app, so remove it there if you want to manage it in the app. Only things the stack needs before the app starts stay in Portainer: `COMPOSE_PROFILES`, `TS_AUTHKEY`/`TS_HOSTNAME`, `RADICALE_PASSWORD`/`RADICALE_USER`, `OLLAMA_RUNTIME` and the other Ollama/Whisper container settings, `BUDDY_PASSWORD`, accounts and the data and backup folders. API keys are only ever read by the server, never sent to the browser.
+Every integration is **optional**. **Most can be set up inside the app:** open **Settings** (top menu or `/setup`), press **Set up** or **Edit** on a card, fill in the details and **Save**. It takes effect right away, with no redeploy. Values are saved in your data folder; keys and passwords go in a separate file that is write-only (the app never shows them back) and is left out of backups. A value saved in the app **wins** over the same value in the stack's environment (Portainer's *Environment variables*, Unraid's `.env`, or `.env.local`); clear it in the app to fall back to the environment value. Only things the stack needs before the app starts stay in Portainer: `COMPOSE_PROFILES`, `TS_AUTHKEY`/`TS_HOSTNAME`, `RADICALE_PASSWORD`/`RADICALE_USER`, `OLLAMA_RUNTIME` and the other Ollama/Whisper container settings, `BUDDY_PASSWORD`, accounts and the data and backup folders. API keys are only ever read by the server, never sent to the browser.
 
 ### 7.1 Web search (SearXNG)
 
@@ -723,7 +723,7 @@ All run in the browser. Files never leave your device.
 
 ## 14. Configuration reference
 
-These are the environment variable names. **Everything marked *(app)* can also be set in the Settings window** (Plex, Seerr, Jellyfin, Trakt, Unraid, ntfy, Telegram, weather, calendar feeds, IMAP, Microsoft 365, brief and review times, backup time and count, time zone, update check). The environment value wins if both are set.
+These are the environment variable names. **Everything marked *(app)* can also be set in the Settings window** (Plex, Seerr, Jellyfin, Trakt, Unraid, ntfy, Telegram, weather, calendar feeds, IMAP, Microsoft 365, brief and review times, backup time and count, time zone, update check). A value saved in the app wins if both are set; clearing it goes back to the environment value.
 
 Set in Portainer's environment variables or in `.env.local`. Anything left empty is simply off.
 

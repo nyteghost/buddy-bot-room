@@ -13,14 +13,14 @@ export const SETTINGS_FILE = "app-settings.json";
 export const SECRETS_FILE = "app-secrets.json";
 
 type Store = { values: Record<string, string>; secrets: Record<string, string> };
-const holder = globalThis as unknown as { __buddySettings?: { original: Record<string, string>; store: Store; ready?: Promise<void> } };
-const state = () => (holder.__buddySettings ??= { original: {}, store: { values: {}, secrets: {} } });
+const holder = globalThis as unknown as { __buddySettings?: { original: Record<string, string>; originalValue: Record<string, string>; store: Store; ready?: Promise<void> } };
+const state = () => (holder.__buddySettings ??= { original: {}, originalValue: {}, store: { values: {}, secrets: {} } });
 
 /** Which keys came from the real environment, captured once before anything is laid over it. */
 function captureOriginal(): void {
   const s = state();
   if (Object.keys(s.original).length) return;
-  for (const f of SETTING_FIELDS) s.original[f.key] = (process.env[f.key] ?? "").trim() ? "1" : "";
+  for (const f of SETTING_FIELDS) { s.original[f.key] = (process.env[f.key] ?? "").trim() ? "1" : ""; s.originalValue[f.key] = process.env[f.key] ?? ""; }
 }
 export const fromEnvironment = (key: string): boolean => { captureOriginal(); return state().original[key] === "1"; };
 
@@ -42,14 +42,14 @@ async function writeJson(name: string, data: Record<string, string>, secret: boo
   await f.rename(`${path}.tmp`, path);
 }
 
-/** Lay the saved settings over the environment (never over a value that came from the real environment). */
+/** Lay the saved settings over the environment. A value saved here wins; clearing it goes back to the stack's own value (if it had one). */
 function apply(): void {
   captureOriginal();
-  const { store, original } = state();
+  const { store, original, originalValue } = state();
   for (const f of SETTING_FIELDS) {
-    if (original[f.key] === "1") continue;
     const stored = (f.secret ? store.secrets[f.key] : store.values[f.key]) ?? "";
     if (stored) process.env[f.key] = envValue(f.key, stored);
+    else if (original[f.key] === "1") process.env[f.key] = originalValue[f.key] ?? "";
     else delete process.env[f.key];
   }
 }
@@ -70,7 +70,7 @@ export async function describeSettings(): Promise<SettingState[]> {
   const { store } = state();
   return SETTING_FIELDS.map((f) => {
     const saved = (f.secret ? store.secrets[f.key] : store.values[f.key]) ?? "";
-    const source: SettingState["source"] = fromEnvironment(f.key) ? "env" : saved ? "app" : "none";
+    const source: SettingState["source"] = saved ? "app" : fromEnvironment(f.key) ? "env" : "none";
     const base = { key: f.key, label: f.label, group: f.group, kind: f.kind, secret: !!f.secret, options: f.options, placeholder: f.placeholder, help: f.help, source };
     return !f.secret && source === "app" ? { ...base, value: saved } : base;
   });
@@ -91,7 +91,6 @@ export async function saveSettings(changes: Record<string, unknown>): Promise<{ 
     for (const [key, raw] of Object.entries(changes)) {
       const field = fieldByKey(key);
       if (!field) { errors[key] = "Unknown setting."; continue; }
-      if (fromEnvironment(key)) { errors[key] = `${field.label} is set in the stack settings (.env). Change or remove it there.`; continue; }
       const clean = raw === null ? ({ ok: true, value: "" } as const) : cleanSetting(field, raw);
       if (!clean.ok) { errors[key] = clean.error; continue; }
       const target = field.secret ? secrets : values;

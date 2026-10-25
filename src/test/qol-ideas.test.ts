@@ -2111,18 +2111,18 @@ describe("in-app settings", () => {
     // Things the stack needs before the app starts must stay in Portainer.
     for (const k of ["COMPOSE_PROFILES", "RADICALE_PASSWORD", "OLLAMA_RUNTIME", "TS_AUTHKEY", "BUDDY_PASSWORD", "BUDDY_DATA_DIR"]) expect(fieldByKey(k)).toBeUndefined();
   });
-  it("saves to the data folder, keeps secrets apart, and lets the environment win", async () => {
+  it("saves to the data folder, keeps secrets apart, and a saved value wins over the environment", async () => {
     const dir = mkdtempSync(`${tmpdir()}/pp-settings-`);
     process.env["BUDDY_DATA_DIR"] = dir;
     process.env["SEERR_URL"] = "http://from-env.example";
     delete process.env["WEATHER_LOCATION"];
     delete process.env["PLEX_TOKEN"];
     const out = await saveSettings({ WEATHER_LOCATION: '"Atlanta, GA"', PLEX_TOKEN: "abc123", SEERR_URL: "http://other.example", NOPE: "x", BRIEF_TIME: "99:99" });
-    expect(out.saved.sort()).toEqual(["PLEX_TOKEN", "WEATHER_LOCATION"]);
-    expect(Object.keys(out.errors).sort()).toEqual(["BRIEF_TIME", "NOPE", "SEERR_URL"]);
+    expect(out.saved.sort()).toEqual(["PLEX_TOKEN", "SEERR_URL", "WEATHER_LOCATION"]);
+    expect(Object.keys(out.errors).sort()).toEqual(["BRIEF_TIME", "NOPE"]);
     expect(process.env["WEATHER_LOCATION"]).toBe("Atlanta, GA");
     expect(process.env["PLEX_TOKEN"]).toBe("abc123");
-    expect(process.env["SEERR_URL"]).toBe("http://from-env.example");
+    expect(process.env["SEERR_URL"]).toBe("http://other.example");
     const plain = readFileSync(`${dir}/app-settings.json`, "utf8");
     const secret = readFileSync(`${dir}/app-secrets.json`, "utf8");
     expect(plain).toContain("Atlanta, GA");
@@ -2134,10 +2134,11 @@ describe("in-app settings", () => {
     expect(row("PLEX_TOKEN").value).toBeUndefined();
     expect(JSON.stringify(view).includes("abc123")).toBe(false);
     expect(row("WEATHER_LOCATION")).toMatchObject({ source: "app", value: "Atlanta, GA" });
-    expect(row("SEERR_URL")).toMatchObject({ source: "env" });
-    expect(row("SEERR_URL").value).toBeUndefined();
-    const cleared = await saveSettings({ WEATHER_LOCATION: null, PLEX_TOKEN: "" });
-    expect(cleared.saved.sort()).toEqual(["PLEX_TOKEN", "WEATHER_LOCATION"]);
+    expect(row("SEERR_URL")).toMatchObject({ source: "app", value: "http://other.example" });
+    const cleared = await saveSettings({ WEATHER_LOCATION: null, PLEX_TOKEN: "", SEERR_URL: null });
+    expect(cleared.saved.sort()).toEqual(["PLEX_TOKEN", "SEERR_URL", "WEATHER_LOCATION"]);
+    expect(process.env["SEERR_URL"]).toBe("http://from-env.example"); // clearing goes back to the stack's own value
+    expect((await describeSettings()).find((x) => x.key === "SEERR_URL")).toMatchObject({ source: "env" });
     expect(process.env["WEATHER_LOCATION"]).toBeUndefined();
     expect(process.env["PLEX_TOKEN"]).toBeUndefined();
     expect(existsSync(`${dir}/app-secrets.json`)).toBe(true);

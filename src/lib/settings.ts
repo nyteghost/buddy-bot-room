@@ -1,9 +1,9 @@
 /**
- * Settings you can change inside the app (Settings window) instead of in Portainer.
+ * Settings you can change inside the app (Settings window) instead of in the stack's environment file.
  * Pure helpers and the field list; the file handling is in settings.server.ts.
  *
- * Rule: a value set as a real environment variable wins and is shown as "set in Portainer";
- * anything else can be edited here. Things the stack itself needs before the app starts
+ * Rule: a value saved here wins over the same value in the stack's environment (which stays as the fallback);
+ * clearing it goes back to the environment value. Things the stack itself needs before the app starts
  * (COMPOSE_PROFILES, Tailscale, Radicale's password, the Ollama runtime, accounts) stay in Portainer.
  */
 export type SettingKind = "text" | "url" | "select" | "time" | "number" | "list";
@@ -125,7 +125,7 @@ export type SettingState = {
   options?: string[] | undefined;
   placeholder?: string | undefined;
   help?: string | undefined;
-  /** "env": set in Portainer and locked here. "app": saved here. "none": not set. */
+  /** "env": only the stack has it (editable here, which overrides it). "app": saved here. "none": not set. */
   source: "env" | "app" | "none";
   /** Only for non-secret values saved here. Secrets and Portainer values are never sent. */
   value?: string | undefined;
