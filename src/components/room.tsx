@@ -484,8 +484,20 @@ export function Room() {
 
   const stop = () => {
     stopSpeaking();
-    abortRef.current?.abort();
+    const running = abortRef.current;
+    running?.abort();
     replayRef.current?.abort();
+    // If the run is stuck waiting on something that ignores the abort (a slow lookup, a model that is still loading),
+    // give it a moment, then free the room anyway. The old run is cancelled, so anything it finishes later is dropped.
+    if (running)
+      window.setTimeout(() => {
+        if (abortRef.current !== running) return;
+        setRunning(false);
+        setRunningMode(null);
+        setSpeaking(null);
+        runLock.current = false;
+        abortRef.current = null;
+      }, 700);
   };
 
   /** Sends in the given mode window (the one you are working in when none is given). */
@@ -693,6 +705,7 @@ export function Room() {
           const answerId = crypto.randomUUID();
           const consume = async (stream: Awaited<ReturnType<typeof runLocal>>) => {
             for await (const partial of readUIMessageStream<RoomMessage>({ stream, terminateOnError: true })) {
+              if (controller.signal.aborted) break;
               answer = {
                 ...partial,
                 id: answerId,
@@ -811,11 +824,14 @@ export function Room() {
         setError(friendlyError(raw, { engine: engine.kind, ollamaUrl: engine.ollamaUrl, ollamaModel: engine.ollamaModel }));
       }
     } finally {
-      setRunning(false);
-      setRunningMode(null);
-      setSpeaking(null);
-      runLock.current = false;
-      abortRef.current = null;
+      // Only the run that is still current may reset the room (Stop may already have freed it for a newer run).
+      if (abortRef.current === controller || abortRef.current === null) {
+        setRunning(false);
+        setRunningMode(null);
+        setSpeaking(null);
+        runLock.current = false;
+        abortRef.current = null;
+      }
       inputRef.current?.focus();
     }
   }
