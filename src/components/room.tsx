@@ -1421,7 +1421,7 @@ export function Room() {
           <div className="conversation-subhead">
             <span className="status-dot" />
             {busyHere
-              ? `${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`
+              ? `${activeAgent ? `${agentName(activeAgent.id, hell, horror, characterMode)} is` : horror ? "The icons are" : hell ? "The Order is" : "Your pals are"} thinking…`
               : msgs.length
                 ? "The floor is yours"
                 : "The room is open"}
@@ -1540,7 +1540,7 @@ export function Room() {
               {busyHere && (
                 <div className="thinking-row">
                   {speaking && <PixelCharacter id={speaking} animated />}
-                  <Shimmer>{`${activeAgent ? agentName(activeAgent.id, hell, horror, characterMode) : horror ? "The icons" : hell ? "The Order" : "Your pals"} is thinking…`}</Shimmer>
+                  <Shimmer>{`${activeAgent ? `${agentName(activeAgent.id, hell, horror, characterMode)} is` : horror ? "The icons are" : hell ? "The Order is" : "Your pals are"} thinking…`}</Shimmer>
                 </div>
               )}
             </ConversationContent>
