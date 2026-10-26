@@ -131,7 +131,7 @@ export function parseSummary(uid: number, flags: string[], block: string): MailS
 export function gmailLink(account: string, messageId: string): string | null {
   const id = messageId.trim().replace(/^<|>$/g, "");
   if (!id || !/^[^\s<>"]+$/.test(id) || !/^[^\s@]+@[^\s@]+$/.test(account)) return null;
-  return `https://mail.google.com/mail/u/${encodeURIComponent(account)}/#search/${encodeURIComponent(`rfc822msgid:${id}`)}`;
+  return `https://mail.google.com/mail/?authuser=${encodeURIComponent(account)}#search/${encodeURIComponent(`rfc822msgid:${id}`)}`;
 }
 export const isGmailHost = (host: string): boolean => /(^|\.)(gmail|googlemail)\.com$/i.test(host.trim());
 
