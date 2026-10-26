@@ -95,12 +95,21 @@ function EventsTab() {
   const [source, setSource] = useState<{ rows: EventRow[]; existing?: File; sources: number } | null>(null);
   const [withPending, setWithPending] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
+  const [report, setReport] = useState("");
   async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean) {
     const { eventsWorkbook } = await import("@/lib/work-files");
     const live = src.rows.filter((r) => !isCancelledRow(r));
     setPending([...new Set(live.filter(isPendingRow).map((r) => `${r.event || r.description} (${r.status})`))].sort());
     const rows = includePending ? live : live.filter((r) => !isPendingRow(r));
     const list = summarizeEvents(rows);
+    const dayList = [...new Set(src.rows.map((r) => r.date))].sort();
+    const statuses = new Map<string, number>();
+    for (const r of src.rows) statuses.set(r.status ?? "(none)", (statuses.get(r.status ?? "(none)") ?? 0) + 1);
+    setReport((old) => [old.split("\n--- counts ---")[0], "--- counts ---",
+      `rows read: ${src.rows.length}`, `cancelled: ${src.rows.length - live.length}`, `not-yet-definite: ${live.filter(isPendingRow).length} (${includePending ? "included" : "left out"})`,
+      `rows used: ${rows.length}`, `entries built: ${list.length}`, `dates: ${dayList[0] ?? "-"} to ${dayList.at(-1) ?? "-"}`,
+      `statuses: ${[...statuses].map(([k, v]) => `${k}=${v}`).join(", ") || "-"}`,
+      `sample rows: ${JSON.stringify(src.rows.slice(0, 3))}`].join("\n"));
     const notes = [...airwallTasks(rows), ...taskSuggestions(rows)].sort((a, b) => a.date.localeCompare(b.date));
     setShared(sharedSpaces(list));
     setEntries(list); setMerged(!!src.existing); setTasks(notes);
@@ -110,6 +119,14 @@ function EventsTab() {
   }
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
+    const head = [`Pixel Pals Events report · ${new Date().toISOString()}`, `build: ${__APP_VERSION__} ${__APP_COMMIT__} ${__APP_BUILD_DATE__}`];
+    setReport(head.join("\n"));
+    try {
+      const { describeSheet } = await import("@/lib/work-files");
+      const described = await Promise.all(files.filter((f) => /\.xlsx?$/i.test(f.name)).map(describeSheet));
+      const names = `dropped: ${files.map((f) => `${f.name} (${f.size} B)`).join("; ") || "nothing"}`;
+      setReport([...head, names, ...described].join("\n"));
+    } catch { /* describing is best-effort */ }
     try {
       const { readEventPdf, readEventSheet } = await import("@/lib/work-files");
       const pdfs = files.filter((f) => /\.pdf$/i.test(f.name));
@@ -120,12 +137,16 @@ function EventsTab() {
       for (const f of sheets) {
         const r = await readEventSheet(f);
         if (r) reports.push(r); else existing = f;
+        setReport((old) => `${old}\nreadEventSheet(${f.name}): ${r ? `${r.length} rows` : "null → treated as a monthly schedule to fill in, not a For Scheduling report"}`);
       }
       const rows = [...(await Promise.all(pdfs.map(readEventPdf))).flat(), ...reports.flat()];
       const src = { rows, sources: pdfs.length + reports.length, ...(existing ? { existing } : {}) };
       setSource(src);
       await build(src, withPending);
-    } catch (e) { setStatus(`Could not read that PDF: ${(e as Error).message}`); }
+    } catch (e) {
+      setReport((old) => `${old}\nERROR: ${(e as Error).stack ?? (e as Error).message}`);
+      setStatus(`Could not read that file: ${(e as Error).message}`);
+    }
   }
   const { deliver } = useDeliver();
   return (
@@ -133,6 +154,12 @@ function EventsTab() {
       <FilePick accept="application/pdf,.xlsx" label="Drop the For Scheduling report (.xlsx or PDF) — add your monthly schedule .xlsx to fill it in" onFiles={load} />
       <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting · MO? = no move-out line in the report; guessed as 3 hours after the show ends, so check it. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
+      {report && /^Could not|^No /.test(status) && (
+        <div className="space-y-1 rounded-md border border-border p-2 text-xs">
+          <div className="flex items-center justify-between gap-2"><span className="font-medium">Details to send me</span><Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(report).catch(() => undefined); }}>Copy details</Button></div>
+          <textarea readOnly value={report} rows={8} className="w-full rounded border border-border bg-background p-1 font-mono" onFocus={(e) => e.currentTarget.select()} />
+        </div>
+      )}
       {pending.length > 0 && (
         <label className="flex items-start gap-2 rounded-md border border-amber-500 p-2 text-xs">
           <input type="checkbox" className="mt-0.5" checked={withPending} onChange={(e) => { setWithPending(e.target.checked); if (source) build(source, e.target.checked).catch((err) => setStatus(`Could not read that PDF: ${(err as Error).message}`)); }} />
