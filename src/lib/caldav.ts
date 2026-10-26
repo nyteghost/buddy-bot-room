@@ -29,7 +29,12 @@ export function fold(line: string): string {
   return out.join("\r\n");
 }
 
+const DAY2 = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
 export function rruleOf(r: Repeat): string {
+  const nth = /^nth:(-?\d):(\d)$/.exec(r);
+  if (nth) return `FREQ=MONTHLY;BYDAY=${nth[1]}${DAY2[Number(nth[2])]}`;
+  if (r === "biweekly") return "FREQ=WEEKLY;INTERVAL=2";
+  if (r === "quarterly") return "FREQ=MONTHLY;INTERVAL=3";
   return r === "weekdays" ? "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" : r === "weekly" ? "FREQ=WEEKLY" : r === "monthly" ? "FREQ=MONTHLY" : "FREQ=DAILY";
 }
 
@@ -37,7 +42,12 @@ export function rruleOf(r: Repeat): string {
 export function repeatFromRrule(rule: string): Repeat | undefined {
   const o: Record<string, string> = {};
   for (const part of rule.split(";")) { const [k = "", v = ""] = part.split("="); o[k.toUpperCase()] = v.toUpperCase(); }
-  if ((o["INTERVAL"] && o["INTERVAL"] !== "1") || o["COUNT"] || o["UNTIL"]) return undefined;
+  if (o["COUNT"] || o["UNTIL"]) return undefined;
+  if (o["FREQ"] === "WEEKLY" && o["INTERVAL"] === "2" && (o["BYDAY"] ?? "").split(",").filter(Boolean).length <= 1) return "biweekly";
+  if (o["FREQ"] === "MONTHLY" && o["INTERVAL"] === "3" && !o["BYDAY"]) return "quarterly";
+  const nth = o["FREQ"] === "MONTHLY" && (!o["INTERVAL"] || o["INTERVAL"] === "1") ? /^(-1|[1-4])(SU|MO|TU|WE|TH|FR|SA)$/.exec(o["BYDAY"] ?? "") : null;
+  if (nth) return `nth:${nth[1]}:${DAY2.indexOf(nth[2] ?? "")}` as Repeat;
+  if (o["INTERVAL"] && o["INTERVAL"] !== "1") return undefined;
   if (o["FREQ"] === "DAILY") return "daily";
   if (o["FREQ"] === "MONTHLY" && !o["BYDAY"]) return "monthly";
   if (o["FREQ"] === "WEEKLY") {

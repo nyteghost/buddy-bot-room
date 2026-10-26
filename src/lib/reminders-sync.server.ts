@@ -39,7 +39,10 @@ export async function syncReminders(): Promise<void> {
     }
     for (const id of plan.remoteDelete) { const ex = byId.get(id); if (ex) await deleteTodo(cfg, ex.href); }
     for (const f of finished) { if (!plan.remoteDelete.includes(f.todo.uid)) await deleteTodo(cfg, f.href).catch(() => undefined); }
-    return { list: plan.local, result: plan.base };
+    // The phone only knows the title, time and repeat; keep the details and the important flag we hold here.
+    const mine = new Map(local.map((r) => [r.id, r]));
+    const merged = plan.local.map((r): Reminder => { const l = mine.get(r.id); return l && (l.notes || l.important) ? { ...r, ...(l.notes ? { notes: l.notes } : {}), ...(l.important ? { important: true } : {}) } : r; });
+    return { list: merged, result: plan.base };
   });
   const f = await fs();
   await f.mkdir(dir(), { recursive: true });

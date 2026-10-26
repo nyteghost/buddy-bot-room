@@ -148,7 +148,7 @@ import { weatherText, type Weather } from "@/lib/weather";
 import { eventLinks, icsQuery, parseEventArgs } from "@/lib/events";
 import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
-import { MailAlertPopup } from "@/components/mail-alerts";
+import { MailAlertPopup, ReminderPopup } from "@/components/mail-alerts";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
 import { SetupPanel } from "@/components/setup-panel";
 import { FunPanel } from "@/components/fun-panel";
@@ -1946,6 +1946,7 @@ export function Room() {
             <WorkspaceWindow id="calendar" title="Calendar" icon={<CalendarDays className="size-4" />} open={calendarOpen} onClose={() => setCalendarOpen(false)} resetVersion={resetVersion}>
               <CalendarPanel open={calendarOpen} />
             </WorkspaceWindow>
+            <ReminderPopup />
             <MailAlertPopup onRead={(a) => { (window as unknown as { __ppOpenMail?: { folder: string; uid: number } }).__ppOpenMail = { folder: a.folder, uid: a.uid }; setMailOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:open-mail")), 250); }} />
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />

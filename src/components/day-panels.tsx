@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ListChecks, Plus, Trash2 } from "lucide-react";
+import { Flag, ListChecks, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { dailyPicks } from "@/lib/brief";
 import { watchQueue } from "@/lib/pick-reason";
@@ -9,12 +9,12 @@ import { describeCode, weatherLine, type Weather } from "@/lib/weather";
 import { whenLabel } from "@/lib/when";
 import { clock, dayLabel } from "./inbox-panels";
 
-type Remind = { id: string; at: number; text: string; repeat?: string | undefined };
+type Remind = { id: string; at: number; text: string; repeat?: string | undefined; repeatName?: string | undefined; notes?: string | undefined; important?: boolean | undefined };
 type RemindReply = { text?: string; error?: string; items?: Remind[] };
 
-async function remindCall(op: "list" | "add" | "remove" | "snooze", text = ""): Promise<RemindReply> {
+async function remindCall(op: "list" | "add" | "remove" | "snooze", text = "", extra: { notes?: string; important?: boolean } = {}): Promise<RemindReply> {
   try {
-    const res = await fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op, text }) });
+    const res = await fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op, text, ...extra }) });
     return (await res.json()) as RemindReply;
   } catch { return { error: "Couldn't reach the server." }; }
 }
@@ -24,6 +24,8 @@ export function TasksPanel({ open }: { open: boolean }) {
   const { todos } = useWorkbench();
   const [text, setText] = useState("");
   const [when, setWhen] = useState("");
+  const [important, setImportant] = useState(false);
+  const [details, setDetails] = useState("");
   const [reminders, setReminders] = useState<Remind[]>([]);
   const [note, setNote] = useState("");
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -32,10 +34,10 @@ export function TasksPanel({ open }: { open: boolean }) {
   const addTask = () => { if (!text.trim()) return; updateWorkbench((w) => ({ ...w, todos: addTodo(w.todos, text) })); setText(""); };
   const addReminder = async () => {
     if (!when.trim()) return;
-    const r = await remindCall("add", when);
+    const r = await remindCall("add", when, { ...(details.trim() ? { notes: details } : {}), ...(important ? { important: true } : {}) });
     setNote(r.text ?? r.error ?? "");
     if (r.items) setReminders(r.items);
-    if (r.text?.startsWith("Okay")) setWhen("");
+    if (r.text?.startsWith("Okay")) { setWhen(""); setDetails(""); setImportant(false); }
   };
   return (
     <div className="grid gap-4 p-3 text-sm">
@@ -59,14 +61,17 @@ export function TasksPanel({ open }: { open: boolean }) {
       <section className="grid gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reminders to your phone</h3>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void addReminder(); }}>
-          <input className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1" placeholder="in 30m call mom · every monday 9am send report" value={when} maxLength={300} onChange={(e) => setWhen(e.target.value)} />
+          <input className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1" placeholder="in 30m call mom · every first saturday 9am PC check" value={when} maxLength={300} onChange={(e) => setWhen(e.target.value)} />
           <Button type="submit" size="sm" aria-label="Add reminder"><Plus className="size-4" /></Button>
         </form>
+        <textarea className="min-h-12 rounded-md border bg-background px-2 py-1 text-xs" aria-label="Reminder details" placeholder="Details (optional): steps, what to check, anything you want in front of you when it goes off" maxLength={2000} value={details} onChange={(e) => setDetails(e.target.value)} />
+        <label className="flex w-fit items-center gap-2 text-xs"><input type="checkbox" checked={important} onChange={(e) => setImportant(e.target.checked)} /> <Flag className="size-3" /> Important: pop up big and keep reminding me every 15 minutes until I press Done</label>
+        <p className="text-xs text-muted-foreground">Repeats: every day / weekday / monday, every other week, every first saturday, every last friday, monthly, every 3 months.</p>
         {note && <p className="text-xs text-muted-foreground">{note}</p>}
         {reminders.map((r) => (
           <div key={r.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
             <span className="w-24 shrink-0 text-xs text-muted-foreground sm:w-28">{whenLabel(r.at, tz)}</span>
-            <span className="min-w-0 flex-1 truncate">{r.text}{r.repeat ? <span className="text-xs text-muted-foreground"> · {r.repeat === "weekdays" ? "every weekday" : r.repeat}</span> : null}</span>
+            <span className="min-w-0 flex-1 truncate" title={r.notes}>{r.important ? <Flag className="mr-1 inline size-3 text-red-500" aria-label="Important" /> : null}{r.text}{r.repeat ? <span className="text-xs text-muted-foreground"> · {r.repeatName ?? r.repeat}</span> : null}{r.notes ? <span className="text-xs text-muted-foreground"> · +details</span> : null}</span>
             <Button size="sm" variant="ghost" className="h-7 px-1 text-xs" title="Snooze 1 hour" onClick={() => void remindCall("snooze", `${r.id} 1h`).then((x) => { if (x.items) setReminders(x.items); })}>+1h</Button>
             <Button size="sm" variant="ghost" className="h-7 px-1" aria-label="Remove reminder" onClick={() => void remindCall("remove", r.id).then((x) => { if (x.items) setReminders(x.items); })}><Trash2 className="size-3.5" /></Button>
           </div>
