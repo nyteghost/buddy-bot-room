@@ -124,7 +124,7 @@ export function LocalAiPanel() {
       <p className={`rounded-md border p-2 text-xs ${status.localOnly ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
         {status.localOnly
           ? "Local-Only AI is ON: every answer, scheduled job and retry uses only your own Ollama. Cloud keys are never called, even if saved. Change it in Settings → Local AI."
-          : "Local-Only AI is OFF: cloud engines with saved keys can be used. Turn it on in Settings → Local AI for guaranteed $0."}
+          : "Local-Only AI is off: the engine you choose is used, including free cloud keys. Turn it on in Settings → Local AI to guarantee nothing leaves your network."}
       </p>
       <div className="flex items-start gap-2 rounded-md border p-3">
         <Cpu className="mt-0.5 size-4 shrink-0" />

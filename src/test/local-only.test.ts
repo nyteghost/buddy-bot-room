@@ -7,12 +7,12 @@ import { agents, models } from "@/lib/agents";
 afterEach(() => { delete process.env["LOCAL_ONLY_AI"]; vi.restoreAllMocks(); });
 
 describe("Local-Only AI mode", () => {
-  it("is ON by default and only off when explicitly turned off", () => {
-    expect(isLocalOnly(undefined)).toBe(true);
-    expect(isLocalOnly("")).toBe(true);
-    expect(isLocalOnly("on")).toBe(true);
-    expect(isLocalOnly("garbage")).toBe(true);
-    for (const off of ["off", "OFF", " 0 ", "false", "no"]) expect(isLocalOnly(off)).toBe(false);
+  it("is OFF by default and only on when explicitly turned on", () => {
+    expect(isLocalOnly(undefined)).toBe(false);
+    expect(isLocalOnly("")).toBe(false);
+    expect(isLocalOnly("garbage")).toBe(false);
+    for (const on of ["on", "ON", " 1 ", "true", "yes"]) expect(isLocalOnly(on)).toBe(true);
+    expect(isLocalOnly("off")).toBe(false);
   });
 
   it("allows only the stack's own Ollama while on", () => {
@@ -35,6 +35,7 @@ describe("Local-Only AI mode", () => {
   });
 
   it("guard blocks cloud engines and a mislabelled address, and allows the real Ollama", () => {
+    process.env["LOCAL_ONLY_AI"] = "on";
     expect(localOnlyOn()).toBe(true);
     const ollama = "http://ollama:11434";
     expect(() => assertInferenceAllowed("anthropic", "https://api.anthropic.com/v1", ollama)).toThrow(LocalOnlyError);
@@ -46,12 +47,13 @@ describe("Local-Only AI mode", () => {
     expect(() => assertInferenceAllowed("ollama-server", "http://ollama:11434/v1", ollama)).not.toThrow();
   });
 
-  it("guard lets cloud engines through only after Local-Only is turned off on purpose", () => {
-    process.env["LOCAL_ONLY_AI"] = "off";
+  it("guard lets cloud engines through while Local-Only is off (the default)", () => {
+    expect(localOnlyOn()).toBe(false);
     expect(() => assertInferenceAllowed("groq", "https://api.groq.com/openai/v1", "")).not.toThrow();
   });
 
   it("the chat endpoint refuses a cloud engine before any network call, even with a key saved", async () => {
+    process.env["LOCAL_ONLY_AI"] = "on";
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const body = {
       agentId: agents[0]!.id,
@@ -71,6 +73,7 @@ describe("Local-Only AI mode", () => {
   });
 
   it("a local engine with no Ollama configured fails safely instead of falling back", async () => {
+    process.env["LOCAL_ONLY_AI"] = "on";
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const prev = process.env["OLLAMA_URL"]; delete process.env["OLLAMA_URL"];
     const body = {

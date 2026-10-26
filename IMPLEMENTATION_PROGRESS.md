@@ -10,7 +10,7 @@ Image for this branch: `ghcr.io/nyteghost/buddy-bot-room:beta` (main stays on `:
 
 ## Phase 1 — Local-Only mode + reliability  (DONE, pending live test)
 - [x] `src/lib/local-only.ts` (pure rules), `src/lib/ai/guard.server.ts` (one gate: engine kind AND real address must be the approved Ollama).
-- [x] Default ON (`LOCAL_ONLY_AI` unset = on). Setting in Settings -> Local AI; env default in both compose files.
+- [x] Optional switch, default OFF (`LOCAL_ONLY_AI=on` or Settings -> Local AI turns it on). Changed from default-on after review: free keys cost nothing, paid engines never run unattended, and default-on locked the app out until Ollama was connected.
 - [x] `chat.server.ts`: cloud/custom engines get 403 `local-only` before any network call; guard re-checked right before the stream.
 - [x] `ask.server.ts` (schedules, Telegram, vendor price AI): only Ollama while on; retries can't escape the guard.
 - [x] Reliability: `src/lib/ai/reliability.ts` (transient detection, capped exponential backoff, cancellation, friendly errors, cached probe); Ollama pre-check gives a clear 503 message; 5-minute cap on local replies; scheduled asks retry connection errors only.
