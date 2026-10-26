@@ -2007,7 +2007,8 @@ describe("CalDAV tasks", () => {
     expect(repeatFromRrule("FREQ=DAILY")).toBe("daily");
     expect(repeatFromRrule("FREQ=WEEKLY;BYDAY=MO")).toBe("weekly");
     expect(repeatFromRrule("FREQ=MONTHLY")).toBe("monthly");
-    expect(repeatFromRrule("FREQ=WEEKLY;INTERVAL=2")).toBeUndefined();
+    expect(repeatFromRrule("FREQ=WEEKLY;INTERVAL=2")).toBe("biweekly");
+    expect(repeatFromRrule("FREQ=WEEKLY;INTERVAL=3")).toBeUndefined();
     expect(repeatFromRrule("FREQ=YEARLY")).toBeUndefined();
     expect(repeatFromRrule("FREQ=DAILY;COUNT=3")).toBeUndefined();
     expect(rruleOf("weekdays")).toBe("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
