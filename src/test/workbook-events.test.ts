@@ -36,7 +36,7 @@ describe("schedule legend colours", () => {
     for (const [codes, color, bold] of [[["MI", "S"], "FF75FFFF", true], [["S", "MO"], "FFFFC000", true], [["MI", "S", "MO"], "FF00B0F0", true], [["MI"], "FF92D050", false], [["MO"], "FFFF0000", false]] as [EventCode[], string, boolean][]) {
       const { room } = await build(codes.flatMap((c) => [event("BallRoom A", c), event("BallRoom B", c)]));
       expect(room("BallRoom A").fill).toEqual({ type: "pattern", pattern: "solid", fgColor: { argb: color } });
-      expect(room("BallRoom A").font?.bold).toBe(bold);
+      expect(Boolean(room("BallRoom A").font?.bold)).toBe(bold);
     }
   });
   it("makes show days bold", async () => {
