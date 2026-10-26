@@ -161,6 +161,7 @@ import { SearchPanel } from "@/components/search-panel";
 import { setHideSecrets, getHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import { MicButton } from "@/components/mic-button";
 import { smartRetrieve } from "@/lib/smart-docs";
+import { installUuidPolyfill } from "@/lib/uuid-polyfill";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
@@ -213,6 +214,8 @@ const modeSuggestions: Record<Mode, string[]> = {
   solve: ["My Plex server keeps buffering on one TV", "My Docker container restarts every few minutes", "I can't focus when I work from home"],
   debate: ["Remote work beats the office", "Cats make better pets than dogs", "AI should write first drafts of everything"],
 };
+
+installUuidPolyfill(); // plain-http pages have no crypto.randomUUID
 
 export function Room() {
   // Each conversation mode (Roundtable, Broadcast, One-on-one, Problem solving, Debate) has its own window, chat and draft.

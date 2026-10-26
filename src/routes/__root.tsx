@@ -1,4 +1,4 @@
-import "@/lib/uuid-polyfill";
+import { installUuidPolyfill } from "@/lib/uuid-polyfill";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -70,6 +70,9 @@ function ErrorComponent({ error }: ErrorComponentProps) {
     </div>
   );
 }
+
+// "sideEffects": false in package.json lets the bundler drop import-only files, so call it explicitly.
+installUuidPolyfill();
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
