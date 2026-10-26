@@ -142,11 +142,11 @@ export function FreeKeysWizard() {
           const st = status[p.id];
           return (
             <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1 basis-48">
                 <div className="font-medium">{p.name}{p.paid && <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">PAID</span>}</div>
                 <div className="text-xs text-muted-foreground">{p.free}</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 {st?.state === "testing" && <Loader2 className="size-4 animate-spin" aria-label="Testing" />}
                 {st?.state === "ok" && <span className="flex items-center gap-1 text-xs text-green-500"><CheckCircle2 className="size-4" /> {st.message}</span>}
                 {st?.state === "bad" && <span className="flex items-center gap-1 text-xs text-destructive"><XCircle className="size-4" /> {st.message}</span>}
