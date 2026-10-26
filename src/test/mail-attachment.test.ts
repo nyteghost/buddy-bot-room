@@ -13,3 +13,16 @@ describe("buildMessage attachments", () => {
     expect(m.match(/--pp_\w+--/)).toBeTruthy();
   });
 });
+
+import { gmailLink, isGmailHost } from "@/lib/mailbox";
+describe("open in Gmail link", () => {
+  it("searches Gmail for the message by its Message-ID", () => {
+    expect(gmailLink("me@gmail.com", "<abc.123@mail.example>")).toBe("https://mail.google.com/mail/u/me%40gmail.com/#search/rfc822msgid%3Aabc.123%40mail.example");
+    expect(gmailLink("me@gmail.com", "")).toBeNull();
+    expect(gmailLink("not an address", "<a@b>")).toBeNull();
+  });
+  it("only for Gmail servers", () => {
+    expect(isGmailHost("imap.gmail.com")).toBe(true);
+    expect(isGmailHost("imap.fastmail.com")).toBe(false);
+  });
+});

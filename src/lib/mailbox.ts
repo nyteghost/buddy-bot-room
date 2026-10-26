@@ -5,8 +5,8 @@ import { decodeMimeWords, senderName } from "./imap";
  * outgoing messages and address checks. No network here, so all of it is unit tested.
  */
 export type Folder = { name: string; label: string; special: "inbox" | "trash" | "sent" | "drafts" | "junk" | "archive" | "all" | "flagged" | ""; };
-export type MailSummary = { uid: number; from: string; fromAddr: string; to: string; subject: string; date: string; seen: boolean };
-export type MailMessage = MailSummary & { cc: string; messageId: string; references: string; text: string; truncated: boolean; attachments: string[] };
+export type MailSummary = { uid: number; from: string; fromAddr: string; to: string; subject: string; date: string; seen: boolean; messageId: string };
+export type MailMessage = MailSummary & { cc: string; references: string; text: string; truncated: boolean; attachments: string[] };
 
 // ---------- folder names ----------
 
@@ -123,8 +123,17 @@ export function parseSummary(uid: number, flags: string[], block: string): MailS
     subject: decodeMimeWords(headerGet(h, "Subject")).slice(0, 200) || "(no subject)",
     date: headerGet(h, "Date"),
     seen: flags.some((f) => f.toLowerCase() === "\\seen"),
+    messageId: headerGet(h, "Message-ID").slice(0, 200),
   };
 }
+
+/** A link that opens one message in Gmail's own web page (Gmail accounts only). Null when there is no Message-ID to look up. */
+export function gmailLink(account: string, messageId: string): string | null {
+  const id = messageId.trim().replace(/^<|>$/g, "");
+  if (!id || !/^[^\s<>"]+$/.test(id) || !/^[^\s@]+@[^\s@]+$/.test(account)) return null;
+  return `https://mail.google.com/mail/u/${encodeURIComponent(account)}/#search/${encodeURIComponent(`rfc822msgid:${id}`)}`;
+}
+export const isGmailHost = (host: string): boolean => /(^|\.)(gmail|googlemail)\.com$/i.test(host.trim());
 
 // ---------- MIME bodies ----------
 

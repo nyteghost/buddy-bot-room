@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FolderInput, Loader2, MailOpen, MailPlus, PenLine, RefreshCw, Reply, Search, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, FolderInput, Loader2, MailOpen, MailPlus, PenLine, RefreshCw, Reply, Search, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { forwardableQuote, replySubject, type Folder, type MailMessage, type MailSummary } from "@/lib/mailbox";
+import { forwardableQuote, gmailLink, replySubject, type Folder, type MailMessage, type MailSummary } from "@/lib/mailbox";
 import { replyPrompt } from "@/lib/mail-reply";
 
-type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; error?: string };
+type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; account?: string; gmail?: boolean; error?: string };
 type Draft = { to: string; cc: string; subject: string; text: string; inReplyTo: string; references: string };
 const blank: Draft = { to: "", cc: "", subject: "", text: "", inReplyTo: "", references: "" };
 
@@ -137,6 +137,7 @@ export function Mailbox({ open }: { open: boolean }) {
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => void backToList()}><ArrowLeft className="size-4" /> Back</Button>
           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{msg.from}{msg.fromAddr ? ` <${msg.fromAddr}>` : ""}</span>
+          {data?.gmail && data.account && gmailLink(data.account, msg.messageId) && <a href={gmailLink(data.account, msg.messageId) ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs hover:bg-accent/40"><ExternalLink className="size-3" /> Open in Gmail</a>}
         </div>
         <h3 className="text-base font-semibold">{msg.subject}</h3>
         <span className="text-xs text-muted-foreground">{when(msg.date)}{msg.to ? ` · to ${msg.to}` : ""}{msg.cc ? ` · cc ${msg.cc}` : ""}</span>
@@ -194,12 +195,18 @@ export function Mailbox({ open }: { open: boolean }) {
       {error && <p className="text-xs text-destructive">{error}</p>}
       {note && <p className="text-xs text-green-600 dark:text-green-400">✅ {note}</p>}
       {data && !data.messages.length && !error && <p className="text-muted-foreground">{q || unread ? "Nothing matches." : "This folder is empty."}</p>}
-      {data?.messages.map((m) => (
-        <button key={m.uid} type="button" onClick={() => void openMessage(m)} className="grid gap-0.5 rounded-md border px-3 py-2 text-left hover:bg-accent/40" disabled={busy === `open${m.uid}`}>
-          <span className={`truncate ${m.seen ? "" : "font-semibold"}`}>{!m.seen && <span className="mr-1 text-primary">●</span>}{m.subject}</span>
-          <span className="truncate text-xs text-muted-foreground">{m.from}{when(m.date) ? ` · ${when(m.date)}` : ""}</span>
-        </button>
-      ))}
+      {data?.messages.map((m) => {
+        const link = data.gmail && data.account ? gmailLink(data.account, m.messageId) : null;
+        return (
+          <div key={m.uid} className="flex items-stretch gap-1">
+            <button type="button" onClick={() => void openMessage(m)} className="grid min-w-0 flex-1 gap-0.5 rounded-md border px-3 py-2 text-left hover:bg-accent/40" disabled={busy === `open${m.uid}`}>
+              <span className={`truncate ${m.seen ? "" : "font-semibold"}`}>{!m.seen && <span className="mr-1 text-primary">●</span>}{m.subject}</span>
+              <span className="truncate text-xs text-muted-foreground">{m.from}{when(m.date) ? ` · ${when(m.date)}` : ""}</span>
+            </button>
+            {link && <a href={link} target="_blank" rel="noopener noreferrer" title="Open in Gmail" aria-label={`Open "${m.subject}" in Gmail`} className="flex w-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-accent/40 hover:text-foreground"><ExternalLink className="size-4" /></a>}
+          </div>
+        );
+      })}
       {data && data.total > data.messages.length && <span className="text-xs text-muted-foreground">Showing the newest {data.messages.length} of {data.total}. Use search to find older ones.</span>}
     </div>
   );

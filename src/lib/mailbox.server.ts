@@ -2,7 +2,7 @@ import { currentUser } from "./accounts.server";
 import { clearMailCache } from "./inbox.server";
 import { imapConfig, type ImapConfig } from "./imap.server";
 import { withImap, type ImapClient, type TlsOverrides } from "./imap-client.server";
-import { allowSend, buildMessage, buildNoteMessage, parseNote, type PhoneNote, folderQuote, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSummary, parseUidSearch, type Folder, type MailMessage, type MailSummary } from "./mailbox";
+import { allowSend, buildMessage, isGmailHost, buildNoteMessage, parseNote, type PhoneNote, folderQuote, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSummary, parseUidSearch, type Folder, type MailMessage, type MailSummary } from "./mailbox";
 import { ackAlert, addAlertRule, alertState, removeAlertRule } from "./mail-alerts.server";
 import { logServer } from "./server-log.server";
 import { smtpCheck, smtpConfig, smtpSend, type SmtpConfig, type SmtpTlsOverrides } from "./smtp.server";
@@ -34,7 +34,7 @@ async function selectFolder(c: ImapClient, name: string): Promise<{ list: Folder
 }
 const uidOk = (u: unknown): number => { const n = Number(u); if (!Number.isInteger(n) || n < 1 || n > 4_294_967_295) throw new Error("Bad message number."); return n; };
 
-export type ListResult = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number };
+export type ListResult = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; account: string; gmail: boolean };
 
 export async function listMessages(cfg: ImapConfig, opts: { folder?: string; q?: string; unread?: boolean; limit?: number } = {}): Promise<ListResult> {
   const q = (opts.q ?? "").trim();
@@ -46,10 +46,10 @@ export async function listMessages(cfg: ImapConfig, opts: { folder?: string; q?:
     const take = all.slice(-Math.min(Math.max(1, opts.limit ?? PAGE), 50));
     let messages: MailSummary[] = [];
     if (take.length) {
-      const raw = await c.cmd(`UID FETCH ${take.join(",")} (UID FLAGS BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])`);
+      const raw = await c.cmd(`UID FETCH ${take.join(",")} (UID FLAGS BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE MESSAGE-ID)])`);
       messages = parseFetchItems(raw).map((i) => parseSummary(i.uid, i.flags, i.literal)).sort((a, b) => b.uid - a.uid);
     }
-    return { folder: folder.name, folders: list, messages, total: all.length };
+    return { folder: folder.name, folders: list, messages, total: all.length, account: cfg.user, gmail: isGmailHost(cfg.host) };
   }, hooks.imap);
 }
 
