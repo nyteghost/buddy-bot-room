@@ -54,6 +54,7 @@ describe("Excel shared event rules", () => {
     { name: "all three activities are blue", codes: ["MI", "S", "MO"], color: "FF00B0F0" },
     { name: "exhibitor move in with show and move out is blue", codes: ["Exmi", "S", "MO"], color: "FF00B0F0" },
     { name: "move in alone is green", codes: ["MI"], color: "FF92D050" },
+    { name: "exhibitor move in / service desk alone is the move in green", codes: ["Exmi"], color: "FF92D050" },
     { name: "move out alone is red", codes: ["MO"], color: "FFFF0000" },
     { name: "a non-show event is purple", codes: ["MTG"], color: "FF7030A0" },
   ] as { name: string; codes: EventCode[]; color: string }[])("$name", async ({ codes, color }) => {
@@ -65,6 +66,12 @@ describe("Excel shared event rules", () => {
       expect(result.room("BallRoom A").fill).toEqual({ type: "pattern", pattern: "solid", fgColor: { argb: color } });
       expect(result.room("BallRoom B").master.address).toBe(result.room("BallRoom A").address);
     }
+  });
+  it("puts a thick black outline around every cell", async () => {
+    const { room } = await build([event("BallRoom A"), event("BallRoom B")]);
+    const thick = { style: "thick", color: { argb: "FF000000" } };
+    expect(room("BallRoom A").border).toEqual({ top: thick, left: thick, bottom: thick, right: thick });
+    expect(room("BallRoom C").border).toEqual({ top: thick, left: thick, bottom: thick, right: thick });
   });
   it("merges Ballroom A and B into one event without including E", async () => {
     const { room } = await build([event("BallRoom A"), event("BallRoom B")]);

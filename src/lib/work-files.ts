@@ -226,6 +226,12 @@ function paint(cell: import("exceljs").Cell, codes: string[]) {
   cell.font = { name: "Aptos Narrow", size: 20, bold: codes.includes("S"), ...(color === LEGEND_FILL.nonShow ? { color: { argb: "FFFFFFFF" } } : {}) };
 }
 
+const THICK = { style: "thick" as const, color: { argb: "FF000000" } };
+/** A thick black outline around every cell in the block, merged cells included. */
+function outline(ws: XSheet, fromRow: number, toRow: number, fromCol: number, toCol: number) {
+  for (let r = fromRow; r <= toRow; r++) for (let c = fromCol; c <= toCol; c++) ws.getCell(r, c).border = { top: THICK, left: THICK, bottom: THICK, right: THICK };
+}
+
 /** Merge only adjacent space rows with identical shows, activities and times. */
 function mergeEventSpaces(ws: XSheet, w: WeekLayout, byLabel: Map<string, number>, cols: Map<string, number>) {
   for (const labels of [HALL_ROWS, BALLROOM_ROWS]) {
@@ -306,7 +312,9 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
   }
   put(r++, ["CCC Escalator and SD", ...DAYS]);
   put(r++, ["Escalator", ...w.escalator], false);
-  put(r++, ["Service Desk", ...w.serviceDesk], false);
+  put(r, ["Service Desk", ...w.serviceDesk], false);
+  w.serviceDesk.forEach((t, i) => { if (t) paint(ws.getRow(r).getCell(i + 2), ["MI"]); });
+  r++;
   const byLabel = new Map<string, number>();
   const section = (title: string, labels: string[]) => {
     put(r++, [title, ...DAYS]);
@@ -326,6 +334,7 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
   for (let i = 3; i < r; i++) ws.getRow(i).height = 54;
   mergeEventSpaces(ws, w, byLabel, new Map(w.dates.map((d, i) => [d, i + 2])));
   fitRows(ws);
+  outline(ws, 4, r - 1, 1, 9);
 }
 
 /** Grows row heights so wrapped event text is never cut off (merged cells share their height across the rows they cover). Heights only grow. */
@@ -415,7 +424,7 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
     if (codes) paint(cell, codes);
   };
   w.dates.forEach((_, i) => {
-    if (w.cgc[i] !== "DARK") write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!);
+    if (w.cgc[i] !== "DARK") write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!, ["MI"]);
     for (const [label, cells] of Object.entries(w.rows)) write(label, i, cells[i]!.text, cells[i]!.codes);
   });
   // Task suggestions go in the empty cells of the Tasks row under HALLS and BALLROOM; anything already typed there is kept.
@@ -445,6 +454,7 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
   }
   mergeEventSpaces(ws, w, byLabel, cols);
   fitRows(ws);
+  outline(ws, dayRow, Math.max(byLabel.get("other") ?? 0, ws.rowCount), 1, 8);
   return true;
 }
 
