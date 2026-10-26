@@ -143,6 +143,27 @@ export async function readEventSheet(file: File): Promise<EventRow[] | null> {
   return rows;
 }
 
+/** A plain-text description of an uploaded workbook, for pasting into a bug report when the Events tab finds nothing. */
+export async function describeSheet(file: File): Promise<string> {
+  const out = [`file: ${file.name} (${file.size} bytes, ${file.type || "no type"})`];
+  try {
+    const module = await import("exceljs");
+    const ExcelJS = module.default ?? module;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await file.arrayBuffer());
+    out.push(`sheets: ${wb.worksheets.map((w) => `${w.name} (${w.rowCount} rows)`).join(", ") || "none"}`);
+    const ws = wb.worksheets[0];
+    if (ws) {
+      const show = (v: unknown) => { const t = v && typeof v === "object" ? JSON.stringify(v) : String(v ?? ""); return t.length > 40 ? `${t.slice(0, 40)}…` : t; };
+      out.push(`A1: ${show(ws.getRow(1).getCell(1).value)}`);
+      out.push(`row 2: ${Array.from({ length: 12 }, (_, i) => show(ws.getRow(2).getCell(i + 1).value)).join(" | ")}`);
+      out.push(`row 3: ${Array.from({ length: 12 }, (_, i) => show(ws.getRow(3).getCell(i + 1).value)).join(" | ")}`);
+      out.push(`row 4: ${Array.from({ length: 12 }, (_, i) => show(ws.getRow(4).getCell(i + 1).value)).join(" | ")}`);
+    }
+  } catch (e) { out.push(`could not open as a workbook: ${(e as Error).message}`); }
+  return out.join("\n");
+}
+
 const serialToIso = (n: number) => new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0, 10);
 
 /** Reads every "Week #" sheet and returns the shifts in the named person's row. */
