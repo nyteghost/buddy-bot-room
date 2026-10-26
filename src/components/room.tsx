@@ -502,7 +502,16 @@ export function Room() {
 
   /** Sends in the given mode window (the one you are working in when none is given). */
   async function start(ask?: { partner: AgentId; text: string }, override?: string, inMode?: Mode, extra?: { summary?: boolean }) {
-    return startIn(inMode ?? mode, ask, override, extra);
+    // Anything that goes wrong before the run's own error handling (a missing browser feature, say) must never leave the room "thinking".
+    return startIn(inMode ?? mode, ask, override, extra).catch((err: unknown) => {
+      logClient("error", "could not start the discussion", err);
+      setRunning(false);
+      setRunningMode(null);
+      setSpeaking(null);
+      runLock.current = false;
+      abortRef.current = null;
+      setError(err instanceof Error ? `Couldn't start: ${err.message}` : "Couldn't start the discussion.");
+    });
   }
   async function startIn(mode: Mode, ask?: { partner: AgentId; text: string }, override?: string, extra?: { summary?: boolean }) {
     if (runLock.current) return;
