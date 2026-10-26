@@ -179,17 +179,27 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
 
 type XWorkbook = import("exceljs").Workbook;
 type XSheet = import("exceljs").Worksheet;
-const FILL: Record<string, string> = { MI: "FF92D050", Exmi: "FF92D050", S: "FFFFFF00", MO: "FFF4B084", moveInShow: "FF4DB6AC", allThree: "FF5B9BD5" };
+/** The schedule legend: Move In green, Move In + Show light cyan, Show + Move Out orange, Move Out red, all three blue, non-show event purple. A show day alone is bold with no fill. */
+export const LEGEND_FILL = { moveIn: "FF92D050", moveInShow: "FF75FFFF", showMoveOut: "FFFFC000", moveOut: "FFFF0000", allThree: "FF00B0F0", nonShow: "FF7030A0" } as const;
+/** Which legend colour (if any) a cell with these activity codes gets. */
+export function legendFill(codes: string[]): string | undefined {
+  const show = codes.includes("S"), moveIn = codes.includes("MI") || codes.includes("Exmi"), moveOut = codes.includes("MO") || codes.includes("MO?");
+  if (show && moveIn && moveOut) return LEGEND_FILL.allThree;
+  if (show && moveOut) return LEGEND_FILL.showMoveOut;
+  if (show && moveIn) return LEGEND_FILL.moveInShow;
+  if (show) return undefined;
+  if (moveIn) return LEGEND_FILL.moveIn;
+  if (moveOut) return LEGEND_FILL.moveOut;
+  return codes.length ? LEGEND_FILL.nonShow : undefined;
+}
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
 function paint(cell: import("exceljs").Cell, codes: string[]) {
-  const show = codes.includes("S"), moveIn = codes.includes("MI") || codes.includes("Exmi"), moveOut = codes.includes("MO") || codes.includes("MO?");
-  const code = show && moveIn && moveOut ? "allThree" : show && moveOut ? "MO" : show && moveIn ? "moveInShow" : show ? "S" : codes[0];
-  const color = code ? FILL[code] : undefined;
+  const color = legendFill(codes);
   cell.fill = color ? { type: "pattern", pattern: "solid", fgColor: { argb: color } } : { type: "pattern", pattern: "none" };
-  cell.font = { name: "Aptos Narrow", size: 20, bold: codes.includes("S") };
+  cell.font = { name: "Aptos Narrow", size: 20, bold: codes.includes("S"), ...(color === LEGEND_FILL.nonShow ? { color: { argb: "FFFFFFFF" } } : {}) };
 }
 
 /** Merge only adjacent space rows with identical shows, activities and times. */
