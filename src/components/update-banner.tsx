@@ -33,7 +33,7 @@ export function UpdateBanner() {
       {open && (
         <div className="update-banner-details">
           <ul>{(info.changes ?? []).map((c) => <li key={c}>{c}</li>)}</ul>
-          <p>To update: Portainer → Stacks → your Pixel Pals stack → <b>Pull and redeploy</b>. Your data is kept.</p>
+          <p>To update on Unraid: Docker tab → Compose → your <b>pixelpals</b> stack → <b>Update Stack</b>. Your data is kept. (Portainer: Stacks → your stack → Pull and redeploy.)</p>
         </div>
       )}
     </div>
