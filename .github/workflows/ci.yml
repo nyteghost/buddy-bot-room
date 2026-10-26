@@ -3,7 +3,7 @@ name: CI
 # Runs the tests and a production build on every push and pull request, so a broken change shows up before you redeploy.
 on:
   push:
-    branches: [main]
+    branches: [main, "upgrade/**"]
   pull_request:
 
 jobs:

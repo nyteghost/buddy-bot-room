@@ -12,7 +12,20 @@ import { DM_SETTING, dmTask, isDmRole } from "./campaign";
 import { ollamaBase, resolveLocalModel } from "./ollama.server";
 import { isModelName, parseAutoMarker } from "./model-catalog";
 import { isCustomModel, validateCustomUrl } from "./custom-provider";
+import { assertInferenceAllowed, localOnlyOn, LocalOnlyError } from "./ai/guard.server";
+import { friendlyAiError, makeProbe, withRetry } from "./ai/reliability";
+import { blockedMessage, engineAllowed } from "./local-only";
 const CLAUDE_IDS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
+
+// One quick "is Ollama answering?" check, remembered for a few seconds, so a down server gives a clear message at once.
+const ollamaProbe = makeProbe(async () => {
+  await withRetry(async () => {
+    const res = await fetch(`${ollamaBase()}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) throw Object.assign(new Error(`Ollama answered ${res.status}`), { statusCode: res.status });
+  }, { retries: 1, baseMs: 300 });
+});
+/** A local answer may take a while on a big model, but never forever. */
+const LOCAL_REPLY_LIMIT_MS = 5 * 60_000;
 
 export async function handleChat(request: Request) {
   try {
@@ -160,6 +173,10 @@ export async function handleChat(request: Request) {
     const engine = body.engine;
     if (!engine || !["groq", "gemini", "openrouter", "nvidia", "anthropic", "ollama-server", "custom"].includes(engine.kind))
       return Response.json({ error: "Add a free key in AI engine settings, or choose In-browser." }, { status: 400 });
+    if (!engineAllowed(engine.kind, localOnlyOn())) {
+      logServer("warn", `chat blocked by Local-Only AI mode: engine=${String(engine.kind)}`);
+      return Response.json({ error: blockedMessage(engine.kind), code: "local-only" }, { status: 403 });
+    }
     {
       const localServer = engine.kind === "ollama-server";
       if (localServer && !ollamaBase())
@@ -178,11 +195,8 @@ export async function handleChat(request: Request) {
       if (custom && !isCustomModel(engine.model)) return Response.json({ error: "Enter a model name for your custom provider." }, { status: 400 });
       if (!localServer && !custom && (typeof engine.apiKey !== "string" || !engine.apiKey.trim()))
         return Response.json({ error: "Add your free API key in Engine settings." }, { status: 400 });
-      const provider = createOpenAICompatible({
-        name: engine.kind,
-        apiKey: localServer ? "ollama" : custom ? String(engine.apiKey ?? "").trim() || "none" : engine.apiKey.trim(),
-        baseURL:
-          customUrl && customUrl.ok
+      const baseURL: string =
+        customUrl && customUrl.ok
             ? customUrl.url
             : localServer
             ? `${ollamaBase()}/v1`
@@ -194,13 +208,22 @@ export async function handleChat(request: Request) {
               ? "https://openrouter.ai/api/v1"
               : engine.kind === "nvidia"
                 ? "https://integrate.api.nvidia.com/v1"
-                : "https://generativelanguage.googleapis.com/v1beta/openai",
+                : "https://generativelanguage.googleapis.com/v1beta/openai";
+      const provider = createOpenAICompatible({
+        name: engine.kind,
+        apiKey: localServer ? "ollama" : custom ? String(engine.apiKey ?? "").trim() || "none" : engine.apiKey.trim(),
+        baseURL,
       });
+      assertInferenceAllowed(engine.kind, baseURL, ollamaBase());
+      if (localServer) {
+        try { await ollamaProbe(); }
+        catch (e) { logServer("warn", "ollama not reachable", e); return Response.json({ error: friendlyAiError(e), code: "ollama-down" }, { status: 503 }); }
+      }
       const free = streamText({
         model: provider(custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
-        abortSignal: request.signal,
+        abortSignal: localServer ? AbortSignal.any([request.signal, AbortSignal.timeout(LOCAL_REPLY_LIMIT_MS)]) : request.signal,
         maxRetries: 0,
         ...(engine.kind === "anthropic" || custom ? { maxOutputTokens: 1500 } : {}),
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
@@ -216,6 +239,7 @@ export async function handleChat(request: Request) {
   } catch (error) {
     if (request.signal.aborted || isAbortError(error))
       return new Response(null, { status: 499 });
+    if (error instanceof LocalOnlyError) return Response.json({ error: error.message, code: "local-only" }, { status: 403 });
     logServer("error", "chat request failed", error);
     return Response.json({ error: safeError(error) }, { status: 400 });
   }

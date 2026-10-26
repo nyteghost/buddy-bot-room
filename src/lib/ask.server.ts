@@ -9,6 +9,9 @@ import { handleSearch } from "./search.server";
 import { wantsWeb, webContext } from "./web-context";
 import type { SearchHit } from "./search";
 import { logServer } from "./server-log.server";
+import { assertInferenceAllowed, localOnlyOn } from "./ai/guard.server";
+import { engineAllowed } from "./local-only";
+import { withRetry } from "./ai/reliability";
 
 /**
  * Unattended questions (scheduled tasks, the Telegram bot) answered with the OWNER's saved engine settings.
@@ -36,6 +39,7 @@ const FREE_BASE = {
 } as const;
 
 function modelFor(p: TurnProvider): { base: string; model: string; key: string } | null {
+  if (!engineAllowed(p.kind, localOnlyOn())) return null; // Local-Only AI mode: nothing but the stack's own Ollama
   if (p.kind === "ollama-server") return ollamaBase() && isModelName(p.model ?? "") ? { base: `${ollamaBase()}/v1`, model: String(p.model), key: "ollama" } : null;
   if (p.kind === "groq" || p.kind === "openrouter" || p.kind === "nvidia" || p.kind === "gemini") return { base: FREE_BASE[p.kind], model: freeModels[p.kind], key: p.apiKey };
   return null; // paid/custom providers are never used unattended
@@ -47,10 +51,10 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
   const s = engineFromJson(raw);
-  const local = s.kind === "local-server" || opts.localOnly === true;
+  const local = s.kind === "local-server" || opts.localOnly === true || localOnlyOn();
   const chain: TurnProvider[] = local ? [] : turnProviders(s, true).filter((p) => modelFor(p));
   if ((local || chain.length) && ollamaBase() && s.localChat) chain.push(localServerProvider(s, { text: prompt }));
-  if (!chain.length) return { ok: false, error: opts.localOnly ? "This needs Local AI (Ollama) on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
+  if (!chain.length) return { ok: false, error: opts.localOnly || localOnlyOn() ? "Local-Only AI mode is on and Local AI (Ollama) isn't available on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
 
   let system = opts.system ?? "You are the Pixel Pals assistant answering a scheduled or phone request for the owner. Reply in plain text, no markdown headings, under 150 words unless asked for more. Be concrete. If you don't know something current, say so instead of guessing.";
   system += `\nNow: ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`;
@@ -68,8 +72,10 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
     const m = modelFor(p);
     if (!m) continue;
     try {
+      assertInferenceAllowed(p.kind, m.base, ollamaBase());
       const provider = createOpenAICompatible({ name: p.kind, apiKey: m.key || "none", baseURL: m.base });
-      const out = await generateText({ model: provider(m.model), system, prompt: user, maxOutputTokens: Math.min(1500, opts.maxTokens ?? 700), maxRetries: 0, abortSignal: AbortSignal.timeout(120_000) });
+      // Only connection-type failures are retried (twice, with backoff), so an answer is never produced twice.
+      const out = await withRetry<{ text: string }>(() => generateText({ model: provider(m.model), system, prompt: user, maxOutputTokens: Math.min(1500, opts.maxTokens ?? 700), maxRetries: 0, abortSignal: AbortSignal.timeout(120_000) }), { retries: p.kind === "ollama-server" ? 2 : 0, onRetry: (n, e, ms) => logServer("warn", `ask retry ${n} in ${ms}ms: ${e instanceof Error ? e.message.slice(0, 80) : "error"}`) });
       const text = out.text.trim();
       if (text) return { ok: true, text, via: p.kind === "ollama-server" ? `Local AI (${m.model})` : p.kind };
       lastError = "empty answer";

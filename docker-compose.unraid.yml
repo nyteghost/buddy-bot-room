@@ -47,6 +47,7 @@ services:
       BUDDY_BACKUP_DIR: /backups
       BUDDY_BACKUP_TIME: ${BUDDY_BACKUP_TIME:-03:30}
       BUDDY_BACKUP_KEEP: ${BUDDY_BACKUP_KEEP:-14}
+      LOCAL_ONLY_AI: ${LOCAL_ONLY_AI:-on}   # on = only your own Ollama is ever used (no cloud/paid AI); "off" allows cloud engines
       OLLAMA_URL: ${OLLAMA_URL:-}   # Local AI engine: http://ollama:11434 if you turn on the ollama profile, or http://<other-machine>:11434
       ALLOW_PRIVATE_CUSTOM: ${ALLOW_PRIVATE_CUSTOM:-}   # 1 = Custom provider may use LAN addresses
       PROVIDER_FEED: ${PROVIDER_FEED:-1}   # 0 = never fetch the community list of free LLM APIs

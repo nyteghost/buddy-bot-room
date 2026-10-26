@@ -1,6 +1,7 @@
 import { readHardware } from "./hardware.server";
 import { bestInstalled, isModelName, parseAutoMarker } from "./model-catalog";
 import { logServer } from "./server-log.server";
+import { isLocalOnly } from "./local-only";
 import { currentFeed, feedEnabled, refreshFeed } from "./model-feed.server";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -17,12 +18,13 @@ type Tag = { name: string; size?: number };
 
 /** GET: status, installed models and the machine's hardware. POST {action:"pull"|"delete", model}: download or remove a model. */
 export async function handleOllamaApi(request: Request): Promise<Response> {
-  if (!ollamaBase()) return json({ configured: false });
+  const localOnly = isLocalOnly(process.env["LOCAL_ONLY_AI"]);
+  if (!ollamaBase()) return json({ configured: false, localOnly });
   if (request.method === "GET") {
     const hardware = await readHardware();
     try {
       const [tags, ps] = await Promise.all([ollama("/api/tags"), ollama("/api/ps").catch(() => null)]);
-      if (!tags.ok) return json({ configured: true, reachable: false, hardware, error: `Ollama answered ${tags.status}.` });
+      if (!tags.ok) return json({ configured: true, localOnly, reachable: false, hardware, error: `Ollama answered ${tags.status}.` });
       const models = ((await tags.json()) as { models?: Tag[] }).models ?? [];
       const loaded = ps?.ok ? (((await ps.json()) as { models?: { name: string; size_vram?: number; size?: number }[] }).models ?? []) : [];
       return json({
@@ -35,7 +37,7 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
         loaded: loaded.map((m) => ({ name: m.name, onGpu: (m.size_vram ?? 0) > 0 })),
       });
     } catch {
-      return json({ configured: true, reachable: false, hardware, error: "Couldn't reach Ollama. Is the ollama container running?" });
+      return json({ configured: true, localOnly, reachable: false, hardware, error: "Couldn't reach Ollama. Is the ollama container running?" });
     }
   }
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);

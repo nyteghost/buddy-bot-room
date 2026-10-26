@@ -9,6 +9,7 @@ import { describeBench, AUTO_MODEL, CATALOG, TASKS, bestInstalled, fitFor, fitLa
 
 type Status = {
   configured: boolean;
+  localOnly?: boolean;
   reachable?: boolean;
   error?: string;
   hardware?: Hardware;
@@ -120,6 +121,11 @@ export function LocalAiPanel() {
 
   return (
     <div className="grid gap-3 text-sm">
+      <p className={`rounded-md border p-2 text-xs ${status.localOnly ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+        {status.localOnly
+          ? "Local-Only AI is ON: every answer, scheduled job and retry uses only your own Ollama. Cloud keys are never called, even if saved. Change it in Settings → Local AI."
+          : "Local-Only AI is OFF: cloud engines with saved keys can be used. Turn it on in Settings → Local AI for guaranteed $0."}
+      </p>
       <div className="flex items-start gap-2 rounded-md border p-3">
         <Cpu className="mt-0.5 size-4 shrink-0" />
         <div className="grid gap-1">

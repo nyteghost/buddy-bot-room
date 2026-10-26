@@ -8,7 +8,7 @@ name: Publish images
 # otherwise Unraid cannot pull it without logging in.
 on:
   push:
-    branches: [main]
+    branches: [main, "upgrade/**"]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -19,7 +19,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: publish-images
+  group: publish-images-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,12 +39,13 @@ jobs:
           target: prod
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/buddy-bot-room:latest
+            ghcr.io/${{ github.repository_owner }}/buddy-bot-room:${{ github.ref == 'refs/heads/main' && 'latest' || 'beta' }}
             ghcr.io/${{ github.repository_owner }}/buddy-bot-room:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   radicale:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

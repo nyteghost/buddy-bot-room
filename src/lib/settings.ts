@@ -21,6 +21,7 @@ export type SettingField = {
 };
 
 export const SETTING_FIELDS: SettingField[] = [
+  { key: "LOCAL_ONLY_AI", label: "Local-Only AI (no paid or cloud AI)", group: "ollama", kind: "select", options: ["on", "off"], help: "On (the default): every answer, scheduled job and retry uses only your own Ollama. Free and paid cloud keys are never called, even if saved. Turn off only if you deliberately want cloud engines." },
   { key: "PLEX_URL", label: "Plex address", group: "plex", kind: "url", placeholder: "http://10.0.0.5:32400" },
   { key: "PLEX_TOKEN", label: "Plex token", group: "plex", kind: "text", secret: true },
   { key: "SEERR_URL", label: "Seerr address", group: "seerr", kind: "url", placeholder: "http://10.0.0.5:5055" },
