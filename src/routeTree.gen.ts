@@ -16,6 +16,7 @@ import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiSpeechRouteImport } from './routes/api.speech'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
+import { Route as ApiAddonsRouteImport } from './routes/api.addons'
 import { Route as ApiPlaytestsRouteImport } from './routes/api.playtests'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiVendorsRouteImport } from './routes/api.vendors'
@@ -91,6 +92,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiSeerrRoute = ApiSeerrRouteImport.update({
   id: '/api/seerr',
   path: '/api/seerr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAddonsRoute = ApiAddonsRouteImport.update({
+  id: '/api/addons',
+  path: '/api/addons',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPlaytestsRoute = ApiPlaytestsRouteImport.update({
@@ -307,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/addons': typeof ApiAddonsRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/repos': typeof ApiReposRoute
   '/api/vendors': typeof ApiVendorsRoute
@@ -357,6 +364,7 @@ export interface FileRoutesByTo {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/addons': typeof ApiAddonsRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/repos': typeof ApiReposRoute
   '/api/vendors': typeof ApiVendorsRoute
@@ -408,6 +416,7 @@ export interface FileRoutesById {
   '/api/speech': typeof ApiSpeechRoute
   '/api/search': typeof ApiSearchRoute
   '/api/seerr': typeof ApiSeerrRoute
+  '/api/addons': typeof ApiAddonsRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/repos': typeof ApiReposRoute
   '/api/vendors': typeof ApiVendorsRoute
@@ -460,6 +469,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/addons'
     | '/api/playtests'
     | '/api/repos'
     | '/api/vendors'
@@ -510,6 +520,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/addons'
     | '/api/playtests'
     | '/api/repos'
     | '/api/vendors'
@@ -560,6 +571,7 @@ export interface FileRouteTypes {
     | '/api/speech'
     | '/api/search'
     | '/api/seerr'
+    | '/api/addons'
     | '/api/playtests'
     | '/api/repos'
     | '/api/vendors'
@@ -611,6 +623,7 @@ export interface RootRouteChildren {
   ApiSpeechRoute: typeof ApiSpeechRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
+  ApiAddonsRoute: typeof ApiAddonsRoute
   ApiPlaytestsRoute: typeof ApiPlaytestsRoute
   ApiReposRoute: typeof ApiReposRoute
   ApiVendorsRoute: typeof ApiVendorsRoute
@@ -703,6 +716,13 @@ declare module '@tanstack/react-router' {
       path: '/api/seerr'
       fullPath: '/api/seerr'
       preLoaderRoute: typeof ApiSeerrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/addons': {
+      id: '/api/addons'
+      path: '/api/addons'
+      fullPath: '/api/addons'
+      preLoaderRoute: typeof ApiAddonsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/playtests': {
@@ -1003,6 +1023,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpeechRoute: ApiSpeechRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSeerrRoute: ApiSeerrRoute,
+  ApiAddonsRoute: ApiAddonsRoute,
   ApiPlaytestsRoute: ApiPlaytestsRoute,
   ApiReposRoute: ApiReposRoute,
   ApiVendorsRoute: ApiVendorsRoute,

@@ -14,6 +14,7 @@ import { tickSchedules } from "./schedules.server";
 import { startTelegram } from "./telegram.server";
 import { tickPlaytests } from "./playtests.server";
 import { tickMailAlerts } from "./mail-alerts.server";
+import { tickAddons } from "./addons.server";
 
 /** One 30-second ticker for the daily jobs. Idempotent. Does nothing unless a job is configured. */
 type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string; lastReviewDay?: string };
@@ -54,6 +55,7 @@ async function tick(s: S): Promise<void> {
   await tickToday(now.getTime()).catch(() => undefined);
   await tickPlaytests(now.getTime()).catch(() => undefined);
   await tickMailAlerts(now.getTime()).catch(() => undefined);
+  await tickAddons(now.getTime()).catch(() => undefined);
   const review = weeklyConfig();
   if (review && isReviewDay(now, review) && isDue(now, review.tz, review.time, s.lastReviewDay ?? "")) {
     s.lastReviewDay = zonedParts(now, review.tz).day;

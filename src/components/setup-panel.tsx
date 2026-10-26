@@ -1,3 +1,4 @@
+import { AddonSettings } from "@/components/addons";
 import { parseServiceKeyFile } from "@/lib/gcal";
 import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
 import { useCallback, useEffect, useState } from "react";
@@ -193,6 +194,7 @@ export function SetupPanel({ open }: { open: boolean }) {
           </section>
         );
       })}
+      <AddonSettings />
       <p className="text-xs text-muted-foreground">Settings you save here are kept on the server and take effect right away. A value saved here wins over the one in the stack settings (.env); clear it to go back to that. Keys and passwords are write-only and are left out of backups. Things the stack itself needs (COMPOSE_PROFILES, Tailscale, the Radicale password, the Ollama runtime) stay in the stack settings.</p>
     </div>
   );

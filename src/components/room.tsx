@@ -1,6 +1,6 @@
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
-import {
+import { Puzzle,
   ArrowUpRight,
   Check,
   ChevronDown,
@@ -149,6 +149,7 @@ import { eventLinks, icsQuery, parseEventArgs } from "@/lib/events";
 import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
 import { MailAlertPopup, ReminderPopup } from "@/components/mail-alerts";
+import { AddonWindows, useAddons } from "@/components/addons";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
 import { SetupPanel } from "@/components/setup-panel";
 import { FunPanel } from "@/components/fun-panel";
@@ -400,6 +401,8 @@ export function Room() {
   const [mailOpen, setMailOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const { addons } = useAddons();
+  const [addonOpen, setAddonOpen] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -515,7 +518,17 @@ export function Room() {
       setTopic("");
       recall.current = freshRecall;
       if (slash.ok) runSlash(slash.action, topic.trim());
-      else say(topic.trim(), slash.error);
+      else if (slash.error.startsWith("Unknown command")) {
+        const raw = topic.trim();
+        const m = /^\/([^\s]+)\s*([\s\S]*)$/.exec(raw);
+        void (async () => {
+          try {
+            const res = await fetch("/api/addons", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "command", name: m?.[1] ?? "", text: m?.[2] ?? "" }) });
+            const json = (await res.json()) as { text?: string | null };
+            say(raw, typeof json.text === "string" ? json.text : slash.error);
+          } catch { say(raw, slash.error); }
+        })();
+      } else say(topic.trim(), slash.error);
       return;
     }
     const assistantToggle = ask ? null : assistantCommand(topic);
@@ -1741,6 +1754,9 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Fun: Dungeon Master campaigns" aria-pressed={funOpen} onClick={() => setFunOpen((value) => !value)}><Gamepad2 /><span>Fun</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
+          {addons.filter((a) => a.enabled && a.window).map((a) => (
+            <Button key={a.id} variant="ghost" className="sidebar-item" title={`Add-on: ${a.name}`} aria-pressed={addonOpen === a.id} onClick={() => setAddonOpen((v) => (v === a.id ? null : a.id))}><Puzzle /><span>{a.window?.title ?? a.name}</span></Button>
+          ))}
           <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Work tools, recorder, compare models and the debug log" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More</span></Button>
           {moreOpen && <>
@@ -1947,6 +1963,7 @@ export function Room() {
               <CalendarPanel open={calendarOpen} />
             </WorkspaceWindow>
             <ReminderPopup />
+            <AddonWindows addons={addons} openId={addonOpen} onClose={() => setAddonOpen(null)} resetVersion={resetVersion} />
             <MailAlertPopup onRead={(a) => { (window as unknown as { __ppOpenMail?: { folder: string; uid: number } }).__ppOpenMail = { folder: a.folder, uid: a.uid }; setMailOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:open-mail")), 250); }} />
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />

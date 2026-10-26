@@ -20,7 +20,7 @@
 5. [AI engines and API keys](#5-ai-engines-and-api-keys)
 6. [Slash commands, shortcuts and the command palette](#6-slash-commands-shortcuts-and-the-command-palette)
 7. [Connecting other things](#7-connecting-other-things)
-   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale) · [iPhone Notes via Gmail](#716-iphone-notes-via-gmail) · [Email alerts](#717-email-alerts)
+   - [Web search (SearXNG)](#71-web-search-searxng) · [Seerr](#72-seerr-requests) · [Plex](#73-plex) · [Trakt](#74-trakt) · [Jellyfin](#75-jellyfin) · [Unraid watcher](#76-unraid-watcher) · [ntfy phone alerts](#77-ntfy-phone-alerts) · [iPhone Notes ↔ Trakt](#78-iphone-notes--trakt-sync) · [iPhone share sheet](#79-iphone-share-sheet) · [Mac Notes helper](#710-mac-notes-helper) · [Microsoft 365 (work)](#711-microsoft-365-work-read-only) · [Calendar and Mail windows](#712-calendar-and-mail-windows) · [Today, Tasks, weather and events](#713-today-tasks-weather-and-events) · [Setup, search, capture and more](#714-settings-search-capture-and-more) · [iPhone Reminders sync](#715-iphone-reminders-sync-radicale) · [iPhone Notes via Gmail](#716-iphone-notes-via-gmail) · [Email alerts](#717-email-alerts) · [Add-ons](#718-add-ons)
 8. [Automatic jobs](#8-automatic-jobs): [Morning brief](#81-morning-brief) · [Nightly backup](#82-nightly-backup) · [Scheduled tasks](#83-scheduled-tasks) · [Telegram bot](#84-telegram-bot)
 9. [Accounts, sharing and saved settings](#9-accounts-sharing-and-saved-settings)
 10. [Using it on your phone](#10-using-it-on-your-phone)
@@ -588,6 +588,10 @@ Pixel Pals can watch your mailbox and make a fuss when something you care about 
 - A match opens a large pop-up in Pixel Pals, **Email from <sender>**, with the subject and a short preview, and **Read** (opens the message in the Mail window) and **Close** buttons. It stays until you press one. No sound. Mail found in Spam says so.
 - Every match also goes to your phone through ntfy or Telegram, even when no Pixel Pals page is open.
 - The pop-up only shows while a Pixel Pals page is open in a browser (it checks every 20 seconds while the tab is visible). Needs the mail account from Settings → Mail, the owner account, and `BUDDY_DATA_DIR` so the rules and "already alerted" list survive restarts.
+
+### 7.18 Add-ons
+
+Make your own windows, slash commands and background jobs without changing Pixel Pals' code: drop a folder into `addons/` in your data folder, then turn it on in **Settings → Add-ons**. Updates never touch it. A working example is in `examples/addons/hello`, and the how-to is in [docs/addons.md](docs/addons.md). An add-on's server script runs with the server's access, so only enable add-ons you trust.
 
 ## 8. Automatic jobs
 
