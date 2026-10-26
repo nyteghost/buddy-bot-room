@@ -44,7 +44,7 @@ export function parseReportTime(t: string): number {
 
 // ---------- Ungerboeck event functions ----------
 export type EventRow = { level: number; usage: string; start: string; end: string; description: string; space: string; date: string; event?: string; eventId?: string; status?: string };
-export type EventCode = "S" | "Exmi" | "MI" | "MO" | "MO?" | "Food" | "Dinner" | "MTG" | "Arr" | "Meal";
+export type EventCode = "S" | "Exmi" | "MI" | "MO" | "MO?" | "Food" | "Dinner" | "MTG" | "Arr" | "Breakfast" | "Lunch";
 export type EventEntry = { date: string; space: string; code: EventCode; start: number; end: number; title: string; eventId?: string };
 
 /** Applies Mark's rules: skip Level 1 date headers; S = show events; Exmi = exhibitor move in; MI = other move in; MO = move out. */
@@ -67,7 +67,8 @@ export function classifyByDescription(description: string): EventCode | null {
   if (NOISE_RE.test(d)) return null;
   if (/\bmeeting\b|\bmtg\b/.test(d) && !/session/.test(d)) return "MTG";
   if (/dinner/.test(d)) return "Dinner";
-  if (/breakfast|lunch|brunch/.test(d)) return "Meal";
+  if (/breakfast/.test(d)) return "Breakfast";
+  if (/lunch|brunch/.test(d)) return "Lunch";
   if (FOOD_RE.test(d)) return "Food";
   if (SKIP_RE.test(d)) return null;
   return "S";
@@ -118,10 +119,11 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
       if (e.start < first && first < 1e9) kept.push({ ...e, end: e.start });
       continue;
     }
-    if (e.code === "Food" || e.code === "Dinner" || e.code === "MTG" || e.code === "Meal") {
-      if (show) continue; // food and meetings around a show are not move in, show or move out
-      // a breakfast or lunch with nothing else going on is the whole event, so it reads as the show
-      kept.push(e.code === "Meal" ? { ...e, code: "S" } : e);
+    // Breakfast, lunch and dinner always get their own line. Other food and meetings around a show are not move in, show or move out.
+    if (e.code === "Breakfast" || e.code === "Lunch" || e.code === "Dinner") { kept.push(e); continue; }
+    if (e.code === "Food" || e.code === "MTG") {
+      if (show) continue;
+      kept.push(e);
       continue;
     }
     kept.push(e);
@@ -151,7 +153,7 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
     const last = list.reduce((a, b) => (b.date > a.date || (b.date === a.date && b.end > a.end) ? b : a));
     kept.push({ ...last, code: "MO?", start: last.end, end: Math.min(last.end + MO_GUESS_MIN, 1440) }); // guess: move out runs 3 h after the show
   }
-  const order: EventCode[] = ["Arr", "MI", "Exmi", "S", "Food", "Dinner", "MTG", "MO", "MO?"];
+  const order: EventCode[] = ["Arr", "MI", "Exmi", "Breakfast", "S", "Lunch", "Food", "Dinner", "MTG", "MO", "MO?"];
   return kept.sort((a, b) => a.date.localeCompare(b.date) || a.space.localeCompare(b.space) || order.indexOf(a.code) - order.indexOf(b.code));
 }
 
@@ -493,7 +495,7 @@ export function airwallTasks(rows: EventRow[]): TaskNote[] {
 export function sharedSpaces(entries: EventEntry[]): string[] {
   const map = new Map<string, Set<string>>();
   for (const e of entries) {
-    if (e.code === "MTG" || e.code === "Food" || e.code === "Dinner" || e.code === "Arr" || e.code === "MO?") continue;
+    if (e.code === "MTG" || e.code === "Food" || e.code === "Dinner" || e.code === "Breakfast" || e.code === "Lunch" || e.code === "Arr" || e.code === "MO?") continue;
     const key = `${e.date}|${e.space}`;
     map.set(key, new Set([...(map.get(key) ?? []), e.title]));
   }

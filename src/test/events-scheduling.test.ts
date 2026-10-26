@@ -7,7 +7,7 @@ describe("For Scheduling report (no Usage column)", () => {
   it.each([
     ["Move In", "MI"], ["AV Move In", "MI"], ["Decorator Move In", "MI"], ["Exhibitor Move In", "Exmi"],
     ["Move In - Exhibitors", "Exmi"], ["Exhibitor Service Desk", "Exmi"], ["Engineering Service Desk", "Exmi"],
-    ["Move Out", "MO"], ["Client Arrival", "Arr"], ["Exhibitor Move Out", "MO"], ["Load Out", "MO"], ["Reception", "Food"], ["Plated Dinner", "Dinner"], ["Buffet Breakfast", "Meal"],
+    ["Move Out", "MO"], ["Client Arrival", "Arr"], ["Exhibitor Move Out", "MO"], ["Load Out", "MO"], ["Reception", "Food"], ["Plated Dinner", "Dinner"], ["Buffet Breakfast", "Breakfast"], ["Plated Lunch/Entree Served", "Lunch"],
     ["Registration/Vendor Load-In", "S"], ["Registration - Exhibitors Only", "S"], ["Meeting", "MTG"], ["General Session", "S"], ["Breakout Session", "S"], ["ARA SHOW OPEN", "S"],
   ])("%s is %s", (d, c) => expect(classifyByDescription(d)).toBe(c));
   it.each(["Event Inspection Walk-Through", "Break", "Show Office", "Room Turn", "Exhibitor Early Access"])("%s is skipped", (d) => expect(classifyByDescription(d)).toBe(null));
@@ -15,11 +15,15 @@ describe("For Scheduling report (no Usage column)", () => {
     expect(classifyEvent(row({ description: "Move In" }))).toBe("MI");
     expect(classifyEvent(row({ usage: "Move Out (OUT)", description: "Whatever" }))).toBe("MO");
   });
+  it("breakfast, lunch and dinner keep their own line, even inside a show; a reception does not", () => {
+    const meals = summarizeEvents([row({ description: "General Session", start: "08:00 AM", end: "05:00 PM" }), row({ description: "Plated Breakfast", start: "08:00 AM", end: "09:00 AM" }), row({ description: "Buffet Lunch", start: "12:00 PM", end: "01:00 PM" }), row({ description: "Plated Dinner", start: "06:00 PM", end: "08:00 PM" }), row({ description: "Hosted Bar", start: "05:00 PM", end: "06:00 PM" })]);
+    expect(meals.map((e) => e.code)).toEqual(["Breakfast", "S", "Lunch", "Dinner"]);
+  });
   it("a reception after the show gets no line of its own, and neither does one inside it", () => {
     const after = summarizeEvents([row({ description: "General Session", start: "09:00 AM", end: "03:00 PM" }), row({ description: "Reception", start: "04:00 PM", end: "06:00 PM" })]);
     expect(after.map((e) => e.code)).toEqual(["S"]);
     const inside = summarizeEvents([row({ description: "General Session", start: "09:00 AM", end: "05:00 PM" }), row({ description: "Buffet Lunch", start: "12:00 PM", end: "01:00 PM" })]);
-    expect(inside.map((e) => e.code)).toEqual(["S"]);
+    expect(inside.map((e) => e.code)).toEqual(["S", "Lunch"]);
   });
   it.each(["Water Coolers", "Water Coolers Refresh", "Coffee Bar", "Chic-Fil-A", "Chick-Fil-A", "Papa John's", "Concessions", "Portable Concession", "Coat Check", "Organizers Office Break", "All Day Beverage Break", "Critical Minerals Conference Theater", "Doors Open", "General Admission Entry"])("%s is service noise, not a line", (d) => expect(classifyByDescription(d)).toBe(null));
   it("one show line per room and day, spanning its real lines, with the service lines left out", () => {
