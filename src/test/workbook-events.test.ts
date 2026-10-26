@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Blob as NodeBlob, File as NodeFile } from "node:buffer";
 import ExcelJS from "exceljs";
-import { eventsWorkbook } from "@/lib/work-files";
+import { eventsWorkbook, legendFill, LEGEND_FILL } from "@/lib/work-files";
 import { BALLROOM_ROWS, summarizeEvents, type EventCode, type EventEntry } from "@/lib/work-tools";
 
 Object.defineProperty(globalThis, "Blob", { value: NodeBlob, configurable: true });
@@ -23,13 +23,32 @@ async function build(entries: EventEntry[], existing?: File) {
   return { wb, ws, room };
 }
 
+describe("schedule legend colours", () => {
+  it("follows the legend: show day alone is bold with no fill", () => {
+    expect(legendFill(["S"])).toBeUndefined();
+    expect(legendFill(["MI"])).toBe(LEGEND_FILL.moveIn);
+    expect(legendFill(["MO?"])).toBe(LEGEND_FILL.moveOut);
+    expect(legendFill(["Food"])).toBe(LEGEND_FILL.nonShow);
+    expect(legendFill([])).toBeUndefined();
+    expect(Object.values(LEGEND_FILL)).toEqual(["FF92D050", "FF75FFFF", "FFFFC000", "FFFF0000", "FF00B0F0", "FF7030A0"]);
+  });
+  it("makes show days bold", async () => {
+    const { room } = await build([event("BallRoom A", "S"), event("BallRoom B", "S")]);
+    expect(room("BallRoom A").font?.bold).toBe(true);
+    expect(room("BallRoom A").fill).toEqual({ type: "pattern", pattern: "none" });
+  });
+});
+
 describe("Excel shared event rules", () => {
   it.each([
-    { name: "show plus move out is orange", codes: ["S", "MO"], color: "FFF4B084" },
-    { name: "move in plus show is teal", codes: ["MI", "S"], color: "FF4DB6AC" },
-    { name: "exhibitor move in plus show is teal", codes: ["Exmi", "S"], color: "FF4DB6AC" },
-    { name: "all three activities are blue", codes: ["MI", "S", "MO"], color: "FF5B9BD5" },
-    { name: "exhibitor move in with show and move out is blue", codes: ["Exmi", "S", "MO"], color: "FF5B9BD5" },
+    { name: "show plus move out is orange", codes: ["S", "MO"], color: "FFFFC000" },
+    { name: "move in plus show is light cyan", codes: ["MI", "S"], color: "FF75FFFF" },
+    { name: "exhibitor move in plus show is light cyan", codes: ["Exmi", "S"], color: "FF75FFFF" },
+    { name: "all three activities are blue", codes: ["MI", "S", "MO"], color: "FF00B0F0" },
+    { name: "exhibitor move in with show and move out is blue", codes: ["Exmi", "S", "MO"], color: "FF00B0F0" },
+    { name: "move in alone is green", codes: ["MI"], color: "FF92D050" },
+    { name: "move out alone is red", codes: ["MO"], color: "FFFF0000" },
+    { name: "a non-show event is purple", codes: ["MTG"], color: "FF7030A0" },
   ] as { name: string; codes: EventCode[]; color: string }[])("$name", async ({ codes, color }) => {
     const entries = codes.flatMap((code) => [event("BallRoom A", code), event("BallRoom B", code)]);
     const original = await build(entries);
