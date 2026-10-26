@@ -51,6 +51,9 @@ export type EventEntry = { date: string; space: string; code: EventCode; start: 
 const FOOD_RE = /reception|dinner|lunch|breakfast|buffet|hosted bar|cash bar|wine service|food|concession|coffee|snack|banquet|luncheon|plated|boxed|brunch/;
 const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat|on.?site/;
 
+/** Service lines inside a show (drinks, food vendors, breaks, entry lines, side rooms). They are not move in, show or move out, so they never get a line of their own. */
+const NOISE_RE = /water cooler|coffee|chic?k?-?fil-?a|papa john|concession|coat check|\bbreaks?\b|beverage|refresh|room turn|doors? (to the \w+ )?open|\bentry\b|queue|rehears|speakers? room|conference theat|networking|lip sync|poster|wellness|volunteers? arrive/;
+
 /** The "For Scheduling" report has no Usage column, so the code comes from the description alone. */
 export function classifyByDescription(description: string): EventCode | null {
   const d = description.toLowerCase();
@@ -58,9 +61,10 @@ export function classifyByDescription(description: string): EventCode | null {
   if (/registration/.test(d) && !/move.?out/.test(d)) return "S"; // registration is the start of the show
   if (/end of show/.test(d)) return "S"; // vendors leaving at the end of the show is still the show
   if (/client arrival/.test(d)) return "Arr";
-  if (/move.?out|tear ?down|load.?out|dismantle/.test(d)) return "MO";
+  if (/move.?out|tear ?down|load.?out|dismantle|out of the building/.test(d)) return "MO";
   if (/exhibitor/.test(d) && /move.?in|load.?in/.test(d)) return "Exmi";
   if (/move.?in|march in|load.?in|set ?up|install|decorator day/.test(d)) return "MI";
+  if (NOISE_RE.test(d)) return null;
   if (/\bmeeting\b|\bmtg\b/.test(d) && !/session/.test(d)) return "MTG";
   if (/dinner/.test(d)) return "Dinner";
   if (/breakfast|lunch|brunch/.test(d)) return "Meal";
@@ -102,7 +106,8 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   }
   // A meal or meeting inside the same show's day is part of the show; only one after the show ends gets its own line.
   const all = [...map.values()];
-  const same = (a: EventEntry, b: EventEntry) => a.date === b.date && a.space === b.space && a.title === b.title && a.eventId === b.eventId;
+  // The report names each line separately (Registration, Expo, Coffee Bar...), so lines of one booking match by its event ID.
+  const same = (a: EventEntry, b: EventEntry) => a.date === b.date && a.space === b.space && a.eventId === b.eventId && (a.eventId !== undefined || a.title === b.title);
   const kept: EventEntry[] = [];
   for (const e of all) {
     const mates = all.filter((x) => same(x, e) && x !== e);
@@ -114,12 +119,23 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
       continue;
     }
     if (e.code === "Food" || e.code === "Dinner" || e.code === "MTG" || e.code === "Meal") {
-      if (show) { if (e.code !== "MTG" && e.start >= show.end) kept.push(e.code === "Meal" ? { ...e, code: "Food" } : e); continue; }
+      if (show) continue; // food and meetings around a show are not move in, show or move out
       // a breakfast or lunch with nothing else going on is the whole event, so it reads as the show
       kept.push(e.code === "Meal" ? { ...e, code: "S" } : e);
       continue;
     }
     kept.push(e);
+  }
+  // One show line per event, room and day: earliest start to latest end, named by its longest line.
+  const shows = new Map<string, EventEntry>();
+  for (const e of [...kept]) {
+    if (e.code !== "S") continue;
+    const key = JSON.stringify([e.date, e.space, e.eventId ?? ""]);
+    const prev = shows.get(key);
+    if (!prev) { shows.set(key, e); continue; }
+    kept.splice(kept.indexOf(e), 1);
+    if (e.end - e.start > prev.end - prev.start) prev.title = e.title;
+    prev.start = Math.min(prev.start, e.start); prev.end = Math.max(prev.end, e.end);
   }
   // The show ends where the move out begins, so the two never overlap in a cell.
   for (const e of kept) {
@@ -129,7 +145,7 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   }
   // No move-out line for an event that had a move in: flag the last day with "MO?" so it gets checked by hand.
   const groups = new Map<string, EventEntry[]>();
-  for (const e of kept) groups.set(JSON.stringify([e.eventId ?? "", e.title, e.space]), [...(groups.get(JSON.stringify([e.eventId ?? "", e.title, e.space])) ?? []), e]);
+  for (const e of kept) { const key = JSON.stringify([e.eventId ?? "", e.eventId ? "" : e.title, e.space]); groups.set(key, [...(groups.get(key) ?? []), e]); }
   for (const list of groups.values()) {
     if (list.some((e) => e.code === "MO") || !list.some((e) => e.code === "MI" || e.code === "Exmi")) continue;
     const last = list.reduce((a, b) => (b.date > a.date || (b.date === a.date && b.end > a.end) ? b : a));

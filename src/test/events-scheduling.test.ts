@@ -15,11 +15,21 @@ describe("For Scheduling report (no Usage column)", () => {
     expect(classifyEvent(row({ description: "Move In" }))).toBe("MI");
     expect(classifyEvent(row({ usage: "Move Out (OUT)", description: "Whatever" }))).toBe("MO");
   });
-  it("a reception after the show gets its own Food line; one inside the show does not", () => {
+  it("a reception after the show gets no line of its own, and neither does one inside it", () => {
     const after = summarizeEvents([row({ description: "General Session", start: "09:00 AM", end: "03:00 PM" }), row({ description: "Reception", start: "04:00 PM", end: "06:00 PM" })]);
-    expect(after.map((e) => e.code)).toEqual(["S", "Food"]);
+    expect(after.map((e) => e.code)).toEqual(["S"]);
     const inside = summarizeEvents([row({ description: "General Session", start: "09:00 AM", end: "05:00 PM" }), row({ description: "Buffet Lunch", start: "12:00 PM", end: "01:00 PM" })]);
     expect(inside.map((e) => e.code)).toEqual(["S"]);
+  });
+  it.each(["Water Coolers", "Water Coolers Refresh", "Coffee Bar", "Chic-Fil-A", "Chick-Fil-A", "Papa John's", "Concessions", "Portable Concession", "Coat Check", "Organizers Office Break", "All Day Beverage Break", "Critical Minerals Conference Theater", "Doors Open", "General Admission Entry"])("%s is service noise, not a line", (d) => expect(classifyByDescription(d)).toBe(null));
+  it("one show line per room and day, spanning its real lines, with the service lines left out", () => {
+    const out = summarizeEvents([
+      row({ description: "Registration", start: "08:00 AM", end: "06:00 PM", space: "Exhibit Hall A (EXA)" }),
+      row({ description: "Critical Materials & Minerals Expo", start: "09:00 AM", end: "05:00 PM", space: "Exhibit Hall A (EXA)" }),
+      row({ description: "Water Coolers", start: "08:00 AM", end: "05:00 PM", space: "Exhibit Hall A (EXA)" }),
+      row({ description: "Coffee Bar", start: "08:00 AM", end: "02:00 PM", space: "Exhibit Hall A (EXA)" }),
+    ]);
+    expect(out.map((e) => [e.code, e.start, e.end])).toEqual([["S", 480, 1080]]);
   });
   it("a lone meeting is MTG; a meeting inside a show is absorbed", () => {
     expect(summarizeEvents([row({ description: "Meeting", space: "Ballroom E (BRE)" })]).map((e) => e.code)).toEqual(["MTG"]);
