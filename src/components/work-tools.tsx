@@ -142,6 +142,10 @@ function EventsTab() {
       const rows = [...(await Promise.all(pdfs.map(readEventPdf))).flat(), ...reports.flat()];
       const src = { rows, sources: pdfs.length + reports.length, ...(existing ? { existing } : {}) };
       setSource(src);
+      if (!rows.length && existing) {
+        setStatus(`No events found: ${existing.name} was read as a schedule to fill in, not a For Scheduling report (cell A1 must say "For Scheduling"). Drop the Ungerboeck report on its own, or with this schedule.`);
+        return;
+      }
       await build(src, withPending);
     } catch (e) {
       setReport((old) => `${old}\nERROR: ${(e as Error).stack ?? (e as Error).message}`);
