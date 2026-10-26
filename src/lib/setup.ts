@@ -3,7 +3,7 @@ export type SetupItem = { id: string; name: string; what: string; env: string; c
 export type SetupTest = { ok: boolean; note: string };
 
 export const INTEGRATIONS: { id: string; name: string; what: string; env: string; testable: boolean }[] = [
-  { id: "ollama", name: "Local AI (Ollama)", what: "Answers on your own GPU", env: "OLLAMA_URL (set by the stack)", testable: true },
+  { id: "ollama", name: "Local AI (Ollama)", what: "Answers on your own GPU", env: "OLLAMA_URL", testable: true },
   { id: "searxng", name: "Web search (SearXNG)", what: "Lets pals look things up", env: "SEARXNG_URL", testable: true },
   { id: "plex", name: "Plex", what: "Library search and what's new", env: "PLEX_URL, PLEX_TOKEN", testable: true },
   { id: "seerr", name: "Seerr", what: "Request movies and shows", env: "SEERR_URL, SEERR_API_KEY", testable: true },

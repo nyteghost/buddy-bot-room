@@ -21,6 +21,7 @@ export type SettingField = {
 };
 
 export const SETTING_FIELDS: SettingField[] = [
+  { key: "OLLAMA_URL", label: "Ollama address", group: "ollama", kind: "url", placeholder: "http://10.200.1.50:11434", help: "Where your Ollama runs: the ollama container (http://ollama:11434) or another machine, such as the PC with the RTX 3080. That machine's Ollama must listen on the network (OLLAMA_HOST=0.0.0.0)." },
   { key: "LOCAL_ONLY_AI", label: "Local-Only AI (no paid or cloud AI)", group: "ollama", kind: "select", options: ["on", "off"], help: "On (the default): every answer, scheduled job and retry uses only your own Ollama. Free and paid cloud keys are never called, even if saved. Turn off only if you deliberately want cloud engines." },
   { key: "PLEX_URL", label: "Plex address", group: "plex", kind: "url", placeholder: "http://10.0.0.5:32400" },
   { key: "PLEX_TOKEN", label: "Plex token", group: "plex", kind: "text", secret: true },
