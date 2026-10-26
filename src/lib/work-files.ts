@@ -129,16 +129,19 @@ export async function readEventSheet(file: File): Promise<EventRow[] | null> {
   if (!cStart || !cEnd || !cDesc || !cSpace) return null;
   const months = ["january","february","march","april","may","june","july","august","september","october","november","december"];
   const rows: EventRow[] = [];
-  let day = "";
+  let day = "", eventName = "";
   ws.eachRow((row, n) => {
     if (n < 3) return;
     const a = text(row.getCell(1).value);
     const dm = a.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/);
-    if (dm) { day = `${dm[3]}-${String(months.indexOf((dm[1] ?? "").toLowerCase()) + 1).padStart(2, "0")}-${(dm[2] ?? "").padStart(2, "0")}`; return; }
+    if (dm) { day = `${dm[3]}-${String(months.indexOf((dm[1] ?? "").toLowerCase()) + 1).padStart(2, "0")}-${(dm[2] ?? "").padStart(2, "0")}`; eventName = ""; return; }
     const start = clock(row.getCell(cStart).value);
+    // The line above an event's rows carries its name in column B (e.g. "Georgia Bridal Show").
+    const named = text(row.getCell(2).value);
+    if (!start && named) { eventName = named; return; }
     if (!day || !start) return;
     const id = text(row.getCell(cId || 99).value).match(/\d{3,}/)?.[0];
-    rows.push({ level: 2, usage: "", start, end: clock(row.getCell(cEnd).value), description: text(row.getCell(cDesc).value), space: text(row.getCell(cSpace).value), event: cEvent ? text(row.getCell(cEvent).value) : "", ...(id ? { eventId: id } : {}), ...(cStatus && text(row.getCell(cStatus).value) ? { status: text(row.getCell(cStatus).value) } : {}), date: day });
+    rows.push({ level: 2, usage: "", start, end: clock(row.getCell(cEnd).value), description: text(row.getCell(cDesc).value), space: text(row.getCell(cSpace).value), event: (cEvent ? text(row.getCell(cEvent).value) : "") || eventName, ...(id ? { eventId: id } : {}), ...(cStatus && text(row.getCell(cStatus).value) ? { status: text(row.getCell(cStatus).value) } : {}), date: day });
   });
   return rows;
 }
