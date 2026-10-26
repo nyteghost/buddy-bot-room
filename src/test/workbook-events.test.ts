@@ -32,6 +32,13 @@ describe("schedule legend colours", () => {
     expect(legendFill([])).toBeUndefined();
     expect(Object.values(LEGEND_FILL)).toEqual(["FF92D050", "FF75FFFF", "FFFFC000", "FFFF0000", "FF00B0F0", "FF7030A0"]);
   });
+  it("show days with a move in and/or move out get their colour AND bold; days without a show are not bold", async () => {
+    for (const [codes, color, bold] of [[["MI", "S"], "FF75FFFF", true], [["S", "MO"], "FFFFC000", true], [["MI", "S", "MO"], "FF00B0F0", true], [["MI"], "FF92D050", false], [["MO"], "FFFF0000", false]] as [EventCode[], string, boolean][]) {
+      const { room } = await build(codes.flatMap((c) => [event("BallRoom A", c), event("BallRoom B", c)]));
+      expect(room("BallRoom A").fill).toEqual({ type: "pattern", pattern: "solid", fgColor: { argb: color } });
+      expect(room("BallRoom A").font?.bold).toBe(bold);
+    }
+  });
   it("makes show days bold", async () => {
     const { room } = await build([event("BallRoom A", "S"), event("BallRoom B", "S")]);
     expect(room("BallRoom A").font?.bold).toBe(true);
