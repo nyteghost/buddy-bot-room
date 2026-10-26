@@ -36,5 +36,5 @@ export function updateText(u: UpdateInfo): string {
   if (u.note) return u.note;
   if (u.behind <= 0) return `Pixel Pals is up to date (${u.current}).`;
   const list = u.changes.length ? `\n\nWhat's new:\n${u.changes.map((c) => `• ${c}`).join("\n")}` : "";
-  return `Update available: ${u.behind} new change${u.behind === 1 ? "" : "s"} (you have ${u.current}, latest is ${u.latest}).${list}\n\nTo update: Portainer → Stacks → your Pixel Pals stack → Pull and redeploy (turn on “Re-pull image and redeploy” / “Build”). Your data lives in the data volume and is kept.`;
+  return `Update available: ${u.behind} new change${u.behind === 1 ? "" : "s"} (you have ${u.current}, latest is ${u.latest}).${list}\n\nTo update on Unraid: Docker tab → Compose → your pixelpals stack → Update Stack. (Portainer: Stacks → your stack → Pull and redeploy, with “Re-pull image and redeploy” turned on.) Your data lives in the data volume and is kept.`;
 }
