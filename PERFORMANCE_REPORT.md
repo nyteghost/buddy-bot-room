@@ -88,3 +88,20 @@ Chats are one JSON document in `localStorage` (all five mode windows), loaded on
 | Mail/Unraid summary | 13 | 3 |
 
 Not measured: battery or CPU effect on a phone.
+
+# Release 2
+
+## R2-1. Context budgeting and older-turn digest
+
+**Findings (confirmed in code):** the prompt was trimmed by characters only (`context-trim.ts`, 6,000 chars for local engines, 12,000 otherwise, same for every engine) and everything older than the newest turns vanished, leaving just "N earlier messages left out". Long chats therefore forgot early decisions completely. Persona, memory and document text are added on top of that budget.
+
+**Change:** `src/lib/context-budget.ts`: token estimates (CJK aware), a per-engine window table (Ollama's OpenAI-compatible endpoint = 4,096 tokens unless the server is configured otherwise; free cloud tiers kept modest), transcript budget = at most 55 % of the window, duplicate-turn removal (retries/reconnects), and a free digest (no model call) of the dropped turns: human turns and turns that state a decision, number or plan come first, in time order, in about 20 % of the budget. `chat.server.ts` puts the digest in the system prompt as data.
+
+**Benchmark:** `npx tsx scripts/bench-context.mts` (synthetic 61-turn chat with 6 early decisions, local engine, 6,000-char budget):
+
+| | turns kept | prompt chars | early decisions visible to the model |
+|---|---|---|---|
+| OLD | 12 | 5,812 | 0 of 6 |
+| NEW | 9 + digest | 5,354 | 6 of 6 |
+
+**Not measured:** whether answers actually get better (needs a model; the synthetic chat is also favourable to the digest because decisions are phrased plainly). The digest is extractive, so it can quote a sentence that is later reversed; the prompt marks it as data. Rolling model-written summaries were deliberately not added (they cost an extra inference call per long chat on a single GPU).

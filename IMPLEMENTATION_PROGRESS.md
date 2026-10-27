@@ -25,7 +25,13 @@ Image for this branch: `ghcr.io/nyteghost/buddy-bot-room:beta` (main stays on `:
 - [x] M4 Conversation storage: measured; speed is fine, so no migration. Quota (~5 MB) is the real limit; IndexedDB persistence is the recommended follow-up (see report).
 - [x] M5 Polling: `poll.ts` applied to six client pollers, `scripts/bench-polling.mts`, `src/test/poll.test.ts`.
 
-Release 1 is complete pending your live check and CI. Release 2 (context budgeting, GPU resource manager, routing, multi-agent mode, memory) has not been started.
+Release 1 is complete pending your live check and CI. 
+## Release 2 — milestones
+- [x] R2-1 Context budgeting: `context-budget.ts`, digest of older turns, per-engine window cap, `scripts/bench-context.mts`, `src/test/context-budget.test.ts`.
+- [ ] R2-2 Ollama resource manager (VRAM, loaded models, keep-alive, queue).
+- [ ] R2-3 Routing and "which model answered".
+- [ ] R2-4 Smart multi-agent mode.
+- [ ] R2-5 Memory (search, edit, explain, project/agent scopes).
 
 ## Next (not started)
 1. Phase 2: split `room.tsx` (extract hooks/modules one at a time, behaviour identical).
