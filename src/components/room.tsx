@@ -161,6 +161,8 @@ import { SearchPanel } from "@/components/search-panel";
 import { setHideSecrets, getHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import { MicButton } from "@/components/mic-button";
 import { smartRetrieve } from "@/lib/smart-docs";
+import { createThrottle, systemClock } from "@/lib/stream-throttle";
+import { createDebouncedSaver } from "@/lib/debounced-save";
 import { installUuidPolyfill } from "@/lib/uuid-polyfill";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
@@ -476,14 +478,28 @@ export function Room() {
       replayRef.current?.abort();
     };
   }, []);
-  useEffect(() => {
-    if (!ready || cloud) return;
+  // Saving rewrites every conversation, so it waits for a quiet moment (and at most 2 s during a long reply) instead of running per token.
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
+  const saverRef = useRef<ReturnType<typeof createDebouncedSaver> | null>(null);
+  saverRef.current ??= createDebouncedSaver(() => {
     try {
-      localStorage.setItem(chatsKey, JSON.stringify(chats));
+      localStorage.setItem(chatsKey, JSON.stringify(chatsRef.current));
     } catch {
       setSaveError("Browser storage is full. This conversation could not be saved.");
     }
+  }, 400, 2000, systemClock);
+  useEffect(() => {
+    if (!ready || cloud) return;
+    saverRef.current?.schedule();
   }, [chats, ready, cloud]);
+  useEffect(() => {
+    const flush = () => saverRef.current?.flush();
+    const hidden = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", hidden);
+    return () => { window.removeEventListener("pagehide", flush); document.removeEventListener("visibilitychange", hidden); flush(); };
+  }, []);
 
   const stop = () => {
     stopSpeaking();
@@ -716,6 +732,9 @@ export function Room() {
           let answer: RoomMessage | undefined;
           const answerId = crypto.randomUUID();
           const consume = async (stream: Awaited<ReturnType<typeof runLocal>>) => {
+            // The first token shows at once; after that the screen updates at most every 50 ms, and the last one is always delivered.
+            const ui = createThrottle<RoomMessage[]>((list) => setMessages(list), 50);
+            try {
             for await (const partial of readUIMessageStream<RoomMessage>({ stream, terminateOnError: true })) {
               if (controller.signal.aborted) break;
               answer = {
@@ -735,8 +754,9 @@ export function Room() {
                   elapsed: (performance.now() - began) / 1000,
                 },
               };
-              setMessages([...transcript, answer]);
+              ui.push([...transcript, answer]);
             }
+            } finally { ui.flush(); }
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
           const blockPaid = isOverCap(engine.spendCapUsd, { inPerM: engine.customPriceIn, outPerM: engine.customPriceOut });
@@ -1230,7 +1250,7 @@ export function Room() {
     URL.revokeObjectURL(url);
   }
   function exportSettings(includeKeys: boolean) {
-    download(includeKeys ? "pixel-pals-backup-with-keys.json" : "pixel-pals-backup.json", JSON.stringify(buildBackup(localStorage, includeKeys), null, 2), "application/json");
+    saverRef.current?.flush(); download(includeKeys ? "pixel-pals-backup-with-keys.json" : "pixel-pals-backup.json", JSON.stringify(buildBackup(localStorage, includeKeys), null, 2), "application/json");
     say("/backup", includeKeys ? "Backup downloaded, including your API keys. Keep that file private." : "Backup downloaded. API keys were left out for safety.");
   }
   async function importSettings(file: File | undefined) {

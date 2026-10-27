@@ -18,6 +18,13 @@ Image for this branch: `ghcr.io/nyteghost/buddy-bot-room:beta` (main stays on `:
 - [x] Tests: `src/test/local-only.test.ts`, `src/test/ai-reliability.test.ts`.
 - Validation: type check clean for touched files; pure logic verified with node shims. Full vitest/build run in GitHub CI (vitest can't be installed in the authoring sandbox).
 
+## Release 1 (performance) — milestones, one commit each
+- [x] M1 Streaming: throttled UI updates + debounced chat saves (`stream-throttle.ts`, `debounced-save.ts`, `scripts/bench-streaming.mts`, `src/test/stream-throttle.test.ts`). Numbers in `PERFORMANCE_REPORT.md`.
+- [ ] M2 Embedding cache (persistent per chunk hash + model; hybrid keyword/semantic; no "first N chunks only" candidates).
+- [ ] M3 Scheduler: tick overlap guard, per-job timeouts, no one slow job blocking the rest.
+- [ ] M4 Conversation storage (only if M1 does not fix large histories).
+- [ ] M5 Polling/network audit (Unraid, Ollama probes).
+
 ## Next (not started)
 1. Phase 2: split `room.tsx` (extract hooks/modules one at a time, behaviour identical).
 2. Phase 3: per-character role + model assignment (actual model used shown per reply).
