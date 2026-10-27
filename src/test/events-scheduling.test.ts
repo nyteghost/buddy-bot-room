@@ -95,7 +95,7 @@ describe("For Scheduling report (no Usage column)", () => {
     ]);
     expect(list.filter((e) => e.eventId !== "9").map((e) => e.code)).toEqual(["S", "MO"]);
     expect(list.find((e) => e.code === "S" && e.start === 600)!.end).toBe(1080);
-    expect(list.filter((e) => e.eventId === "9").map((e) => entryLabel(e))).toEqual(["Client Arr 6:15a", "S 7a-9a"]);
+    expect(list.filter((e) => e.eventId === "9").map((e) => entryLabel(e))).toEqual(["Client Arr 6:15a", "Breakfast 7a-9a"]);
   });
   it("a dinner stays a dinner and joins air wall tasks on the same day with a slash", () => {
     expect(summarizeEvents([row({ description: "Plated Dinner" })]).map((e) => entryLabel(e))).toEqual(["Dinner 8a-5p"]);
