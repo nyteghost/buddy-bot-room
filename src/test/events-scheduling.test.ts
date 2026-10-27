@@ -25,7 +25,8 @@ describe("For Scheduling report (no Usage column)", () => {
     const inside = summarizeEvents([row({ description: "General Session", start: "09:00 AM", end: "05:00 PM" }), row({ description: "Buffet Lunch", start: "12:00 PM", end: "01:00 PM" })]);
     expect(inside.map((e) => e.code)).toEqual(["S", "Lunch"]);
   });
-  it.each(["Water Coolers", "Water Coolers Refresh", "Coffee Bar", "Chic-Fil-A", "Chick-Fil-A", "Papa John's", "Concessions", "Portable Concession", "Coat Check", "Organizers Office Break", "All Day Beverage Break", "Critical Minerals Conference Theater", "Doors Open", "General Admission Entry"])("%s is service noise, not a line", (d) => expect(classifyByDescription(d)).toBe(null));
+  it("keeps General Admission Entry and Doors Open as show time", () => { expect(classifyByDescription("General Admission Entry")).toBe("S"); expect(classifyByDescription("Doors Open")).toBe("S"); });
+  it.each(["Water Coolers", "Water Coolers Refresh", "Coffee Bar", "Chic-Fil-A", "Chick-Fil-A", "Papa John's", "Concessions", "Portable Concession", "Coat Check", "Organizers Office Break", "All Day Beverage Break", "Critical Minerals Conference Theater"])("%s is service noise, not a line", (d) => expect(classifyByDescription(d)).toBe(null));
   it("one show line per room and day, spanning its real lines, with the service lines left out", () => {
     const out = summarizeEvents([
       row({ description: "Registration", start: "08:00 AM", end: "06:00 PM", space: "Exhibit Hall A (EXA)" }),

@@ -52,7 +52,7 @@ const FOOD_RE = /reception|dinner|lunch|breakfast|buffet|hosted bar|cash bar|win
 const SKIP_RE = /inspection|walk-?through|early access|advance freight|deliver|guests? depart|staff arrival|security|show office|break\b|official|lounge|storage|green room|dressing|office|freight|parking|will call|exhibitor access|group out|room turn|strike|warm-?up|check-?in|coat|on.?site/;
 
 /** Service lines inside a show (drinks, food vendors, breaks, entry lines, side rooms). They are not move in, show or move out, so they never get a line of their own. */
-const NOISE_RE = /water cooler|coffee|chic?k?-?fil-?a|papa john|concession|coat check|\bbreaks?\b|beverage|refresh|room turn|doors? (to the \w+ )?open|\bentry\b|queue|rehears|speakers? room|conference theat|networking|lip sync|poster|wellness|volunteers? arrive/;
+const NOISE_RE = /water cooler|coffee|chic?k?-?fil-?a|papa john|concession|coat check|\bbreaks?\b|beverage|refresh|room turn|queue|rehears|speakers? room|conference theat|networking|lip sync|poster|wellness|volunteers? arrive/;
 
 /** The "For Scheduling" report has no Usage column, so the code comes from the description alone. */
 export function classifyByDescription(description: string): EventCode | null {
@@ -132,7 +132,7 @@ export function summarizeEvents(rows: EventRow[]): EventEntry[] {
   const shows = new Map<string, EventEntry>();
   for (const e of [...kept]) {
     if (e.code !== "S") continue;
-    const key = JSON.stringify([e.date, e.space, e.eventId ?? ""]);
+    const key = JSON.stringify([e.date, e.space, e.eventId ?? e.title]);
     const prev = shows.get(key);
     if (!prev) { shows.set(key, e); continue; }
     kept.splice(kept.indexOf(e), 1);
