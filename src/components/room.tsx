@@ -784,8 +784,10 @@ export function Room() {
           // Your own Ollama didn't answer: skip it and use the next AI you have set up (Local-Only mode on the server still blocks cloud AI).
           const cloudFallback = async (why: unknown) => {
             if (controller.signal.aborted || (answer && messageText(answer).trim())) throw why;
+            // Mail, calendar and task details never go to a cloud AI, so with those in the question there is nothing to fall back to.
+            if (requestBody.realData) throw why;
             const rest = cloudFallbackChain(engine, blockPaid);
-            if (!rest.length) throw why;
+            if (!rest.length) throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} No other AI is set up to take over: add a free key in AI engine settings (or switch the engine to Auto) and chats will fall back to it.`);
             answer = undefined;
             logClient("warn", "Ollama didn't answer, trying the next AI", why);
             let lastError: unknown = why;
