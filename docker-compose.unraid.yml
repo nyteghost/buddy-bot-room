@@ -80,6 +80,8 @@ services:
       - ${APPDATA:-/mnt/user/appdata/pixelpals}/data:/data   # saved chats and the server log live here
       # Nightly backups. Set BUDDY_BACKUP_PATH to a folder on another machine (e.g. a mounted Unraid share) to survive a disk failure.
       - ${BUDDY_BACKUP_PATH:-/mnt/user/appdata/pixelpals/backups}:/backups
+      # Optional: your Obsidian vault, so the Notes tab can open and edit it. Then set OBSIDIAN_VAULT_DIR=/vault in Settings → Obsidian.
+      - ${OBSIDIAN_VAULT_HOST:-/mnt/user/appdata/obsidian/vaults/Homelab}:/vault
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s

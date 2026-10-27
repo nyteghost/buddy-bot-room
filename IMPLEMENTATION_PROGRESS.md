@@ -38,3 +38,7 @@ Release 1 is complete pending your live check and CI.
 2. Phase 3: per-character role + model assignment (actual model used shown per reply).
 3. Phase 4: projects workspace and structured multi-agent workflow (sequential on the GPU, turn/time limits).
 4. Phase 5: read-only Docker/Unraid diagnostics, then approval-gated actions with audit log.
+
+## Extras (user requests during Release 2)
+- [x] Chat: when your own Ollama can't be reached (or errors before any text), skip it and use the next cloud AI that is set up (`cloudFallbackChain`: free keys first, paid only if switched on and under the spend cap). Local-Only mode still blocks cloud AI on the server.
+- [x] Notes tab: Obsidian vault link (`/api/vault`, owner only; settings `OBSIDIAN_VAULT_DIR`, `OBSIDIAN_NEW_FOLDER`; mount the vault into the container). Not yet tried against a real vault.

@@ -169,6 +169,12 @@ export function fallbackProviders(s: EngineSettings, blockPaid = false): TurnPro
   return [claude, custom].filter((p): p is TurnProvider => !!p);
 }
 
+/** When your own Ollama can't be reached: every cloud AI you have set up, free keys first, and a paid one only if you switched it on (share, only or fallback). Empty means nothing else is set up. */
+export function cloudFallbackChain(s: EngineSettings, blockPaid = false): TurnProvider[] {
+  const seen = new Set<string>();
+  return [...turnProviders(s, blockPaid), ...fallbackProviders(s, blockPaid)].filter((p) => (seen.has(p.kind) ? false : (seen.add(p.kind), true)));
+}
+
 /** What to try, in order, when `failed` errored before producing text. */
 export function chainAfter(s: EngineSettings, failed: TurnProvider, blockPaid = false): TurnProvider[] {
   if (failed.kind === "ollama-server") return [];

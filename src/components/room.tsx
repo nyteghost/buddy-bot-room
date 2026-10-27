@@ -107,7 +107,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { chainAfter, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
+import { chainAfter, cloudFallbackChain, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
@@ -781,6 +781,23 @@ export function Room() {
             }
             throw lastError;
           };
+          // Your own Ollama didn't answer: skip it and use the next AI you have set up (Local-Only mode on the server still blocks cloud AI).
+          const cloudFallback = async (why: unknown) => {
+            if (controller.signal.aborted || (answer && messageText(answer).trim())) throw why;
+            const rest = cloudFallbackChain(engine, blockPaid);
+            if (!rest.length) throw why;
+            answer = undefined;
+            logClient("warn", "Ollama didn't answer, trying the next AI", why);
+            let lastError: unknown = why;
+            for (const p of rest) {
+              try { await consume(await runCloud(p)); return; }
+              catch (err) {
+                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
+                answer = undefined; lastError = err;
+              }
+            }
+            throw lastError;
+          };
           const runOllama = async () =>
             consume(
               await ollamaTurn(
@@ -814,16 +831,18 @@ export function Room() {
             }
           } else if (engine.kind === "local-server") {
             if (!provider) throw new Error("Local AI isn't available.");
-            await runChain(provider);
+            try { await runChain(provider); } catch (err) { await cloudFallback(err); }
           } else if (engine.kind === "ollama") {
-            await consume(
-              await ollamaTurn(
-                await fetchPrompt(),
-                { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
-                { agentId: agent.id, round: currentRound },
-                controller.signal,
-              ),
-            );
+            try {
+              await consume(
+                await ollamaTurn(
+                  await fetchPrompt(),
+                  { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
+                  { agentId: agent.id, round: currentRound },
+                  controller.signal,
+                ),
+              );
+            } catch (err) { await cloudFallback(err); }
           } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
             await consume(await runLocal());
           } else if (!provider) {
