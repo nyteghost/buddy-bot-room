@@ -136,7 +136,7 @@ import { CompareDialog } from "./compare-dialog";
 import { SeerrDialog } from "./seerr-dialog";
 import { NotesPanel } from "./notes-panel";
 import { DebugLogDialog } from "./debug-log-dialog";
-import { installGlobalLogging, logClient } from "@/lib/debug-log";
+import { buildRecentReport, clientLog, installGlobalLogging, logClient } from "@/lib/debug-log";
 import { warmOllama } from "@/lib/ollama-models";
 import { CommandPalette, type PaletteAction } from "./command-palette";
 import { matchShortcut, shortcutList } from "@/lib/shortcuts";
@@ -979,6 +979,7 @@ export function Room() {
         return say(command, "Cleared the finished to-dos.");
       case "tasks": setNotesOpen(true); return;
       case "log": setLogOpen(true); return;
+      case "logfile": void downloadRecentLog(action.seconds, command); return;
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
@@ -1275,6 +1276,17 @@ export function Room() {
     const link = document.createElement("a");
     link.href = url; link.download = name; link.click();
     URL.revokeObjectURL(url);
+  }
+  async function downloadRecentLog(seconds: number, command: string) {
+    const nowMs = Date.now();
+    const server = await fetch("/api/debuglog").then((r) => (r.ok ? r.text() : "")).catch(() => "");
+    const report = buildRecentReport({
+      app: `${__APP_VERSION__} · ${__APP_COMMIT__}`, seconds, nowMs, server, client: clientLog(),
+      context: [`engine: ${engine.kind}${engine.kind.includes("ollama") ? ` (${engine.ollamaUrl} · ${engine.ollamaModel})` : ""}`, `last error shown: ${error || "none"}`],
+    });
+    download(`pixel-pals-log-${new Date(nowMs).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.txt`, report, "text/plain");
+    const empty = report.includes("(no server events in the last") && report.includes("(nothing logged in this browser");
+    say(command, empty ? `Downloaded, but nothing was logged in the last ${seconds} seconds. If the problem happened earlier, try @log 60.` : `Downloaded the log lines from the last ${seconds} seconds.`);
   }
   function exportSettings(includeKeys: boolean) {
     saverRef.current?.flush(); download(includeKeys ? "pixel-pals-backup-with-keys.json" : "pixel-pals-backup.json", JSON.stringify(buildBackup(localStorage, includeKeys), null, 2), "application/json");

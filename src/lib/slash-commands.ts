@@ -3,6 +3,7 @@ import type { CharacterMode } from "./hellraiser";
 import { parseDice } from "./dice";
 import { parsePromptArgs } from "./prompts";
 import { parseWrite } from "./trakt-write";
+import { parseWindowSeconds } from "./debug-log";
 
 /** Room controls you can type instead of click. Pure parsing only — the Room runs the action. */
 export type ThemeId = Exclude<CharacterMode, "assistant">;
@@ -29,6 +30,7 @@ export type SlashAction =
   | { type: "research"; query: string }
   | { type: "compare"; question: string }
   | { type: "log" }
+  | { type: "logfile"; seconds: number }
   | { type: "library"; query: string }
   | { type: "roll"; expr: string }
   | { type: "plex"; query: string }
@@ -140,6 +142,7 @@ export const slashCommands = [
   { name: "dm", usage: "/dm start <premise>", description: "Dungeon Master mode: start, end, status, character, fact" },
   { name: "roll", usage: "/roll <2d6+3|d20 adv>", description: "Roll dice" },
   { name: "library", usage: "/library <title|recent>", description: "Look in your Jellyfin library (needs JELLYFIN_URL)" },
+  { name: "@log", usage: "@log [10s|2m]", description: "Download the browser and server log lines from the last 10 seconds (or the time you give)" },
   { name: "log", usage: "/log", description: "Open the debug log to copy for a bug report" },
   { name: "compare", usage: "/compare <question>", description: "Blind side-by-side model test" },
 ] as const;
@@ -149,6 +152,11 @@ const slug = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
 /** Returns null when the text isn't a slash command at all (including paths like /etc/fstab). */
 export function parseSlash(input: string): SlashResult | null {
   const text = input.trim();
+  const logFile = text.match(/^@log\b\s*([\s\S]*)$/i);
+  if (logFile) {
+    const seconds = parseWindowSeconds(logFile[1] ?? "");
+    return seconds ? { ok: true, action: { type: "logfile", seconds } } : { ok: false, error: "Type @log for the last 10 seconds, or @log 60 / @log 2m for longer (up to 60 minutes)." };
+  }
   const match = text.match(/^\/([^\s]*)\s*([\s\S]*)$/);
   if (!match) return null;
   const name = (match[1] ?? "").toLowerCase();
@@ -358,7 +366,7 @@ export function slashSuggestions(input: string): SlashSuggestion[] {
   if (space === -1) {
     const typed = body.toLowerCase();
     return slashCommands
-      .filter((c) => c.name.startsWith(typed))
+      .filter((c) => !c.name.startsWith("@") && c.name.startsWith(typed))
       .map((c) => ({ label: c.usage, insert: `/${c.name} `, description: c.description }));
   }
   const name = body.slice(0, space).toLowerCase();
