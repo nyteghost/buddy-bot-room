@@ -38,3 +38,23 @@ Saves drop by ~98 % and UI updates by ~50 % with no added delay on the first tok
 The ranking compute adds ~11-17 ms per question on this sandbox (keyword scoring over all passages). Real Ollama embedding latency was not measured (no Ollama in the authoring sandbox); the saving is the number of embedding calls, which on your GPU also means fewer embedding-model loads next to the chat model.
 
 **Not done on purpose:** background embedding of whole collections. On a single GPU it would compete with chat inference and can evict the chat model from VRAM; passages get embedded lazily as questions touch them.
+
+## M3. Background scheduler: overlap and blocking
+
+**Findings (confirmed in code):**
+1. The 30 s ticker called `tick()` with no re-entry guard, so a tick that took longer than 30 s overlapped the next ones.
+2. `tick()` awaited everything in sequence, and `tickSchedules` (which waits for a whole model answer, possibly minutes) came *before* reminders, update checks, CalDAV, mail alerts and add-ons. One slow answer therefore delayed all of them.
+3. A manual "run now" of a scheduled task could run at the same time as the timed one, and two model jobs (a scheduled task and the morning brief) could hit the GPU together.
+
+**Change:** `src/lib/job-runner.ts` + `src/lib/jobs.server.ts` (one runner per server process, events in the server log). One run per job id at a time (a still-running job is skipped and logged), a lane that runs model work one at a time (`inference`), per-job timeouts that abort and free the slot, cancellation, optional capped retries with exponential backoff. The ticker now runs the quick checks side by side and starts the slow ones (backup, scheduled tasks, weekly review, morning brief) without waiting for them. Missed daily jobs after a restart are still caught the same day by the existing "due and not yet run today" rule.
+
+**Benchmark:** `npx tsx scripts/bench-scheduler.mts` (real job runner; a slow answer scaled to 600 ms stands for 60 s, tick every 30 ms stands for 30 s).
+
+| | ticks overlapping at peak | first reminders check ran after | reminders checks completed |
+|---|---|---|---|
+| OLD (sequential, no guard) | 20 | 630 ms (~63 s scaled) | 24 |
+| NEW | 1 | 32 ms (~3 s scaled) | 24 |
+
+"OLD" is a model of the previous control flow, not the old file executed; the NEW row uses the real runner with the new control flow. Not measured: a real multi-minute Ollama answer.
+
+**Known limits:** a run that ignores its abort signal keeps running in the background after a timeout (the slot is freed so the scheduler is never stuck, and the timeout is logged); a task marked as run just before a hard crash is not retried until the next day.

@@ -2,6 +2,7 @@ import { currentUser } from "./accounts.server";
 import { askPals } from "./ask.server";
 import { telegramSend } from "./telegram.server";
 import { logServer } from "./server-log.server";
+import { jobs } from "./jobs.server";
 import { addSchedule, parseScheduleArgs, parseSchedules, removeSchedule, scheduleDue, scheduleList, today, type Schedule } from "./schedules";
 import { validZone } from "./schedule";
 
@@ -32,18 +33,24 @@ export async function pushNotice(title: string, body: string): Promise<void> {
   } else if (!sent) logServer("info", `Scheduled task finished but no NTFY_URL or Telegram is set: ${title}`);
 }
 
-/** Run one task now: ask the pals, send the answer, remember it. */
+/** Run one task now: ask the pals, send the answer, remember it. Only one run of a task at a time, and model work goes one at a time. */
 export async function runSchedule(id: string, now = new Date()): Promise<string> {
-  const list = await readSchedules();
-  const s = list.find((x) => x.id === id);
-  if (!s) return "That task no longer exists.";
-  const r = await askPals(s.prompt);
-  const text = r.ok ? r.text : `Couldn't run: ${r.error}`;
-  await locked(async () => {
-    const fresh = await readSchedules();
-    await writeSchedules(fresh.map((x) => (x.id === id ? { ...x, last: today(now, tz()), lastResult: text.slice(0, 600) } : x)));
-  });
-  await pushNotice(`Pixel Pals: ${s.prompt.slice(0, 40)}`, r.ok ? `${text}\n\n— ${r.via}` : text);
+  let text = "That task no longer exists.";
+  const result = await jobs().run(`schedule:${id}`, async () => {
+    const list = await readSchedules();
+    const s = list.find((x) => x.id === id);
+    if (!s) return;
+    const r = await askPals(s.prompt);
+    text = r.ok ? r.text : `Couldn't run: ${r.error}`;
+    await locked(async () => {
+      const fresh = await readSchedules();
+      await writeSchedules(fresh.map((x) => (x.id === id ? { ...x, last: today(now, tz()), lastResult: text.slice(0, 600) } : x)));
+    });
+    await pushNotice(`Pixel Pals: ${s.prompt.slice(0, 40)}`, r.ok ? `${text}\n\n— ${r.via}` : text);
+  }, { timeoutMs: 15 * 60_000, lane: "inference" });
+  if (result === "skipped") return "That task is already running.";
+  if (result === "timeout") return "That task took too long and was stopped.";
+  if (result === "failed") return `Couldn't run: ${jobs().state(`schedule:${id}`)?.lastError ?? "error"}`;
   return text;
 }
 
