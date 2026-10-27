@@ -42,7 +42,7 @@ export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: strin
   { id: "calendar-mail", name: "Calendar & mail", blurb: "Calendar feeds, Google Calendar, email", ids: ["calendar", "gcal", "imap", "m365"] },
   { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "today", "telegram", "brief", "caldav"] },
   { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
-  { id: "home", name: "Home & server", blurb: "Weather and your Unraid server", ids: ["weather", "unraid"] },
+  { id: "home", name: "Home & server", blurb: "Weather, your Unraid server and your Obsidian vault", ids: ["weather", "unraid", "obsidian"] },
   { id: "code", name: "Code", blurb: "GitHub repos you keep an eye on", ids: ["github"] },
   { id: "maintenance", name: "Backups & schedules", blurb: "Daily backups and scheduled tasks", ids: ["backup"] },
 ];
