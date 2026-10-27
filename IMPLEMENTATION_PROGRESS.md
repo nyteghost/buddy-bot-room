@@ -22,8 +22,10 @@ Image for this branch: `ghcr.io/nyteghost/buddy-bot-room:beta` (main stays on `:
 - [x] M1 Streaming: throttled UI updates + debounced chat saves (`stream-throttle.ts`, `debounced-save.ts`, `scripts/bench-streaming.mts`, `src/test/stream-throttle.test.ts`). Numbers in `PERFORMANCE_REPORT.md`.
 - [x] M2 Embedding cache: `embed-cache.ts`, `embed-store.ts` (IndexedDB), hybrid ranking, `scripts/bench-embeddings.mts`, `src/test/embed-cache.test.ts`. Numbers in `PERFORMANCE_REPORT.md`.
 - [x] M3 Scheduler: `job-runner.ts`, `jobs.server.ts`, scheduler tick + `runSchedule` rewired, `scripts/bench-scheduler.mts`, `src/test/job-runner.test.ts`.
-- [ ] M4 Conversation storage (only if M1 does not fix large histories).
-- [ ] M5 Polling/network audit (Unraid, Ollama probes).
+- [x] M4 Conversation storage: measured; speed is fine, so no migration. Quota (~5 MB) is the real limit; IndexedDB persistence is the recommended follow-up (see report).
+- [x] M5 Polling: `poll.ts` applied to six client pollers, `scripts/bench-polling.mts`, `src/test/poll.test.ts`.
+
+Release 1 is complete pending your live check and CI. Release 2 (context budgeting, GPU resource manager, routing, multi-agent mode, memory) has not been started.
 
 ## Next (not started)
 1. Phase 2: split `room.tsx` (extract hooks/modules one at a time, behaviour identical).

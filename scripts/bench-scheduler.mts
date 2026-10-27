@@ -1,3 +1,4 @@
+// NOTE: run with `npx tsx scripts/bench-scheduler.mts` (src uses extensionless imports).
 // Scheduler benchmark. Run: npx tsx scripts/bench-scheduler.mts
 // A slow model answer (scaled: 600 ms stands for 60 s) runs while the 30 s tick keeps firing (scaled: every 30 ms).
 // Measures when the reminders check gets to run and how many copies of the slow job run at once. Uses the real job runner.

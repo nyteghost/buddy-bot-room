@@ -58,3 +58,33 @@ The ranking compute adds ~11-17 ms per question on this sandbox (keyword scoring
 "OLD" is a model of the previous control flow, not the old file executed; the NEW row uses the real runner with the new control flow. Not measured: a real multi-minute Ollama answer.
 
 **Known limits:** a run that ignores its abort signal keeps running in the background after a timeout (the slot is freed so the scheduler is never stuck, and the timeout is logged); a task marked as run just before a hard crash is not retried until the next day.
+
+## M4. Conversation storage: measured, deliberately not migrated
+
+Chats are one JSON document in `localStorage` (all five mode windows), loaded once at start and (after M1) saved at most every 2 s while a reply streams. Measured on the authoring sandbox (`node -e` with 1.5 KB messages, 5 windows):
+
+| messages per window | stored | load (JSON.parse) | save (JSON.stringify) |
+|---|---|---|---|
+| 4 | 0.03 MB | 0.1 ms | 0.1 ms |
+| 40 | 0.32 MB | 0.6 ms | 1.0 ms |
+| 400 | 3.21 MB | 6.0 ms | 11.0 ms |
+| 1500 | 12.03 MB | 30.1 ms | 47.3 ms |
+
+**Decision:** speed is not a problem, so no SQLite migration (it would add a migration risk to everyone's saved chats for no measurable gain). The real limit is the browser's `localStorage` quota (about 5 MB), which the 400-per-window case is already close to; the app already shows "Browser storage is full" and offers server-side storage. **Recommended follow-up if you hit that:** move chat persistence to IndexedDB (no 5 MB cap) behind the same debounced saver. Not started.
+
+## M5. Polling
+
+**Finding (confirmed in code):** background refreshers used plain `setInterval` and kept firing in hidden tabs and while their service was off (Ollama status probe every 5 s forever, phone captures and task sync every 60 s, mail/Unraid summary every 5 min, desktop update check every 30 min).
+
+**Change:** `src/lib/poll.ts` `startPolling`: no requests while the tab is hidden (catches up when it becomes visible), never two in flight, doubling delays while a service keeps failing (Ollama probe up to 60 s, phone captures up to 10 min). Applied to `ollama-mascot`, `room.tsx` (captures), `task-sync`, `room-live`, `inbox-panels`, `update-popup`. Server-side: the Unraid watcher already has a `running` guard and the model/provider feeds poll every 6 h, so they were left alone.
+
+**Benchmark:** `npx tsx scripts/bench-polling.mts` (real `startPolling` on a fake clock; one hour with the tab visible 15 min and hidden 45 min; the OLD column is a plain interval, which ignores visibility).
+
+| poller | OLD requests/hour | NEW requests/hour |
+|---|---|---|
+| Ollama status probe, Ollama off | 721 | 17 |
+| Ollama status probe, Ollama on | 721 | 180 |
+| Phone captures and task sync | 61 | 15 |
+| Mail/Unraid summary | 13 | 3 |
+
+Not measured: battery or CPU effect on a phone.

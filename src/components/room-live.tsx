@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { startPolling } from "@/lib/poll";
 import { agentName, type AgentId } from "@/lib/agents";
 import { ambientLines, needsAttention, phaseOf, skyOf, whenText, type LiveData } from "@/lib/live-room";
 import { levelFraction, levelOf, seasonal, unlocked } from "@/lib/progress";
@@ -42,9 +43,8 @@ function useLiveData(active: boolean): LiveData {
       if (un?.configured && un.status) next.server = un.phase === "down" ? "the server is down" : (un.status.problems?.[0] ?? true);
       setD(next);
     };
-    void load();
-    const t = window.setInterval(() => void load(), 300_000);
-    return () => { stop = true; window.clearInterval(t); };
+    const off = startPolling(load, 300_000);
+    return () => { stop = true; off(); };
   }, [active]);
   const open = todos.filter((t) => !t.done).length;
   return { ...d, tasks: open };

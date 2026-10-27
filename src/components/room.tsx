@@ -1,4 +1,5 @@
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import { Puzzle,
   ArrowUpRight,
@@ -347,17 +348,16 @@ export function Room() {
   const savedPrompts = usePrompts();
   useEffect(() => {
     // Things you sent from your phone (Telegram, share sheet) are waiting on the server; fold them into notes and tasks.
-    const collect = async () => {
+    const collect = async (): Promise<boolean> => {
       try {
         const res = await fetch("/api/capture", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "take" }) });
-        if (!res.ok) return;
+        if (!res.ok) return false;
         const { items } = (await res.json()) as { items?: Capture[] };
         if (items?.length) updateWorkbench((w) => mergeCaptures(w, items));
-      } catch { /* offline or not the owner */ }
+        return true;
+      } catch { return false; /* offline or not the owner: ask less often */ }
     };
-    void collect();
-    const t = window.setInterval(() => void collect(), 60_000);
-    return () => window.clearInterval(t);
+    return startPolling(collect, 60_000, { maxMs: 600_000 });
   }, []);
   const speakingMessage = useSpeakingId();
   const [canSpeak, setCanSpeak] = useState(false);
