@@ -798,7 +798,7 @@ export function Room() {
                 answer = undefined; lastError = err;
               }
             }
-            throw lastError;
+            throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} The cloud AIs didn't answer either (${lastError instanceof Error ? lastError.message : String(lastError)}).`);
           };
           const runOllama = async () =>
             consume(
@@ -828,7 +828,13 @@ export function Room() {
               } catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
-                await runOllama();
+                logClient("warn", "Cloud AI failed, trying Ollama", err);
+                try { await runOllama(); }
+                catch (localErr) {
+                  if (controller.signal.aborted || (answer && messageText(answer).trim())) throw localErr;
+                  // Say what the cloud AI did, not only that Ollama is off: that is the error worth fixing.
+                  throw new Error(`The cloud AI didn't answer (${err instanceof Error ? err.message : String(err)}), and ${localErr instanceof Error ? localErr.message : "your Ollama didn't answer either"}`);
+                }
               }
             }
           } else if (engine.kind === "local-server") {
