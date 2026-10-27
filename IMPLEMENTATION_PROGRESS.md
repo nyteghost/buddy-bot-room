@@ -20,7 +20,7 @@ Image for this branch: `ghcr.io/nyteghost/buddy-bot-room:beta` (main stays on `:
 
 ## Release 1 (performance) — milestones, one commit each
 - [x] M1 Streaming: throttled UI updates + debounced chat saves (`stream-throttle.ts`, `debounced-save.ts`, `scripts/bench-streaming.mts`, `src/test/stream-throttle.test.ts`). Numbers in `PERFORMANCE_REPORT.md`.
-- [ ] M2 Embedding cache (persistent per chunk hash + model; hybrid keyword/semantic; no "first N chunks only" candidates).
+- [x] M2 Embedding cache: `embed-cache.ts`, `embed-store.ts` (IndexedDB), hybrid ranking, `scripts/bench-embeddings.mts`, `src/test/embed-cache.test.ts`. Numbers in `PERFORMANCE_REPORT.md`.
 - [ ] M3 Scheduler: tick overlap guard, per-job timeouts, no one slow job blocking the rest.
 - [ ] M4 Conversation storage (only if M1 does not fix large histories).
 - [ ] M5 Polling/network audit (Unraid, Ollama probes).

@@ -1,3 +1,4 @@
+// NOTE: run with `npx tsx scripts/bench-streaming.mts` (src uses extensionless imports).
 // Streaming write benchmark. Run: node --experimental-strip-types scripts/bench-streaming.mts
 // Models one streamed reply (token every 25 ms for 1200 tokens ~ 30 s) on top of short, medium and long chat histories and counts
 // how many UI state updates and localStorage saves the old behaviour (every token) and the new one (throttled + debounced) cause.
