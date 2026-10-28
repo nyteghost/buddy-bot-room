@@ -1769,6 +1769,7 @@ export function Room() {
             setFunOpen(show("fun"));
             setRecorderOpen(show("recorder"));
             setPlaytestsOpen(show("playtests"));
+            setAddonOpen(addons.find((a) => show(`addon-${a.id}`))?.id ?? null);
             setSearchOpen(show("search"));
             setMoreOpen(show("tools") || show("setup"));
             setSidebarCompact(false);
