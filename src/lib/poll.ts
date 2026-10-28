@@ -4,12 +4,15 @@ export type PollEnv = {
   setTimeout(fn: () => void, ms: number): unknown;
   clearTimeout(id: unknown): void;
   onVisible(fn: () => void): () => void;
+  /** Multiplies every wait (low-power mode). Omitted = 1. */
+  scale?(): number;
 };
 export const browserEnv: PollEnv = {
   now: () => Date.now(),
   hidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
   setTimeout: (fn, ms) => window.setTimeout(fn, ms),
   clearTimeout: (id) => window.clearTimeout(id as number),
+  scale: () => { try { return localStorage.getItem("pixel-pals-lowpower-v1") === "1" ? 3 : 1; } catch { return 1; } },
   onVisible: (fn) => {
     const h = () => { if (document.visibilityState === "visible") fn(); };
     document.addEventListener("visibilitychange", h);
@@ -22,7 +25,7 @@ export const browserEnv: PollEnv = {
 export function startPolling(task: () => Promise<boolean | void>, ms: number, opts: { maxMs?: number; immediate?: boolean; env?: PollEnv } = {}): () => void {
   const env = opts.env ?? browserEnv;
   let stopped = false, running = false, timer: unknown = null, delay = ms, lastRun = -Infinity;
-  const schedule = (wait: number) => { if (stopped) return; if (timer !== null) env.clearTimeout(timer); timer = env.setTimeout(fire, wait); };
+  const schedule = (wait: number) => { if (stopped) return; if (timer !== null) env.clearTimeout(timer); timer = env.setTimeout(fire, wait * (env.scale?.() ?? 1)); };
   const fire = async () => {
     timer = null;
     if (stopped) return;

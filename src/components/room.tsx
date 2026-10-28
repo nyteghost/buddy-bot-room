@@ -173,6 +173,7 @@ import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
 import { getOverrides, mayUseRealData, memoryAccess, useOverrides } from "@/lib/character-overrides";
+import { chatSlice, lowPower, usePowerAttributes } from "@/lib/power";
 import { getProjects, logRun, projectBrief, updateProject, useProjects } from "@/lib/projects";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
@@ -222,6 +223,8 @@ export function Room() {
   const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
   const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
   useOverrides();
+  usePowerAttributes();
+  const [shownCount, setShownCount] = useState<Record<string, number>>({});
   const projectsAll = useProjects();
   const activeName = activeProject.use();
   // Resume: when a project with assigned pals is active (including right after a restart), seat exactly those pals.
@@ -1011,6 +1014,11 @@ export function Room() {
         setAppearance(next);
         return say(command, `Appearance: ${next.scheme} colours, ${next.size} text.${next.scheme !== "dark" ? " (Light applies to the Normal theme; other themes keep their own palettes.)" : ""}`);
       }
+      case "lowpower": {
+        const on = action.on ?? !lowPower.get();
+        lowPower.set(on);
+        return say(command, on ? "Low-power mode is on: background timers are slower, decorative animations are paused and the app polls less often. Replies and features are unchanged. /lowpower off turns it off." : "Low-power mode is off.");
+      }
       case "panel": {
         if (action.panel === "calendar") setCalendarOpen(true); else if (action.panel === "mail") setMailOpen(true); else if (action.panel === "today") setTodayOpen(true); else if (action.panel === "setup") setSetupOpen(true); else if (action.panel === "search") setSearchOpen(true); else setTasksOpen(true);
         return say(command, action.panel === "calendar" ? "Calendar is open in the workspace." : "Mail is open in the workspace.");
@@ -1326,6 +1334,7 @@ export function Room() {
     ...modeNames.map((m): PaletteAction => ({ id: `mode-${m}`, group: "Mode", label: `Mode: ${m}`, run: () => { setMode(m as Mode); showMode(m as Mode); } })),
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
+    { id: "lowpower-toggle", group: "View", label: "Low-power mode: on / off", keywords: "battery save power phone animation", run: () => runSlash({ type: "lowpower", on: null }, "/lowpower") },
     { id: "appearance-light", group: "View", label: "Appearance: light colours", keywords: "light mode bright theme", run: () => runSlash({ type: "appearance", words: "light" }, "/appearance light") },
     { id: "appearance-dark", group: "View", label: "Appearance: dark colours", keywords: "dark mode", run: () => runSlash({ type: "appearance", words: "dark" }, "/appearance dark") },
     { id: "appearance-large", group: "View", label: "Text size: larger", keywords: "font zoom bigger accessibility", run: () => runSlash({ type: "appearance", words: "large" }, "/appearance large") },
@@ -1502,7 +1511,11 @@ export function Room() {
                   <span className="empty-caption">FOUR PERSONALITIES. ENDLESS POSSIBILITIES.</span>
                 </div>
               ) : (
-                msgs.map((m) => {
+                <>
+                {(() => { const sl = chatSlice(msgs, shownCount[wm] ?? 0); return sl.hidden > 0 ? (
+                  <button type="button" className="show-earlier" onClick={() => setShownCount((c) => ({ ...c, [wm]: msgs.length - sl.hidden + 60 }))}>Show {Math.min(60, sl.hidden)} earlier messages ({sl.hidden} hidden to keep the page fast)</button>
+                ) : null; })()}
+                {chatSlice<RoomMessage>(msgs, shownCount[wm] ?? 0).items.map((m) => {
                   const a = agents.find((a) => a.id === m.metadata?.agentId);
                   const messageMode = m.metadata?.characterMode ?? characterMode;
                   const sideTag = m.metadata?.side === "for" ? " · FOR" : m.metadata?.side === "against" ? " · AGAINST" : "";
@@ -1593,7 +1606,8 @@ export function Room() {
                       </div>
                     </Message>
                   );
-                })
+                })}
+                </>
               )}
               {busyHere && (
                 <div className="thinking-row">

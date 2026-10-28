@@ -52,6 +52,7 @@ export type SlashAction =
   | { type: "panel"; panel: "calendar" | "mail" | "today" | "tasks" | "setup" | "search" }
   | { type: "hide"; mode: "on" | "off" | "toggle" }
   | { type: "appearance"; words: string }
+  | { type: "lowpower"; on: boolean | null }
   | { type: "m365"; op: string }
   | { type: "schedule"; op: "list" | "add" | "remove" | "run"; text: string }
   | { type: "web"; mode: "on" | "off" | "toggle" }
@@ -120,6 +121,7 @@ export const slashCommands = [
   { name: "schedule", usage: "/schedule add 08:00 weekdays <question> | list | remove N | run N", description: "Have the pals answer something on a schedule and send it to your phone (owner only; free keys and Local AI only)" },
   { name: "m365", usage: "/m365 connect | status | today | mail | summary | disconnect", description: "Read-only work calendar and unread mail subjects (Microsoft 365). Summaries use Local AI only" },
   { name: "appearance", usage: "/appearance light|dark|auto · small|normal|large", description: "Colour scheme (light applies to the Normal theme) and text size" },
+  { name: "lowpower", usage: "/lowpower on|off", description: "Low-power mode: slower background timers, decorative animations paused, less frequent polling (good for phones and battery)" },
   { name: "calendar", usage: "/calendar", description: "Open the Calendar window (next 7 days)" },
   { name: "mail", usage: "/mail", description: "Open the Mail window (unread subjects)" },
   { name: "find", usage: "/find", description: "Search your saved chats, notes, tasks, memories and reminders" },
@@ -252,6 +254,9 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "m365", op: arg } };
     case "appearance": case "theme-color": case "textsize":
       return rawArg ? { ok: true, action: { type: "appearance", words: rawArg } } : fail("Try /appearance light, /appearance dark, /appearance auto, or /appearance large.");
+    case "lowpower": case "low-power": case "battery":
+      if (arg && !["on", "off", "toggle"].includes(arg)) return fail("Try /lowpower on or /lowpower off.");
+      return { ok: true, action: { type: "lowpower", on: arg === "on" ? true : arg === "off" ? false : null } };
     case "calendar": case "agenda":
       return { ok: true, action: { type: "panel", panel: "calendar" } };
     case "find": case "lookup":

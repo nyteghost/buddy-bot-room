@@ -57,6 +57,12 @@ jobs:
           PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
           SMOKE_URL: http://localhost:8090
           SMOKE_SHOT: ${{ runner.temp }}/smoke.png
+      - name: Frontend profile (informational)
+        continue-on-error: true
+        run: node tools/smoke/profile.mjs 2>&1 | tee profile.log
+        env:
+          PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
+          SMOKE_URL: http://localhost:8090
       - name: Server log
         if: always()
         run: tail -n 60 server.log || true

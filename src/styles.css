@@ -2206,3 +2206,11 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .pp-print-root { display: block !important; }
   .pp-print-root img { display: block; width: 100%; break-after: page; page-break-after: always; }
 }
+
+/* Power: nothing animates while the tab is hidden, and low-power mode pauses purely decorative loops (replies, the "thinking" dots and every feature are unchanged). */
+html[data-hidden="1"] *, html[data-hidden="1"] *::before, html[data-hidden="1"] *::after { animation-play-state: paused !important; }
+html[data-lowpower="1"] .thinking-prop rect,
+html[data-lowpower="1"] .hell-glow,
+html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-play-state: paused !important; }
+.show-earlier { display: block; margin: 0.5rem auto; padding: 0.35rem 0.75rem; font-size: 0.75rem; border: 1px solid var(--border, currentColor); border-radius: 0.375rem; background: transparent; color: inherit; cursor: pointer; opacity: 0.8; }
+.show-earlier:hover { opacity: 1; }

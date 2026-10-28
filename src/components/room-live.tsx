@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { startPolling } from "@/lib/poll";
+import { useCalmInterval } from "@/lib/power";
 import { agentName, type AgentId } from "@/lib/agents";
 import { ambientLines, needsAttention, phaseOf, skyOf, whenText, type LiveData } from "@/lib/live-room";
 import { levelFraction, levelOf, seasonal, unlocked } from "@/lib/progress";
@@ -58,12 +59,12 @@ export function RoomLive({ active, running, theme, onOpen, onChatter }: { active
   const done = todos.filter((t) => t.done).length;
   useEffect(() => { syncDoneTasks(done); }, [done]);
   const [hour, setHour] = useState(() => new Date().getHours());
-  useEffect(() => { const t = window.setInterval(() => setHour(new Date().getHours()), 60_000); return () => window.clearInterval(t); }, []);
+  useCalmInterval(() => setHour(new Date().getHours()), 60_000);
   const phase = phaseOf(hour);
   const sky = data.weather?.sky ?? "clear";
   const lines = useMemo(() => ambientLines(data), [data]);
   const [i, setI] = useState(0);
-  useEffect(() => { if (lines.length < 2) return; const t = window.setInterval(() => setI((n) => n + 1), 9000); return () => window.clearInterval(t); }, [lines.length]);
+  useCalmInterval(() => setI((n) => n + 1), 9000, lines.length >= 2);
   const line = lines.length ? lines[i % lines.length] : undefined;
   useEffect(() => { onChatter?.(!running && line ? line.agent : null); }, [line?.agent, line?.text, running]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => onChatter?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps

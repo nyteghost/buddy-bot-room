@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Plus, Square, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCalmInterval } from "@/lib/power";
 import { FOCUS_CHOICES, focusLeftMs, type Focus } from "@/lib/today";
 
 type Run = (label: string, body: Record<string, unknown>) => Promise<void>;
@@ -9,7 +10,9 @@ const clock = (ms: number) => { const t = Math.floor(Math.abs(ms) / 1000); retur
 /** The running focus session: time left, and three ways out. Check-ins also go to your phone at halfway and at the end. */
 export function FocusCard({ focus, busy, run }: { focus: Focus | null; busy: boolean; run: Run }) {
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { if (!focus) return; setNow(Date.now()); const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, [focus]);
+  useEffect(() => { if (focus) setNow(Date.now()); }, [focus]);
+  // The countdown redraws each second while you can see it; it recomputes from the clock when you come back.
+  useCalmInterval(() => setNow(Date.now()), 1000, !!focus, false);
   if (!focus) return null;
   const left = focusLeftMs(focus, now);
   const over = left <= 0;

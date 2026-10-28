@@ -5,6 +5,7 @@ import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, type Heading } from "@/lib/office-motion";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
+import { useCalmInterval } from "@/lib/power";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
 
@@ -13,12 +14,10 @@ export function OfficePal({ id, index, mode, active, enabled }: {
 }) {
   const [elapsed, setElapsed] = useState(0);
   const [arrived, setArrived] = useState(false);
-  useEffect(() => {
-    if (!enabled || active || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const start = performance.now();
-    const timer = window.setInterval(() => setElapsed(performance.now() - start), 160);
-    return () => window.clearInterval(timer);
-  }, [enabled, active]);
+  const [start] = useState(() => performance.now());
+  const wandering = enabled && !active && !(typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // The walk is redrawn 6 times a second; it pauses while the tab is hidden and slows down in low-power mode.
+  useCalmInterval(() => setElapsed(performance.now() - start), 160, wandering);
   useEffect(() => {
     setArrived(false);
     if (!active) return;
