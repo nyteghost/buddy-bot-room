@@ -48,6 +48,7 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 - `migrate.ts` (pure runner + record format), `migrations.ts` (the list; append only), `migrate.server.ts` (file adapter over the data folder, atomic writes, runs once per process from `bootJobs` and the dev server), `migrate-client.ts` (localStorage adapter, called when the room module loads).
 - Record: `{version, pending?{id,attempts,saved}, skipped[], history[]}`. `pending` is written before a migration starts and removed after; finding it at start means the last run was cut off. `saved` holds the old values of the declared keys.
 - Operating guide: `docs/UPDATING.md`.
+- Dependency advisories: see the open finding in IMPLEMENTATION_PROGRESS.md (38 reported by `bun audit` on 2026-10-28, not yet triaged for reachability).
 
 ## Security boundaries (audit, Release 3 item 12)
 Already in place before this pass: optional shared-password gate or built-in accounts (signed sessions, owner-only windows), secrets kept server-side in `app-secrets.json` (mode 600, never returned to the browser), `redact()` on logs/bug reports, Local-Only AI enforced on the server, SSRF checks on custom provider URLs, read-only Unraid monitoring (no admin or shell operations exist, so nothing needs approval), mail attachments served `private, no-store` with a sandbox CSP.
