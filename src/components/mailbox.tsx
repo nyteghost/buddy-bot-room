@@ -115,12 +115,12 @@ export function Mailbox({ open }: { open: boolean }) {
 
   const doDelete = async () => {
     if (confirm !== "delete") { setConfirm("delete"); return; }
-    if (msg && (await act("delete", { op: "delete", uid: msg.uid }, "Moved to Trash."))) await backToList();
+    if (msg && (await act("delete", { op: "delete", uid: msg.uid }, "Moved to Trash."))) await backToList(true);
     setConfirm("");
   };
 
   const doMove = async () => {
-    if (msg && moveTo && (await act("move", { op: "move", uid: msg.uid, to: moveTo }, "Moved."))) await backToList();
+    if (msg && moveTo && (await act("move", { op: "move", uid: msg.uid, to: moveTo }, "Moved."))) await backToList(true);
   };
 
   const inTrash = data?.folders.find((f) => f.name === folder)?.special === "trash" || data?.folders.find((f) => f.name === folder)?.special === "junk";
