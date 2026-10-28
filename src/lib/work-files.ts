@@ -199,7 +199,7 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
     for (let r = dayRow + 2; r <= lastRow; r++) {
       const label = String(value(ws.getCell(r, 1)) ?? "").trim();
       const next = String(value(ws.getCell(r + 1, 1)) ?? "").trim();
-      if (label && /^\\d{3}$/.test(next)) people.add(label);
+      if (label && /^\d{3}$/.test(next)) people.add(label);
       if (label.toLowerCase() !== target) continue;
       for (let c = 2; c <= 8; c++) {
         const raw = String(value(ws.getCell(r, c)) ?? "").trim();
