@@ -4,6 +4,7 @@ import {
   readSession, signSession, toPublic, verifyPassword, type PublicUser, type StoredUser,
 } from "./accounts";
 import { logServer } from "./server-log.server";
+import { firstRunSetupCode, clearFirstRunSetupCode } from "./first-setup.server";
 
 /**
  * Accounts for the self-hosted build. Users live in BUDDY_DATA_DIR/users.json (PBKDF2-hashed passwords, file mode 600);
@@ -107,7 +108,7 @@ button{background:#7c6cf0;border:0;cursor:pointer}.err{color:#ff8a8a;margin:0}.h
 
 /** The page an unauthenticated browser sees: sign in, or first-run account creation. */
 export async function authPage(message = ""): Promise<Response> {
-  return (await userCount()) ? page("signin", message) : page("setup", message, !!(process.env["BUDDY_PASSWORD"] ?? "").trim());
+  return (await userCount()) ? page("signin", message) : page("setup", message, !!(await firstRunSetupCode()));
 }
 
 const fails = new Map<string, { n: number; first: number }>();
@@ -163,7 +164,7 @@ export async function handleAccounts(request: Request, now = Date.now()): Promis
     if (limited(ip, now)) return page("setup", "Too many tries. Wait a few minutes.", !!(process.env["BUDDY_PASSWORD"] ?? "").trim());
     const form = await request.formData().catch(() => null);
     const get = (k: string) => (typeof form?.get(k) === "string" ? String(form?.get(k)) : "");
-    const setupCode = (process.env["BUDDY_PASSWORD"] ?? "").trim();
+    const setupCode = await firstRunSetupCode();
     const again = (m: string) => page("setup", m, !!setupCode);
     if (setupCode && !safeEqual(get("code"), setupCode)) { fail(ip, now); return again("That setup password isn't right."); }
     const name = get("username").trim();
@@ -178,6 +179,7 @@ export async function handleAccounts(request: Request, now = Date.now()): Promis
       return true;
     });
     if (!created) return page("signin", "An account already exists. Sign in.");
+    await clearFirstRunSetupCode().catch((e) => logServer("warn", "Could not remove used first-run setup code", e));
     logServer("info", `first account created: ${name}`);
     return startSession(request, name, now);
   }
