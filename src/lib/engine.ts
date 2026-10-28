@@ -175,6 +175,27 @@ export function cloudFallbackChain(s: EngineSettings, blockPaid = false): TurnPr
   return [...turnProviders(s, blockPaid), ...fallbackProviders(s, blockPaid)].filter((p) => (seen.has(p.kind) ? false : (seen.add(p.kind), true)));
 }
 
+/** AIs that just failed are put on a bench so the next turns skip them instead of waiting on them again. */
+export type Bench = Map<string, number>;
+export const benchKey = (p: Pick<TurnProvider, "kind" | "baseUrl">): string => `${p.kind}|${p.baseUrl ?? ""}`;
+const TRANSIENT_BENCH_MS = 3 * 60_000;
+const BROKEN_BENCH_MS = 15 * 60_000;
+
+/** How long to skip an AI after it failed: longer when the key or model itself is wrong, shorter for limits and outages. */
+export function benchMs(error: unknown): number {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /HTTP (401|402|403|404)\b/.test(msg) ? BROKEN_BENCH_MS : TRANSIENT_BENCH_MS;
+}
+export function benchProvider(bench: Bench, p: Pick<TurnProvider, "kind" | "baseUrl">, error: unknown, now = Date.now()): void {
+  bench.set(benchKey(p), now + benchMs(error));
+}
+export const isBenched = (bench: Bench, p: Pick<TurnProvider, "kind" | "baseUrl">, now = Date.now()): boolean => (bench.get(benchKey(p)) ?? 0) > now;
+
+/** Same list, with benched AIs moved to the end: they are only tried when nothing else is left. Order is otherwise kept. */
+export function orderByHealth(chain: TurnProvider[], bench: Bench, now = Date.now()): TurnProvider[] {
+  return [...chain.filter((p) => !isBenched(bench, p, now)), ...chain.filter((p) => isBenched(bench, p, now))];
+}
+
 /** What to try, in order, when `failed` errored before producing text. */
 export function chainAfter(s: EngineSettings, failed: TurnProvider, blockPaid = false): TurnProvider[] {
   if (failed.kind === "ollama-server") return [];
@@ -194,7 +215,7 @@ export function providerForTurn(s: EngineSettings, turnIndex: number, hint: Rout
   return list.length ? list[turnIndex % list.length] : undefined;
 }
 
-const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", custom: "Custom" };
+export const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", custom: "Custom" };
 const shortModel = (m: string): string => (m.split("/").pop() ?? m).slice(0, 40);
 
 /** Which AI answers for the pal at this position in the roster, in words: "Groq · gpt-oss-120b", "Ollama · qwen2.5:7b". Same rotation the chat uses. */

@@ -1,4 +1,5 @@
 import { convertToModelMessages, streamText, validateUIMessages, type ModelMessage } from "ai";
+import { explainAiError } from "./ai-error";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { agents, agentName, agentPersona, contextForMode, contextForPartner, models, messageText, type RoomMessage } from "./agents";
@@ -248,20 +249,5 @@ export async function handleChat(request: Request) {
   }
 }
 export function safeError(error: unknown): string {
-  if (
-    error &&
-    typeof error === "object" &&
-    "responseBody" in error &&
-    typeof error.responseBody === "string"
-  ) {
-    try {
-      const body = JSON.parse(error.responseBody);
-      return (
-        body.message ?? body.error?.message ?? (typeof body.error === "string" ? body.error : undefined) ?? "The AI service could not complete this request."
-      );
-    } catch {
-      /* use message below */
-    }
-  }
-  return error instanceof Error ? error.message : "The AI service could not complete this request.";
+  return explainAiError(error);
 }

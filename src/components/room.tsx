@@ -107,7 +107,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { chainAfter, cloudFallbackChain, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
+import { benchProvider, chainAfter, cloudFallbackChain, isBenched, orderByHealth, providerNames, type Bench, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
@@ -413,6 +413,8 @@ export function Room() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  /** AIs that failed recently: later turns skip them (see orderByHealth). */
+  const benchRef = useRef<Bench>(new Map());
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [forkSignals, setForkSignals] = useState<Record<Mode, number>>({ roundtable: 0, broadcast: 0, direct: 0, solve: 0, debate: 0 });
   const bumpFork = (m: Mode) => setForkSignals((f) => ({ ...f, [m]: f[m] + 1 }));
@@ -763,7 +765,7 @@ export function Room() {
           const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
-            const chain = [first, ...chainAfter(engine, first, blockPaid)];
+            const chain = orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
             let lastError: unknown;
             for (const p of chain) {
               try {
@@ -775,8 +777,9 @@ export function Room() {
               } catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
-                lastError = err;
-                logClient("warn", `${p.kind} failed, trying the next provider`, err);
+                lastError = new Error(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                benchProvider(benchRef.current, p, err);
+                logClient("warn", `${p.kind} failed, skipping it for a few minutes and trying the next AI`, err);
               }
             }
             throw lastError;
@@ -786,7 +789,7 @@ export function Room() {
             if (controller.signal.aborted || (answer && messageText(answer).trim())) throw why;
             // Mail, calendar and task details never go to a cloud AI, so with those in the question there is nothing to fall back to.
             if (requestBody.realData) throw why;
-            const rest = cloudFallbackChain(engine, blockPaid);
+            const rest = orderByHealth(cloudFallbackChain(engine, blockPaid), benchRef.current);
             if (!rest.length) throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} No other AI is set up to take over: add a free key in AI engine settings (or switch the engine to Auto) and chats will fall back to it.`);
             answer = undefined;
             logClient("warn", "Ollama didn't answer, trying the next AI", why);
@@ -795,7 +798,8 @@ export function Room() {
               try { await consume(await runCloud(p)); return; }
               catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
-                answer = undefined; lastError = err;
+                answer = undefined; lastError = new Error(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                benchProvider(benchRef.current, p, err);
               }
             }
             throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} The cloud AIs didn't answer either (${lastError instanceof Error ? lastError.message : String(lastError)}).`);
@@ -841,7 +845,10 @@ export function Room() {
             if (!provider) throw new Error("Local AI isn't available.");
             try { await runChain(provider); } catch (err) { await cloudFallback(err); }
           } else if (engine.kind === "ollama") {
+            const ollamaKey = { kind: "ollama-server" as const, baseUrl: engine.ollamaUrl };
             try {
+              // Ollama failed a moment ago and another AI is set up: don't wait on it again for every pal.
+              if (isBenched(benchRef.current, ollamaKey) && cloudFallbackChain(engine, blockPaid).length) throw new Error(`Can't reach your local server at ${engine.ollamaUrl}.`);
               await consume(
                 await ollamaTurn(
                   await fetchPrompt(),
@@ -850,7 +857,10 @@ export function Room() {
                   controller.signal,
                 ),
               );
-            } catch (err) { await cloudFallback(err); }
+            } catch (err) {
+              if (!controller.signal.aborted && !isBenched(benchRef.current, ollamaKey)) benchProvider(benchRef.current, ollamaKey, err);
+              await cloudFallback(err);
+            }
           } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
             await consume(await runLocal());
           } else if (!provider) {
