@@ -8,7 +8,7 @@ const LIMITS: Record<keyof MailDraft, number> = {
 };
 export const blankMailDraft = (): MailDraft => ({ to: "", cc: "", subject: "", text: "", inReplyTo: "", references: "" });
 export const hasMailDraft = (draft: MailDraft): boolean =>
-  !!(draft.to || draft.cc || draft.subject || draft.text || draft.inReplyTo || draft.references).trim();
+  Object.values(draft).some((value) => value.trim().length > 0);
 
 export function mailDraftKey(account: string | null | undefined): string | null {
   const clean = (account ?? "").trim().toLowerCase();
