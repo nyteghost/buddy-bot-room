@@ -13,6 +13,13 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
 const out = (k, v) => console.log(`PROFILE ${k} ${JSON.stringify(v)}`);
 
+const loaded = [];
+page.on("response", async (res) => {
+  const u = res.url();
+  if (!/\.js(\?|$)/.test(u)) return;
+  try { loaded.push({ file: u.split("/").pop().split("?")[0], kb: Math.round((await res.body()).length / 1024) }); } catch { /* streamed or cancelled */ }
+});
+
 async function signIn() {
   await page.goto(URL_, { waitUntil: "domcontentloaded", timeout: 60000 });
   const boxes = page.locator("input");
@@ -63,6 +70,8 @@ async function measure(label) {
 
 try {
   await signIn();
+  loaded.sort((a, b) => b.kb - a.kb);
+  out("startup-js", { files: loaded.length, totalKb: loaded.reduce((n, f) => n + f.kb, 0), largest: loaded.slice(0, 10).map((f) => `${f.file} ${f.kb}k`) });
   await page.evaluate(seed, COUNT);
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator(".room-message").first().waitFor({ timeout: 30000 });
