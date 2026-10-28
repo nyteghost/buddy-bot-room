@@ -15,7 +15,7 @@ export async function firstRunSetupCode(): Promise<string> {
   const configured = (process.env["BUDDY_PASSWORD"] ?? "").trim();
   if (configured) return configured;
   if (!dir()) throw new Error("A data directory is required for first-run setup.");
-  const fs = await import("node:fs/promises");
+  const fs = (await import(/* @vite-ignore */ "node:" + "fs/promises")) as typeof import("node:fs/promises");
   await fs.mkdir(dir(), { recursive: true, mode: 0o700 });
   let code: string;
   try {
@@ -41,7 +41,7 @@ export async function firstRunSetupCode(): Promise<string> {
 
 export async function clearFirstRunSetupCode(): Promise<void> {
   if ((process.env["BUDDY_PASSWORD"] ?? "").trim() || !dir()) return;
-  const fs = await import("node:fs/promises");
+  const fs = (await import(/* @vite-ignore */ "node:" + "fs/promises")) as typeof import("node:fs/promises");
   await fs.unlink(codeFile()).catch((error: { code?: string }) => {
     if (error.code !== "ENOENT") throw error;
   });
