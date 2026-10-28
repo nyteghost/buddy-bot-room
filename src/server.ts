@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { isAbortError } from "./lib/ai/stream-errors.server";
 import { gate } from "./lib/gate.server";
+import { applySecurityHeaders } from "./lib/security-headers";
 import { startScheduler } from "./lib/scheduler.server";
 import { startWatcher } from "./lib/unraid.server";
 
@@ -69,8 +70,7 @@ function bootJobs(): void {
 }
 bootJobs();
 
-export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
+async function handleRequest(request: Request, env: unknown, ctx: unknown): Promise<Response> {
     try {
       // Self-hosted only: BUDDY_PASSWORD turns on a shared-password gate (no-op when unset).
       const url = new URL(request.url);
@@ -92,5 +92,10 @@ export default {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
     }
+}
+
+export default {
+  async fetch(request: Request, env: unknown, ctx: unknown) {
+    return applySecurityHeaders(await handleRequest(request, env, ctx), { allowFraming: typeof process !== "undefined" && process.env["ALLOW_FRAMING"] === "1" });
   },
 };

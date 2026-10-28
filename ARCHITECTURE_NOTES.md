@@ -24,3 +24,19 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 ## Memory
 - Storage unchanged: `pixel-pals-workbench-v1` in browser localStorage (`memories` shared, `pal[id]` private to one pal, new optional `project[name]`). New optional entry fields: `pinned`, `digest`. Old data loads as is; rolling back leaves the extra fields ignored.
 - Prompt memory = `promptContextFor` -> `pickMemories`: everything if it fits the budget (same text as before), otherwise ranked by keyword (IDF-weighted word stems) + optional meaning score (`memoryBoost`, only computed when over budget) + recency + scope. Other pals' private memories are never visible to a pal. Active project: `pixel-pals-active-project-v1`.
+
+## Security boundaries (audit, Release 3 item 12)
+Already in place before this pass: optional shared-password gate or built-in accounts (signed sessions, owner-only windows), secrets kept server-side in `app-secrets.json` (mode 600, never returned to the browser), `redact()` on logs/bug reports, Local-Only AI enforced on the server, SSRF checks on custom provider URLs, read-only Unraid monitoring (no admin or shell operations exist, so nothing needs approval), mail attachments served `private, no-store` with a sandbox CSP.
+
+Changed in this pass:
+- Shared-password sessions are signed tokens with a 30-day expiry (key in `BUDDY_DATA_DIR/gate.key`, mode 600; changing `BUDDY_PASSWORD` signs everyone out). The old cookie was a bare SHA-256 of the password, valid forever. Everyone signs in once after the update.
+- Sign-in attempts: 8 per address and 40 per server per 10 minutes (`rate-limit.ts`), because `X-Forwarded-For` can be faked by anyone who reaches the port. Side effect: someone guessing wrongly 40 times can lock you out for up to 10 minutes.
+- Every response gets `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'` unless it sets its own policy; `ALLOW_FRAMING=1` turns the framing part off.
+- The test-key button sends nothing to cloud providers in Local-Only mode.
+- Compose files publish the stack's Ollama (it has no password) on `127.0.0.1` by default (`OLLAMA_BIND`). Copy the new line into your own compose file to adopt it.
+
+Known gaps, not changed (each needs a design decision or live testing):
+- Cloud provider API keys entered in engine settings live in browser storage and are synced to your account file on the server; moving them to the server-only secret store is a migration.
+- No Origin/CSRF token check on API POSTs (cookies are `SameSite=Lax`, which blocks cross-site POSTs in current browsers).
+- No full Content-Security-Policy (the app relies on inline styles, a PDF worker and blob URLs).
+- Prompt injection: documents, web results, mail and hand-offs are passed to the model labelled as data and the pals have no tools that change anything, so the worst case is a misleading answer, not an action.

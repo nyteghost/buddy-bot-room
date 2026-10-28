@@ -4,13 +4,16 @@
  * The cookie holds a SHA-256 of the password, never the password itself, and is HttpOnly.
  */
 import { readCookie, safeEqual } from "./cookies";
+import { createLimiter } from "./rate-limit";
+import { readSession, signSession } from "./accounts";
 import { accountsEnabled } from "./accounts";
 import { authPage, currentUser, handleAccounts, tokenUser } from "./accounts.server";
 
 const COOKIE = "buddy_auth";
 const MAX_FAILS = 8;
 const WINDOW_MS = 10 * 60 * 1000;
-const fails = new Map<string, { n: number; first: number }>();
+/** 8 wrong tries per address, and 40 for the whole server in 10 minutes (the address header can be faked by anyone who reaches the port). */
+export const loginLimiter = createLimiter({ max: MAX_FAILS, windowMs: WINDOW_MS, globalMax: 40 });
 
 async function digest(password: string): Promise<string> {
   const bytes = new TextEncoder().encode(`pixel-pals-gate:${password}`);
@@ -19,6 +22,34 @@ async function digest(password: string): Promise<string> {
 }
 
 export { readCookie, safeEqual };
+
+/**
+ * Sessions are signed tokens with an expiry (30 days), not a fixed hash of the password: a copied cookie stops working when it expires,
+ * and changing BUDDY_PASSWORD signs everyone out. The signing key is random, kept in BUDDY_DATA_DIR/gate.key (mode 600) so sessions
+ * survive a restart; without a data folder it lives in memory only.
+ */
+let keyCache: string | undefined;
+async function gateKey(): Promise<string> {
+  if (keyCache) return keyCache;
+  const rand = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const dir = typeof process !== "undefined" ? (process.env["BUDDY_DATA_DIR"] ?? "").trim().replace(/\/+$/, "") : "";
+  if (!dir) return (keyCache = rand);
+  try {
+    const fs = (await import(/* @vite-ignore */ "node:" + "fs/promises")) as typeof import("node:fs/promises");
+    const path = `${dir}/gate.key`;
+    let value = "";
+    try { value = (await fs.readFile(path, "utf8")).trim(); } catch (e) { if ((e as { code?: string }).code !== "ENOENT") throw e; }
+    if (!value) {
+      await fs.mkdir(dir, { recursive: true });
+      try { await fs.writeFile(path, rand, { encoding: "utf8", mode: 0o600, flag: "wx" }); value = rand; }
+      catch { value = (await fs.readFile(path, "utf8")).trim(); }
+    }
+    return (keyCache = value || rand);
+  } catch {
+    return (keyCache = rand); // no writable folder: sessions last until the next restart
+  }
+}
+const sessionSecret = async (password: string) => `${await gateKey()}:${await digest(password)}`;
 
 function loginPage(message = ""): Response {
   const note = message ? `<p class="err">${message.replace(/[<>&]/g, "")}</p>` : "";
@@ -68,27 +99,24 @@ export async function gate(
   const expected = await digest(password);
   if (url.pathname === "/__login" && request.method === "POST") {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-    const seen = fails.get(ip);
-    if (seen && now - seen.first > WINDOW_MS) fails.delete(ip);
-    const current = fails.get(ip);
-    if (current && current.n >= MAX_FAILS) return loginPage("Too many tries. Wait a few minutes.");
+    if (loginLimiter.blocked(ip, now)) return loginPage("Too many tries. Wait a few minutes.");
     const form = await request.formData().catch(() => null);
     const given = typeof form?.get("password") === "string" ? String(form?.get("password")) : "";
     if (!safeEqual(await digest(given), expected)) {
-      fails.set(ip, { n: (current?.n ?? 0) + 1, first: current?.first ?? now });
+      loginLimiter.fail(ip, now);
       return loginPage("Wrong password.");
     }
-    fails.delete(ip);
+    loginLimiter.clear(ip);
     const secure = url.protocol === "https:" || request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https" ? "; Secure" : "";
     return new Response(null, {
       status: 303,
       headers: {
         location: "/",
-        "set-cookie": `${COOKIE}=${expected}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${secure}`,
+        "set-cookie": `${COOKIE}=${await signSession("gate", await sessionSecret(password), now)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${secure}`,
       },
     });
   }
-  if (safeEqual(readCookie(request.headers.get("cookie"), COOKIE), expected)) return null;
+  if ((await readSession(readCookie(request.headers.get("cookie"), COOKIE), await sessionSecret(password), now)) === "gate") return null;
   if (url.pathname.startsWith("/api/")) return Response.json({ error: "Password required." }, { status: 401 });
   return loginPage();
 }

@@ -89,7 +89,7 @@ services:
     restart: unless-stopped
     runtime: ${OLLAMA_RUNTIME:-runc}   # set OLLAMA_RUNTIME=nvidia to use an NVIDIA GPU
     ports:
-      - "${OLLAMA_PORT:-11435}:11434"   # 11435 so it never collides with an Ollama already running on the host (11434)
+      - "${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11435}:11434"   # 11435 so it never collides with an Ollama already running on the host (11434)
     environment:
       OLLAMA_HOST: 0.0.0.0
       OLLAMA_ORIGINS: "*"   # Pixel Pals calls Ollama from your browser

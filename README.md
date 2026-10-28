@@ -763,6 +763,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `OLLAMA_MODELS` | `qwen2.5:7b nomic-embed-text` | Models downloaded on first start |
 | `OLLAMA_RUNTIME` | `runc` | `nvidia` to give Ollama (and hardware detection) the GPU |
 | `OLLAMA_PORT` | `11435` | Published Ollama port (the host's own Ollama keeps 11434) |
+| `OLLAMA_BIND` | `127.0.0.1` | Which address the stack's Ollama port is published on. Ollama has no password, so by default only this server can reach it (Pixel Pals inside the stack still does, over the stack network). Set `0.0.0.0` only if another device must call it directly |
+| `ALLOW_FRAMING` | empty | `1` lets another site or dashboard show Pixel Pals in a frame (by default it refuses, against clickjacking) |
 | `ALLOW_PRIVATE_CUSTOM` | empty | `1` lets the Custom provider use private/LAN addresses (http allowed) |
 | `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
