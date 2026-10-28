@@ -11,7 +11,9 @@ import { clampBudget } from "./context-trim";
 import { buildContext, transcriptBudgetChars } from "./context-budget";
 import { DM_SETTING, dmTask, isDmRole } from "./campaign";
 
-import { ollamaBase, resolveLocalModel } from "./ollama.server";
+import { ollamaBase, ollamaHost, resolveLocalModel } from "./ollama.server";
+import { keepAliveSetting, ollamaApi, prepareModel, touchKeepAlive } from "./ollama-runtime.server";
+import { readHardware } from "./hardware.server";
 import { isModelName, parseAutoMarker } from "./model-catalog";
 import { isCustomModel, validateCustomUrl } from "./custom-provider";
 import { assertInferenceAllowed, localOnlyOn, LocalOnlyError } from "./ai/guard.server";
@@ -213,6 +215,8 @@ export async function handleChat(request: Request) {
               : engine.kind === "nvidia"
                 ? "https://integrate.api.nvidia.com/v1"
                 : "https://generativelanguage.googleapis.com/v1beta/openai";
+      const localApi = ollamaApi(ollamaBase());
+      let answeredBy: { model: string; requested: string; fellBack: boolean } | null = null;
       const provider = createOpenAICompatible({
         name: engine.kind,
         apiKey: localServer ? "ollama" : custom ? String(engine.apiKey ?? "").trim() || "none" : engine.apiKey.trim(),
@@ -222,6 +226,12 @@ export async function handleChat(request: Request) {
       if (localServer) {
         try { await ollamaProbe(); }
         catch (e) { logServer("warn", "ollama not reachable", e); return Response.json({ error: friendlyAiError(e), code: "ollama-down" }, { status: 503 }); }
+        // Load the model with the keep-alive from settings; if the GPU runs out of memory, use a smaller downloaded model instead of failing.
+        const prep = await prepareModel(localApi, { requested: localModel, vramGb: ollamaHost(await readHardware()).gpu.gb, keepAlive: keepAliveSetting(), allowFallback: engine.noFallback !== true });
+        if (!prep.ok) { logServer("warn", `ollama: ${prep.message}`); return Response.json({ error: prep.message, code: "ollama-memory" }, { status: 507 }); }
+        if (prep.fellBack) logServer("warn", `ollama: ${prep.reason}; answering with ${prep.model} instead`);
+        localModel = prep.model;
+        answeredBy = { model: prep.model, requested: prep.requested, fellBack: prep.fellBack };
       }
       const free = streamText({
         model: provider(custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "openrouter/free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
@@ -232,8 +242,10 @@ export async function handleChat(request: Request) {
         ...(engine.kind === "anthropic" || custom ? { maxOutputTokens: 1500 } : {}),
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
         onError: logStreamError,
+        ...(localServer ? { onFinish: () => { void touchKeepAlive(localApi, localModel, keepAliveSetting()); } } : {}),
       });
       return free.toUIMessageStreamResponse({
+        ...(answeredBy ? { headers: { "x-pixelpals-model": answeredBy.model, ...(answeredBy.fellBack ? { "x-pixelpals-fallback-from": answeredBy.requested } : {}) } } : {}),
         originalMessages: messages,
         messageMetadata: ({ part }) =>
           part.type === "start" ? { agentId: agent.id, round: body.round } : undefined,

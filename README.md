@@ -766,6 +766,8 @@ Set in Portainer's environment variables or in `.env.local`. Anything left empty
 | `PROVIDER_FEED` | `1` | `0` stops the daily fetch of the free-provider list |
 | `MODEL_FEED` | `1` | `0` stops the daily check of ollama.com for new models |
 | `LOCAL_VRAM_GB` | empty | Your GPU's memory, only if it isn't detected |
+| `OLLAMA_VRAM_GB` / `OLLAMA_RAM_GB` | empty | Memory of the machine that runs Ollama, only when `OLLAMA_URL` points to another machine (for example the 10 GB RTX 3080 PC). Pixel Pals can't see that GPU; these also appear in the Setup window |
+| `OLLAMA_KEEP_ALIVE` | `30m` | How long a model stays loaded after the last reply: `5m`, `2h`, `24h`, `-1` (always) or `0` (unload at once) |
 | `TRAKT_CLIENT_SECRET` | empty | Only for `/trakt connect` (write access) |
 | `WEATHER_LOCATION` / `WEATHER_LAT` / `WEATHER_LON` | empty | Where you are, for `/weather` and the brief ([7.13](#713-today-tasks-weather-and-events)) |
 | `WEATHER_UNITS` | `imperial` | `metric` for °C and km/h |
