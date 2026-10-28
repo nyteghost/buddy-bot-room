@@ -7,7 +7,7 @@
  */
 import { randomHex } from "./accounts";
 
-const dir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim().replace(/\\/+$/, "");
+const dir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim().replace(/\/+$/, "");
 const codeFile = () => `${dir()}/initial-setup.code`;
 let logged = false;
 
