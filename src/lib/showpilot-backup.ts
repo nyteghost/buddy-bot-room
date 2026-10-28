@@ -3,7 +3,8 @@
  * never export application credentials or arbitrary Pixel Pals local storage.
  */
 const MAX_BYTES=5_000_000;
-const allow=(k:string)=>k.startsWith("showpilot:")||k.startsWith("stage-planner:")||k.startsWith("pixelpals:floormap:")||k==="pixelpals:work-name";
+const SHOWPILOT_DATA=new Set(["showpilot:vendors:v1","showpilot:theme","showpilot:screen","showpilot:sidebar"]);
+const allow=(k:string)=>SHOWPILOT_DATA.has(k)||k.startsWith("stage-planner:")||k.startsWith("pixelpals:floormap:")||k==="pixelpals:work-name";
 export type WorkBackup={kind:"showpilot-work-backup";version:1;createdAt:string;data:Record<string,string>};
 export function exportWorkBackup(storage:Pick<Storage,"length"|"key"|"getItem">):WorkBackup {
  const data:Record<string,string>={};
