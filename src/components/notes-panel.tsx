@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BookOpen, FileText, RefreshCw, Send, Smartphone, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MemorySection } from "@/components/memory-section";
 import { agents, agentName } from "@/lib/agents";
 import { useCharacterMode } from "@/lib/hellraiser";
 import { addFile, removeDoc, useDocs } from "@/lib/documents";
@@ -215,7 +216,6 @@ function ObsidianNotes() {
 /** Memories and notes. Memories are shared with the pals; notes stay private. To-dos live in the Tasks window. */
 export function NotesPanel() {
   const bench = useWorkbench();
-  const [memory, setMemory] = useState("");
   const [note, setNote] = useState("");
   const docs = useDocs();
   const notes = useAgentNotes();
@@ -243,24 +243,7 @@ export function NotesPanel() {
 
       <ObsidianNotes />
 
-      <section>
-        <h3>Pals remember <span>shared with every pal</span></h3>
-        <ul>
-          {bench.memories.map((m, i) => (
-            <li key={m.id}>
-              <span>{m.text}</span>
-              <button type="button" aria-label={`Forget memory ${i + 1}`} onClick={() => updateWorkbench((w) => ({ ...w, memories: removeAt(w.memories, i + 1) }))}>
-                <Trash2 size={13} />
-              </button>
-            </li>
-          ))}
-          {bench.memories.length === 0 && <li className="empty">Nothing yet. Try “I run Unraid with a 3080”.</li>}
-        </ul>
-        <form onSubmit={(e) => { e.preventDefault(); updateWorkbench((w) => ({ ...w, memories: addEntry(w.memories, memory) })); setMemory(""); }}>
-          <Input aria-label="New memory" placeholder="Something for the pals to remember" value={memory} onChange={(e) => setMemory(e.target.value)} />
-          <Button type="submit" size="sm" disabled={!memory.trim()}>Add</Button>
-        </form>
-      </section>
+      <MemorySection />
 
       <section>
         <h3>Documents <span>pals search these when you ask</span></h3>

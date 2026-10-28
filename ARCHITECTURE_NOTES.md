@@ -20,3 +20,7 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 
 ## Ollama model management
 - `ollama-resources.ts` (pure) + `ollama-runtime.server.ts` (prepare/load with keep-alive, out-of-memory fallback to the largest smaller installed model, keep-alive re-armed after each reply). Host GPU comes from `OLLAMA_VRAM_GB` when Ollama is on another machine. Reply metadata carries `model` and `fellBackFrom`; the UI shows `via`.
+
+## Memory
+- Storage unchanged: `pixel-pals-workbench-v1` in browser localStorage (`memories` shared, `pal[id]` private to one pal, new optional `project[name]`). New optional entry fields: `pinned`, `digest`. Old data loads as is; rolling back leaves the extra fields ignored.
+- Prompt memory = `promptContextFor` -> `pickMemories`: everything if it fits the budget (same text as before), otherwise ranked by keyword (IDF-weighted word stems) + optional meaning score (`memoryBoost`, only computed when over budget) + recency + scope. Other pals' private memories are never visible to a pal. Active project: `pixel-pals-active-project-v1`.

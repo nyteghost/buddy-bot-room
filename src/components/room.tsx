@@ -190,7 +190,10 @@ import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
 import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
 import { buildHandoff, cleanSmartConfig, defaultSmartConfig, isRepeat, outOfTime, planSmartTeam, shouldRun, SMART_ROLES, type SmartConfig, type SmartPlan, type SmartRole } from "@/lib/smart-team";
-import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
+import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContextFor, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
+import { pickMemories, visibleMemories } from "@/lib/memory-rank";
+import { memoryBoost } from "@/lib/memory-boost";
+import { activeProject } from "@/lib/prefs";
 
 const storageKey = "pixel-pals-conversation-v1";
 const suggestions = [
@@ -639,6 +642,18 @@ export function Room() {
     const notesNow = getNotes();
     const docsNow = getDocs();
     let docText = docsNow.length ? docContext(await smartRetrieve(allChunks(docsNow), topic)) : "";
+    // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
+    let memBoost: ReadonlyMap<string, number> | undefined;
+    {
+      const wbNow = getWorkbench();
+      const project = activeProject.get() || undefined;
+      const ids = (direct ? [partner] : enabled) as string[];
+      if (ids.some((id) => pickMemories(wbNow, topic, { pal: id, project }).ranked)) {
+        const seen = new Map<string, string>();
+        for (const id of ids) for (const v of visibleMemories(wbNow, { pal: id, project })) seen.set(v.entry.id, v.entry.text);
+        memBoost = await memoryBoost([...seen].map(([id, text]) => ({ id, text })), topic);
+      }
+    }
     // Optional: let the pals look things up themselves when the question needs current facts (/web on).
     if (autoSearch.get() && wantsWeb(topic)) {
       try {
@@ -738,7 +753,7 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: promptContext(getWorkbench(), 1500, agent.id),
+            memoryContext: promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, boost: memBoost }),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             docContext: docText,
