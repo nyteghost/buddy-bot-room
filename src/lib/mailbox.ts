@@ -6,7 +6,11 @@ import { decodeMimeWords, senderName } from "./imap";
  */
 export type Folder = { name: string; label: string; special: "inbox" | "trash" | "sent" | "drafts" | "junk" | "archive" | "all" | "flagged" | ""; };
 export type MailSummary = { uid: number; from: string; fromAddr: string; to: string; subject: string; date: string; seen: boolean; messageId: string };
-export type MailMessage = MailSummary & { cc: string; references: string; text: string; truncated: boolean; attachments: string[] };
+/** What the viewer can open: PDFs and spreadsheets in the browser; everything else is download-only. */
+export type AttachmentKind = "pdf" | "sheet" | "other";
+/** One attachment of a message. `index` is its position among the message's attachments (stable for one UIDVALIDITY+UID); `size` is bytes, or -1 when the message was cut short and it isn't known. */
+export type AttachmentInfo = { index: number; name: string; type: string; size: number; kind: AttachmentKind };
+export type MailMessage = MailSummary & { cc: string; references: string; text: string; truncated: boolean; attachments: string[]; files: AttachmentInfo[] };
 
 // ---------- folder names ----------
 
@@ -192,7 +196,8 @@ const param = (value: string, name: string): string => {
   return (m?.[1] ?? m?.[2] ?? "").trim();
 };
 
-type Extracted = { plain: string[]; html: string[]; attachments: string[] };
+type RawPart = { name: string; type: string; encoding: string; body: string };
+type Extracted = { plain: string[]; html: string[]; attachments: string[]; parts?: RawPart[] };
 
 function walk(raw: string, depth: number, into: Extracted): void {
   if (depth > 6) return;
@@ -213,11 +218,12 @@ function walk(raw: string, depth: number, into: Extracted): void {
     }
     return;
   }
-  if (/^attachment/i.test(disp) || (filename && !type.startsWith("text/"))) { if (filename) into.attachments.push(filename); return; }
+  const keep = () => { if (filename) { into.attachments.push(filename); into.parts?.push({ name: filename, type, encoding: headerGet(h, "Content-Transfer-Encoding"), body }); } };
+  if (/^attachment/i.test(disp) || (filename && !type.startsWith("text/"))) { keep(); return; }
   if (type === "text/plain" || type === "text/html") {
     const text = decodeCharset(decodeTransfer(body, headerGet(h, "Content-Transfer-Encoding")), param(ct, "charset"));
     (type === "text/html" ? into.html : into.plain).push(text);
-  } else if (filename) into.attachments.push(filename);
+  } else keep();
 }
 
 /** The readable text of a raw message (plain text preferred, HTML turned into text), plus attachment names. Never returns HTML. */
@@ -231,7 +237,33 @@ export function extractBody(raw: string, maxChars = 30_000): { text: string; tru
   return { text: truncated ? text.slice(0, maxChars) : text, truncated, attachments: into.attachments.slice(0, 20) };
 }
 
-export function parseMessage(uid: number, flags: string[], raw: string): MailMessage {
+const ATTACH_KINDS: [RegExp, AttachmentKind][] = [[/\.pdf$/i, "pdf"], [/\.(xlsx|xlsm|xls|csv)$/i, "sheet"]];
+/** Which in-app viewer (if any) fits a file. Decided by the extension; the type is only a hint because mail clients often send "application/octet-stream". */
+export function attachmentKind(name: string, type = ""): AttachmentKind {
+  for (const [re, kind] of ATTACH_KINDS) if (re.test(name)) return kind;
+  if (/^application\/pdf$/i.test(type)) return "pdf";
+  return "other";
+}
+const decodedSize = (p: RawPart): number => {
+  const e = p.encoding.trim().toLowerCase();
+  if (e === "base64") { const s = p.body.replace(/[^A-Za-z0-9+/=]/g, ""); return Math.max(0, Math.floor((s.length * 3) / 4) - (s.endsWith("==") ? 2 : s.endsWith("=") ? 1 : 0)); }
+  return p.body.length;
+};
+/** Attachments of a raw message, in order. `complete` is false when only the start of a long message was downloaded: sizes are then unknown (-1). */
+export function attachmentList(raw: string, complete = true): AttachmentInfo[] {
+  const into: Extracted = { plain: [], html: [], attachments: [], parts: [] };
+  walk(raw, 0, into);
+  return (into.parts ?? []).slice(0, 20).map((p, index) => ({ index, name: p.name.slice(0, 200), type: p.type.slice(0, 100), size: complete ? decodedSize(p) : -1, kind: attachmentKind(p.name, p.type) }));
+}
+/** The decoded bytes of attachment number `index` (null if there isn't one). */
+export function attachmentBytes(raw: string, index: number): { name: string; type: string; bytes: Uint8Array } | null {
+  const into: Extracted = { plain: [], html: [], attachments: [], parts: [] };
+  walk(raw, 0, into);
+  const p = into.parts?.[index];
+  return p ? { name: p.name, type: p.type, bytes: decodeTransfer(p.body, p.encoding) } : null;
+}
+
+export function parseMessage(uid: number, flags: string[], raw: string, complete = true): MailMessage {
   const { headers } = splitMessage(raw);
   const h = unfold(headers);
   const body = extractBody(raw);
@@ -243,6 +275,7 @@ export function parseMessage(uid: number, flags: string[], raw: string): MailMes
     text: body.text,
     truncated: body.truncated,
     attachments: body.attachments,
+    files: attachmentList(raw, complete),
   };
 }
 
@@ -394,4 +427,56 @@ export function parseNote(uid: number, raw: string): PhoneNote {
   const first = text.split("\n")[0]?.trim() ?? "";
   if (first && (first === title || title.startsWith(first) || first.startsWith(title))) text = text.split("\n").slice(1).join("\n").replace(/^\n+/, "");
   return { uid, uuid: headerGet(h, "X-Universally-Unique-Identifier").trim().slice(0, 64), title: title || first || "Untitled", text, date: headerGet(h, "Date").slice(0, 60) };
+}
+
+// ---------- selecting a folder, paging and searching ----------
+
+export type SelectInfo = { exists: number; uidvalidity: string; uidnext: number };
+/** What SELECT/EXAMINE tells us about the folder: how many messages, and the numbers that show whether it changed. */
+export function parseSelectInfo(reply: string): SelectInfo {
+  return {
+    exists: Number(/^\* (\d+) EXISTS/m.exec(reply)?.[1] ?? 0),
+    uidvalidity: /\[UIDVALIDITY (\d+)\]/i.exec(reply)?.[1] ?? "",
+    uidnext: Number(/\[UIDNEXT (\d+)\]/i.exec(reply)?.[1] ?? 0),
+  };
+}
+/** Changes whenever mail arrives, leaves, or the folder was rebuilt (UIDVALIDITY). Flag-only changes don't alter it. */
+export const folderSignature = (i: SelectInfo): string => `${i.uidvalidity}|${i.uidnext}|${i.exists}`;
+
+/** Sequence numbers of the newest `limit` messages, skipping the newest `offset`. Message numbers run 1..exists, oldest first. */
+export function newestRange(exists: number, limit: number, offset = 0): { lo: number; hi: number } | null {
+  const hi = exists - Math.max(0, offset);
+  if (exists < 1 || hi < 1) return null;
+  return { lo: Math.max(1, hi - Math.max(1, limit) + 1), hi };
+}
+
+const IMAP_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const quoteTerm = (t: string): string => `"${t.replace(/[\\"]/g, "\\$&")}"`;
+
+/**
+ * Turns what you typed into IMAP SEARCH keys so the server does the work. Plain words search the whole message (as before).
+ * Also understood: from:x  to:x  subject:x  since:2026-10-01  before:2026-10-31  is:unread  is:read  (quote several words: subject:"big sale").
+ */
+export function buildSearch(q: string, unread = false): { criteria: string; error?: string } {
+  const keys: string[] = [unread ? "UNSEEN" : ""];
+  const words: string[] = [];
+  const re = /(?:(from|to|cc|subject|since|before|is):)?(?:"([^"]*)"|(\S+))/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(q.trim()))) {
+    const op = (m[1] ?? "").toLowerCase();
+    const val = (m[2] ?? m[3] ?? "").trim();
+    if (!val) continue;
+    if (op === "from" || op === "to" || op === "cc" || op === "subject") keys.push(`${op.toUpperCase()} ${quoteTerm(val)}`);
+    else if (op === "since" || op === "before") {
+      const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(val);
+      if (!d || Number(d[2]) < 1 || Number(d[2]) > 12 || Number(d[3]) < 1 || Number(d[3]) > 31) return { criteria: "ALL", error: `Write dates like ${op}:2026-10-31.` };
+      keys.push(`${op.toUpperCase()} ${Number(d[3])}-${IMAP_MONTHS[Number(d[2]) - 1]}-${d[1]}`);
+    } else if (op === "is") {
+      if (val.toLowerCase() === "unread") keys.push("UNSEEN"); else if (val.toLowerCase() === "read") keys.push("SEEN");
+      else return { criteria: "ALL", error: "Use is:unread or is:read." };
+    } else words.push(val);
+  }
+  if (words.length) keys.push(`TEXT ${quoteTerm(words.join(" "))}`);
+  const out = [...new Set(keys.filter(Boolean))];
+  return { criteria: out.length ? out.join(" ") : "ALL" };
 }

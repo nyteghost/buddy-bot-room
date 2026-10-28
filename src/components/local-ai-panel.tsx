@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Trash2, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BenchSection } from "@/components/bench-section";
 import { setEngine, useEngine } from "@/lib/engine";
 import { describeHardware, modelBudgetGb, type Hardware } from "@/lib/hardware";
 import { agents } from "@/lib/agents";
@@ -9,6 +10,7 @@ import { describeBench, AUTO_MODEL, CATALOG, TASKS, bestInstalled, fitFor, fitLa
 
 type Status = {
   configured: boolean;
+  localOnly?: boolean;
   reachable?: boolean;
   error?: string;
   hardware?: Hardware;
@@ -120,6 +122,11 @@ export function LocalAiPanel() {
 
   return (
     <div className="grid gap-3 text-sm">
+      <p className={`rounded-md border p-2 text-xs ${status.localOnly ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
+        {status.localOnly
+          ? "Local-Only AI is ON: every answer, scheduled job and retry uses only your own Ollama. Cloud keys are never called, even if saved. Change it in Settings → Local AI."
+          : "Local-Only AI is off: the engine you choose is used, including free cloud keys. Turn it on in Settings → Local AI to guarantee nothing leaves your network."}
+      </p>
       <div className="flex items-start gap-2 rounded-md border p-3">
         <Cpu className="mt-0.5 size-4 shrink-0" />
         <div className="grid gap-1">
@@ -207,6 +214,8 @@ export function LocalAiPanel() {
               </div>
             ))}
           </div>
+
+          {installed.length > 0 && <BenchSection installed={installed.map((m) => m.name)} />}
 
           {status.feedEnabled !== false && (
             <div className="grid gap-2">

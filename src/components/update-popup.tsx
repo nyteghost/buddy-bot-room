@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { startPolling } from "@/lib/poll";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { desktop } from "@/lib/linux";
@@ -71,9 +72,7 @@ export function UpdatePopup() {
 
   useEffect(() => {
     if (!isTauri()) return;
-    void check(false);
-    const timer = setInterval(() => void check(false), 30 * 60 * 1000);
-    return () => clearInterval(timer);
+    return startPolling(() => check(false), 30 * 60 * 1000);
   }, [check]);
 
   // "Up to date" / error feedback is temporary, then the button goes back to its normal label.

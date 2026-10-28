@@ -3,7 +3,7 @@ name: CI
 # Runs the tests and a production build on every push and pull request, so a broken change shows up before you redeploy.
 on:
   push:
-    branches: [main]
+    branches: [main, beta, "upgrade/**"]
   pull_request:
 
 jobs:
@@ -21,6 +21,13 @@ jobs:
           fi
       - name: Tests
         run: bun run test
+      - name: Dependency security check (informational)
+        continue-on-error: true
+        run: |
+          # Known-vulnerability report for the locked dependencies. It never fails the build; read it before an update.
+          bun audit > audit.log 2>&1 || true
+          summary=$(grep -iE 'vulnerabilit|critical|high|moderate|low' audit.log | tail -n 8 | cut -c1-160 | awk '{printf "%s | ", $0}')
+          echo "::notice title=bun audit::${summary}"
       - name: Build
         run: |
           bun run build > build.log 2>&1 && exit 0
@@ -64,6 +71,17 @@ jobs:
           SMOKE_URL: http://localhost:8090
           SMOKE_SETUP_CODE: "Smoke-CI-Setup-Only"
           SMOKE_SHOT: ${{ runner.temp }}/smoke.png
+      - name: Frontend profile (informational)
+        continue-on-error: true
+        run: |
+          node tools/smoke/profile.mjs 2>&1 | tee profile.log
+          # Surface the numbers as annotations so they can be read without the raw log.
+          grep '^PROFILE' profile.log | while read -r line; do echo "::notice title=Profile::${line}"; done
+          sizes=$(ls -S .output/public/assets/*.js 2>/dev/null | head -12 | while read -r f; do printf '%s %sk | ' "$(basename "$f")" "$(( $(stat -c %s "$f") / 1024 ))"; done)
+          echo "::notice title=Largest JS chunks::${sizes}"
+        env:
+          PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
+          SMOKE_URL: http://localhost:8090
       - name: Server log
         if: always()
         run: tail -n 60 server.log || true

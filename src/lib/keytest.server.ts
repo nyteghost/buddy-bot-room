@@ -1,5 +1,6 @@
 import { cleanKey, providerById } from "@/lib/key-providers";
 import { validateCustomUrl } from "@/lib/custom-provider";
+import { localOnlyOn } from "./ai/guard.server";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -14,6 +15,8 @@ const CHECKS: Record<string, Check> = {
 
 /** POST { provider, key }. Makes one free "list models" request to confirm the key is accepted. Nothing is stored. */
 export async function handleKeyTest(request: Request): Promise<Response> {
+  // Local-Only AI mode: no key may be sent to a cloud provider, not even for a "does it work" check.
+  if (localOnlyOn()) return json({ ok: false, message: "Local-Only AI mode is on, so keys are not sent to any cloud provider. Turn it off in Setup to test a key." }, 403);
   let body: { provider?: unknown; key?: unknown; baseUrl?: unknown } = {};
   try { body = (await request.json()) as typeof body; } catch { return json({ ok: false, message: "Bad request." }, 400); }
   if (body.provider === "custom") {

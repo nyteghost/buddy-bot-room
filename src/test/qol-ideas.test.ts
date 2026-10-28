@@ -2285,8 +2285,9 @@ import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
 import { ALL_MODES } from "@/lib/agents";
 
 describe("conversation mode windows", () => {
-  it("has five modes including debate", () => {
-    expect(ALL_MODES).toEqual(["roundtable", "broadcast", "direct", "solve", "debate"]);
+  it("has six modes including debate and smart team", () => {
+    expect(ALL_MODES).toEqual(["roundtable", "broadcast", "direct", "solve", "debate", "smart"]);
+    expect(parseSlash("/mode smart")).toEqual({ ok: true, action: { type: "mode", mode: "smart" } });
     expect(modeNames).toEqual([...ALL_MODES]);
     expect(parseSlash("/mode debate")).toEqual({ ok: true, action: { type: "mode", mode: "debate" } });
   });
@@ -2619,5 +2620,30 @@ describe("playtest data feeds and suggestions", () => {
     expect(pSuggest.length > 0).toBe(true);
     for (const g of pSuggest) expect(/^https:\/\//.test(g.url)).toBe(true);
     expect(pClean(pSuggest).length).toBe(pSuggest.length);
+  });
+});
+
+import { buildRecentReport as recentReport, entriesSince as logSince, parseWindowSeconds as winSecs, serverLinesSince as srvSince } from "@/lib/debug-log";
+describe("@log download", () => {
+  const now = Date.parse("2026-10-27T12:00:30.000Z");
+  it("parses the time window", () => {
+    expect(parseSlash("@log")).toEqual({ ok: true, action: { type: "logfile", seconds: 10 } });
+    expect(parseSlash("@log 60")).toEqual({ ok: true, action: { type: "logfile", seconds: 60 } });
+    expect(parseSlash("@LOG 2m")).toEqual({ ok: true, action: { type: "logfile", seconds: 120 } });
+    expect(parseSlash("@log banana")).toMatchObject({ ok: false });
+    expect(winSecs("0")).toBe(null);
+    expect(winSecs("99999")).toBe(3600);
+    expect(parseSlash("@logging")).toBe(null);
+  });
+  it("keeps only lines from the window", () => {
+    const list = [{ t: "2026-10-27T12:00:00.000Z", level: "info" as const, msg: "old" }, { t: "2026-10-27T12:00:25.000Z", level: "error" as const, msg: "new" }];
+    expect(logSince(list, now, 10).map((e) => e.msg)).toEqual(["new"]);
+    const text = "uptime: 5s\n2026-10-27T12:00:00.000Z INFO old\n2026-10-27T12:00:26.000Z ERROR boom\ncontinued line\n";
+    expect(srvSince(text, now, 10)).toEqual(["2026-10-27T12:00:26.000Z ERROR boom", "continued line", ""]);
+  });
+  it("says so when nothing happened and hides secrets", () => {
+    expect(recentReport({ app: "x", context: [], seconds: 10, nowMs: now, server: "", client: [] })).toContain("nothing logged in this browser in the last 10 seconds");
+    const r = recentReport({ app: "x", context: [], seconds: 10, nowMs: now, server: "", client: [{ t: "2026-10-27T12:00:29.000Z", level: "error", msg: "key gsk_abcdefghijklmnopqrstuvwxyz123456" }] });
+    expect(r).not.toContain("gsk_abcdefghijklmnopqrstuvwxyz123456");
   });
 });

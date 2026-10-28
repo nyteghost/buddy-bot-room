@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import { getOverrides, setKnownPals, withOverride, type Overrides } from "./character-overrides";
 import type { CharacterMode } from "./hellraiser";
 import { matrixCast, fantasyCast, devCast, cyberCast, linuxCast, dccCast } from "./theme-personas";
 
@@ -78,6 +79,7 @@ export const agents = [
   },
 ] as const;
 export type AgentId = (typeof agents)[number]["id"];
+setKnownPals(agents.map((a) => a.id));
 export const cenobites: Record<AgentId, { name: string; role: string; tone: string }> = {
   nova: {
     name: "The Hell Priest",
@@ -162,8 +164,8 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
     tone: "Wildly enthusiastic about horror lore and survival tactics. Hype the group up with PG-13 suspense and a concrete next step; no gore.",
   },
 };
-export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, assistant = false) {
-  const base = themePersona(id, hell, horror, mode);
+export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, assistant = false, overrides?: Overrides) {
+  const base = themePersona(id, hell, horror, mode, overrides);
   if (!assistant || mode === "linux" || mode === "assistant") return base;
   // Assistant Mode on any theme: keep the character's name and voice, take the assistant job.
   const job = linuxCast[id];
@@ -173,7 +175,7 @@ export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: 
     tone: `${job.tone} Speak in character as ${base.name} (${base.role}) — ${base.tone} Stay genuinely helpful; the persona is flavor, the job comes first.`,
   };
 }
-function themePersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode) {
+function themePersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, overrides?: Overrides) {
   if (mode === "dcc") return dccCast[id];
   if (mode === "matrix") return matrixCast[id];
   if (mode === "finalfantasy") return fantasyCast[id];
@@ -182,12 +184,14 @@ function themePersona(id: AgentId, hell: boolean, horror = false, mode?: Charact
   if (mode === "linux" || mode === "assistant") return linuxCast[id];
   if (horror) return horrorIcons[id];
   if (hell) return cenobites[id];
-  return agents.find((agent) => agent.id === id) ?? agents[0];
+  // Your own edits apply to the normal cast only; every theme keeps its own characters.
+  const base = agents.find((agent) => agent.id === id) ?? agents[0];
+  return withOverride(base, (overrides ?? getOverrides())[base.id]);
 }
-export function agentName(id: AgentId | undefined, hell: boolean, horror = false, mode?: CharacterMode): string {
+export function agentName(id: AgentId | undefined, hell: boolean, horror = false, mode?: CharacterMode, overrides?: Overrides): string {
   const a = agents.find((x) => x.id === id);
   if (!a) return "Agent";
-  return agentPersona(a.id, hell, horror, mode).name;
+  return agentPersona(a.id, hell, horror, mode, false, overrides).name;
 }
 const mentionAliases: Record<AgentId, string[]> = {
   nova: ["gmail", "email", "mail", "nova"],
@@ -213,8 +217,8 @@ export function resolveMention(text: string, mode?: CharacterMode): AgentId | nu
   }
   return null;
 }
-export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate";
-export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate"];
+export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate" | "smart";
+export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate", "smart"];
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;
@@ -230,6 +234,11 @@ export type RoomMessage = UIMessage<{
   elapsed?: number;
   characterMode?: CharacterMode;
   assistant?: boolean;
+  /** Which AI wrote this reply, in words ("Groq · gpt-oss-120b"). Set by the app as the reply arrives. */
+  via?: string;
+  /** The model the server actually used, and the one it was asked for when memory ran out and a smaller one took over. */
+  model?: string;
+  fellBackFrom?: string;
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;

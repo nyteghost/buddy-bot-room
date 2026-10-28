@@ -3,7 +3,8 @@ export type SetupItem = { id: string; name: string; what: string; env: string; c
 export type SetupTest = { ok: boolean; note: string };
 
 export const INTEGRATIONS: { id: string; name: string; what: string; env: string; testable: boolean }[] = [
-  { id: "ollama", name: "Local AI (Ollama)", what: "Answers on your own GPU", env: "OLLAMA_URL (set by the stack)", testable: true },
+  { id: "ollama", name: "Local AI (Ollama)", what: "Answers on your own GPU", env: "OLLAMA_URL", testable: true },
+  { id: "obsidian", name: "Obsidian vault", what: "Open and edit your vault notes in the Notes tab", env: "OBSIDIAN_VAULT_DIR", testable: false },
   { id: "searxng", name: "Web search (SearXNG)", what: "Lets pals look things up", env: "SEARXNG_URL", testable: true },
   { id: "plex", name: "Plex", what: "Library search and what's new", env: "PLEX_URL, PLEX_TOKEN", testable: true },
   { id: "seerr", name: "Seerr", what: "Request movies and shows", env: "SEERR_URL, SEERR_API_KEY", testable: true },
@@ -41,7 +42,7 @@ export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: strin
   { id: "calendar-mail", name: "Calendar & mail", blurb: "Calendar feeds, Google Calendar, email", ids: ["calendar", "gcal", "imap", "m365"] },
   { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "today", "telegram", "brief", "caldav"] },
   { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
-  { id: "home", name: "Home & server", blurb: "Weather and your Unraid server", ids: ["weather", "unraid"] },
+  { id: "home", name: "Home & server", blurb: "Weather, your Unraid server and your Obsidian vault", ids: ["weather", "unraid", "obsidian"] },
   { id: "code", name: "Code", blurb: "GitHub repos you keep an eye on", ids: ["github"] },
   { id: "maintenance", name: "Backups & schedules", blurb: "Daily backups and scheduled tasks", ids: ["backup"] },
 ];

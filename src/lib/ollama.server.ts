@@ -1,9 +1,14 @@
 import { readHardware } from "./hardware.server";
-import { accountsEnabled } from "./accounts";
-import { currentUser } from "./accounts.server";
 import { bestInstalled, isModelName, parseAutoMarker } from "./model-catalog";
 import { logServer } from "./server-log.server";
+import { isLocalOnly } from "./local-only";
 import { currentFeed, feedEnabled, refreshFeed } from "./model-feed.server";
+import { hostGpu, hostHardware } from "./ollama-resources";
+import { keepAliveSetting } from "./ollama-runtime.server";
+import type { Hardware } from "./hardware";
+import { accountsEnabled } from "./accounts";
+import { addResult, avoidedModels, benchPersistent, clearResults, httpBenchApi, readResults, runSuite, takeBenchLock } from "./ollama-bench.server";
+import { avoidModels, measuredBest, summarize } from "./ollama-bench";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -17,37 +22,90 @@ async function ollama(path: string, init: RequestInit & { timeout?: number } = {
 
 type Tag = { name: string; size?: number };
 
+/** The GPU that matters is the one on the machine running Ollama, which is not this server when OLLAMA_URL points elsewhere. */
+export function ollamaHost(server: Hardware, observedGb?: number) {
+  const gpu = hostGpu({ url: ollamaBase(), settingGb: process.env["OLLAMA_VRAM_GB"], server, ...(observedGb ? { observedGb } : {}) });
+  return { gpu, hardware: hostHardware(server, gpu, process.env["OLLAMA_RAM_GB"]) };
+}
+
 /** GET: status, installed models and the machine's hardware. POST {action:"pull"|"delete", model}: download or remove a model. */
 export async function handleOllamaApi(request: Request): Promise<Response> {
-  if (!ollamaBase()) return json({ configured: false });
+  const localOnly = isLocalOnly(process.env["LOCAL_ONLY_AI"]);
+  if (!ollamaBase()) return json({ configured: false, localOnly });
   if (request.method === "GET") {
-    const hardware = await readHardware();
+    const serverHardware = await readHardware();
+    let hardware = ollamaHost(serverHardware).hardware;
     try {
       const [tags, ps] = await Promise.all([ollama("/api/tags"), ollama("/api/ps").catch(() => null)]);
-      if (!tags.ok) return json({ configured: true, reachable: false, hardware, error: `Ollama answered ${tags.status}.` });
+      if (!tags.ok) return json({ configured: true, localOnly, reachable: false, hardware, error: `Ollama answered ${tags.status}.` });
       const models = ((await tags.json()) as { models?: Tag[] }).models ?? [];
       const loaded = ps?.ok ? (((await ps.json()) as { models?: { name: string; size_vram?: number; size?: number }[] }).models ?? []) : [];
+      const observedGb = Math.max(0, ...loaded.map((m) => (m.size_vram ?? 0) / 1024 ** 3));
+      const host = ollamaHost(serverHardware, observedGb);
+      hardware = host.hardware;
       return json({
         configured: true,
         reachable: true,
         hardware,
+        host: { vramGb: host.gpu.gb, source: host.gpu.source, remote: host.gpu.remote },
+        keepAlive: keepAliveSetting(),
         models: models.map((m) => ({ name: m.name, gb: Math.round(((m.size ?? 0) / 1024 ** 3) * 10) / 10 })),
         feed: await currentFeed(),
         feedEnabled: feedEnabled(),
         loaded: loaded.map((m) => ({ name: m.name, onGpu: (m.size_vram ?? 0) > 0 })),
       });
     } catch {
-      return json({ configured: true, reachable: false, hardware, error: "Couldn't reach Ollama. Is the ollama container running?" });
+      return json({ configured: true, localOnly, reachable: false, hardware, error: "Couldn't reach Ollama. Is the ollama container running?" });
     }
   }
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-  // Model downloads, deletion and benchmarks consume disk/GPU resources. Do not let non-owner accounts mutate Ollama.
-  if (accountsEnabled(process.env) && !(await currentUser(request))?.owner)
+  // Download, delete, benchmark and other model-management operations require owner authorization.
+  if (accountsEnabled(process.env) && !(await (await import("./accounts.server")).currentUser(request))?.owner)
     return json({ error: "Only the owner account can manage Local AI models." }, 403);
   let body: { action?: unknown; model?: unknown } = {};
   try { body = (await request.json()) as typeof body; } catch { return json({ error: "Bad request." }, 400); }
   if (body.action === "refresh-feed") return feedEnabled() ? json({ feed: await refreshFeed() }) : json({ error: "Model list updates are turned off (MODEL_FEED=0)." }, 400);
-  if (!isModelName(body.model)) return json({ error: "That isn't a valid model name." }, 400);
+  if (body.action === "bench-results") {
+    const summary = summarize(await readResults());
+    return json({ summary, best: measuredBest(summary), avoid: [...avoidModels(summary)], persistent: benchPersistent() });
+  }
+  if (!isModelName(body.model) && body.action !== "bench-clear") return json({ error: "That isn't a valid model name." }, 400);
+  // Running or deleting benchmarks changes the shared record and loads the GPU, so with accounts on only the owner may.
+  if ((body.action === "bench-clear" || body.action === "bench-suite") && accountsEnabled(process.env)) {
+    const user = await (await import("./accounts.server")).currentUser(request);
+    if (!user?.owner) return json({ error: "Only the owner account can run or delete benchmarks." }, 403);
+  }
+  if (body.action === "bench-clear") {
+    await clearResults(isModelName(body.model) && body.model !== "x" ? body.model : undefined);
+    return json({ ok: true });
+  }
+  if (body.action === "bench-suite") {
+    const release = takeBenchLock();
+    if (!release) return json({ error: "A benchmark is already running. Wait for it to finish." }, 409);
+    const model = body.model as string;
+    const api = httpBenchApi(ollamaBase());
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        let gone = false;
+        // If the browser went away the run still finishes and is stored; only the progress lines stop.
+        const send = (o: unknown) => { if (gone) return; try { controller.enqueue(encoder.encode(JSON.stringify(o) + "\n")); } catch { gone = true; } };
+        try {
+          for await (const ev of runSuite(api, model, keepAliveSetting())) {
+            if (ev.type === "result") await addResult(ev.result);
+            send(ev);
+          }
+        } catch (e) {
+          send({ type: "error", message: e instanceof Error ? e.message : "The benchmark stopped." });
+        } finally {
+          release();
+          try { controller.close(); } catch { /* already closed */ }
+        }
+      },
+    });
+    logServer("info", `ollama benchmark started: ${model}`);
+    return new Response(stream, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" } });
+  }
   if (body.action === "pull") {
     try {
       const res = await ollama("/api/pull", { method: "POST", body: JSON.stringify({ model: body.model, stream: true }), headers: { "content-type": "application/json" }, timeout: 60 * 60_000 });
@@ -88,10 +146,11 @@ export async function resolveLocalModel(model: string): Promise<string | null> {
   const task = parseAutoMarker(model);
   if (!task) return model;
   try {
-    const [tags, hardware] = await Promise.all([ollama("/api/tags"), readHardware()]);
+    const [tags, server] = await Promise.all([ollama("/api/tags"), readHardware()]);
     if (!tags.ok) return null;
+    const hardware = ollamaHost(server).hardware;
     const list = (((await tags.json()) as { models?: Tag[] }).models ?? []).map((m) => ({ name: m.name, gb: (m.size ?? 0) / 1024 ** 3 }));
-    return bestInstalled(task, list, hardware);
+    return bestInstalled(task, list, hardware, await avoidedModels());
   } catch {
     return null;
   }
