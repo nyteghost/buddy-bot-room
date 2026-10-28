@@ -172,6 +172,7 @@ import { installUuidPolyfill } from "@/lib/uuid-polyfill";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
+import { getOverrides, mayUseRealData, memoryAccess, useOverrides } from "@/lib/character-overrides";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
 import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign } from "@/lib/campaign";
@@ -219,6 +220,7 @@ export function Room() {
   }
   const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
   const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
+  useOverrides();
   const characterMode = useCharacterMode();
   const assistantOn = useAssistantMode();
   const assistantRef = useRef(assistantOn);
@@ -612,6 +614,7 @@ export function Room() {
     inputRef.current?.focus();
     // Chat with your files: pull the passages that best match this question (no AI call needed).
     const notesNow = getNotes();
+    const personasNow = getOverrides();
     const docsNow = getDocs();
     let docText = docsNow.length ? docContext(await smartRetrieve(allChunks(docsNow), topic)) : "";
     // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
@@ -620,9 +623,9 @@ export function Room() {
       const wbNow = getWorkbench();
       const project = activeProject.get() || undefined;
       const ids = (direct ? [partner] : enabled) as string[];
-      if (ids.some((id) => pickMemories(wbNow, topic, { pal: id, project }).ranked)) {
+      if (ids.some((id) => pickMemories(wbNow, topic, { pal: id, project, access: memoryAccess(personasNow, id) }).ranked)) {
         const seen = new Map<string, string>();
-        for (const id of ids) for (const v of visibleMemories(wbNow, { pal: id, project })) seen.set(v.entry.id, v.entry.text);
+        for (const id of ids) for (const v of visibleMemories(wbNow, { pal: id, project, access: memoryAccess(personasNow, id) })) seen.set(v.entry.id, v.entry.text);
         memBoost = await memoryBoost([...seen].map(([id, text]) => ({ id, text })), topic);
       }
     }
@@ -647,7 +650,7 @@ export function Room() {
       };
     })());
     const realDataFor = async (id: AgentId): Promise<string | undefined> => {
-      if (!wantsAny(want)) return undefined;
+      if (!wantsAny(want) || !mayUseRealData(personasNow, id)) return undefined;
       const day = want.calendar && want.mail && want.tasks;
       const r = await loadReal();
       // A mentioned job pal gets just its own data; "my day" gives everyone the lot.
@@ -697,9 +700,10 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, boost: memBoost }),
+            memoryContext: promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
+            ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
             docContext: docText,
             linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
             realData: await realDataFor(agent.id),

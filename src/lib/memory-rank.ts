@@ -27,16 +27,18 @@ export const nearDuplicate = (list: Entry[], text: string, limit = 0.8): Entry |
 const DAY = 86_400_000;
 
 /** Everything this pal may see right now: shared, its own private ones, and the active project's. Other pals' private memories never appear. */
-export function visibleMemories(w: Workbench, o: { pal?: string | undefined; project?: string | undefined }): { entry: Entry; scope: MemoryScope; owner: string }[] {
+export function visibleMemories(w: Workbench, o: { pal?: string | undefined; project?: string | undefined; access?: "all" | "own" | "none" | undefined }): { entry: Entry; scope: MemoryScope; owner: string }[] {
+  // A pal set to "none" sees no memories; "own" sees only what was told to it (and the active project's), not the shared list.
+  if (o.access === "none") return [];
   return [
-    ...w.memories.map((entry) => ({ entry, scope: "shared" as const, owner: "" })),
+    ...(o.access === "own" ? [] : w.memories).map((entry) => ({ entry, scope: "shared" as const, owner: "" })),
     ...(o.pal ? (w.pal?.[o.pal] ?? []).map((entry) => ({ entry, scope: "pal" as const, owner: o.pal! })) : []),
     ...(o.project ? (w.project?.[o.project] ?? []).map((entry) => ({ entry, scope: "project" as const, owner: o.project! })) : []),
   ];
 }
 
 /** Score every visible memory for a question. `boost` is an optional 0..1 "same meaning" score per memory id (from embeddings). */
-export function rankMemories(w: Workbench, query: string, o: { pal?: string | undefined; project?: string | undefined; now?: number; boost?: ReadonlyMap<string, number> | undefined }): Scored[] {
+export function rankMemories(w: Workbench, query: string, o: { pal?: string | undefined; project?: string | undefined; access?: "all" | "own" | "none" | undefined; now?: number; boost?: ReadonlyMap<string, number> | undefined }): Scored[] {
   const now = o.now ?? Date.now();
   const vis = visibleMemories(w, o);
   const q = stems(query);
@@ -66,7 +68,7 @@ export function rankMemories(w: Workbench, query: string, o: { pal?: string | un
 
 const line = (e: Entry) => `- ${e.text}`;
 /** Builds the memory text for a prompt within `maxChars`, choosing by relevance only when everything does not fit. */
-export function pickMemories(w: Workbench, query: string, o: { pal?: string | undefined; project?: string | undefined; maxChars?: number; now?: number; boost?: ReadonlyMap<string, number> | undefined }): Pick {
+export function pickMemories(w: Workbench, query: string, o: { pal?: string | undefined; project?: string | undefined; access?: "all" | "own" | "none" | undefined; maxChars?: number; now?: number; boost?: ReadonlyMap<string, number> | undefined }): Pick {
   const maxChars = o.maxChars ?? 1500;
   const all = rankMemories(w, query, o);
   const full = all.reduce((n, s) => n + line(s.entry).length + 1, 0);

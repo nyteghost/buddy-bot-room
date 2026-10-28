@@ -17,6 +17,7 @@ export const BACKUP_KEYS = [
   "pixel-pals-workspace-v1",
   "pixel-pals-voice-v1",
   "pixel-pals-smart-v1",
+  "pixel-pals-characters-v1",
 ] as const;
 /** Keys that follow a signed-in account on the self-hosted build. Saved chats are excluded: the server store handles those. */
 export const SYNC_JSON_KEYS: readonly string[] = BACKUP_KEYS.filter((k) => k !== "pixel-pals-saved-discussions-v1");

@@ -92,11 +92,11 @@ export function promptContext(w: Workbench, maxChars = 1500, pal?: string): stri
 
 /** Like promptContext, but when the memories do not all fit it keeps the ones that matter for this question (and says why in the Notes panel).
  *  Open to-dos are added after the memories. With everything fitting the result is the same as promptContext. */
-export function promptContextFor(w: Workbench, query: string, o: { pal?: string | undefined; project?: string | undefined; maxChars?: number; boost?: ReadonlyMap<string, number> | undefined } = {}): string {
+export function promptContextFor(w: Workbench, query: string, o: { pal?: string | undefined; project?: string | undefined; access?: "all" | "own" | "none" | undefined; maxChars?: number; boost?: ReadonlyMap<string, number> | undefined } = {}): string {
   const maxChars = o.maxChars ?? 1500;
-  const open = w.todos.filter((t) => !t.done);
+  const open = o.access === "none" ? [] : w.todos.filter((t) => !t.done);
   const todos = open.length ? "The human's open to-dos:\n" + open.map((t) => `- ${t.text}`).join("\n") : "";
-  const pick = pickMemories(w, query, { pal: o.pal, project: o.project, maxChars: Math.max(400, maxChars - todos.length - 2), boost: o.boost });
+  const pick = pickMemories(w, query, { pal: o.pal, project: o.project, access: o.access, maxChars: Math.max(400, maxChars - todos.length - 2), boost: o.boost });
   const text = [pick.text, todos].filter(Boolean).join("\n\n");
   return text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text;
 }

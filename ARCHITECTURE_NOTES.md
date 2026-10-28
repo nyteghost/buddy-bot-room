@@ -25,6 +25,11 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 - Storage unchanged: `pixel-pals-workbench-v1` in browser localStorage (`memories` shared, `pal[id]` private to one pal, new optional `project[name]`). New optional entry fields: `pinned`, `digest`. Old data loads as is; rolling back leaves the extra fields ignored.
 - Prompt memory = `promptContextFor` -> `pickMemories`: everything if it fits the budget (same text as before), otherwise ranked by keyword (IDF-weighted word stems) + optional meaning score (`memoryBoost`, only computed when over budget) + recency + scope. Other pals' private memories are never visible to a pal. Active project: `pixel-pals-active-project-v1`.
 
+## Character overrides (Release 3 item 14)
+- `character-overrides.ts`: pure `cleanOverrides` / `withOverride` plus a small localStorage store (`pixel-pals-characters-v1`, included in backups and account sync). Fields per pal: `name`, `role`, `tone`, `memory` (`all` default, `own`, `none`), `realData` (false blocks calendar/mail/task text for that pal).
+- Wording overrides are applied inside `themePersona` for the normal theme only; hellraiser, horror and every themed cast are untouched. The browser sends `personas` with each chat request; `chat.server.ts` re-cleans it and passes it explicitly (no shared server state, accounts stay separate). Memory access is enforced where the prompt text is built (`visibleMemories` -> `promptContextFor`); real data is withheld in `realDataFor`. Nothing here weakens Local-Only mode or the 'mail/calendar never go to cloud' rule.
+- Storage is additive: old data has no such key; rolling back leaves it ignored.
+
 ## Security boundaries (audit, Release 3 item 12)
 Already in place before this pass: optional shared-password gate or built-in accounts (signed sessions, owner-only windows), secrets kept server-side in `app-secrets.json` (mode 600, never returned to the browser), `redact()` on logs/bug reports, Local-Only AI enforced on the server, SSRF checks on custom provider URLs, read-only Unraid monitoring (no admin or shell operations exist, so nothing needs approval), mail attachments served `private, no-store` with a sandbox CSP.
 

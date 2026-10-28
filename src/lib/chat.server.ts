@@ -3,6 +3,7 @@ import { explainAiError } from "./ai-error";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { agents, agentName, agentPersona, contextForMode, contextForPartner, models, messageText, type RoomMessage } from "./agents";
+import { cleanOverrides } from "./character-overrides";
 import { isAbortError, logStreamError } from "./ai/stream-errors.server";
 import { isCharacterMode } from "./hellraiser";
 import { NEUTRAL_SYSTEM } from "./compare";
@@ -49,6 +50,8 @@ export async function handleChat(request: Request) {
       );
     }
     const messages = await validateUIMessages<RoomMessage>({ messages: body.messages });
+    // The human's own edits to the characters (normal theme only). Sanitized again here; the server keeps no copy.
+    const overrides = cleanOverrides(body.personas, agents.map((a) => a.id));
     const characterMode = isCharacterMode(body.characterMode) ? body.characterMode : body.horror === true ? "horror" : body.hellraiser === true ? "hellraiser" : "normal";
     const visible: RoomMessage[] =
       body.mode === "direct" ? contextForPartner(messages, agent.id) : body.mode === "broadcast" && (body.verdict === true || body.summary === true) ? messages : contextForMode(messages, body.mode);
@@ -59,7 +62,7 @@ export async function handleChat(request: Request) {
     // Long chats: keep only the newest turns that fit the budget so replies stay fast and never overflow small models.
     // The budget follows the engine's real window; older turns that no longer fit become a short digest instead of vanishing.
     const budget = transcriptBudgetChars(body.engine?.kind, clampBudget(body.contextChars));
-    const trimmed = buildContext(visible.map((m) => ({ m, role: m.role, text: messageText(m), speaker: m.role === "user" ? "Human" : m.metadata?.agentId ? agentName(m.metadata.agentId, false, false, "normal") : "Pal" })), budget);
+    const trimmed = buildContext(visible.map((m) => ({ m, role: m.role, text: messageText(m), speaker: m.role === "user" ? "Human" : m.metadata?.agentId ? agentName(m.metadata.agentId, false, false, "normal", overrides) : "Pal" })), budget);
     let kept = trimmed.kept;
     let dropped = trimmed.dropped;
     const earlier = trimmed.digest;
@@ -70,7 +73,7 @@ export async function handleChat(request: Request) {
       parts: [
         {
           type: "text" as const,
-          text: `${message.metadata?.agentId ? agentName(message.metadata.agentId, characterMode === "hellraiser", characterMode === "horror", characterMode) : "Human"}: ${messageText(message)}`,
+          text: `${message.metadata?.agentId ? agentName(message.metadata.agentId, characterMode === "hellraiser", characterMode === "horror", characterMode, overrides) : "Human"}: ${messageText(message)}`,
         },
       ],
     }));
@@ -92,7 +95,7 @@ export async function handleChat(request: Request) {
     const hell = body.hellraiser === true;
     const horror = body.horror === true;
     const assistant = body.assistant === true || (body.assistant === undefined && (characterMode === "linux" || characterMode === "assistant"));
-    const persona = agentPersona(agent.id, hell, horror, characterMode, assistant);
+    const persona = agentPersona(agent.id, hell, horror, characterMode, assistant, overrides);
     const themeSetting = characterMode === "dcc" ? "a fictional Dungeon Crawler Carl safe room on the dungeon floor, with the System AI broadcasting to the galaxy. Stay in character with crawler banter, loot boxes, achievements and sponsors, but give genuinely useful real-world ideas; keep violence cartoonish and PG-13"
       : characterMode === "linux" ? "Linux Mode, where each participant is a practical personal assistant for the human's Arch/CachyOS computer. Be concrete and helpful; only suggest shell commands inside ```bash blocks, and never claim you ran anything yourself"
       : characterMode === "matrix" ? "a fictional Matrix crew meeting. Stay in character while giving useful real-world discussion; simulated realities are fictional, not claims about the human's reality"

@@ -3,6 +3,7 @@ import { BookOpen, FileText, RefreshCw, Send, Smartphone, Trash2 } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MemorySection } from "@/components/memory-section";
+import { CharacterSection } from "@/components/character-section";
 import { agents, agentName } from "@/lib/agents";
 import { useCharacterMode } from "@/lib/hellraiser";
 import { addFile, removeDoc, useDocs } from "@/lib/documents";
@@ -277,6 +278,8 @@ export function NotesPanel() {
           />
         </label>
       </section>
+
+      <CharacterSection />
 
       <section>
         <h3>Notes <span>private to this browser</span></h3>
