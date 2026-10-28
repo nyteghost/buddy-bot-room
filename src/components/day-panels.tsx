@@ -103,7 +103,7 @@ const Block = ({ title, children }: { title: string; children: React.ReactNode }
 const Quiet = ({ children }: { children: React.ReactNode }) => <p className="text-xs text-muted-foreground">{children}</p>;
 
 /** Everything for today in one place: weather, calendar, unread mail, tasks and a watch pick. Each part quietly says how to set it up if it isn't. */
-export function TodayPanel({ open }: { open: boolean }) {
+export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks }: { open: boolean; onOpenMail?: () => void; onOpenCalendar?: () => void; onOpenTasks?: () => void }) {
   const [tick, setTick] = useState(0);
   useEffect(() => { if (!open) return; const t = window.setInterval(() => setTick((n) => n + 1), 5 * 60_000); return () => window.clearInterval(t); }, [open]);
   const { todos } = useWorkbench();
@@ -132,19 +132,19 @@ export function TodayPanel({ open }: { open: boolean }) {
       <Block title="Calendar">
         {cal.data?.configured === false && <Quiet>No calendar connected. Open Calendar for the one-minute setup.</Quiet>}
         {cal.data?.configured && !events.length && <Quiet>Nothing else on today.</Quiet>}
-        {events.map((e, i) => <div key={`${e.start}-${i}`} className="flex gap-3"><span className="w-16 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : clock(e.start, tz)}</span><span className="truncate">{e.title}</span></div>)}
+        {events.map((e, i) => <button key={`${e.start}-${i}`} type="button" className="flex min-w-0 gap-3 rounded-sm text-left hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={onOpenCalendar} title="Open Calendar"><span className="w-16 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : clock(e.start, tz)}</span><span className="truncate">{e.title}</span></button>)}
         {!cal.data && <Quiet>{cal.error || "Loading…"}</Quiet>}
       </Block>
       <Block title="Mail">
         {mail.data?.configured === false && <Quiet>No mailbox connected. Open Mail for setup.</Quiet>}
         {mail.data?.configured && <p>{mail.data.items.length ? `${mail.data.items.length} unread` : "No unread mail."}</p>}
-        {mail.data?.items.slice(0, 3).map((m, i) => <p key={i} className="truncate text-xs text-muted-foreground">{m.subject} · {m.from}</p>)}
+        {mail.data?.items.slice(0, 3).map((m, i) => <button key={i} type="button" className="block w-full truncate rounded-sm text-left text-xs text-muted-foreground hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-ring" title="Open Mail inbox" onClick={onOpenMail}>{m.subject} · {m.from}</button>)}
         {!mail.data && <Quiet>{mail.error || "Loading…"}</Quiet>}
       </Block>
       <Block title="Tasks">
         {!open_.length && !todayReminders.length && <Quiet>Nothing open. Add some in Tasks.</Quiet>}
-        {todayReminders.map((r) => <p key={r.id} className="truncate">⏰ {whenLabel(r.at, tz)} — {r.text}</p>)}
-        {open_.slice(0, 6).map((t) => <p key={t.id} className="truncate">☐ {t.text}</p>)}
+        {todayReminders.map((r) => <button type="button" key={r.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>⏰ {whenLabel(r.at, tz)} — {r.text}</button>)}
+        {open_.slice(0, 6).map((t) => <button type="button" key={t.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>☐ {t.text}</button>)}
       </Block>
       <Block title="Tonight">
         {pick ? <p>{pick.kind === "show" ? "📺" : "🎬"} {pick.title}{pick.year ? ` (${pick.year})` : ""}{pick.inPlex ? " · in Plex" : ""}</p> : <Quiet>{trakt.error ? "Connect Trakt to get a pick." : trakt.data ? "Nothing unwatched on your list." : "Loading…"}</Quiet>}
