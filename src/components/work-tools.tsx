@@ -223,53 +223,16 @@ function useDeliver() {
   return { deliver: (blob: Blob, name: string) => import("@/lib/work-files").then((m) => m.downloadBlob(blob, name)) };
 }
 
-/** Button that connects Google Calendar once, then pushes every shift with one click. */
-type GoogleReply = { configured?: boolean; connected?: boolean; mode?: string; error?: string; added?: number; updated?: number; removed?: number; skipped?: number; reasons?: string[] };
-
-function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownload }: { shifts: Shift[]; title: string; remove: string[]; onPushed: () => void; onStatus: (s: string) => void; onDownload: () => void }) {
-  const [own, setOwn] = useState<{ configured: boolean; connected: boolean } | null>(null);
-  const [ownBusy, setOwnBusy] = useState(false);
-  const ownCall = async (body: object) => (await fetch("/api/google", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json() as Promise<GoogleReply>;
-  useEffect(() => {
-    // Standalone ShowPilot does not expose the Pixel Pals /api/google service.
-    // Keep the reliable offline .ics workflow until native OAuth is implemented.
-    setOwn({ configured: false, connected: false });
-    const done = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.pixelpals === "google-connected") setOwn({ configured: true, connected: true }); };
-    window.addEventListener("message", done);
-    return () => window.removeEventListener("message", done);
-  }, []);
-  async function ownRun() {
-    setOwnBusy(true);
-    try {
-      const r = await ownCall({ op: "push", shifts, title, remove });
-      if (!r.connected) {
-        setOwn((o) => ({ configured: o?.configured ?? true, connected: false }));
-        onStatus(String(r.error ?? "Google Calendar isn't connected yet."));
-        return;
-      }
-      const reasons = r.reasons ?? [];
-      const why = reasons.length ? ` — ${reasons.slice(0, 3).join("; ")}${reasons.length > 3 ? ` (+${reasons.length - 3} more)` : ""}` : "";
-      if (!r.skipped) onPushed();
-      const bits = [r.added ? `added ${r.added}` : "", r.updated ? `updated ${r.updated}` : "", r.removed ? `removed ${r.removed}` : ""].filter(Boolean).join(", ") || "nothing to change";
-      onStatus(`Google Calendar: ${bits}${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
-    } catch { onStatus("Couldn't connect to the calendar service."); } finally { setOwnBusy(false); }
-  }
-  // (self-hosted): use your own Google sign-in when it's set up, otherwise download one calendar file.
-  // Each event has a fixed id, so pushing or importing again updates the same events instead of making copies.
-  return (
-    <>
-      {own?.connected
-        ? <Button size="sm" variant="outline" disabled={ownBusy || !shifts.length} onClick={ownRun}><CalendarSync className="size-4" /> {ownBusy ? "Working…" : "Add or update in Google Calendar"}</Button>
-        : own?.configured
-          ? <Button size="sm" variant="outline" onClick={() => { if (!window.open(`/api/google/start?origin=${encodeURIComponent(location.origin)}`, "pixelpals-google", "width=520,height=700")) onStatus("Popup blocked. Allow popups for this site and try again."); else onStatus("Approve Google Calendar access in the popup, then press the button again."); }}><CalendarSync className="size-4" /> Connect Google Calendar</Button>
-          : null}
-      <Button size="sm" variant="secondary" disabled={!shifts.length} onClick={() => {
-        onDownload();
-        window.open("https://calendar.google.com/calendar/u/0/r/settings/import", "_blank", "noopener");
-        onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Use a dedicated calendar for these shifts; repeated manual imports may create duplicates.");
-      }}><CalendarPlus className="size-4" /> {own?.connected ? "Download .ics instead" : "Download .ics for Google Calendar"}</Button>
-    </>
-  );
+/** Standalone .ics handoff: never call Pixel Pals' server-only Google routes. */
+function AddAllToCalendar({ shifts, onStatus, onDownload }: {
+  shifts: Shift[]; title: string; remove: string[]; onPushed: () => void;
+  onStatus: (s: string) => void; onDownload: () => void;
+}) {
+  return <Button size="sm" variant="secondary" disabled={!shifts.length} onClick={() => {
+    onDownload();
+    window.open("https://calendar.google.com/calendar/u/0/r/settings/import", "_blank", "noopener");
+    onStatus("Downloaded my-shifts.ics. In Google Calendar, open Settings → Import & export → Import and select the file. Manual re-imports may duplicate shifts; direct sync is coming later.");
+  }}><CalendarPlus className="size-4"/> Download .ics for Google Calendar</Button>;
 }
 
 function ShiftsTab() {
@@ -354,8 +317,8 @@ function ShiftsTab() {
             <AddAllToCalendar onDownload={() => void ics()} shifts={shifts} title={title.trim() || "Mark Work"} remove={removed} onPushed={() => setRemoved([])} onStatus={setStatus} />
             <Button size="sm" variant="outline" onClick={add}>Add a shift</Button>
           </div>
-          {removed.length > 0 && <p className="text-xs text-muted-foreground">{removed.length} removed shift{removed.length === 1 ? "" : "s"} will also be deleted from Google Calendar the next time you press “Add or update”.</p>}
-          <p className="text-xs text-muted-foreground">Press Edit on a shift to change its date, times or note. Pushing again updates the events you already added instead of making copies.</p>
+          {removed.length > 0 && <p className="text-xs text-muted-foreground">{removed.length} removed shift{removed.length === 1 ? "" : "s"} will be omitted from the next .ics export; already imported Google Calendar events are not deleted automatically.</p>}
+          <p className="text-xs text-muted-foreground">Press Edit on a shift to change its date, times or note. Save a new .ics after editing. Manual re-imports can create duplicates.</p>
           <ul className="max-h-80 space-y-1 overflow-y-auto text-sm">
             {shifts.map((s, i) => (
               <li key={s.id ?? `${s.date}-${i}`} className="rounded border border-border px-2 py-1">
