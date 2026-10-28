@@ -1971,7 +1971,7 @@ export function Room() {
               <SetupPanel open={setupOpen} />
             </WorkspaceWindow>
             <WorkspaceWindow id="today" title="Today" icon={<Sun className="size-4" />} open={todayOpen} onClose={() => setTodayOpen(false)} resetVersion={resetVersion}>
-              <TodayPanel open={todayOpen} />
+              <TodayPanel open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} />
             </WorkspaceWindow>
             <WorkspaceWindow id="tasks" title="Tasks & reminders" icon={<CheckSquare className="size-4" />} open={tasksOpen} onClose={() => setTasksOpen(false)} resetVersion={resetVersion}>
               <TasksPanel open={tasksOpen} />
