@@ -1,0 +1,16 @@
+import {useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {cleanStore, DEFAULT_VENDORS, newId, ranked, type Store} from "@/lib/vendors";
+const KEY="showpilot:vendors:v1";
+function initial():Store {try{return cleanStore(JSON.parse(localStorage.getItem(KEY)||"null"))}catch{return {items:[],vendors:DEFAULT_VENDORS}}}
+export function StandaloneVendors(){
+ const [store,setStore]=useState<Store>(initial);const [name,setName]=useState("");const [vendor,setVendor]=useState("");const [price,setPrice]=useState("");const [chosen,setChosen]=useState("");
+ const save=(s:Store)=>{const v=cleanStore(s);setStore(v);try{localStorage.setItem(KEY,JSON.stringify(v))}catch{}};
+ const backup=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(store,null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="showpilot-vendors.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ return <div className="space-y-4 p-2"><div className="rounded-lg border p-3 text-sm">Offline vendor quotes and comparisons. Automatic website refresh and email integration are not yet available in the standalone version.</div>
+ <div className="flex flex-wrap gap-2"><Input placeholder="New item or rental" aria-label="Item name" value={name} onChange={e=>setName(e.target.value)}/><Button onClick={()=>{if(name.trim())save({...store,items:[...store.items,{id:newId(),name:name.trim(),kind:"buy",offers:[]}]});setName("")}}>Add item</Button><Button variant="outline" onClick={backup}>Export backup</Button>
+ <label className="rounded-md border px-3 py-2 text-sm cursor-pointer">Import backup<input className="sr-only" type="file" accept=".json" onChange={async e=>{const f=e.target.files?.[0];if(f){try{save(cleanStore(JSON.parse(await f.text())))}catch{alert("Invalid vendor backup")}}}}/></label></div>
+ <div className="grid gap-2 md:grid-cols-4"><select className="rounded-md border bg-background p-2" aria-label="Quote item" value={chosen} onChange={e=>setChosen(e.target.value)}><option value="">Select item</option>{store.items.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select><Input aria-label="Vendor name" placeholder="Vendor" value={vendor} onChange={e=>setVendor(e.target.value)}/><Input aria-label="Quote price" placeholder="Price" value={price} onChange={e=>setPrice(e.target.value)}/><Button disabled={!chosen||!vendor||!Number.isFinite(Number(price))||Number(price)<=0} onClick={()=>{save({...store,items:store.items.map(x=>x.id===chosen?{...x,offers:[...x.offers,{id:newId(),vendor,price:Number(price),source:"quote",checked:new Date().toISOString()}]}:x)});setVendor("");setPrice("")}}>Add quote</Button></div>
+ {store.items.map(x=><div key={x.id} className="rounded-lg border p-3"><h3 className="font-semibold">{x.name}</h3>{ranked(x).map(o=><div key={o.id} className="flex justify-between border-t p-2"><span>{o.vendor}</span><strong>{o.price===undefined?"No price":"$"+o.price.toFixed(2)}</strong></div>)}</div>)}</div>
+}

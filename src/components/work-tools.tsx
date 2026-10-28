@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, airwallTasks, isCancelledRow, isPendingRow, sharedSpaces, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type EventRow, type Shift, type TaskNote } from "@/lib/work-tools";
-import { VendorsPanel } from "@/components/vendors-panel";
+import { StandaloneVendors } from "@/components/showpilot-vendors";
 import { FloorMapPanel } from "@/components/floor-map-panel";
-import { RepoWatch } from "@/components/repo-watch";
+import { scopeShowPilotRows } from "@/lib/showpilot-venue";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -34,9 +34,9 @@ const TABS = [
   { id: "deck", label: "Deck", Icon: Layers, hint: "Plan a stage from the decks, stairs and rails in the warehouse." },
   { id: "vendors", label: "Vendors", Icon: Store, hint: "Compare prices and rentals across your usual suppliers." },
   { id: "floor", label: "Floor map", Icon: MapIcon, hint: "Color a floor plan from the work order: who ordered what power, where." },
-  { id: "repos", label: "Repos", Icon: GitBranch, hint: "Keep an eye on the code repositories you follow." },
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+export type WorkTabId = (typeof TABS)[number]["id"];
+type TabId = WorkTabId;
 const TAB_KEY = "pixelpals:work-tab";
 const startTab = (): TabId => {
   try {
@@ -45,27 +45,27 @@ const startTab = (): TabId => {
   } catch { return "events"; }
 };
 
-export function ShowServicesTools({ page = false }: { page?: boolean } = {}) {
+export function ShowServicesTools({ page = false, selectedTab, hideTabBar = false, venueOnly = false }: { page?: boolean; selectedTab?: WorkTabId; hideTabBar?: boolean; venueOnly?: boolean } = {}) {
   const [tab, setTab] = useState<TabId>("events");
-  useEffect(() => { setTab(startTab()); }, []); // after mount so server and browser render the same first frame
+  useEffect(() => { if (!selectedTab) setTab(startTab()); }, [selectedTab]); // after mount so server and browser render the same first frame
   const pick = (v: string) => { setTab(v as TabId); try { localStorage.setItem(TAB_KEY, v); } catch { /* private window */ } };
-  const cur = TABS.find((x) => x.id === tab) ?? TABS[0];
-  return <Tabs value={tab} onValueChange={pick}>
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+  const activeTab = selectedTab ?? tab;
+  const cur = TABS.find((x) => x.id === activeTab) ?? TABS[0];
+  return <Tabs value={activeTab} onValueChange={pick}>
+          {!hideTabBar && <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
             {TABS.map(({ id, label, Icon }) => (
               <TabsTrigger key={id} value={id} className="gap-1.5"><Icon className="size-4" aria-hidden />{label}</TabsTrigger>
             ))}
-          </TabsList>
+          </TabsList>}
           <div className="flex items-start justify-between gap-3 pt-2">
             <p className="text-sm text-muted-foreground">{cur.hint}</p>
             {!page && <a href={`/work?tab=${tab}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs text-primary underline"><ExternalLink className="size-3.5" /> Open as its own page</a>}
           </div>
-          <TabsContent value="events"><EventsTab /></TabsContent>
+          <TabsContent value="events"><EventsTab venueOnly={venueOnly} /></TabsContent>
           <TabsContent value="shifts"><ShiftsTab /></TabsContent>
           <TabsContent value="deck"><DeckTab /></TabsContent>
-          <TabsContent value="vendors"><VendorsTab /></TabsContent>
+          <TabsContent value="vendors"><StandaloneVendors /></TabsContent>
           <TabsContent value="floor"><FloorMapPanel /></TabsContent>
-          <TabsContent value="repos"><RepoWatch /></TabsContent>
         </Tabs>;
 }
 
@@ -85,7 +85,7 @@ function FilePick({ accept, label, onFile, onFiles }: { accept: string; label: s
   );
 }
 
-function EventsTab() {
+function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
   const [entries, setEntries] = useState<EventEntry[]>([]);
   const [status, setStatus] = useState("");
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -95,18 +95,24 @@ function EventsTab() {
   const [source, setSource] = useState<{ rows: EventRow[]; existing?: File; sources: number } | null>(null);
   const [withPending, setWithPending] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
+  const [venueReview, setVenueReview] = useState<string[]>([]);
+  const [venueExcluded, setVenueExcluded] = useState(0);
   const [report, setReport] = useState("");
   async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean) {
     const { eventsWorkbook } = await import("@/lib/work-files");
-    const live = src.rows.filter((r) => !isCancelledRow(r));
+    const uncancelled = src.rows.filter((r) => !isCancelledRow(r));
+    const scope = venueOnly ? scopeShowPilotRows(uncancelled) : { accepted: uncancelled, excluded: [] as EventRow[], needsReview: [] as EventRow[] };
+    const live = scope.accepted;
+    setVenueExcluded(scope.excluded.length);
+    setVenueReview([...new Set(scope.needsReview.map((r) => r.space || "(no space)"))].sort());
     setPending([...new Set(live.filter(isPendingRow).map((r) => `${r.event || r.description} (${r.status})`))].sort());
     const rows = includePending ? live : live.filter((r) => !isPendingRow(r));
     const list = summarizeEvents(rows);
-    const dayList = [...new Set(src.rows.map((r) => r.date))].sort();
+    const dayList = [...new Set(live.map((r) => r.date))].sort();
     const statuses = new Map<string, number>();
     for (const r of src.rows) statuses.set(r.status ?? "(none)", (statuses.get(r.status ?? "(none)") ?? 0) + 1);
     setReport((old) => [old.split("\n--- counts ---")[0], "--- counts ---",
-      `rows read: ${src.rows.length}`, `cancelled: ${src.rows.length - live.length}`, `not-yet-definite: ${live.filter(isPendingRow).length} (${includePending ? "included" : "left out"})`,
+      `rows read: ${src.rows.length}`, `cancelled: ${src.rows.length - uncancelled.length}`, `other-building rows excluded: ${scope.excluded.length}`, `unverified-space rows: ${scope.needsReview.length}`, `not-yet-definite: ${live.filter(isPendingRow).length} (${includePending ? "included" : "left out"})`,
       `rows used: ${rows.length}`, `entries built: ${list.length}`, `dates: ${dayList[0] ?? "-"} to ${dayList.at(-1) ?? "-"}`,
       `statuses: ${[...statuses].map(([k, v]) => `${k}=${v}`).join(", ") || "-"}`,
       `sample rows: ${JSON.stringify(src.rows.slice(0, 3))}`].join("\n"));
@@ -119,7 +125,7 @@ function EventsTab() {
   }
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null);
-    const head = [`Pixel Pals Events report · ${new Date().toISOString()}`, `build: ${__APP_VERSION__} ${__APP_COMMIT__} ${__APP_BUILD_DATE__}`];
+    const head = [`ShowPilot Events report · ${new Date().toISOString()}`, `build: ${__APP_VERSION__} ${__APP_COMMIT__} ${__APP_BUILD_DATE__}`];
     setReport(head.join("\n"));
     try {
       const { describeSheet } = await import("@/lib/work-files");
@@ -164,6 +170,7 @@ function EventsTab() {
           <textarea readOnly value={report} rows={8} className="w-full rounded border border-border bg-background p-1 font-mono" onFocus={(e) => e.currentTarget.select()} />
         </div>
       )}
+      {venueOnly && (venueExcluded > 0 || venueReview.length > 0) && <details className="rounded border border-amber-500 p-3 text-xs"><summary className="cursor-pointer font-semibold">Venue review: {venueExcluded} excluded rows and {venueReview.length} space name(s) needing review</summary><p className="mt-2">Only confirmed Cobb Convention Center-Atlanta spaces are scheduled. Unrecognized spaces are not included until their venue is verified.</p><ul className="mt-2 list-disc pl-4">{venueReview.map((s) => <li key={s}>{s}</li>)}</ul></details>}
       {pending.length > 0 && (
         <label className="flex items-start gap-2 rounded-md border border-amber-500 p-2 text-xs">
           <input type="checkbox" className="mt-0.5" checked={withPending} onChange={(e) => { setWithPending(e.target.checked); if (source) build(source, e.target.checked).catch((err) => setStatus(`Could not read that PDF: ${(err as Error).message}`)); }} />
@@ -231,7 +238,7 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
       if (!r.skipped) onPushed();
       const bits = [r.added ? `added ${r.added}` : "", r.updated ? `updated ${r.updated}` : "", r.removed ? `removed ${r.removed}` : ""].filter(Boolean).join(", ") || "nothing to change";
       onStatus(`Google Calendar: ${bits}${r.skipped ? ` (${r.skipped} skipped${why})` : ""}.`);
-    } catch { onStatus("Couldn't reach Pixel Pals."); } finally { setOwnBusy(false); }
+    } catch { onStatus("Couldn't connect to the calendar service."); } finally { setOwnBusy(false); }
   }
   // (self-hosted): use your own Google sign-in when it's set up, otherwise download one calendar file.
   // Each event has a fixed id, so pushing or importing again updates the same events instead of making copies.
@@ -381,11 +388,8 @@ function DeckTab() {
       <Suspense fallback={<p className="text-sm text-muted-foreground">Loading the stage planner…</p>}>
         <DeckPlanner />
       </Suspense>
-      <p className="mt-3 text-xs text-muted-foreground">Tip: type <code>@deck 24x24x32</code> in the chat box for a quick answer. Want to send the planner to someone without Pixel Pals? <a className="text-primary underline" href="/stage-planner.html" download="stage-planner.html">Download the one-file version</a>. It works offline in any browser.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Tip: type <code>@deck 24x24x32</code> in the chat box for a quick answer. Want to share the planner? <a className="text-primary underline" href="/stage-planner.html" download="stage-planner.html">Download the one-file version</a>. It works offline in any browser.</p>
     </div>
   );
 }
 
-function VendorsTab() {
-  return <VendorsPanel />;
-}

@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=Pixel Pals
-Comment=AI agent chat room with pixel characters
-Exec=pixelpals
-Icon=pixelpals
-Terminal=false
-Type=Application
-Categories=Utility;Development;
-StartupWMClass=PixelPals
