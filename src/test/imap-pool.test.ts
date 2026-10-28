@@ -142,7 +142,8 @@ describe("failures and reconnection", () => {
     srv.dropAll();
     await op(); // the close event may not have arrived yet, so the NOOP check has to catch it
     expect(srv.connections).toBe(2);
-    expect(imapStats().probes + imapStats().retries).toBeGreaterThan(0);
+    // Either the NOOP check, the safe retry, or the close event itself (which discards it first) is enough; which wins is a matter of timing.
+    expect(imapStats().probes + imapStats().retries + imapStats().discarded).toBeGreaterThan(0);
   });
   it("repeats a read-only operation once when a reused connection was dead without anyone noticing", async () => {
     await op();
