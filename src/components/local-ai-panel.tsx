@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Trash2, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BenchSection } from "@/components/bench-section";
 import { setEngine, useEngine } from "@/lib/engine";
 import { describeHardware, modelBudgetGb, type Hardware } from "@/lib/hardware";
 import { agents } from "@/lib/agents";
@@ -213,6 +214,8 @@ export function LocalAiPanel() {
               </div>
             ))}
           </div>
+
+          {installed.length > 0 && <BenchSection installed={installed.map((m) => m.name)} />}
 
           {status.feedEnabled !== false && (
             <div className="grid gap-2">

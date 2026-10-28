@@ -111,8 +111,11 @@ export function taskOfInstalled(m: Installed): TaskKey {
  * The best model you already have for a task, given this machine. Quick replies get the smallest small model (speed matters);
  * everything else gets the largest model that fits the GPU (or runs comfortably on CPU). A task with no suitable model borrows the Chat choice.
  */
-export function bestInstalled(task: TaskKey, installed: Installed[], hw: Hardware | null): string | null {
-  const usable = installed.filter((m) => !/embed/i.test(m.name) && m.gb > 0);
+export function bestInstalled(task: TaskKey, installed: Installed[], hw: Hardware | null, avoid?: ReadonlySet<string>): string | null {
+  const all = installed.filter((m) => !/embed/i.test(m.name) && m.gb > 0);
+  // Models your own benchmarks showed to be failing or too slow are skipped, but only when something else is left to choose.
+  const kept = avoid?.size ? all.filter((m) => !avoid.has(m.name)) : all;
+  const usable = kept.length ? kept : all;
   if (!usable.length) return null;
   const fits = (m: Installed): Fit => (hw ? fitFor({ id: m.name, task: taskOfInstalled(m), gb: m.gb, note: "" }, hw) : "cpu");
   const preferred: Fit = hw && modelBudgetGb(hw).onGpu ? "gpu" : "cpu";
@@ -129,7 +132,7 @@ export function bestInstalled(task: TaskKey, installed: Installed[], hw: Hardwar
   }
   const own = pickLargest(inClass(task));
   if (own) return own.name;
-  if (task !== "chat") return bestInstalled("chat", installed, hw);
+  if (task !== "chat") return bestInstalled("chat", installed, hw, avoid);
   const general = pickLargest(usable.filter((m) => taskOfInstalled(m) !== "code" && fits(m) !== "no"));
   return general ? general.name : null;
 }

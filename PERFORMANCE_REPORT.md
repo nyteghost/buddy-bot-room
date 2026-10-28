@@ -105,3 +105,25 @@ Not measured: battery or CPU effect on a phone.
 | NEW | 9 + digest | 5,354 | 6 of 6 |
 
 **Not measured:** whether answers actually get better (needs a model; the synthetic chat is also favourable to the digest because decisions are phrased plainly). The digest is extractive, so it can quote a sentence that is later reversed; the prompt marks it as data. Rolling model-written summaries were deliberately not added (they cost an extra inference call per long chat on a single GPU).
+
+## R3-16. Ollama benchmarking tool
+
+**What it is:** Settings -> Local AI -> Benchmark. For one installed model it loads the model once, then runs three fixed prompts (chat, code, reasoning) at temperature 0 with a fixed seed and stores one record per prompt in `BUDDY_DATA_DIR/ollama-bench.json` (in memory only when no data folder is set).
+
+**What is measured, and where each number comes from:**
+
+| Metric | Source |
+|---|---|
+| Time to first token | our stopwatch around a streaming request (first non-empty text chunk) |
+| Tokens per second | Ollama `eval_count / eval_duration` |
+| Prompt processing time and speed | Ollama `prompt_eval_duration`, `prompt_eval_count` (null when Ollama reports none, for example a cached prompt) |
+| Model loading time | `load_duration` of the warm-up request that loads the model before the three prompts |
+| GPU memory | `/api/ps` `size_vram` right after the run, and its share of the model |
+| Queue/other wait | wall-clock minus Ollama's own `total_duration` (queueing, network); it is a derived upper bound, not a queue counter, because Ollama does not expose one |
+| Failure rate | failed requests, including a model that will not load (one failure per prompt) |
+
+Anything Ollama does not report is stored as `null` and shown as "not measured". A simple automatic check (code contains `def is_palindrome(`, reasoning contains 6:30) is a smoke test, not a quality score.
+
+**How it informs choices:** after 3 or more runs, a model that failed in at least half of them or generates under 5 tokens/s is skipped by "Automatic (by task)" whenever another installed model is available; the results table shows the best measured model per task. Results older than 90 days are ignored. Only one benchmark runs at a time, and with accounts on only the owner can run or delete them.
+
+**Not measured yet:** this report contains no benchmark numbers from the RTX 3080 box because no Ollama was reachable from the build environment. Run it on the server and the numbers appear in the panel; nothing here is estimated. Unit tests (13) cover the arithmetic, null handling, failure recording, summaries, the avoid rule and the suite flow with a fake Ollama, not real hardware.
