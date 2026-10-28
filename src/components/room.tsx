@@ -1760,7 +1760,7 @@ export function Room() {
             setRoomOpen(show("room"));
             setTodayOpen(show("today"));
             setMailOpen(show("mail"));
-            setDocsOpen(show("docs"));
+            setDocsOpen(show("documents"));
             setToolsOpen(show("tools"));
             setSetupOpen(show("setup"));
             setNotesOpen(show("notes"));
