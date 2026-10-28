@@ -146,6 +146,7 @@ Your data lives in the `buddy-data` volume and survives updates.
   - *One-on-one*: a private chat with one pal. The menu shows which AI each pal uses, like "Nova (Groq · gpt-oss-120b)".
   - *Problem solving*: a team with roles (Diagnoser, Fixer, Skeptic) that ends in a plan (Best approach / Steps / Watch out). The "Add these steps to Tasks" button on the plan puts the steps on your task list.
   - *Debate*: two pals argue for and against your claim and a third judges who argued better.
+  - *Smart team*: uses only as many pals as the question needs. A simple question gets one pal. A problem about a server, code or a plan goes through a specialist, then a coder (if a fix is needed), then a reviewer (only if something looks risky), then a coordinator who sums up. Pals take turns one after another, so one Ollama model is loaded at a time; each gets a short hand-off of what the earlier ones found, repeated answers are dropped, and it stops at the time limit. Under "Team settings" you set the most pals per answer, the time limit, "always one pal", and who plays which role. Who speaks is decided by plain rules, not by an AI call. `/mode smart` or `/team`.
   - Every window has **Keep going** (one more step) and **Summarize** (a short recap of that chat). `/mode debate` etc. opens the window.
 - **Rounds**: how many times the pals go around (1–5).
 - **@mentions** talk to one pal directly: `@calendar`, `@gmail`, `@notes`, `@system`, `@terminal`, `@deck`, `@price`, `@gear`, `@seerr`, `@record`.

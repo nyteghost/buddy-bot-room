@@ -11,3 +11,12 @@ No data format changed for existing users. The IndexedDB cache is new and dispos
 
 ## Rollback
 Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` undoes one without touching the others. The `:latest` image (main) is unaffected.
+
+## Agent orchestration (Smart Team)
+- Modes live in `Mode` (`agents.ts`); `smart` is additive, existing modes are unchanged. Saved chats from before simply have no `smart` conversation.
+- `smart-team.ts` is pure: `profileTask` (keyword/length rules), `planSmartTeam` (who speaks, in order), `shouldRun` (skip reviewer/coordinator when not useful), `isRepeat` (word overlap), `buildHandoff` (bounded notes from earlier turns), `outOfTime`. No model call is used to route.
+- `room.tsx` runs the planned turns sequentially in the existing turn loop (so Stop/abort, retry chain, Local-Only and `keepLocal` rules all still apply); the server adds the role instruction and the hand-off (labelled as data) to the system prompt.
+- Settings (`pixel-pals-smart-v1`, browser storage only): max turns 1-6, time limit 20-900 s, single-pal switch, per-role pal.
+
+## Ollama model management
+- `ollama-resources.ts` (pure) + `ollama-runtime.server.ts` (prepare/load with keep-alive, out-of-memory fallback to the largest smaller installed model, keep-alive re-armed after each reply). Host GPU comes from `OLLAMA_VRAM_GB` when Ollama is on another machine. Reply metadata carries `model` and `fellBackFrom`; the UI shows `via`.

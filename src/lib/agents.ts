@@ -213,8 +213,8 @@ export function resolveMention(text: string, mode?: CharacterMode): AgentId | nu
   }
   return null;
 }
-export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate";
-export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate"];
+export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate" | "smart";
+export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate", "smart"];
 export type RoomMessage = UIMessage<{
   agentId?: AgentId;
   round?: number;

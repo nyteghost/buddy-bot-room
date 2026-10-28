@@ -44,6 +44,7 @@ import { Puzzle,
   CheckSquare,
   Sun,
   FileText,
+  Workflow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -188,6 +189,7 @@ import { awardXp } from "@/lib/progress-store";
 import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
 import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
+import { buildHandoff, cleanSmartConfig, defaultSmartConfig, isRepeat, outOfTime, planSmartTeam, shouldRun, SMART_ROLES, type SmartConfig, type SmartPlan, type SmartRole } from "@/lib/smart-team";
 import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
 
 const storageKey = "pixel-pals-conversation-v1";
@@ -197,14 +199,15 @@ const suggestions = [
   "Pitch the next big indie game",
 ];
 const chatsKey = "pixel-pals-conversations-v2";
-const defaultOpenModes: Record<Mode, boolean> = { roundtable: true, broadcast: false, direct: false, solve: false, debate: false };
-const modeLabel: Record<Mode, string> = { roundtable: "Roundtable", broadcast: "Broadcast", direct: "One-on-one", solve: "Problem solving", debate: "Debate" };
+const defaultOpenModes: Record<Mode, boolean> = { roundtable: true, broadcast: false, direct: false, solve: false, debate: false, smart: false };
+const modeLabel: Record<Mode, string> = { roundtable: "Roundtable", broadcast: "Broadcast", direct: "One-on-one", solve: "Problem solving", debate: "Debate", smart: "Smart team" };
 const modeHelp: Record<Mode, string> = {
   roundtable: "Everyone hears everyone: pals react to each other, then one gives the verdict.",
   broadcast: "Each pal answers on their own, without seeing the others. Optionally a judge ranks the answers.",
   direct: "A private chat with one pal.",
   solve: "A team with roles (Diagnoser, Fixer, Skeptic) that ends in a plan you can send to Tasks.",
   debate: "Two pals argue for and against; a third judges who argued better.",
+  smart: "Only as many pals as the question needs: a simple question gets one answer; a hard one goes specialist, coder, reviewer, coordinator, one after another.",
 };
 const modePlaceholder: Record<Mode, string> = {
   roundtable: "Give your pals something to talk about…",
@@ -212,6 +215,7 @@ const modePlaceholder: Record<Mode, string> = {
   direct: "Message your pal…",
   solve: "Describe the problem you need solved…",
   debate: "State a claim for the pals to argue about…",
+  smart: "Ask anything; the team size fits the question…",
 };
 const modeSuggestions: Record<Mode, string[]> = {
   roundtable: suggestions,
@@ -219,14 +223,15 @@ const modeSuggestions: Record<Mode, string[]> = {
   direct: ["Help me plan my week", "Explain this like I'm new to it", "What should I cook tonight?"],
   solve: ["My Plex server keeps buffering on one TV", "My Docker container restarts every few minutes", "I can't focus when I work from home"],
   debate: ["Remote work beats the office", "Cats make better pets than dogs", "AI should write first drafts of everything"],
+  smart: ["My Docker container restarts every few minutes", "What should I cook tonight?", "A script of mine fails with a permission error after a reboot"],
 };
 
 installUuidPolyfill(); // plain-http pages have no crypto.randomUUID
 
 export function Room() {
   // Each conversation mode (Roundtable, Broadcast, One-on-one, Problem solving, Debate) has its own window, chat and draft.
-  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>({ roundtable: [], broadcast: [], direct: [], solve: [], debate: [] });
-  const [drafts, setDrafts] = useState<Record<Mode, string>>({ roundtable: "", broadcast: "", direct: "", solve: "", debate: "" });
+  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>({ roundtable: [], broadcast: [], direct: [], solve: [], debate: [], smart: [] });
+  const [drafts, setDrafts] = useState<Record<Mode, string>>({ roundtable: "", broadcast: "", direct: "", solve: "", debate: "", smart: "" });
   /** The mode window you are working in; plain "messages" and "topic" below mean that window's. */
   const [mode, setMode] = useState<Mode>("roundtable");
   const messages = chats[mode];
@@ -298,8 +303,12 @@ export function Room() {
   }, []);
   const [rounds, setRounds] = useState(2);
   const [judgeOn, setJudgeOn] = useState(false);
+  // Smart Team settings (how many pals, time limit, who plays which role). Remembered on this device.
+  const [smartCfg, setSmartCfgState] = useState<SmartConfig>(defaultSmartConfig);
+  useEffect(() => { try { setSmartCfgState(cleanSmartConfig(JSON.parse(localStorage.getItem("pixel-pals-smart-v1") ?? "null"))); } catch { /* optional storage */ } }, []);
+  const setSmartCfg = (patch: Partial<SmartConfig>) => setSmartCfgState((cur) => { const next = cleanSmartConfig({ ...cur, ...patch }); try { localStorage.setItem("pixel-pals-smart-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   // "Short answers" per mode window: cheaper and quicker replies. Remembered on this device.
-  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
+  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, smart: false });
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem("pixel-pals-short-v1") ?? "null"); if (v && typeof v === "object") setShortOn((cur) => ({ ...cur, ...Object.fromEntries(ALL_MODES.map((m) => [m, v[m] === true])) })); } catch { /* optional storage */ } }, []);
   const setShort = (m: Mode, on: boolean) => setShortOn((cur) => { const next = { ...cur, [m]: on }; try { localStorage.setItem("pixel-pals-short-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   const [partner, setPartner] = useState<AgentId>("claude");
@@ -400,7 +409,7 @@ export function Room() {
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
   function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
-    setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
+    setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, smart: false });
     setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
     setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
     setToolsOpen(false); setFunOpen(false); setSetupOpen(false); setSearchOpen(false); setRecorderOpen(false);
@@ -420,7 +429,7 @@ export function Room() {
   /** AIs that failed recently: later turns skip them (see orderByHealth). */
   const benchRef = useRef<Bench>(new Map());
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>({ roundtable: 0, broadcast: 0, direct: 0, solve: 0, debate: 0 });
+  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>({ roundtable: 0, broadcast: 0, direct: 0, solve: 0, debate: 0, smart: 0 });
   const bumpFork = (m: Mode) => setForkSignals((f) => ({ ...f, [m]: f[m] + 1 }));
   const [runningMode, setRunningMode] = useState<Mode | null>(null);
   const [regen, setRegen] = useState<{ text: string; mode: Mode } | null>(null);
@@ -664,12 +673,23 @@ export function Room() {
         ? agents.filter((a) => a.id === partner)
         : agents.filter((a) => enabled.includes(a.id));
       const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean; dmRole?: DmRole; role?: string; side?: "for" | "against"; summary?: boolean }[] = [];
+      let smartPlan: SmartPlan | null = null;
+      const smartDone: { role: SmartRole; name: string; text: string }[] = [];
+      const smartStarted = Date.now();
       // Dungeon Master mode: the first seated pal narrates, the rest react as the party, one pass per action.
       const campaign = getCampaign();
       if (extra?.summary && seated[0]) turns.push({ agent: seated[0], round: 1, verdict: false, summary: true });
       else if (campaign.active) seated.forEach((agent, i) => turns.push({ agent, round: 1, verdict: false, dmRole: i === 0 ? "dm" : "party" }));
       else {
-        if (mode === "debate" && !direct) {
+        if (mode === "smart" && !direct) {
+          // Smart Team: plan with plain code (no model call), then run only the pals the question needs, one at a time.
+          smartPlan = planSmartTeam({ text: topic, seated: seated.map((a) => a.id), config: smartCfg });
+          for (const st of smartPlan.steps) {
+            const agent = seated.find((a) => a.id === st.agentId);
+            if (agent) turns.push({ agent, round: 1, verdict: false, ...(smartPlan.single ? {} : { role: st.role }) });
+          }
+          logClient("info", `Smart team: ${smartPlan.why}`);
+        } else if (mode === "debate" && !direct) {
           // Two pals take the sides; the next pal (or the first, with only two) judges.
           const debaters = seated.slice(0, 2);
           for (let r = 1; r <= rounds; r++)
@@ -688,6 +708,15 @@ export function Room() {
         for (const [turnIndex, { agent, round: currentRound, verdict, dmRole, role, side, summary }] of turns.entries()) {
           setRound(currentRound);
           if (controller.signal.aborted) return;
+          const smartRole = smartPlan && role && (SMART_ROLES as string[]).includes(role) ? (role as SmartRole) : null;
+          if (smartPlan && smartRole && smartDone.length) {
+            if (!shouldRun({ agentId: agent.id, role: smartRole }, smartPlan, smartDone)) { logClient("info", `Smart team: ${smartRole} not needed`); continue; }
+            if (outOfTime(smartStarted, Date.now(), smartCfg)) {
+              transcript = [...transcript, { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: "echo", characterMode: modeRef.current }, parts: [{ type: "text", text: `Smart team stopped: the ${smartCfg.maxSeconds}s time limit was reached. You can raise it in the Smart team settings.` }] }];
+              setMessages(transcript);
+              break;
+            }
+          }
           setSpeaking(agent.id);
           const began = performance.now();
           // Read the theme live so switching themes mid-discussion applies to the very next speaker.
@@ -703,6 +732,7 @@ export function Room() {
             // In a campaign every pal needs to see the whole table, even in one-on-one.
             mode: dmRole || summary ? ("roundtable" as Mode) : direct ? ("direct" as Mode) : mode,
             ...(role ? { role } : {}),
+            ...(smartRole ? { handoff: buildHandoff(smartDone) } : {}),
             ...(side ? { side } : {}),
             ...(summary ? { summary: true } : {}),
             ...(shortOn[mode] ? { short: true } : {}),
@@ -890,6 +920,12 @@ export function Room() {
             await runChain(provider);
           }
           if (answer && messageText(answer).trim()) {
+            if (smartRole) {
+              const said = messageText(answer);
+              // A pal that only repeats what an earlier one said is dropped instead of cluttering the chat.
+              if (isRepeat(said, smartDone.map((d) => d.text))) { logClient("info", `Smart team: dropped a repeated ${smartRole} reply`); setMessages(transcript); continue; }
+              smartDone.push({ role: smartRole, name: agent.name, text: said });
+            }
             transcript = [...transcript, answer];
             setMessages(transcript);
           } else if (!controller.signal.aborted)
@@ -1439,7 +1475,7 @@ export function Room() {
   function renderModeWindow(wm: Mode) {
     const msgs = chats[wm];
     const busyHere = running && runningMode === wm;
-    const icons: Record<Mode, ReactNode> = { roundtable: <Users className="size-4" />, broadcast: <Radio className="size-4" />, direct: <MessageSquare className="size-4" />, solve: <Wrench className="size-4" />, debate: <Swords className="size-4" /> };
+    const icons: Record<Mode, ReactNode> = { roundtable: <Users className="size-4" />, broadcast: <Radio className="size-4" />, direct: <MessageSquare className="size-4" />, solve: <Wrench className="size-4" />, debate: <Swords className="size-4" />, smart: <Workflow className="size-4" /> };
     return (
       <WorkspaceWindow id={`mode-${wm}`} className={cn("window-conversation window-mode", `window-mode-${wm}`, wm === mode && "window-mode-active")} title={modeLabel[wm]} icon={icons[wm]} open={openModes[wm]} onClose={() => setOpenModes((o) => ({ ...o, [wm]: false }))} resetVersion={resetVersion}>
         <section className="conversation-panel" onPointerDownCapture={() => { if (mode !== wm) setMode(wm); }}>
@@ -1743,6 +1779,24 @@ export function Room() {
               <label className="judge-toggle" title="Replies of 1–3 sentences: faster and cheaper">
                 <input type="checkbox" checked={shortOn[wm]} disabled={running} onChange={(e) => setShort(wm, e.target.checked)} /> Short answers
               </label>
+              {wm === "smart" && (
+                <details className="judge-toggle" title="Smart team settings">
+                  <summary>Team settings</summary>
+                  <div className="grid gap-1 p-1 text-xs">
+                    <label>Most pals per answer <input type="number" min={1} max={6} value={smartCfg.maxTurns} disabled={running} onChange={(e) => setSmartCfg({ maxTurns: Number(e.target.value) })} style={{ width: "3.5rem" }} /></label>
+                    <label>Time limit (seconds) <input type="number" min={20} max={900} value={smartCfg.maxSeconds} disabled={running} onChange={(e) => setSmartCfg({ maxSeconds: Number(e.target.value) })} style={{ width: "4.5rem" }} /></label>
+                    <label><input type="checkbox" checked={smartCfg.singleOnly} disabled={running} onChange={(e) => setSmartCfg({ singleOnly: e.target.checked })} /> Always use just one pal</label>
+                    {SMART_ROLES.map((r) => (
+                      <label key={r} className="capitalize">{r}{" "}
+                        <select value={smartCfg.assign[r] ?? "auto"} disabled={running} onChange={(e) => setSmartCfg({ assign: { ...smartCfg.assign, [r]: e.target.value } })}>
+                          <option value="auto">auto</option>
+                          {agents.filter((a) => enabled.includes(a.id)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              )}
               {wm === "broadcast" && (
                 <label className="judge-toggle" title="After everyone answers, one pal ranks the answers and picks the best">
                   <input type="checkbox" checked={judgeOn} disabled={running} onChange={(e) => setJudgeOn(e.target.checked)} /> Judge picks the best
@@ -1760,7 +1814,7 @@ export function Room() {
                 disabled={running ? !busyHere : !drafts[wm].trim() || (!characterModeCommand(drafts[wm]) && tooFewFor(wm)) || !ready}
               >
                 {busyHere ? <Square /> : <Play fill="currentColor" />}
-                {busyHere ? "Stop" : wm === "direct" ? "Send" : wm === "debate" ? "Start debate" : wm === "solve" ? "Solve it" : wm === "broadcast" ? "Ask everyone" : "Start discussion"}
+                {busyHere ? "Stop" : wm === "direct" ? "Send" : wm === "debate" ? "Start debate" : wm === "solve" ? "Solve it" : wm === "smart" ? "Ask the team" : wm === "broadcast" ? "Ask everyone" : "Start discussion"}
               </Button>
             </div>
             {tooFewFor(wm) && <p className="validation-note">Invite at least two pals to start.</p>}
@@ -1859,7 +1913,7 @@ export function Room() {
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
           {ALL_MODES.map((m) => (
-            <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : <Swords />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
+            <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : m === "debate" ? <Swords /> : <Workflow />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
           ))}
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>

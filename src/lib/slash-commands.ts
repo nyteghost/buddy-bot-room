@@ -76,6 +76,10 @@ const MODES: Record<string, Mode> = {
   "problem-solving": "solve",
   problemsolving: "solve",
   debate: "debate",
+  smart: "smart",
+  team: "smart",
+  "smart-team": "smart",
+  smartteam: "smart",
 };
 const THEMES: Record<string, ThemeId> = {
   normal: "normal", default: "normal",
@@ -88,12 +92,12 @@ const THEMES: Record<string, ThemeId> = {
   dcc: "dcc", carl: "dcc",
   linux: "linux",
 };
-export const modeNames = ["roundtable", "broadcast", "direct", "solve", "debate"];
+export const modeNames = ["roundtable", "broadcast", "direct", "solve", "debate", "smart"];
 export const themeNames = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux"];
 
 export const slashCommands = [
   { name: "help", usage: "/help", description: "List every command" },
-  { name: "mode", usage: "/mode <roundtable|broadcast|direct|solve|debate>", description: "Switch conversation mode" },
+  { name: "mode", usage: "/mode <roundtable|broadcast|direct|solve|debate|smart>", description: "Switch conversation mode" },
   { name: "rounds", usage: `/rounds <${MIN_ROUNDS}-${MAX_ROUNDS}>`, description: "How many rounds the pals debate" },
   { name: "theme", usage: "/theme <name>", description: "Swap the whole cast" },
   { name: "assistant", usage: "/assistant [on|off]", description: "Office look on or off (same as /theme linux)" },
