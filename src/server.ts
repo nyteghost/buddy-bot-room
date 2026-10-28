@@ -59,6 +59,7 @@ function bootJobs(): void {
   booted = true;
   void (async () => {
     try {
+      await (await import("./lib/migrate.server")).ensureMigrated();
       await (await import("./lib/settings.server")).ensureSettings();
       if (process.env["UNRAID_URL"]) startWatcher();
       startScheduler();

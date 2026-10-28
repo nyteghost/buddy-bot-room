@@ -32,5 +32,8 @@ export async function collectStatus(): Promise<string> {
   else rows.push(snap.reachable ? { name: "Unraid", state: "ok" } : { name: "Unraid", state: "down", note: "not answering" });
   rows.push(env("TRAKT_CLIENT_ID") ? { name: "Trakt", state: "ok", note: "configured" } : { name: "Trakt", state: "off" });
   rows.push(env("NTFY_URL") ? { name: "Phone alerts (ntfy)", state: "ok", note: "configured" } : { name: "Phone alerts (ntfy)", state: "off" });
-  return servicesReport(rows, [backupConfig() ? `Backups: ${(await backupText()).split("\n")[0]}` : "Backups: off"]);
+  const extra = [backupConfig() ? `Backups: ${(await backupText()).split("\n")[0]}` : "Backups: off"];
+  const data = await (await import("./migrate.server")).migrationStatusLine().catch(() => null);
+  if (data) extra.push(data);
+  return servicesReport(rows, extra);
 }

@@ -44,6 +44,11 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 - `power.ts` / `power-pure.ts`: `useCalmInterval` (decorative timers; stop when hidden, slower in low-power), `usePowerAttributes` (sets `data-hidden` / `data-lowpower` on `<html>` for CSS), `chatSlice` (newest 60 messages unless the user asks for more), `useEverTrue` (load a window's code on first open). Low-power is per device (`pixel-pals-lowpower-v1`, deliberately not in backups or account sync). `startPolling` multiplies waits by `env.scale()`.
 - Code splitting: `ai-elements/message-markdown.tsx` holds streamdown and its plugins and is loaded by `React.lazy`; Work tools and Betas windows are lazy and mount on first open.
 
+## Migrations and recovery (Release 3 item 18)
+- `migrate.ts` (pure runner + record format), `migrations.ts` (the list; append only), `migrate.server.ts` (file adapter over the data folder, atomic writes, runs once per process from `bootJobs` and the dev server), `migrate-client.ts` (localStorage adapter, called when the room module loads).
+- Record: `{version, pending?{id,attempts,saved}, skipped[], history[]}`. `pending` is written before a migration starts and removed after; finding it at start means the last run was cut off. `saved` holds the old values of the declared keys.
+- Operating guide: `docs/UPDATING.md`.
+
 ## Security boundaries (audit, Release 3 item 12)
 Already in place before this pass: optional shared-password gate or built-in accounts (signed sessions, owner-only windows), secrets kept server-side in `app-secrets.json` (mode 600, never returned to the browser), `redact()` on logs/bug reports, Local-Only AI enforced on the server, SSRF checks on custom provider URLs, read-only Unraid monitoring (no admin or shell operations exist, so nothing needs approval), mail attachments served `private, no-store` with a sandbox CSP.
 

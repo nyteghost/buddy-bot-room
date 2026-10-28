@@ -15,6 +15,13 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Tests
         run: bun run test
+      - name: Dependency security check (informational)
+        continue-on-error: true
+        run: |
+          # Known-vulnerability report for the locked dependencies. It never fails the build; read it before an update.
+          bun audit > audit.log 2>&1 || true
+          summary=$(tail -n 3 audit.log | cut -c1-200 | awk '{printf "%s | ", $0}')
+          echo "::notice title=bun audit::${summary}"
       - name: Build
         run: |
           bun run build > build.log 2>&1 && exit 0

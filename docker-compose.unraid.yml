@@ -106,6 +106,12 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ${APPDATA:-/mnt/user/appdata/pixelpals}/ollama:/root/.ollama
+    healthcheck:   # "healthy" means the Ollama server answers; it does not mean a model is loaded
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # One-shot helper: downloads the models in OLLAMA_MODELS (space separated) the first time, then exits.
   ollama-pull:

@@ -6,7 +6,9 @@
 #   prod            EXPERIMENTAL Node production build. The project builds for Cloudflare Workers by
 #                   default, so this forces Nitro's node-server preset. Try it with
 #                   BUDDY_TARGET=prod docker compose up -d --build
-FROM oven/bun:1 AS base
+# BUN_VERSION=1 follows the newest Bun 1.x. For a build you can repeat exactly, pass a full version (--build-arg BUN_VERSION=1.4.2) or pin the image digest.
+ARG BUN_VERSION=1
+FROM oven/bun:${BUN_VERSION} AS base
 WORKDIR /app
 # git lets the build stamp the real version and commit on the sidebar label.
 RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates && rm -rf /var/lib/apt/lists/* && git config --global --add safe.directory /app
@@ -22,6 +24,7 @@ RUN SHA=$(curl -fsSL --max-time 15 -H 'Accept: application/vnd.github.sha' "http
 # Where the app finds SearXNG (web search) from inside the container. Override in .env.local.
 ENV SEARXNG_URL=http://host.docker.internal:8081 BUDDY_ALLOW_ALL_HOSTS=1 BUDDY_SELF_HOSTED=1
 ENV BUDDY_DATA_DIR=/data
+LABEL org.opencontainers.image.source="https://github.com/nyteghost/buddy-bot-room" org.opencontainers.image.title="Pixel Pals"
 RUN mkdir -p /data
 EXPOSE 8090
 

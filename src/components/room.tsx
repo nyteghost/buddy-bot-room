@@ -123,6 +123,7 @@ import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
 import { getOverrides, mayUseRealData, memoryAccess, useOverrides } from "@/lib/character-overrides";
+import { runClientMigrations } from "@/lib/migrate-client";
 import { chatSlice, lowPower, useEverTrue, usePowerAttributes } from "@/lib/power";
 import { getProjects, logRun, projectBrief, updateProject, useProjects } from "@/lib/projects";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
@@ -151,6 +152,7 @@ import { pickMemories, visibleMemories } from "@/lib/memory-rank";
 import { memoryBoost } from "@/lib/memory-boost";
 import { activeProject } from "@/lib/prefs";
 
+runClientMigrations();
 const storageKey = "pixel-pals-conversation-v1";
 const chatsKey = "pixel-pals-conversations-v2";
 

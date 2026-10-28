@@ -120,6 +120,8 @@ Put the same variables in `.env.local` (Bun loads it automatically). Server-side
 
 Your data lives in the `buddy-data` volume and survives updates.
 
+For the step-by-step safe procedure (what to back up first, `:latest` vs `:beta` vs a pinned build, rolling back code or data, interrupted data migrations, dependency checks) read [docs/UPDATING.md](docs/UPDATING.md).
+
 ---
 
 ## 3. First run: accounts and HTTPS
