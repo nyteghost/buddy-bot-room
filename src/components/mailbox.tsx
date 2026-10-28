@@ -168,7 +168,7 @@ export function Mailbox({ open }: { open: boolean }) {
             {busy === "delete" ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />} {confirm === "delete" ? (inTrash ? "Delete for good?" : "Move to Trash?") : "Delete"}
           </Button>
           {confirm === "delete" && <Button size="sm" variant="ghost" onClick={() => setConfirm("")}>Cancel</Button>}
-          <Button size="sm" variant="outline" disabled={busy === "seen"} onClick={async () => { if (await act("seen", { op: "seen", uid: msg.uid, seen: false }, "Marked unread.")) await backToList(); }}><MailOpen className="size-3" /> Mark unread</Button>
+          <Button size="sm" variant="outline" disabled={busy === "seen"} onClick={async () => { if (await act("seen", { op: "seen", uid: msg.uid, seen: false }, "Marked unread.")) await backToList(true); }}><MailOpen className="size-3" /> Mark unread</Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <FolderInput className="size-4 text-muted-foreground" />
