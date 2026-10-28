@@ -6,10 +6,11 @@ import { humanSize, mailAttachmentUrl } from "@/lib/doc-viewer/doc-source";
 import { Input } from "@/components/ui/input";
 import { forwardableQuote, gmailLink, replySubject, type Folder, type MailMessage, type MailSummary } from "@/lib/mailbox";
 import { replyPrompt } from "@/lib/mail-reply";
+import { blankMailDraft, hasMailDraft, readMailDraft, writeMailDraft, type MailDraft } from "@/lib/mail-draft";
 
 type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; offset?: number; account?: string; gmail?: boolean; error?: string };
-type Draft = { to: string; cc: string; subject: string; text: string; inReplyTo: string; references: string };
-const blank: Draft = { to: "", cc: "", subject: "", text: "", inReplyTo: "", references: "" };
+type Draft = MailDraft;
+const blank = blankMailDraft();
 
 async function call<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T & { error?: string; aborted?: boolean }> {
   try {
@@ -46,6 +47,21 @@ export function Mailbox({ open }: { open: boolean }) {
   const [msg, setMsg] = useState<MailMessage | null>(null);
   const [view, setView] = useState<"list" | "read" | "compose">("list");
   const [draft, setDraft] = useState<Draft>(blank);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const account = data?.account ?? null;
+  useEffect(() => {
+    if (!account) return;
+    const saved = readMailDraft(sessionStorage, account);
+    setDraft(saved ?? blankMailDraft());
+    setDraftRestored(!!saved);
+  }, [account]);
+  useEffect(() => {
+    if (!account || view !== "compose") return;
+    const timer = window.setTimeout(() => {
+      writeMailDraft(sessionStorage, account, draft);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [account, draft, view]);
   const [busy, setBusy] = useState("");
   const [confirm, setConfirm] = useState<"" | "send" | "delete">("");
   const [moveTo, setMoveTo] = useState("");
@@ -141,6 +157,8 @@ export function Mailbox({ open }: { open: boolean }) {
   const backToList = async (refresh = true) => { readReq.current?.abort(); setView("list"); setMsg(null); setConfirm(""); if (refresh) { seenLists.clear(); await load(folder, q, unread, true); } };
 
   const startReply = (m: MailMessage) => {
+    if (hasMailDraft(draft) && !window.confirm("Replace your unfinished draft with this reply?")) return;
+    setDraftRestored(false);
     setDraft({ to: m.fromAddr, cc: "", subject: replySubject(m.subject), text: forwardableQuote(m.from, m.date, m.text), inReplyTo: m.messageId, references: [m.references, m.messageId].filter(Boolean).join(" ").slice(-600) });
     setConfirm(""); setView("compose");
   };
@@ -149,7 +167,10 @@ export function Mailbox({ open }: { open: boolean }) {
     if (confirm !== "send") { setConfirm("send"); return; }
     const ok = await act("send", { op: "send", to: draft.to, cc: draft.cc, subject: draft.subject, text: draft.text, inReplyTo: draft.inReplyTo, references: draft.references }, "Sent.");
     setConfirm("");
-    if (ok) { setDraft(blank); setView("list"); setMsg(null); }
+    if (ok) {
+      if (account) writeMailDraft(sessionStorage, account, null);
+      setDraft(blankMailDraft()); setDraftRestored(false); setView("list"); setMsg(null);
+    }
   };
 
   const doDelete = async () => {
@@ -170,6 +191,7 @@ export function Mailbox({ open }: { open: boolean }) {
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => { setView(msg ? "read" : "list"); setConfirm(""); }}><ArrowLeft className="size-4" /> Back</Button>
           <span className="font-medium">{draft.inReplyTo ? "Reply" : "New message"}</span>
+          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { if (account) writeMailDraft(sessionStorage, account, null); setDraft(blankMailDraft()); setDraftRestored(false); setConfirm(""); }}>Discard draft</Button>
         </div>
         <Input aria-label="To" placeholder="To (separate several with commas)" value={draft.to} onChange={(e) => { setDraft({ ...draft, to: e.target.value }); setConfirm(""); }} />
         <Input aria-label="Cc" placeholder="Cc (optional)" value={draft.cc} onChange={(e) => setDraft({ ...draft, cc: e.target.value })} />
@@ -182,7 +204,7 @@ export function Mailbox({ open }: { open: boolean }) {
           </Button>
           {confirm === "send" && <><span className="text-xs text-muted-foreground">Sends to {draft.to}{draft.cc.trim() ? `, ${draft.cc}` : ""} right now.</span><Button size="sm" variant="ghost" onClick={() => setConfirm("")}>Cancel</Button></>}
         </div>
-        <span className="text-xs text-muted-foreground">Plain text only, no attachments. Gmail keeps a copy in Sent by itself.</span>
+        <span className="text-xs text-muted-foreground">{account ? `${draftRestored ? "Recovered draft. " : ""}Unsent changes are saved in this browser tab (not sent to the server).` : "Drafts can be saved after your mailbox connects."} Plain text only, no attachments.</span>
       </div>
     );
   }
@@ -255,7 +277,7 @@ export function Mailbox({ open }: { open: boolean }) {
           {(data?.folders ?? [{ name: "INBOX", label: "INBOX", special: "inbox" as const }]).map((f) => <option key={f.name} value={f.name}>{f.special === "inbox" ? "Inbox" : f.label}</option>)}
         </select>
         <Button size="sm" variant="ghost" className="h-8" onClick={() => void load(folder, q, unread, true)} aria-label="Refresh"><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /></Button>
-        <Button size="sm" className="h-8" onClick={() => { setDraft(blank); setConfirm(""); setMsg(null); setView("compose"); }}><MailPlus className="size-4" /> Write</Button>
+        <Button size="sm" className="h-8" onClick={() => { setConfirm(""); setMsg(null); setView("compose"); }}><MailPlus className="size-4" /> Write</Button>
       </div>
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void load(folder, q, unread); }}>
         <Input aria-label="Search mail" placeholder="Search this folder, e.g. from:anna subject:invoice since:2026-10-01" title="Words search the whole message. Also: from: to: subject: since:YYYY-MM-DD before:YYYY-MM-DD is:unread is:read" value={q} onChange={(e) => setQ(e.target.value)} />
