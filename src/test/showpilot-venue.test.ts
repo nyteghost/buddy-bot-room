@@ -16,6 +16,12 @@ describe("ShowPilot event source scoping", () => {
     const rows=[{space:"Meeting Room 100"},{space:""},{space:"Unknown Space"}];
     expect(scopeShowPilotRows(rows).needsReview).toEqual(rows);
   });
+  it("accepts explicitly confirmed unknown spaces only for the current import", () => {
+    const rows=[{space:"Meeting Room 100"},{space:"CEPAC Theatre"}];
+    const scoped=scopeShowPilotRows(rows, ["Meeting Room 100", "CEPAC Theatre"]);
+    expect(scoped.accepted).toEqual([rows[0]]);
+    expect(scoped.excluded).toEqual([rows[1]]);
+  });
   it("does not infer venue from a show title", () => {
     expect(scopeShowPilotRows([{space:"Unknown",event:"Cobb Convention Center-Atlanta"}]).accepted).toHaveLength(0);
   });
