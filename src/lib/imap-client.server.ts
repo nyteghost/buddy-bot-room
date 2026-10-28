@@ -307,7 +307,10 @@ function release(pool: Pool, c: Conn, set: PoolSettings, user: string, pass: str
 }
 
 /** Errors that mean the connection itself was gone (not that the server said no). */
-const connectionLost = (e: unknown): boolean => e instanceof Error && /connection closed|ECONNRESET|EPIPE|ERR_STREAM|socket hang up|the server closed the connection/i.test(e.message);
+export const connectionLost = (e: unknown): boolean =>
+  e instanceof Error && (/connection closed|ECONNRESET|EPIPE|ERR_STREAM|socket hang up|the server closed the connection|ended by the other party|write after end/i.test(e.message)
+    // Node words a write to a socket the server already hung up on as "This socket has been ended by the other party" (code EPIPE), so check the code too.
+    || ["EPIPE", "ECONNRESET", "ECONNABORTED"].includes((e as Error & { code?: string }).code ?? ""));
 /** Commands that change nothing: the only ones whose first attempt may be repeated on a fresh connection. */
 const READ_ONLY_FIRST = /^(LIST|SELECT|EXAMINE|NOOP|CAPABILITY|STATUS|LSUB)$/;
 
