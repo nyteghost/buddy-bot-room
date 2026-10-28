@@ -175,6 +175,43 @@ await step("Documents: a non-document file is refused politely", async () => {
   await page.getByTestId("doc-input").setInputFiles({ name: "photo.zip", mimeType: "application/zip", buffer: Buffer.from("PK") });
   await page.getByText(/can't be viewed here/).waitFor({ timeout: 10000 });
 });
+await step("workspace sidebar has no horizontal overflow", async () => {
+  const bar = page.locator(".workspace-sidebar");
+  const size = await bar.evaluate((e) => ({ content: e.scrollWidth, visible: e.clientWidth }));
+  if (size.content > size.visible + 2) throw new Error(`sidebar scrolls sideways: ${size.content} > ${size.visible}`);
+});
+await step("workspace layouts save, switch, and restore the open windows", async () => {
+  const picker = page.getByRole("combobox", { name: "Workspace layout" });
+  await picker.selectOption("mail");
+  await page.locator('[data-window-id="mail"]').waitFor({ state: "visible" });
+  await picker.selectOption("work");
+  await page.locator('[data-window-id="tools"]').waitFor({ state: "visible" });
+  await page.locator('[data-window-id="documents"]').waitFor({ state: "visible" });
+  await picker.selectOption("chat");
+  await page.locator('[data-window-id="room"]').waitFor({ state: "visible" });
+  await page.locator('[data-window-id="mode-roundtable"]').waitFor({ state: "visible" });
+  if (await page.locator('[data-window-id="mail"]').isVisible()) throw new Error("Mail stayed open in Chat layout");
+  await page.getByRole("button", { name: "Save current layout" }).click();
+  await picker.selectOption("mail");
+  await picker.selectOption("saved");
+  await page.locator('[data-window-id="room"]').waitFor({ state: "visible" });
+  if (await page.locator('[data-window-id="mail"]').isVisible()) throw new Error("Saved Chat layout did not restore");
+});
+await step("dragging a title bar against an edge snaps the window to half width", async () => {
+  const picker = page.getByRole("combobox", { name: "Workspace layout" });
+  await picker.selectOption("mail");
+  const canvas = await page.locator(".window-canvas").boundingBox();
+  const bar = await page.locator('[data-window-id="mail"] .window-titlebar').boundingBox();
+  if (!canvas || !bar) throw new Error("workspace or Mail titlebar is missing");
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + 16);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + 5, canvas.y + Math.min(canvas.height / 3, 180), { steps: 12 });
+  await page.mouse.up();
+  const rect = await page.locator('[data-window-id="mail"]').boundingBox();
+  if (!rect || Math.abs(rect.x - canvas.x) > 8 || Math.abs(rect.width - canvas.width / 2) > 12) {
+    throw new Error(`Mail did not snap to left: ${JSON.stringify(rect)}`);
+  }
+});
 await step("planner file is served", async () => {
   const r = await page.request.get(`${URL_}/stage-planner.html`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);

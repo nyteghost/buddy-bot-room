@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { GripHorizontal, Maximize2, Minimize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { clampWindowPosition, readWindowPosition, resizeWindowRect, type WindowResizeEdge } from "@/lib/workspace";
+import { createPortal } from "react-dom";
+import { clampWindowPosition, fitWindowRect, readWindowPosition, resizeWindowRect, snapRect, snapZone, WORKSPACE_LAYOUT_EVENT, type WindowRect, type WindowResizeEdge, type WindowSnap } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 
 let windowStack = 1;
@@ -27,6 +28,10 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [size, setSize] = useState<Size | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [snapped, setSnapped] = useState<WindowSnap | null>(null);
+  const [preview, setPreview] = useState<WindowSnap | null>(null);
+  const previewRef = useRef<WindowSnap | null>(null);
+  const restoreRef = useRef<WindowRect | null>(null);
   const [front, setFront] = useState(1);
   const positionRef = useRef(position);
   positionRef.current = position;
@@ -45,7 +50,8 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   }, [key, sizeKey]);
   useEffect(() => {
     if (!resetVersion) return;
-    setPosition(null); setSize(null); setExpanded(false);
+    setPosition(null); setSize(null); setExpanded(false); setSnapped(null); setPreview(null);
+    restoreRef.current = null; previewRef.current = null;
     try { localStorage.removeItem(key); localStorage.removeItem(sizeKey); } catch { /* optional storage */ }
   }, [resetVersion, key, sizeKey]);
   useEffect(() => {
@@ -53,14 +59,57 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
     const parent = element?.parentElement;
     if (!element || !parent || !open) return;
     const observer = new ResizeObserver(() => {
+      const bounds = parent.getBoundingClientRect();
+      if (snapped && !expanded) {
+        // A docked window must continue filling its half (or whole) canvas when the browser resizes.
+        const r = snapRect(snapped, bounds);
+        if (!positionRef.current || r.x !== positionRef.current.x || r.y !== positionRef.current.y) {
+          positionRef.current = { x: r.x, y: r.y }; setPosition(positionRef.current);
+        }
+        if (!sizeRef.current || r.w !== sizeRef.current.w || r.h !== sizeRef.current.h) {
+          sizeRef.current = { w: r.w, h: r.h }; setSize(sizeRef.current);
+        }
+        return;
+      }
       const current = positionRef.current;
       if (!current) return;
-      const next = clampWindowPosition(current, parent.getBoundingClientRect(), element.getBoundingClientRect());
-      if (next.x !== current.x || next.y !== current.y) setPosition(next);
+      const measured = element.getBoundingClientRect();
+      const fitted = fitWindowRect({ x: current.x, y: current.y, w: measured.width, h: measured.height }, bounds);
+      if (fitted.x !== current.x || fitted.y !== current.y) {
+        positionRef.current = { x: fitted.x, y: fitted.y };
+        setPosition(positionRef.current);
+      }
+      const saved = sizeRef.current;
+      if (saved && (saved.w > bounds.width || saved.h > bounds.height)) {
+        sizeRef.current = { w: fitted.w, h: fitted.h };
+        setSize(sizeRef.current);
+      }
     });
     observer.observe(parent); observer.observe(element);
     return () => observer.disconnect();
-  }, [open]);
+  }, [open, snapped, expanded]);
+  // Every window listens for a single validated preset/custom-layout event. Hidden windows
+  // remain mounted, so they receive their geometry before being opened.
+  useEffect(() => {
+    const apply = (event: Event) => {
+      const rect = (event as CustomEvent<{ windows: Record<string, WindowRect> }>).detail?.windows?.[id];
+      if (!rect) return;
+      const parent = ref.current?.parentElement;
+      if (!parent) return;
+      const fitted = fitWindowRect(rect, parent.getBoundingClientRect());
+      positionRef.current = { x: fitted.x, y: fitted.y };
+      sizeRef.current = { w: fitted.w, h: fitted.h };
+      setPosition(positionRef.current); setSize(sizeRef.current);
+      setExpanded(false); setSnapped(null); setPreview(null);
+      restoreRef.current = null;
+      try {
+        localStorage.setItem(key, JSON.stringify(positionRef.current));
+        localStorage.setItem(sizeKey, JSON.stringify(sizeRef.current));
+      } catch { /* browser storage is optional */ }
+    };
+    window.addEventListener(WORKSPACE_LAYOUT_EVENT, apply);
+    return () => window.removeEventListener(WORKSPACE_LAYOUT_EVENT, apply);
+  }, [id, key, sizeKey]);
   const isMobile = () => window.matchMedia("(max-width: 700px)").matches;
   function begin(event: PointerEvent<HTMLDivElement>) {
     if (expanded || event.button !== 0 || (event.target as HTMLElement).closest("button") || isMobile()) return;
@@ -69,7 +118,17 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
     if (!element || !parent) return;
     const rect = element.getBoundingClientRect();
     const bounds = parent.getBoundingClientRect();
-    drag.current = { x: event.clientX, y: event.clientY, originX: rect.left - bounds.left, originY: rect.top - bounds.top };
+    let x = rect.left - bounds.left, y = rect.top - bounds.top;
+    if (snapped && restoreRef.current) {
+      // Undock under the cursor and return to the original size when dragging.
+      const previous = fitWindowRect(restoreRef.current, bounds);
+      x = Math.max(0, Math.min(bounds.width - previous.w, event.clientX - bounds.left - previous.w / 2));
+      y = Math.max(0, Math.min(bounds.height - previous.h, event.clientY - bounds.top - 18));
+      positionRef.current = { x, y }; sizeRef.current = { w: previous.w, h: previous.h };
+      setPosition(positionRef.current); setSize(sizeRef.current);
+    }
+    setSnapped(null);
+    drag.current = { x: event.clientX, y: event.clientY, originX: x, originY: y };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent<HTMLDivElement>) {
@@ -77,11 +136,30 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
     const element = ref.current;
     const parent = element?.parentElement;
     if (!active || !element || !parent) return;
-    setPosition(clampWindowPosition({ x: active.originX + event.clientX - active.x, y: active.originY + event.clientY - active.y }, parent.getBoundingClientRect(), element.getBoundingClientRect()));
+    const bounds = parent.getBoundingClientRect();
+    positionRef.current = clampWindowPosition({ x: active.originX + event.clientX - active.x, y: active.originY + event.clientY - active.y }, bounds, element.getBoundingClientRect());
+    setPosition(positionRef.current);
+    const zone = snapZone({ x: event.clientX - bounds.left, y: event.clientY - bounds.top }, bounds);
+    previewRef.current = zone;
+    setPreview(zone);
   }
-  function end() {
+  function end(commitSnap = true) {
     if (!drag.current) return;
     drag.current = null;
+    const zone = commitSnap ? previewRef.current : null;
+    previewRef.current = null; setPreview(null);
+    if (zone) {
+      const element = ref.current, parent = element?.parentElement;
+      if (element && parent) {
+        const bounds = parent.getBoundingClientRect();
+        const rect = element.getBoundingClientRect();
+        restoreRef.current = { x: positionRef.current?.x ?? rect.left - bounds.left, y: positionRef.current?.y ?? rect.top - bounds.top, w: rect.width, h: rect.height };
+        const next = snapRect(zone, bounds);
+        positionRef.current = { x: next.x, y: next.y }; sizeRef.current = { w: next.w, h: next.h };
+        setPosition(positionRef.current); setSize(sizeRef.current); setSnapped(zone);
+        try { localStorage.setItem(sizeKey, JSON.stringify(sizeRef.current)); } catch { /* optional storage */ }
+      }
+    }
     try { localStorage.setItem(key, JSON.stringify(positionRef.current)); } catch { /* optional storage */ }
   }
   function beginResize(edge: WindowResizeEdge) {
@@ -93,6 +171,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
       event.stopPropagation();
       const rect = element.getBoundingClientRect();
       const bounds = parent.getBoundingClientRect();
+      setSnapped(null);
       resize.current = { x: event.clientX, y: event.clientY, w: rect.width, h: rect.height, left: rect.left - bounds.left, top: rect.top - bounds.top, edge };
       event.currentTarget.setPointerCapture(event.pointerId);
     };
@@ -131,17 +210,30 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
     zIndex: front,
   } as CSSProperties;
   return <section ref={ref} aria-label={title} hidden={!open} style={style}
+    data-window-id={id}
     className={cn("workspace-window", `window-${id}`, className, size && "window-sized", expanded && "window-expanded")}
     onPointerDownCapture={() => setFront(++windowStack)}>
-    <div className="window-titlebar" onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
+    <div className="window-titlebar" onPointerDown={begin} onPointerMove={move} onPointerUp={() => end()} onPointerCancel={() => end(false)}>
       <span className="window-title">{icon}{title}</span>
       <GripHorizontal className="window-grip size-4" aria-hidden />
       <div className="window-actions">
-        <Button variant="ghost" size="icon" title={expanded ? `Restore ${title}` : `Maximize ${title}`} aria-label={expanded ? `Restore ${title}` : `Maximize ${title}`} onClick={() => setExpanded((value) => !value)}>{expanded ? <Minimize2 /> : <Maximize2 />}</Button>
+        <Button variant="ghost" size="icon" title={expanded || snapped ? `Restore ${title}` : `Maximize ${title}`} aria-label={expanded || snapped ? `Restore ${title}` : `Maximize ${title}`} onClick={() => {
+          if (snapped && restoreRef.current) {
+            const next = restoreRef.current;
+            positionRef.current = { x: next.x, y: next.y }; sizeRef.current = { w: next.w, h: next.h };
+            setPosition(positionRef.current); setSize(sizeRef.current); setSnapped(null);
+            try { localStorage.setItem(key, JSON.stringify(positionRef.current)); localStorage.setItem(sizeKey, JSON.stringify(sizeRef.current)); } catch { /* optional */ }
+          } else setExpanded((value) => !value);
+        }}>{expanded || snapped ? <Minimize2 /> : <Maximize2 />}</Button>
         <Button variant="ghost" size="icon" title={`Hide ${title}`} aria-label={`Hide ${title}`} onClick={onClose}><X /></Button>
       </div>
     </div>
     <div className="window-body">{children}</div>
+    {preview && drag.current && typeof document !== "undefined" && ref.current?.parentElement && createPortal((() => {
+      const bounds = ref.current!.parentElement!.getBoundingClientRect();
+      const area = snapRect(preview, bounds);
+      return <div className="window-snap-preview" aria-hidden style={{ left: bounds.left + area.x, top: bounds.top + area.y, width: area.w, height: area.h }} />;
+    })(), document.body)}
     {!expanded && <>{(["n", "e", "s", "w", "ne", "se", "sw", "nw"] as const).map((edge) => <div key={edge} className={`window-resize window-resize-${edge}`} aria-hidden
       onPointerDown={beginResize(edge)} onPointerMove={moveResize} onPointerUp={endResize} onPointerCancel={endResize} />)}</>}
   </section>;
