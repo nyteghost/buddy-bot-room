@@ -73,6 +73,7 @@ export function WorkspaceLayoutMenu({ onShow }: { onShow: (visibleIds: string[])
       <option value="saved" disabled={!hasSaved}>My saved layout</option>
     </select>
     <Button variant="outline" size="sm" type="button" onClick={save}>Save current layout</Button>
+    {hasSaved && <Button variant="ghost" size="sm" type="button" onClick={() => select("saved")}>Restore saved layout</Button>}
     {notice && <span className="workspace-layout-notice" role="status">{notice}</span>}
   </div>;
 }
