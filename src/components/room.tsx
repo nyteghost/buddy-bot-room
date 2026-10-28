@@ -197,10 +197,20 @@ export function Room() {
   }
   const engine = useEngine();
   useEffect(() => { installGlobalLogging(); }, []);
-  // Preload the Ollama model as soon as it's the chosen engine, so the first reply isn't slow.
+  // Preload only while active. When someone returns after Ollama's idle timeout,
+  // re-warm the model without forcing it to stay resident all day.
   useEffect(() => {
     if (engine.kind !== "ollama" && engine.kind !== "auto-ollama") return;
-    void warmOllama(engine.ollamaUrl, engine.ollamaModel).then((ok) => { if (ok) logClient("info", `Ollama model ${engine.ollamaModel} preloaded`); });
+    const warm = () => {
+      if (document.visibilityState === "hidden") return;
+      void warmOllama(engine.ollamaUrl, engine.ollamaModel).then((ok) => {
+        if (ok) logClient("info", `Ollama model ${engine.ollamaModel} preloaded`);
+      });
+    };
+    warm();
+    window.addEventListener("focus", warm);
+    document.addEventListener("visibilitychange", warm);
+    return () => { window.removeEventListener("focus", warm); document.removeEventListener("visibilitychange", warm); };
   }, [engine.kind, engine.ollamaUrl, engine.ollamaModel]);
   const hell = characterMode === "hellraiser";
   const horror = characterMode === "horror";
