@@ -174,7 +174,7 @@ import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
-import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign, type DmRole } from "@/lib/campaign";
+import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign } from "@/lib/campaign";
 import { parseDice, rollDice, secureRng } from "@/lib/dice";
 import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/lib/unraid";
 import { UnraidBanner } from "./unraid-banner";
@@ -188,53 +188,25 @@ import { RoomLive } from "@/components/room-live";
 import { awardXp } from "@/lib/progress-store";
 import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
-import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
-import { buildHandoff, cleanSmartConfig, defaultSmartConfig, isRepeat, outOfTime, planSmartTeam, shouldRun, SMART_ROLES, type SmartConfig, type SmartPlan, type SmartRole } from "@/lib/smart-team";
+import { extractSteps } from "@/lib/solve-steps";
+import { defaultOpenModes, modeHelp, modeLabel, modePlaceholder, modeSuggestions, perMode, suggestions } from "@/lib/mode-meta";
+import { planTurns } from "@/lib/turn-plan";
+import { dispatchTurn } from "@/lib/turn-dispatch";
+import { buildHandoff, cleanSmartConfig, defaultSmartConfig, isRepeat, outOfTime, shouldRun, SMART_ROLES, type SmartConfig, type SmartRole } from "@/lib/smart-team";
 import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContextFor, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
 import { pickMemories, visibleMemories } from "@/lib/memory-rank";
 import { memoryBoost } from "@/lib/memory-boost";
 import { activeProject } from "@/lib/prefs";
 
 const storageKey = "pixel-pals-conversation-v1";
-const suggestions = [
-  "What would a city designed by AI look like?",
-  "Is creativity uniquely human?",
-  "Pitch the next big indie game",
-];
 const chatsKey = "pixel-pals-conversations-v2";
-const defaultOpenModes: Record<Mode, boolean> = { roundtable: true, broadcast: false, direct: false, solve: false, debate: false, smart: false };
-const modeLabel: Record<Mode, string> = { roundtable: "Roundtable", broadcast: "Broadcast", direct: "One-on-one", solve: "Problem solving", debate: "Debate", smart: "Smart team" };
-const modeHelp: Record<Mode, string> = {
-  roundtable: "Everyone hears everyone: pals react to each other, then one gives the verdict.",
-  broadcast: "Each pal answers on their own, without seeing the others. Optionally a judge ranks the answers.",
-  direct: "A private chat with one pal.",
-  solve: "A team with roles (Diagnoser, Fixer, Skeptic) that ends in a plan you can send to Tasks.",
-  debate: "Two pals argue for and against; a third judges who argued better.",
-  smart: "Only as many pals as the question needs: a simple question gets one answer; a hard one goes specialist, coder, reviewer, coordinator, one after another.",
-};
-const modePlaceholder: Record<Mode, string> = {
-  roundtable: "Give your pals something to talk about…",
-  broadcast: "Ask a question and get independent answers…",
-  direct: "Message your pal…",
-  solve: "Describe the problem you need solved…",
-  debate: "State a claim for the pals to argue about…",
-  smart: "Ask anything; the team size fits the question…",
-};
-const modeSuggestions: Record<Mode, string[]> = {
-  roundtable: suggestions,
-  broadcast: ["Name my new indie game", "Best way to learn guitar in 3 months?", "Write a one-line pitch for a pixel café"],
-  direct: ["Help me plan my week", "Explain this like I'm new to it", "What should I cook tonight?"],
-  solve: ["My Plex server keeps buffering on one TV", "My Docker container restarts every few minutes", "I can't focus when I work from home"],
-  debate: ["Remote work beats the office", "Cats make better pets than dogs", "AI should write first drafts of everything"],
-  smart: ["My Docker container restarts every few minutes", "What should I cook tonight?", "A script of mine fails with a permission error after a reboot"],
-};
 
 installUuidPolyfill(); // plain-http pages have no crypto.randomUUID
 
 export function Room() {
   // Each conversation mode (Roundtable, Broadcast, One-on-one, Problem solving, Debate) has its own window, chat and draft.
-  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>({ roundtable: [], broadcast: [], direct: [], solve: [], debate: [], smart: [] });
-  const [drafts, setDrafts] = useState<Record<Mode, string>>({ roundtable: "", broadcast: "", direct: "", solve: "", debate: "", smart: "" });
+  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>(() => perMode(() => []));
+  const [drafts, setDrafts] = useState<Record<Mode, string>>(() => perMode(() => ""));
   /** The mode window you are working in; plain "messages" and "topic" below mean that window's. */
   const [mode, setMode] = useState<Mode>("roundtable");
   const messages = chats[mode];
@@ -311,7 +283,7 @@ export function Room() {
   useEffect(() => { try { setSmartCfgState(cleanSmartConfig(JSON.parse(localStorage.getItem("pixel-pals-smart-v1") ?? "null"))); } catch { /* optional storage */ } }, []);
   const setSmartCfg = (patch: Partial<SmartConfig>) => setSmartCfgState((cur) => { const next = cleanSmartConfig({ ...cur, ...patch }); try { localStorage.setItem("pixel-pals-smart-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   // "Short answers" per mode window: cheaper and quicker replies. Remembered on this device.
-  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, smart: false });
+  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>(() => perMode(() => false));
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem("pixel-pals-short-v1") ?? "null"); if (v && typeof v === "object") setShortOn((cur) => ({ ...cur, ...Object.fromEntries(ALL_MODES.map((m) => [m, v[m] === true])) })); } catch { /* optional storage */ } }, []);
   const setShort = (m: Mode, on: boolean) => setShortOn((cur) => { const next = { ...cur, [m]: on }; try { localStorage.setItem("pixel-pals-short-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   const [partner, setPartner] = useState<AgentId>("claude");
@@ -412,7 +384,7 @@ export function Room() {
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
   function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
-    setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, smart: false });
+    setOpenModes(perMode(() => false));
     setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
     setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
     setToolsOpen(false); setFunOpen(false); setSetupOpen(false); setSearchOpen(false); setRecorderOpen(false);
@@ -432,7 +404,7 @@ export function Room() {
   /** AIs that failed recently: later turns skip them (see orderByHealth). */
   const benchRef = useRef<Bench>(new Map());
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>({ roundtable: 0, broadcast: 0, direct: 0, solve: 0, debate: 0, smart: 0 });
+  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>(() => perMode(() => 0));
   const bumpFork = (m: Mode) => setForkSignals((f) => ({ ...f, [m]: f[m] + 1 }));
   const [runningMode, setRunningMode] = useState<Mode | null>(null);
   const [regen, setRegen] = useState<{ text: string; mode: Mode } | null>(null);
@@ -687,38 +659,10 @@ export function Room() {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
         : agents.filter((a) => enabled.includes(a.id));
-      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean; dmRole?: DmRole; role?: string; side?: "for" | "against"; summary?: boolean }[] = [];
-      let smartPlan: SmartPlan | null = null;
       const smartDone: { role: SmartRole; name: string; text: string }[] = [];
       const smartStarted = Date.now();
-      // Dungeon Master mode: the first seated pal narrates, the rest react as the party, one pass per action.
-      const campaign = getCampaign();
-      if (extra?.summary && seated[0]) turns.push({ agent: seated[0], round: 1, verdict: false, summary: true });
-      else if (campaign.active) seated.forEach((agent, i) => turns.push({ agent, round: 1, verdict: false, dmRole: i === 0 ? "dm" : "party" }));
-      else {
-        if (mode === "smart" && !direct) {
-          // Smart Team: plan with plain code (no model call), then run only the pals the question needs, one at a time.
-          smartPlan = planSmartTeam({ text: topic, seated: seated.map((a) => a.id), config: smartCfg });
-          for (const st of smartPlan.steps) {
-            const agent = seated.find((a) => a.id === st.agentId);
-            if (agent) turns.push({ agent, round: 1, verdict: false, ...(smartPlan.single ? {} : { role: st.role }) });
-          }
-          logClient("info", `Smart team: ${smartPlan.why}`);
-        } else if (mode === "debate" && !direct) {
-          // Two pals take the sides; the next pal (or the first, with only two) judges.
-          const debaters = seated.slice(0, 2);
-          for (let r = 1; r <= rounds; r++)
-            debaters.forEach((agent, i) => turns.push({ agent, round: r, verdict: false, side: i === 0 ? "for" : "against" }));
-          const judge = seated[2] ?? seated[0];
-          if (judge && debaters.length === 2) turns.push({ agent: judge, round: rounds, verdict: true });
-        } else {
-          for (let r = 1; r <= (direct ? 1 : rounds); r++)
-            seated.forEach((agent, i) => turns.push({ agent, round: r, verdict: false, ...(mode === "solve" && !direct ? { role: SOLVE_ROLE_ORDER[i % SOLVE_ROLE_ORDER.length] } : {}) }));
-          const lead = seated[0];
-          if ((mode === "roundtable" || mode === "solve" || (mode === "broadcast" && judgeOn)) && !direct && seated.length > 1 && lead)
-            turns.push({ agent: lead, round: rounds, verdict: true });
-        }
-      }
+      const { turns, smartPlan } = planTurns({ seated, mode, direct, rounds, judgeOn, campaignActive: getCampaign().active, summary: !!extra?.summary, topic, smart: smartCfg });
+      if (smartPlan) logClient("info", `Smart team: ${smartPlan.why}`);
       {
         for (const [turnIndex, { agent, round: currentRound, verdict, dmRole, role, side, summary }] of turns.entries()) {
           setRound(currentRound);
@@ -869,71 +813,25 @@ export function Room() {
               ),
               `Ollama · ${engine.ollamaModel}`,
             );
-          // Your own mail, calendar and tasks are only ever read by your own Ollama: free API tokens aren't spent on them and the details never go to a cloud AI.
-          const keepLocal = !!requestBody.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server";
-          if (keepLocal) {
-            try {
-              if (engine.kind === "auto-ollama") await runOllama();
-              else await runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }));
-            } catch (err) {
-              if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
-              throw new Error("Your own AI (Ollama) isn't reachable, so I didn't send your mail, calendar or task details to a cloud AI. Check Local AI in Settings, or ask without @mail, @calendar or @tasks.");
-            }
-          } else if (engine.kind === "auto-ollama") {
-            // Free keys first; local Ollama takes over when no key is set or a key fails before any text.
-            if (!provider) await runOllama();
-            else {
-              try {
-                await runChain(provider);
-              } catch (err) {
-                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
-                answer = undefined;
-                logClient("warn", "Cloud AI failed, trying Ollama", err);
-                try { await runOllama(); }
-                catch (localErr) {
-                  if (controller.signal.aborted || (answer && messageText(answer).trim())) throw localErr;
-                  // Say what the cloud AI did, not only that Ollama is off: that is the error worth fixing.
-                  throw new Error(`The cloud AI didn't answer (${err instanceof Error ? err.message : String(err)}), and ${localErr instanceof Error ? localErr.message : "your Ollama didn't answer either"}`);
-                }
-              }
-            }
-          } else if (engine.kind === "local-server") {
-            if (!provider) throw new Error("Local AI isn't available.");
-            try { await runChain(provider); } catch (err) { await cloudFallback(err); }
-          } else if (engine.kind === "ollama") {
-            const ollamaKey = { kind: "ollama-server" as const, baseUrl: engine.ollamaUrl };
-            try {
-              // Ollama failed a moment ago and another AI is set up: don't wait on it again for every pal.
-              if (isBenched(benchRef.current, ollamaKey) && cloudFallbackChain(engine, blockPaid).length) throw new Error(`Can't reach your local server at ${engine.ollamaUrl}.`);
-              await consume(
-                await ollamaTurn(
-                  await fetchPrompt(),
-                  { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
-                  { agentId: agent.id, round: currentRound },
-                  controller.signal,
-                ),
-                `Ollama · ${engine.ollamaModel}`,
-              );
-            } catch (err) {
-              if (!controller.signal.aborted && !isBenched(benchRef.current, ollamaKey)) benchProvider(benchRef.current, ollamaKey, err);
-              await cloudFallback(err);
-            }
-          } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
-            await consume(await runLocal(), "In-browser model");
-          } else if (!provider) {
-            throw new Error(blockPaid ? "Your monthly spend cap is reached and no free provider is set up. Raise the cap in AI engine settings, add a free key, or choose In-browser." : "Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
-          } else if (engine.kind === "auto") {
-            // Auto: free keys are far faster; the in-browser model takes over when a key hits its limit.
-            try {
-              await runChain(provider);
-            } catch (err) {
-              if (controller.signal.aborted || !hasWebGPU() || (answer && messageText(answer).trim())) throw err;
-              answer = undefined;
-              await consume(await runLocal(), "In-browser model");
-            }
-          } else {
-            await runChain(provider);
-          }
+          const ollamaKey = { kind: "ollama-server" as const, baseUrl: engine.ollamaUrl };
+          await dispatchTurn({
+            engine,
+            provider,
+            realData: !!requestBody.realData,
+            blockPaid,
+            hasWebGpu: hasWebGPU(),
+            aborted: () => controller.signal.aborted,
+            hasAnswer: () => !!(answer && messageText(answer).trim()),
+            clearAnswer: () => { answer = undefined; },
+            runChain,
+            localChain: () => runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" })),
+            runOllama,
+            runBrowserModel: async () => consume(await runLocal(), "In-browser model"),
+            cloudFallback,
+            ollamaBenchedWithBackup: () => isBenched(benchRef.current, ollamaKey) && cloudFallbackChain(engine, blockPaid).length > 0,
+            benchOllama: (err) => { if (!controller.signal.aborted && !isBenched(benchRef.current, ollamaKey)) benchProvider(benchRef.current, ollamaKey, err); },
+            log: (level, msg, err) => logClient(level, msg, err),
+          });
           if (answer && messageText(answer).trim()) {
             if (smartRole) {
               const said = messageText(answer);
@@ -1550,7 +1448,7 @@ export function Room() {
           </div>
           <div className="mobile-modes" role="tablist" aria-label="Conversation mode">
             {ALL_MODES.map((m) => (
-              <button key={m} type="button" role="tab" aria-selected={m === wm} disabled={running && m !== wm} onClick={() => { setMode(m); setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, [m]: true }); }}>{modeLabel[m]}</button>
+              <button key={m} type="button" role="tab" aria-selected={m === wm} disabled={running && m !== wm} onClick={() => { setMode(m); setOpenModes(perMode((k) => k === m)); }}>{modeLabel[m]}</button>
             ))}
           </div>
           <SavedDiscussions perMode openRequest={wm === mode ? historyRequest : 0} forkSignal={forkSignals[wm]} messages={msgs} mode={wm} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessagesIn(wm, items); setCharacterMode(theme); setMode(wm); setRound(0); setError(""); void discussionMode; }} />

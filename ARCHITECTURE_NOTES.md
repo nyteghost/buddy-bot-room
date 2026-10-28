@@ -40,3 +40,11 @@ Known gaps, not changed (each needs a design decision or live testing):
 - No Origin/CSRF token check on API POSTs (cookies are `SameSite=Lax`, which blocks cross-site POSTs in current browsers).
 - No full Content-Security-Policy (the app relies on inline styles, a PDF worker and blob URLs).
 - Prompt injection: documents, web results, mail and hand-offs are passed to the model labelled as data and the pals have no tools that change anything, so the worst case is a misleading answer, not an action.
+
+## Room component split (Release 3 item 13, in progress)
+`room.tsx` still holds the UI state and the turn loop; the decisions inside it now live in small pure modules with tests:
+- `turn-plan.ts`: who speaks in what order for each mode (roundtable, broadcast, solve, debate, direct, campaign, summary, smart).
+- `turn-dispatch.ts`: which AI answers a turn and the fallback order, including the rule that mail/calendar/task details never reach a cloud AI.
+- `mode-meta.ts`: labels, help, placeholders and suggestions per mode, plus `perMode()` so a new mode needs one entry per table instead of edits across the component.
+- `smart-team.ts`, `memory-rank.ts`, `ollama-runtime.server.ts`, `ollama-resources.ts`: see their sections above.
+Still inside `room.tsx` and good next candidates: building the request body per turn, the streaming `consume` loop, the slash-command handler (`runSlash`).
