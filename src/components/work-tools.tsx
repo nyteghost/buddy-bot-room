@@ -97,11 +97,12 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
   const [pending, setPending] = useState<string[]>([]);
   const [venueReview, setVenueReview] = useState<string[]>([]);
   const [venueExcluded, setVenueExcluded] = useState(0);
+  const [approvedSpaces, setApprovedSpaces] = useState<string[]>([]);
   const [report, setReport] = useState("");
-  async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean) {
+  async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean, approved: string[] = []) {
     const { eventsWorkbook } = await import("@/lib/work-files");
     const uncancelled = src.rows.filter((r) => !isCancelledRow(r));
-    const scope = venueOnly ? scopeShowPilotRows(uncancelled) : { accepted: uncancelled, excluded: [] as EventRow[], needsReview: [] as EventRow[] };
+    const scope = venueOnly ? scopeShowPilotRows(uncancelled, approved) : { accepted: uncancelled, excluded: [] as EventRow[], needsReview: [] as EventRow[] };
     const live = scope.accepted;
     setVenueExcluded(scope.excluded.length);
     setVenueReview([...new Set(scope.needsReview.map((r) => r.space || "(no space)"))].sort());
@@ -124,7 +125,7 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
     setStatus(list.length ? `${src.sources} report${src.sources > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${src.existing ? `Filled into ${src.existing.name} — engineer shifts kept.${notes.length ? ` ${notes.length} task suggestions added to empty Tasks cells.` : ""}` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
   }
   async function load(files: File[]) {
-    setStatus("Reading…"); setBlob(null);
+    setStatus("Reading…"); setBlob(null); setApprovedSpaces([]); setVenueReview([]); setVenueExcluded(0);
     const head = [`ShowPilot Events report · ${new Date().toISOString()}`, `build: ${__APP_VERSION__} ${__APP_COMMIT__} ${__APP_BUILD_DATE__}`];
     setReport(head.join("\n"));
     try {
@@ -152,7 +153,7 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
         setStatus(`No events found: ${existing.name} was read as a schedule to fill in, not a For Scheduling report (cell A1 must say "For Scheduling"). Drop the Ungerboeck report on its own, or with this schedule.`);
         return;
       }
-      await build(src, withPending);
+      await build(src, withPending, []);
     } catch (e) {
       setReport((old) => `${old}\nERROR: ${(e as Error).stack ?? (e as Error).message}`);
       setStatus(`Could not read that file: ${(e as Error).message}`);
@@ -170,10 +171,21 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
           <textarea readOnly value={report} rows={8} className="w-full rounded border border-border bg-background p-1 font-mono" onFocus={(e) => e.currentTarget.select()} />
         </div>
       )}
-      {venueOnly && (venueExcluded > 0 || venueReview.length > 0) && <details className="rounded border border-amber-500 p-3 text-xs"><summary className="cursor-pointer font-semibold">Venue review: {venueExcluded} excluded rows and {venueReview.length} space name(s) needing review</summary><p className="mt-2">Only confirmed Cobb Convention Center-Atlanta spaces are scheduled. Unrecognized spaces are not included until their venue is verified.</p><ul className="mt-2 list-disc pl-4">{venueReview.map((s) => <li key={s}>{s}</li>)}</ul></details>}
+      {venueOnly && (venueExcluded > 0 || venueReview.length > 0) && <details className="rounded border border-amber-500 p-3 text-xs">
+        <summary className="cursor-pointer font-semibold">Venue review: {venueExcluded} other-building row(s) excluded; {venueReview.length} unverified space name(s)</summary>
+        <p className="mt-2">CEPAC rows are excluded. Unknown spaces are withheld from scheduling unless you confirm they belong to Cobb Convention Center-Atlanta for this import.</p>
+        <div className="mt-2 space-y-2">{venueReview.map((space) => <label key={space} className="flex items-center gap-2">
+          <input type="checkbox" checked={approvedSpaces.includes(space)} onChange={(e) => {
+            const next = e.target.checked ? [...approvedSpaces,space] : approvedSpaces.filter((s) => s !== space);
+            setApprovedSpaces(next);
+            if (source) void build(source, withPending, next).catch((err) => setStatus(`Could not update venue selections: ${(err as Error).message}`));
+          }}/>
+          <span>Confirm <strong>{space}</strong> is a convention center location</span>
+        </label>)}</div>
+      </details>}
       {pending.length > 0 && (
         <label className="flex items-start gap-2 rounded-md border border-amber-500 p-2 text-xs">
-          <input type="checkbox" className="mt-0.5" checked={withPending} onChange={(e) => { setWithPending(e.target.checked); if (source) build(source, e.target.checked).catch((err) => setStatus(`Could not read that PDF: ${(err as Error).message}`)); }} />
+          <input type="checkbox" className="mt-0.5" checked={withPending} onChange={(e) => { setWithPending(e.target.checked); if (source) build(source, e.target.checked, approvedSpaces).catch((err) => setStatus(`Could not read that PDF: ${(err as Error).message}`)); }} />
           <span><span className="font-medium">Include {pending.length} not-yet-definite events</span> (left out unless checked): {pending.slice(0, 8).join("; ")}{pending.length > 8 ? ` +${pending.length - 8} more` : ""}</span>
         </label>
       )}
@@ -219,7 +231,9 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
   const [ownBusy, setOwnBusy] = useState(false);
   const ownCall = async (body: object) => (await fetch("/api/google", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json() as Promise<GoogleReply>;
   useEffect(() => {
-    ownCall({ op: "status" }).then((r) => setOwn({ configured: !!r.configured, connected: !!r.connected })).catch(() => setOwn({ configured: false, connected: false }));
+    // Standalone ShowPilot does not expose the Pixel Pals /api/google service.
+    // Keep the reliable offline .ics workflow until native OAuth is implemented.
+    setOwn({ configured: false, connected: false });
     const done = (e: MessageEvent) => { if (e.origin === location.origin && e.data?.pixelpals === "google-connected") setOwn({ configured: true, connected: true }); };
     window.addEventListener("message", done);
     return () => window.removeEventListener("message", done);
@@ -251,9 +265,9 @@ function AddAllToCalendar({ shifts, title, remove, onPushed, onStatus, onDownloa
           : null}
       <Button size="sm" variant="secondary" disabled={!shifts.length} onClick={() => {
         onDownload();
-        window.open("https://calendar.google.com/calendar/u/0/r/settings/export", "_blank", "noopener");
-        onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Importing again later updates the same events.");
-      }}><CalendarPlus className="size-4" /> {own?.connected ? "Download .ics instead" : "Add all to Google Calendar"}</Button>
+        window.open("https://calendar.google.com/calendar/u/0/r/settings/import", "_blank", "noopener");
+        onStatus("Downloaded my-shifts.ics. In the Google Calendar tab: Import → Select file from your computer → pick the calendar → Import. Use a dedicated calendar for these shifts; repeated manual imports may create duplicates.");
+      }}><CalendarPlus className="size-4" /> {own?.connected ? "Download .ics instead" : "Download .ics for Google Calendar"}</Button>
     </>
   );
 }
