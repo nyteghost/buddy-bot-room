@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ExternalLink, FolderInput, Loader2, MailOpen, MailPlus, PenLine, RefreshCw, Reply, Search, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Eye, FileSpreadsheet, FileText, FolderInput, Paperclip, Loader2, MailOpen, MailPlus, PenLine, RefreshCw, Reply, Search, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { viewDocument } from "@/components/doc-viewer/document-modal";
+import { humanSize, mailAttachmentUrl } from "@/lib/doc-viewer/doc-source";
 import { Input } from "@/components/ui/input";
 import { forwardableQuote, gmailLink, replySubject, type Folder, type MailMessage, type MailSummary } from "@/lib/mailbox";
 import { replyPrompt } from "@/lib/mail-reply";
@@ -184,7 +186,22 @@ export function Mailbox({ open }: { open: boolean }) {
         <h3 className="text-base font-semibold">{msg.subject}</h3>
         <span className="text-xs text-muted-foreground">{when(msg.date)}{msg.to ? ` · to ${msg.to}` : ""}{msg.cc ? ` · cc ${msg.cc}` : ""}</span>
         <div className="max-h-[45vh] overflow-auto whitespace-pre-wrap break-words rounded-md border bg-background/50 p-3 text-sm">{msg.text || "(no text in this message)"}{msg.truncated ? "\n\n… (shortened)" : ""}</div>
-        {msg.attachments.length > 0 && <span className="text-xs text-muted-foreground">Attachments (not downloaded): {msg.attachments.join(", ")}</span>}
+        {(msg.files?.length ?? 0) > 0 ? (
+          <div className="grid gap-1" aria-label="Attachments">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground"><Paperclip className="size-3" /> Attachments are only downloaded when you open them.</span>
+            {msg.files.map((f) => {
+              const source = { kind: "mail" as const, folder, uid: msg.uid, index: f.index, name: f.name, size: f.size };
+              return (
+                <div key={f.index} className="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1.5 text-sm">
+                  {f.kind === "sheet" ? <FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" /> : <FileText className="size-4 shrink-0 text-muted-foreground" />}
+                  <span className="min-w-0 flex-1 truncate" title={f.name}>{f.name}{f.size >= 0 ? <span className="text-xs text-muted-foreground"> · {humanSize(f.size)}</span> : null}</span>
+                  {f.kind !== "other" && <Button size="sm" variant="outline" className="h-7" onClick={() => viewDocument(source)}><Eye className="size-3" /> Preview</Button>}
+                  <a href={mailAttachmentUrl(source, true)} download={f.name} className="inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs hover:bg-accent/40"><Download className="size-3" /> Download</a>
+                </div>
+              );
+            })}
+          </div>
+        ) : msg.attachments.length > 0 && <span className="text-xs text-muted-foreground">Attachments: {msg.attachments.join(", ")}</span>}
         {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => startReply(msg)} disabled={!msg.fromAddr}><Reply className="size-3" /> Reply</Button>

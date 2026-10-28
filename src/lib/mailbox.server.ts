@@ -3,7 +3,7 @@ import { clearMailCache } from "./inbox.server";
 import { imapConfig, type ImapConfig } from "./imap.server";
 import { withImap, type ImapClient, type TlsOverrides } from "./imap-client.server";
 import { createMailCache } from "./mail-cache";
-import { allowSend, buildSearch, folderSignature, newestRange, parseSelectInfo, type SelectInfo, buildMessage, isGmailHost, buildNoteMessage, parseNote, type PhoneNote, folderQuote, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSummary, parseUidSearch, type Folder, type MailMessage, type MailSummary } from "./mailbox";
+import { allowSend, buildSearch, folderSignature, newestRange, parseSelectInfo, type SelectInfo, buildMessage, isGmailHost, buildNoteMessage, parseNote, type PhoneNote, folderQuote, attachmentBytes, attachmentKind, parseFetchItems, parseFolderList, parseMessage, parseRecipients, parseSummary, parseUidSearch, type Folder, type MailMessage, type MailSummary } from "./mailbox";
 import { ackAlert, addAlertRule, alertState, removeAlertRule } from "./mail-alerts.server";
 import { logServer } from "./server-log.server";
 import { smtpCheck, smtpConfig, smtpSend, type SmtpConfig, type SmtpTlsOverrides } from "./smtp.server";
@@ -36,8 +36,15 @@ const caches = (() => {
 /** Forget everything cached for this account (after a move, delete, flag change, new folder or a manual refresh). */
 export function clearMailboxCaches(account?: string): void {
   const mine = (k: string) => !account || k.startsWith(`${account}|`);
-  caches.lists.deleteWhere(mine); caches.bodies.deleteWhere(mine); caches.folders.deleteWhere(mine);
+  caches.lists.deleteWhere(mine); caches.bodies.deleteWhere(mine); caches.folders.deleteWhere(mine); attachmentCache.deleteWhere(mine);
 }
+/** Opened attachments, memory only and small: a PDF you just previewed can be downloaded or re-opened without fetching the message again. */
+type CachedAttachment = { name: string; type: string; bytes: Uint8Array };
+const attachmentCache = (() => {
+  const g = globalThis as unknown as { __pixelMailAttachments?: ReturnType<typeof createMailCache<CachedAttachment>> };
+  return (g.__pixelMailAttachments ??= createMailCache<CachedAttachment>({ ttlMs: 300_000, max: 6, maxCost: 48_000_000, cost: (a) => a.bytes.length }));
+})();
+export const attachmentMaxBytes = () => envNum("MAIL_ATTACHMENT_MAX_MB", 25, 1, 100) * 1_000_000;
 export const mailCacheStats = () => ({ lists: caches.lists.size, bodies: caches.bodies.size, bodyBytes: caches.bodies.cost, folders: caches.folders.size });
 
 async function folders(c: ImapClient, forceFresh = false): Promise<Folder[]> {
@@ -112,7 +119,7 @@ export async function readMessage(cfg: ImapConfig, folderName: string, uid: unkn
       const raw = await c.cmd(`UID FETCH ${id} (UID FLAGS BODY.PEEK[]<0.${BODY_BYTES}>)`);
       const item = parseFetchItems(raw)[0];
       if (!item) throw new Error("That message is gone.");
-      message = parseMessage(item.uid, item.flags, item.literal);
+      message = parseMessage(item.uid, item.flags, item.literal, item.literal.length < BODY_BYTES);
     }
     if (markSeen && !message.seen) {
       await c.cmd(`UID STORE ${id} +FLAGS.SILENT (\\Seen)`).catch(() => undefined);
@@ -122,6 +129,50 @@ export async function readMessage(cfg: ImapConfig, folderName: string, uid: unkn
     caches.bodies.set(key, message);
     return message;
   }, hooks.imap);
+}
+
+/**
+ * One attachment's bytes, fetched only when asked for. The size is checked first (a huge message is refused before it is downloaded), the message is
+ * read with BODY.PEEK so it isn't marked read, and the result is cached briefly in memory under this account's key.
+ */
+export async function readAttachment(cfg: ImapConfig, folderName: string, uid: unknown, index: unknown): Promise<CachedAttachment> {
+  const id = uidOk(uid);
+  const n = Number(index);
+  if (!Number.isInteger(n) || n < 0 || n > 19) throw new Error("Bad attachment number.");
+  const limit = attachmentMaxBytes();
+  return withImap(cfg, async (c) => {
+    const { folder, info } = await selectFolder(c, folderName);
+    const key = `${c.account}|att|${folder.name}|${info.uidvalidity}|${id}|${n}`;
+    const hit = attachmentCache.get(key, Date.now(), listTtl() * 10);
+    if (hit) return hit;
+    const size = Number(/RFC822\.SIZE (\d+)/i.exec(await c.cmd(`UID FETCH ${id} (RFC822.SIZE)`))?.[1]);
+    if (!Number.isFinite(size) || size <= 0) throw new Error("That message is gone.");
+    if (size > limit * 1.4) throw new Error(`That message is too large to open here (over ${Math.round(limit / 1_000_000)} MB). Open it in your mail app instead.`);
+    const item = parseFetchItems(await c.cmd(`UID FETCH ${id} (UID BODY.PEEK[])`))[0];
+    if (!item) throw new Error("That message is gone.");
+    const part = attachmentBytes(item.literal, n);
+    if (!part) throw new Error("That attachment isn't in the message any more.");
+    if (part.bytes.length > limit) throw new Error(`That file is larger than ${Math.round(limit / 1_000_000)} MB, so it isn't opened here.`);
+    attachmentCache.set(key, part);
+    return part;
+  }, hooks.imap);
+}
+
+/** The headers that make a download safe even if someone opens the URL directly: the file can't run, be sniffed as HTML, or be kept by shared caches. */
+export function attachmentResponse(a: CachedAttachment, download: boolean): Response {
+  const kind = attachmentKind(a.name, a.type);
+  const type = kind === "pdf" ? "application/pdf" : /\.xlsx$/i.test(a.name) ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : /\.xlsm$/i.test(a.name) ? "application/vnd.ms-excel.sheet.macroEnabled.12" : /\.xls$/i.test(a.name) ? "application/vnd.ms-excel" : /\.csv$/i.test(a.name) ? "text/csv; charset=utf-8" : "application/octet-stream";
+  const safe = a.name.replace(/[\r\n"\\]/g, "").replace(/[^\x20-\x7e]/g, "_").slice(0, 120) || "attachment";
+  return new Response(a.bytes as unknown as BodyInit, {
+    headers: {
+      "content-type": type,
+      "content-length": String(a.bytes.length),
+      "content-disposition": `${download || kind === "other" ? "attachment" : "inline"}; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(a.name.slice(0, 200))}`,
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "sandbox; default-src 'none'",
+    },
+  });
 }
 
 export async function setSeen(cfg: ImapConfig, folderName: string, uid: unknown, seen: boolean): Promise<void> {
@@ -281,6 +332,10 @@ export async function handleMailbox(request: Request): Promise<Response> {
       const folder = u.searchParams.get("folder") ?? "INBOX";
       if (u.searchParams.get("op") === "alerts") return Response.json(await alertState());
       if (u.searchParams.get("op") === "notes") return Response.json(await listNotes(cfg));
+      if (u.searchParams.get("op") === "attachment") {
+        const a = await readAttachment(cfg, folder, u.searchParams.get("uid"), u.searchParams.get("index"));
+        return attachmentResponse(a, u.searchParams.get("download") === "1");
+      }
       if (u.searchParams.get("op") === "read") {
         const message = await readMessage(cfg, folder, u.searchParams.get("uid"), u.searchParams.get("keep") !== "1");
         clearMailCache();

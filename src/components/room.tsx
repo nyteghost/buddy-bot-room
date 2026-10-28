@@ -43,6 +43,7 @@ import { Puzzle,
   CalendarDays,
   CheckSquare,
   Sun,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -149,6 +150,8 @@ import { weatherText, type Weather } from "@/lib/weather";
 import { eventLinks, icsQuery, parseEventArgs } from "@/lib/events";
 import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
+import { DocumentsPanel } from "@/components/doc-viewer/documents-panel";
+import { DocumentModalHost } from "@/components/doc-viewer/document-modal";
 import { MailAlertPopup, ReminderPopup } from "@/components/mail-alerts";
 import { AddonWindows, useAddons } from "@/components/addons";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
@@ -404,6 +407,7 @@ export function Room() {
     if (tab === "chat") showMode(mode);
   }
   const [mailOpen, setMailOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const { addons } = useAddons();
@@ -1337,6 +1341,7 @@ export function Room() {
     { id: "win-tasks", group: "Windows", label: "Open Tasks and reminders", keywords: "todo to-do remind reminder checklist", run: () => setTasksOpen(true) },
     { id: "win-calendar", group: "Windows", label: "Open Calendar (next 7 days)", keywords: "schedule events agenda ics google outlook", run: () => setCalendarOpen(true) },
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
+    { id: "win-docs", group: "Windows", label: "Open Documents (PDF and Excel viewer)", keywords: "pdf excel xlsx csv viewer file spreadsheet", run: () => setDocsOpen(true) },
     { id: "win-fun", group: "Windows", label: "Open Fun (Dungeon Master campaign)", keywords: "dnd rpg adventure dice dungeon master games", run: () => setFunOpen(true) },
     { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
@@ -1860,6 +1865,7 @@ export function Room() {
             <Button key={a.id} variant="ghost" className="sidebar-item" title={`Add-on: ${a.name}`} aria-pressed={addonOpen === a.id} onClick={() => setAddonOpen((v) => (v === a.id ? null : a.id))}><Puzzle /><span>{a.window?.title ?? a.name}</span></Button>
           ))}
           <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Documents: read PDF and Excel files" aria-pressed={docsOpen} onClick={() => setDocsOpen((value) => !value)}><FileText /><span>Documents</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Work tools, recorder, compare models and the debug log" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More</span></Button>
           {moreOpen && <>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
@@ -2070,7 +2076,11 @@ export function Room() {
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />
             </WorkspaceWindow>
-            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
+            <WorkspaceWindow id="documents" title="Documents" icon={<FileText className="size-4" />} open={docsOpen} onClose={() => setDocsOpen(false)} resetVersion={resetVersion}>
+              <DocumentsPanel />
+            </WorkspaceWindow>
+            <DocumentModalHost />
+            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !docsOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
           </main>
         </div>
       </div>

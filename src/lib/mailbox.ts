@@ -6,7 +6,11 @@ import { decodeMimeWords, senderName } from "./imap";
  */
 export type Folder = { name: string; label: string; special: "inbox" | "trash" | "sent" | "drafts" | "junk" | "archive" | "all" | "flagged" | ""; };
 export type MailSummary = { uid: number; from: string; fromAddr: string; to: string; subject: string; date: string; seen: boolean; messageId: string };
-export type MailMessage = MailSummary & { cc: string; references: string; text: string; truncated: boolean; attachments: string[] };
+/** What the viewer can open: PDFs and spreadsheets in the browser; everything else is download-only. */
+export type AttachmentKind = "pdf" | "sheet" | "other";
+/** One attachment of a message. `index` is its position among the message's attachments (stable for one UIDVALIDITY+UID); `size` is bytes, or -1 when the message was cut short and it isn't known. */
+export type AttachmentInfo = { index: number; name: string; type: string; size: number; kind: AttachmentKind };
+export type MailMessage = MailSummary & { cc: string; references: string; text: string; truncated: boolean; attachments: string[]; files: AttachmentInfo[] };
 
 // ---------- folder names ----------
 
@@ -192,7 +196,8 @@ const param = (value: string, name: string): string => {
   return (m?.[1] ?? m?.[2] ?? "").trim();
 };
 
-type Extracted = { plain: string[]; html: string[]; attachments: string[] };
+type RawPart = { name: string; type: string; encoding: string; body: string };
+type Extracted = { plain: string[]; html: string[]; attachments: string[]; parts?: RawPart[] };
 
 function walk(raw: string, depth: number, into: Extracted): void {
   if (depth > 6) return;
@@ -213,11 +218,12 @@ function walk(raw: string, depth: number, into: Extracted): void {
     }
     return;
   }
-  if (/^attachment/i.test(disp) || (filename && !type.startsWith("text/"))) { if (filename) into.attachments.push(filename); return; }
+  const keep = () => { if (filename) { into.attachments.push(filename); into.parts?.push({ name: filename, type, encoding: headerGet(h, "Content-Transfer-Encoding"), body }); } };
+  if (/^attachment/i.test(disp) || (filename && !type.startsWith("text/"))) { keep(); return; }
   if (type === "text/plain" || type === "text/html") {
     const text = decodeCharset(decodeTransfer(body, headerGet(h, "Content-Transfer-Encoding")), param(ct, "charset"));
     (type === "text/html" ? into.html : into.plain).push(text);
-  } else if (filename) into.attachments.push(filename);
+  } else keep();
 }
 
 /** The readable text of a raw message (plain text preferred, HTML turned into text), plus attachment names. Never returns HTML. */
@@ -231,7 +237,33 @@ export function extractBody(raw: string, maxChars = 30_000): { text: string; tru
   return { text: truncated ? text.slice(0, maxChars) : text, truncated, attachments: into.attachments.slice(0, 20) };
 }
 
-export function parseMessage(uid: number, flags: string[], raw: string): MailMessage {
+const ATTACH_KINDS: [RegExp, AttachmentKind][] = [[/\.pdf$/i, "pdf"], [/\.(xlsx|xlsm|xls|csv)$/i, "sheet"]];
+/** Which in-app viewer (if any) fits a file. Decided by the extension; the type is only a hint because mail clients often send "application/octet-stream". */
+export function attachmentKind(name: string, type = ""): AttachmentKind {
+  for (const [re, kind] of ATTACH_KINDS) if (re.test(name)) return kind;
+  if (/^application\/pdf$/i.test(type)) return "pdf";
+  return "other";
+}
+const decodedSize = (p: RawPart): number => {
+  const e = p.encoding.trim().toLowerCase();
+  if (e === "base64") { const s = p.body.replace(/[^A-Za-z0-9+/=]/g, ""); return Math.max(0, Math.floor((s.length * 3) / 4) - (s.endsWith("==") ? 2 : s.endsWith("=") ? 1 : 0)); }
+  return p.body.length;
+};
+/** Attachments of a raw message, in order. `complete` is false when only the start of a long message was downloaded: sizes are then unknown (-1). */
+export function attachmentList(raw: string, complete = true): AttachmentInfo[] {
+  const into: Extracted = { plain: [], html: [], attachments: [], parts: [] };
+  walk(raw, 0, into);
+  return (into.parts ?? []).slice(0, 20).map((p, index) => ({ index, name: p.name.slice(0, 200), type: p.type.slice(0, 100), size: complete ? decodedSize(p) : -1, kind: attachmentKind(p.name, p.type) }));
+}
+/** The decoded bytes of attachment number `index` (null if there isn't one). */
+export function attachmentBytes(raw: string, index: number): { name: string; type: string; bytes: Uint8Array } | null {
+  const into: Extracted = { plain: [], html: [], attachments: [], parts: [] };
+  walk(raw, 0, into);
+  const p = into.parts?.[index];
+  return p ? { name: p.name, type: p.type, bytes: decodeTransfer(p.body, p.encoding) } : null;
+}
+
+export function parseMessage(uid: number, flags: string[], raw: string, complete = true): MailMessage {
   const { headers } = splitMessage(raw);
   const h = unfold(headers);
   const body = extractBody(raw);
@@ -243,6 +275,7 @@ export function parseMessage(uid: number, flags: string[], raw: string): MailMes
     text: body.text,
     truncated: body.truncated,
     attachments: body.attachments,
+    files: attachmentList(raw, complete),
   };
 }
 
