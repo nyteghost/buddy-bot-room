@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { closeAllImap, imapStats, imapTimeouts, poolSettings, withImap, type ImapClient } from "@/lib/imap-client.server";
+import { closeAllImap, connectionLost, imapStats, imapTimeouts, poolSettings, withImap, type ImapClient } from "@/lib/imap-client.server";
 import { fetchUnread } from "@/lib/imap.server";
 import { FakeImapServer } from "./helpers/fake-imap";
 
@@ -246,5 +246,21 @@ describe("account isolation", () => {
       expect(Object.keys(c).sort()).toEqual(["account", "append", "capabilities", "cmd"]);
       expect(JSON.stringify(c)).not.toContain(srv.pass);
     }, tlsOk);
+  });
+});
+
+describe("telling a dead connection from a refused command", () => {
+  it("recognises the ways Node reports a socket the server already closed", () => {
+    expect(connectionLost(new Error("connection closed"))).toBe(true);
+    expect(connectionLost(Object.assign(new Error("This socket has been ended by the other party"), { code: "EPIPE" }))).toBe(true);
+    expect(connectionLost(new Error("This socket has been ended by the other party"))).toBe(true);
+    expect(connectionLost(Object.assign(new Error("read failed"), { code: "ECONNRESET" }))).toBe(true);
+    expect(connectionLost(new Error("write EPIPE"))).toBe(true);
+  });
+  it("does not treat the server saying no as a lost connection", () => {
+    expect(connectionLost(new Error("Invalid credentials"))).toBe(false);
+    expect(connectionLost(new Error("timed out"))).toBe(false);
+    expect(connectionLost("connection closed")).toBe(false);
+    expect(connectionLost(Object.assign(new Error("denied"), { code: "EACCES" }))).toBe(false);
   });
 });
