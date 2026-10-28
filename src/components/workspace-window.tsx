@@ -59,14 +59,35 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
     const parent = element?.parentElement;
     if (!element || !parent || !open) return;
     const observer = new ResizeObserver(() => {
+      const bounds = parent.getBoundingClientRect();
+      if (snapped && !expanded) {
+        // A docked window must continue filling its half (or whole) canvas when the browser resizes.
+        const r = snapRect(snapped, bounds);
+        if (!positionRef.current || r.x !== positionRef.current.x || r.y !== positionRef.current.y) {
+          positionRef.current = { x: r.x, y: r.y }; setPosition(positionRef.current);
+        }
+        if (!sizeRef.current || r.w !== sizeRef.current.w || r.h !== sizeRef.current.h) {
+          sizeRef.current = { w: r.w, h: r.h }; setSize(sizeRef.current);
+        }
+        return;
+      }
       const current = positionRef.current;
       if (!current) return;
-      const next = clampWindowPosition(current, parent.getBoundingClientRect(), element.getBoundingClientRect());
-      if (next.x !== current.x || next.y !== current.y) setPosition(next);
+      const measured = element.getBoundingClientRect();
+      const fitted = fitWindowRect({ x: current.x, y: current.y, w: measured.width, h: measured.height }, bounds);
+      if (fitted.x !== current.x || fitted.y !== current.y) {
+        positionRef.current = { x: fitted.x, y: fitted.y };
+        setPosition(positionRef.current);
+      }
+      const saved = sizeRef.current;
+      if (saved && (saved.w > bounds.width || saved.h > bounds.height)) {
+        sizeRef.current = { w: fitted.w, h: fitted.h };
+        setSize(sizeRef.current);
+      }
     });
     observer.observe(parent); observer.observe(element);
     return () => observer.disconnect();
-  }, [open]);
+  }, [open, snapped, expanded]);
   // Every window listens for a single validated preset/custom-layout event. Hidden windows
   // remain mounted, so they receive their geometry before being opened.
   useEffect(() => {
