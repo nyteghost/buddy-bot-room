@@ -30,6 +30,11 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 - Wording overrides are applied inside `themePersona` for the normal theme only; hellraiser, horror and every themed cast are untouched. The browser sends `personas` with each chat request; `chat.server.ts` re-cleans it and passes it explicitly (no shared server state, accounts stay separate). Memory access is enforced where the prompt text is built (`visibleMemories` -> `promptContextFor`); real data is withheld in `realDataFor`. Nothing here weakens Local-Only mode or the 'mail/calendar never go to cloud' rule.
 - Storage is additive: old data has no such key; rolling back leaves it ignored.
 
+## Project workspaces (Release 3 item 15)
+- `projects.ts` (pure helpers + browser store, key `pixel-pals-projects-v1`, cleaned on every read/write: known pals only, length caps, dependency loops removed). Project memories are NOT copied: they stay in `workbench.project[name]`. The active project is the existing `pixel-pals-active-project-v1`.
+- Room integration: `projectBrief` is prepended to `memoryContext` (server cap raised 1500 -> 2400 chars; still labelled as data, not instructions); docs are filtered to the project's list when it has one; an effect seats the project's pals when the active project (or its team) changes, including on load; a run is logged after each completed discussion.
+- Storage is additive; rolling back leaves the key unused.
+
 ## Security boundaries (audit, Release 3 item 12)
 Already in place before this pass: optional shared-password gate or built-in accounts (signed sessions, owner-only windows), secrets kept server-side in `app-secrets.json` (mode 600, never returned to the browser), `redact()` on logs/bug reports, Local-Only AI enforced on the server, SSRF checks on custom provider URLs, read-only Unraid monitoring (no admin or shell operations exist, so nothing needs approval), mail attachments served `private, no-store` with a sandbox CSP.
 

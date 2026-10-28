@@ -3,6 +3,7 @@ import { BookOpen, FileText, RefreshCw, Send, Smartphone, Trash2 } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MemorySection } from "@/components/memory-section";
+import { ProjectsSection } from "@/components/projects-section";
 import { CharacterSection } from "@/components/character-section";
 import { agents, agentName } from "@/lib/agents";
 import { useCharacterMode } from "@/lib/hellraiser";
@@ -245,6 +246,8 @@ export function NotesPanel() {
       <ObsidianNotes />
 
       <MemorySection />
+
+      <ProjectsSection />
 
       <section>
         <h3>Documents <span>pals search these when you ask</span></h3>

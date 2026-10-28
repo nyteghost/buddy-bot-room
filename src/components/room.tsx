@@ -173,6 +173,7 @@ import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
 import { getOverrides, mayUseRealData, memoryAccess, useOverrides } from "@/lib/character-overrides";
+import { getProjects, logRun, projectBrief, updateProject, useProjects } from "@/lib/projects";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
 import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign } from "@/lib/campaign";
@@ -221,6 +222,10 @@ export function Room() {
   const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
   const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
   useOverrides();
+  const projectsAll = useProjects();
+  const activeName = activeProject.use();
+  // Resume: when a project with assigned pals is active (including right after a restart), seat exactly those pals.
+  const seatKey = activeName && projectsAll[activeName]?.status !== "done" ? (projectsAll[activeName]?.agents ?? []).join(",") : "";
   const characterMode = useCharacterMode();
   const assistantOn = useAssistantMode();
   const assistantRef = useRef(assistantOn);
@@ -290,6 +295,10 @@ export function Room() {
   const setShort = (m: Mode, on: boolean) => setShortOn((cur) => { const next = { ...cur, [m]: on }; try { localStorage.setItem("pixel-pals-short-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan").map((a) => a.id)); // Saiyan joins when you switch him on
+  useEffect(() => {
+    const ids = seatKey.split(",").filter(Boolean) as AgentId[];
+    if (ids.length) setEnabled(agents.filter((a) => ids.includes(a.id)).map((a) => a.id));
+  }, [seatKey]);
   const direct = mode === "direct";
   const mentionTarget = resolveMention(topic, characterMode);
   const tooFew = !direct && !mentionTarget && enabled.length < 2;
@@ -615,7 +624,10 @@ export function Room() {
     // Chat with your files: pull the passages that best match this question (no AI call needed).
     const notesNow = getNotes();
     const personasNow = getOverrides();
-    const docsNow = getDocs();
+    const projectNow = getProjects()[activeProject.get()];
+    // When the active project lists its own documents, only those are searched.
+    const docsAll = getDocs();
+    const docsNow = projectNow?.docs.length && docsAll.some((d) => projectNow.docs.includes(d.name)) ? docsAll.filter((d) => projectNow.docs.includes(d.name)) : docsAll;
     let docText = docsNow.length ? docContext(await smartRetrieve(allChunks(docsNow), topic)) : "";
     // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
     let memBoost: ReadonlyMap<string, number> | undefined;
@@ -700,7 +712,7 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }),
+            memoryContext: [projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost })].filter(Boolean).join("\n\n"),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
@@ -850,6 +862,11 @@ export function Room() {
         }
       }
       if (!controller.signal.aborted) awardXp(Math.min(10, turns.length));
+      // Keep a short run history for the active project so it can be resumed after a restart.
+      if (!controller.signal.aborted && projectNow) {
+        const lastReply = [...transcript].reverse().find((m) => m.role === "assistant" && m.metadata?.agentId !== "echo");
+        updateProject(projectNow.name, (p) => logRun(p, { topic, mode: String(mode), pals: [...new Set(turns.map((t) => agentName(t.agent.id, false, false, "normal")))], gist: lastReply ? messageText(lastReply).replace(/\s+/g, " ").slice(0, 200) : "" }));
+      }
       if (mode === "solve" && !direct && !controller.signal.aborted) celebrate();
     } catch (err) {
       if (!controller.signal.aborted) {
