@@ -13,7 +13,8 @@ const op = (c = cfg()) => withImap(c, ping, tlsOk);
 
 beforeAll(async () => { srv = await new FakeImapServer().start(); });
 afterAll(async () => { closeAllImap(); await srv.stop(); });
-beforeEach(() => { closeAllImap(); srv.resetCounters(); srv.stall = false; srv.rejectNext = 0; Object.assign(imapTimeouts, defaults); delete process.env["IMAP_POOL_MAX"]; delete process.env["IMAP_IDLE_SECONDS"]; });
+// Sockets closed by the previous test are only noticed by the fake server a moment later; wait for that so they are not counted as "open" in this test.
+beforeEach(async () => { closeAllImap(); for (let i = 0; i < 100 && srv.open > 0; i++) await sleep(10); srv.resetCounters(); srv.stall = false; srv.rejectNext = 0; Object.assign(imapTimeouts, defaults); delete process.env["IMAP_POOL_MAX"]; delete process.env["IMAP_IDLE_SECONDS"]; });
 afterEach(async () => { closeAllImap(); await sleep(10); });
 
 describe("settings", () => {
