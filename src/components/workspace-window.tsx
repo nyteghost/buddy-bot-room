@@ -109,8 +109,11 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
       bounds,
       { width: MIN_W, height: MIN_H },
     );
-    setPosition({ x: next.x, y: next.y });
-    setSize({ w: next.w, h: next.h });
+    // Keep refs in sync with the last pointer event so releasing immediately persists the exact size.
+    positionRef.current = { x: next.x, y: next.y };
+    sizeRef.current = { w: next.w, h: next.h };
+    setPosition(positionRef.current);
+    setSize(sizeRef.current);
   }
   function endResize() {
     if (!resize.current) return;
