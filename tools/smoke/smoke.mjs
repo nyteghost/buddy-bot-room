@@ -162,7 +162,7 @@ await step("Documents: open an .xlsx in the worker (sheets, merges, frozen heade
   if (money !== "$1,234.50") throw new Error(`B2 shows ${JSON.stringify(money)}`);
   if (!(await page.locator('[data-cell="D2"]').count())) throw new Error("merged cell missing");
   // Scroll far down: only nearby rows are drawn, and the frozen header stays.
-  await page.getByTestId("sheet-scroller").evaluate((el) => { el.scrollTop = 6000; });
+  await page.getByTestId("sheet-scroller").evaluate((el) => { el.scrollTop = 7000; });
   await page.locator('[data-cell="A300"]').waitFor({ timeout: 10000 });
   if (await page.locator('[data-cell="A20"]').count()) throw new Error("rows far above the window are still drawn");
   if (!(await page.locator('[data-cell="A1"]').count())) throw new Error("frozen header row not drawn after scrolling");
