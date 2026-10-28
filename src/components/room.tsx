@@ -51,6 +51,7 @@ import {
 import { listLocalOrServer } from "@/lib/chat-store";
 import type { SavedDiscussion } from "@/lib/saved-discussions";
 import { SavedDiscussions } from "./saved-discussions";
+import { WorkspaceLayoutMenu } from "./workspace-layout-menu";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
@@ -1751,6 +1752,27 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Copy a bug report for Claude" onClick={() => setLogOpen(true)}><Bug /><span>Debug log</span></Button>
           </>}
           <div className="sidebar-divider" />
+          <WorkspaceLayoutMenu onShow={(ids) => {
+            const show = (id: string) => ids.includes(id);
+            setOpenModes(perMode((m) => show(`mode-${m}`)));
+            const selectedMode = ALL_MODES.find((m) => show(`mode-${m}`));
+            if (selectedMode) setMode(selectedMode);
+            setRoomOpen(show("room"));
+            setTodayOpen(show("today"));
+            setMailOpen(show("mail"));
+            setDocsOpen(show("docs"));
+            setToolsOpen(show("tools"));
+            setSetupOpen(show("setup"));
+            setNotesOpen(show("notes"));
+            setTasksOpen(show("tasks"));
+            setCalendarOpen(show("calendar"));
+            setFunOpen(show("fun"));
+            setRecorderOpen(show("recorder"));
+            setPlaytestsOpen(show("playtests"));
+            setSearchOpen(show("search"));
+            setMoreOpen(show("tools") || show("setup"));
+            setSidebarCompact(false);
+          }} />
           <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
