@@ -1660,10 +1660,16 @@ h1 {
 .window-recorder { left: var(--window-x, 16%); top: var(--window-y, 48px); width: min(540px, 84%); height: min(540px, calc(100% - 48px)); }
 .workspace-window.window-sized { width: var(--window-w); height: var(--window-h); }
 .workspace-window.window-expanded { left: 0; top: 0; width: 100%; height: 100%; }
-.window-resize { position: absolute; z-index: 2; touch-action: none; }
-.window-resize-e { top: 43px; right: 0; bottom: 12px; width: 8px; cursor: ew-resize; }
-.window-resize-s { left: 0; right: 12px; bottom: 0; height: 8px; cursor: ns-resize; }
-.window-resize-se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--muted-foreground) 50%, var(--muted-foreground) 58%, transparent 58%, transparent 72%, var(--muted-foreground) 72%, var(--muted-foreground) 80%, transparent 80%); opacity: 0.6; }
+.window-resize { position: absolute; z-index: 5; touch-action: none; user-select: none; }
+.window-resize-e { top: 14px; right: 0; bottom: 14px; width: 8px; cursor: ew-resize; }
+.window-resize-w { top: 14px; left: 0; bottom: 14px; width: 8px; cursor: ew-resize; }
+.window-resize-n { top: 0; left: 14px; right: 14px; height: 8px; cursor: ns-resize; }
+.window-resize-s { bottom: 0; left: 14px; right: 14px; height: 8px; cursor: ns-resize; }
+.window-resize-ne, .window-resize-nw, .window-resize-se, .window-resize-sw { width: 16px; height: 16px; z-index: 6; }
+.window-resize-ne { top: 0; right: 0; cursor: nesw-resize; }
+.window-resize-nw { top: 0; left: 0; cursor: nwse-resize; }
+.window-resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.window-resize-se { right: 0; bottom: 0; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--muted-foreground) 50%, var(--muted-foreground) 58%, transparent 58%, transparent 72%, var(--muted-foreground) 72%, var(--muted-foreground) 80%, transparent 80%); opacity: 0.6; }
 .window-resize-se:hover { opacity: 1; }
 @media (max-width: 700px) { .window-resize { display: none; } .workspace-window.window-sized { width: 100%; height: 100%; } }
 .window-titlebar { height: 43px; min-height: 43px; display: flex; align-items: center; padding: 0 10px 0 14px; gap: 12px; background: var(--muted); border-bottom: 1px solid var(--border); cursor: grab; touch-action: none; user-select: none; }
@@ -2192,4 +2198,71 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .deck-planner .print-layout-key th { background: #e5e5e5 !important; border-bottom: 2px solid #000; }
   .deck-planner .print-layout-key tbody tr:nth-child(even) td { background: #f5f5f5 !important; }
   .deck-planner .print-document { font-family: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif; }
+}
+
+/* ---- Document viewer (PDF text layer, search highlight, print) ---- */
+.pp-textlayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; opacity: 1; }
+.pp-textlayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.pp-textlayer span.markedContent { top: 0; height: 0; }
+.pp-textlayer ::selection { background: rgb(0 100 255 / 0.3); }
+.pp-textlayer .pp-hit { background: rgb(255 214 0 / 0.5); border-radius: 2px; }
+.pp-print-root { display: none; }
+@media print {
+  body > *:not(.pp-print-root) { display: none !important; }
+  .pp-print-root { display: block !important; }
+  .pp-print-root img { display: block; width: 100%; break-after: page; page-break-after: always; }
+}
+
+/* Power: nothing animates while the tab is hidden, and low-power mode pauses purely decorative loops (replies, the "thinking" dots and every feature are unchanged). */
+html[data-hidden="1"] *, html[data-hidden="1"] *::before, html[data-hidden="1"] *::after { animation-play-state: paused !important; }
+html[data-lowpower="1"] .thinking-prop rect,
+html[data-lowpower="1"] .hell-glow,
+html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-play-state: paused !important; }
+.show-earlier { display: block; margin: 0.5rem auto; padding: 0.35rem 0.75rem; font-size: 0.75rem; border: 1px solid var(--border, currentColor); border-radius: 0.375rem; background: transparent; color: inherit; cursor: pointer; opacity: 0.8; }
+.show-earlier:hover { opacity: 1; }
+
+
+/* Conversation windows: keep the message field full-width, with settings on their own row.
+   This prevents Smart Team (and other modes) from cramming typing into a narrow column. */
+.modular-workspace:not(.focus-mode) .window-mode .workspace-composer {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px 16px;
+}
+.modular-workspace:not(.focus-mode) .window-mode .workspace-composer .topic-section {
+  grid-column: 1;
+  min-width: 0;
+  width: 100%;
+}
+.modular-workspace:not(.focus-mode) .window-mode .workspace-composer .topic-composer {
+  width: 100%;
+  min-width: 0;
+}
+.modular-workspace:not(.focus-mode) .window-mode .workspace-composer .topic-composer textarea {
+  width: 100%;
+  min-height: 72px;
+  max-height: 180px;
+  resize: vertical;
+}
+.modular-workspace:not(.focus-mode) .window-mode .workspace-composer .launch-controls {
+  grid-column: 1;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px 14px;
+}
+.modular-workspace:not(.focus-mode) .window-mode .workspace-composer .start-button {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+@media (max-width: 700px) {
+  .modular-workspace:not(.focus-mode) .window-mode .workspace-composer { padding: 8px 10px max(10px, env(safe-area-inset-bottom)); }
+  .modular-workspace:not(.focus-mode) .window-mode .workspace-composer .topic-composer textarea { min-height: 56px; max-height: 115px; }
+  .modular-workspace:not(.focus-mode) .window-mode .workspace-composer .launch-controls { flex-wrap: wrap; }
+  .modular-workspace:not(.focus-mode) .window-mode .workspace-composer .start-button { margin-left: auto; }
 }

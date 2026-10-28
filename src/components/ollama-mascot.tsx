@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { startPolling } from "@/lib/poll";
 import { setEngine, useEngine } from "@/lib/engine";
 import { isTauri, tauriOllamaTags } from "@/lib/local-llm";
 import { cn } from "@/lib/utils";
@@ -47,7 +48,7 @@ function useOllamaStatus(url: string): Status {
   useEffect(() => {
     let stop = false;
     const base = url.replace(/\/v1\/?$/, "").replace(/\/$/, "");
-    async function probe() {
+    async function probe(): Promise<boolean> {
       const t = performance.now();
       try {
         let models: string[];
@@ -60,15 +61,17 @@ function useOllamaStatus(url: string): Status {
           models = (json.models ?? []).map((m) => m.name);
         }
         if (!stop) setStatus({ online: true, models, ping: Math.round(performance.now() - t) });
+        return true;
       } catch {
         if (!stop) setStatus({ online: false, models: [] });
+        return false; // offline: ask less and less often (up to once a minute)
       }
     }
-    void probe();
-    const timer = setInterval(probe, 5000);
+    // Every 5 s while the tab is visible; not at all while hidden.
+    const off = startPolling(probe, 5000, { maxMs: 60_000 });
     return () => {
       stop = true;
-      clearInterval(timer);
+      off();
     };
   }, [url]);
   return status;

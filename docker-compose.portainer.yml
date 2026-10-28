@@ -89,7 +89,7 @@ services:
     restart: unless-stopped
     runtime: ${OLLAMA_RUNTIME:-runc}   # set OLLAMA_RUNTIME=nvidia to use an NVIDIA GPU
     ports:
-      - "${OLLAMA_PORT:-11435}:11434"   # 11435 so it never collides with an Ollama already running on the host (11434)
+      - "${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11435}:11434"   # 11435 so it never collides with an Ollama already running on the host (11434)
     environment:
       OLLAMA_HOST: 0.0.0.0
       OLLAMA_ORIGINS: "*"   # Pixel Pals calls Ollama from your browser
@@ -97,6 +97,12 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ollama-models:/root/.ollama
+    healthcheck:   # "healthy" means the Ollama server answers; it does not mean a model is loaded
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # One-shot helper: downloads the models in OLLAMA_MODELS (space separated) the first time, then exits.
   ollama-pull:

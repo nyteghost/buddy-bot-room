@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { startPolling } from "@/lib/poll";
 import { readBase, signature, writeBase, type SyncBase, type SyncItem } from "@/lib/task-sync-client";
 import { getWorkbench, updateWorkbench, useWorkbench } from "@/lib/workbench";
 
@@ -39,9 +40,7 @@ export function TaskSync() {
   };
 
   useEffect(() => {
-    void run.current();
-    const t = window.setInterval(() => void run.current(), 60_000);
-    return () => window.clearInterval(t);
+    return startPolling(() => run.current(), 60_000);
   }, []);
   useEffect(() => {
     const t = window.setTimeout(() => void run.current(), 2000);

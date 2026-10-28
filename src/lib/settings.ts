@@ -21,6 +21,13 @@ export type SettingField = {
 };
 
 export const SETTING_FIELDS: SettingField[] = [
+  { key: "OLLAMA_URL", label: "Ollama address", group: "ollama", kind: "url", placeholder: "http://10.200.1.50:11434", help: "Where your Ollama runs: the ollama container (http://ollama:11434) or another machine, such as the PC with the RTX 3080. That machine's Ollama must listen on the network (OLLAMA_HOST=0.0.0.0)." },
+  { key: "OLLAMA_VRAM_GB", label: "Ollama machine's GPU memory (GB)", group: "ollama", kind: "number", placeholder: "10", help: "Only needed when Ollama runs on another machine (for example the RTX 3080 PC has 10 GB). Pixel Pals can't see that GPU, so this tells it what fits. Leave empty when Ollama is the container in this stack." },
+  { key: "OLLAMA_RAM_GB", label: "Ollama machine's RAM (GB)", group: "ollama", kind: "number", placeholder: "32", help: "Only for a remote Ollama: used for model suggestions. Leave empty for the container in this stack." },
+  { key: "OLLAMA_KEEP_ALIVE", label: "Keep the model loaded for", group: "ollama", kind: "text", placeholder: "30m", help: "How long Ollama keeps a model in memory after the last reply: 5m, 30m, 2h, 24h, -1 (always) or 0 (unload at once). Empty means 30m. A model that is still loaded answers the next message without the load delay." },
+  { key: "LOCAL_ONLY_AI", label: "Local-Only AI (no paid or cloud AI)", group: "ollama", kind: "select", options: ["on", "off"], help: "On: every answer, scheduled job and retry uses only your own Ollama. Free and paid cloud keys are never called, even if saved. Off (the default): the engine you pick in AI engine settings is used, including free cloud keys. Paid engines never run unattended either way." },
+  { key: "OBSIDIAN_VAULT_DIR", label: "Obsidian vault folder", group: "obsidian", kind: "text", placeholder: "/vault", help: "Where your Obsidian vault is mounted inside the Pixel Pals container (add a volume like /mnt/user/appdata/obsidian/vaults/Homelab:/vault, read-write). The Notes tab can then open, edit and add vault notes." },
+  { key: "OBSIDIAN_NEW_FOLDER", label: "Folder for new notes", group: "obsidian", kind: "text", placeholder: "Pixel Pals", help: "Notes created from Pixel Pals go in this vault folder. Leave empty for the vault's top level." },
   { key: "PLEX_URL", label: "Plex address", group: "plex", kind: "url", placeholder: "http://10.0.0.5:32400" },
   { key: "PLEX_TOKEN", label: "Plex token", group: "plex", kind: "text", secret: true },
   { key: "SEERR_URL", label: "Seerr address", group: "seerr", kind: "url", placeholder: "http://10.0.0.5:5055" },
@@ -53,6 +60,10 @@ export const SETTING_FIELDS: SettingField[] = [
   { key: "IMAP_PORT", label: "Port", group: "imap", kind: "number", placeholder: "993" },
   { key: "IMAP_USER", label: "Email address", group: "imap", kind: "text", placeholder: "you@gmail.com", help: "Your full address. Sending needs it." },
   { key: "IMAP_PASS", label: "App password", group: "imap", kind: "text", secret: true, help: "Not your normal password. Gmail: turn on 2-Step Verification, then create a 16-character app password at myaccount.google.com/apppasswords." },
+  { key: "IMAP_POOL_MAX", label: "Mail connections kept open", group: "imap", kind: "number", placeholder: "2", help: "Mail reuses a few logged-in connections instead of signing in for every click. 1 to 4 (default 2). Gmail allows about 15 per account." },
+  { key: "IMAP_IDLE_SECONDS", label: "Close idle mail connections after (seconds)", group: "imap", kind: "number", placeholder: "90", help: "Default 90. 0 turns reuse off: every action signs in fresh, like before (slower, but the most cautious)." },
+  { key: "MAIL_CACHE_SECONDS", label: "Remember mail lists for (seconds)", group: "imap", kind: "number", placeholder: "30", help: "Message lists and opened messages are kept in memory only (never saved to disk), and checked against the server every time. 0 turns it off." },
+  { key: "MAIL_ATTACHMENT_MAX_MB", label: "Largest attachment to open (MB)", group: "imap", kind: "number", placeholder: "25", help: "Attachments are only downloaded when you press Preview or Download. Bigger files are refused (1 to 100, default 25)." },
   { key: "SMTP_HOST", label: "Sending server (SMTP)", group: "imap", kind: "text", placeholder: "smtp.gmail.com", help: "Leave empty to use the usual name (imap.gmail.com becomes smtp.gmail.com)." },
   { key: "SMTP_PORT", label: "Sending port", group: "imap", kind: "number", placeholder: "465", help: "465 (encrypted straight away) or 587 (upgrades with STARTTLS)." },
   { key: "MAIL_FROM_NAME", label: "Your name on sent mail", group: "imap", kind: "text", placeholder: "Chelli" },

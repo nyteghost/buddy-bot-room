@@ -94,3 +94,53 @@ export function buildReport(parts: { app: string; context: string[]; server: str
     formatEntries(parts.client),
   ].join("\n"));
 }
+
+/** "10", "10s", "90 sec", "2m", "2 min" -> seconds (default 10, at most 1 hour). */
+export function parseWindowSeconds(arg: string): number | null {
+  const t = arg.trim().toLowerCase();
+  if (!t) return 10;
+  const m = t.match(/^(\d{1,5})\s*(s|sec|secs|seconds?|m|min|mins|minutes?)?$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const secs = m[2] && m[2].startsWith("m") ? n * 60 : n;
+  return secs >= 1 ? Math.min(secs, 3600) : null;
+}
+
+/** Browser log entries from the last `seconds` seconds. */
+export function entriesSince(list: LogEntry[], nowMs: number, seconds: number): LogEntry[] {
+  const from = nowMs - seconds * 1000;
+  return list.filter((e) => { const t = Date.parse(e.t); return Number.isFinite(t) && t >= from; });
+}
+
+/** Server log lines (each starts with an ISO time) from the last `seconds` seconds. Lines without a time stay with the line before. */
+export function serverLinesSince(text: string, nowMs: number, seconds: number): string[] {
+  const from = nowMs - seconds * 1000;
+  const out: string[] = [];
+  let keep = false;
+  for (const line of text.split("\n")) {
+    const m = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s/);
+    if (m) keep = Date.parse(m[1]!) >= from;
+    if ((m || out.length) && keep) out.push(line);
+  }
+  return out;
+}
+
+/** The text file `@log` downloads. */
+export function buildRecentReport(parts: { app: string; context: string[]; seconds: number; nowMs: number; server: string; client: LogEntry[] }): string {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
+  const client = entriesSince(parts.client, parts.nowMs, parts.seconds);
+  const server = serverLinesSince(parts.server, parts.nowMs, parts.seconds);
+  return redact([
+    `=== Pixel Pals log, last ${parts.seconds} seconds ===`,
+    `time: ${new Date(parts.nowMs).toISOString()}`,
+    `app: ${parts.app}`,
+    `browser: ${ua}`,
+    ...parts.context,
+    "",
+    "--- server ---",
+    server.length ? server.join("\n") : `(no server events in the last ${parts.seconds} seconds)`,
+    "",
+    "--- browser log ---",
+    client.length ? formatEntries(client) : `(nothing logged in this browser in the last ${parts.seconds} seconds)`,
+  ].join("\n"));
+}

@@ -169,6 +169,33 @@ export function fallbackProviders(s: EngineSettings, blockPaid = false): TurnPro
   return [claude, custom].filter((p): p is TurnProvider => !!p);
 }
 
+/** When your own Ollama can't be reached: every cloud AI you have set up, free keys first, and a paid one only if you switched it on (share, only or fallback). Empty means nothing else is set up. */
+export function cloudFallbackChain(s: EngineSettings, blockPaid = false): TurnProvider[] {
+  const seen = new Set<string>();
+  return [...turnProviders(s, blockPaid), ...fallbackProviders(s, blockPaid)].filter((p) => (seen.has(p.kind) ? false : (seen.add(p.kind), true)));
+}
+
+/** AIs that just failed are put on a bench so the next turns skip them instead of waiting on them again. */
+export type Bench = Map<string, number>;
+export const benchKey = (p: Pick<TurnProvider, "kind" | "baseUrl">): string => `${p.kind}|${p.baseUrl ?? ""}`;
+const TRANSIENT_BENCH_MS = 3 * 60_000;
+const BROKEN_BENCH_MS = 15 * 60_000;
+
+/** How long to skip an AI after it failed: longer when the key or model itself is wrong, shorter for limits and outages. */
+export function benchMs(error: unknown): number {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /HTTP (401|402|403|404)\b/.test(msg) ? BROKEN_BENCH_MS : TRANSIENT_BENCH_MS;
+}
+export function benchProvider(bench: Bench, p: Pick<TurnProvider, "kind" | "baseUrl">, error: unknown, now = Date.now()): void {
+  bench.set(benchKey(p), now + benchMs(error));
+}
+export const isBenched = (bench: Bench, p: Pick<TurnProvider, "kind" | "baseUrl">, now = Date.now()): boolean => (bench.get(benchKey(p)) ?? 0) > now;
+
+/** Same list, with benched AIs moved to the end: they are only tried when nothing else is left. Order is otherwise kept. */
+export function orderByHealth(chain: TurnProvider[], bench: Bench, now = Date.now()): TurnProvider[] {
+  return [...chain.filter((p) => !isBenched(bench, p, now)), ...chain.filter((p) => isBenched(bench, p, now))];
+}
+
 /** What to try, in order, when `failed` errored before producing text. */
 export function chainAfter(s: EngineSettings, failed: TurnProvider, blockPaid = false): TurnProvider[] {
   if (failed.kind === "ollama-server") return [];
@@ -188,7 +215,7 @@ export function providerForTurn(s: EngineSettings, turnIndex: number, hint: Rout
   return list.length ? list[turnIndex % list.length] : undefined;
 }
 
-const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", custom: "Custom" };
+export const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", custom: "Custom" };
 const shortModel = (m: string): string => (m.split("/").pop() ?? m).slice(0, 40);
 
 /** Which AI answers for the pal at this position in the roster, in words: "Groq · gpt-oss-120b", "Ollama · qwen2.5:7b". Same rotation the chat uses. */
@@ -203,10 +230,22 @@ export function palEngineLabel(s: EngineSettings, rosterIndex: number): string {
   return `${providerNames[p.kind]}${model ? ` · ${shortModel(model)}` : ""}`;
 }
 
+/** "Groq · gpt-oss-120b" for a provider on this turn (same words as palEngineLabel). */
+export function providerLabel(p: Pick<TurnProvider, "kind"> & { model?: string | undefined }): string {
+  const model = p.model ?? (p.kind === "groq" || p.kind === "gemini" || p.kind === "openrouter" || p.kind === "nvidia" ? freeModels[p.kind] : "");
+  return `${providerNames[p.kind]}${model ? ` · ${shortModel(model)}` : ""}`;
+}
+
+/** What to show under a reply: who wrote it, and when a smaller local model took over because the first one did not fit, say so. */
+export function answeredLabel(o: { via?: string | undefined; model?: string | undefined; fellBackFrom?: string | undefined }): string {
+  if (o.fellBackFrom && o.model) return `Ollama · ${shortModel(o.model)} (smaller model: ${shortModel(o.fellBackFrom)} didn't fit)`;
+  return o.via ?? "";
+}
+
 export const freeModels = {
   groq: "openai/gpt-oss-120b",
   gemini: "gemini-2.5-flash",
-  openrouter: "meta-llama/llama-3.3-70b-instruct:free",
+  openrouter: "openrouter/free",
   nvidia: "meta/llama-3.1-70b-instruct",
   local: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
 } as const;

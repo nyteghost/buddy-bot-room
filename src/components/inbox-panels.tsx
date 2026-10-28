@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { startPolling } from "@/lib/poll";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Mailbox } from "@/components/mailbox";
@@ -25,9 +26,7 @@ export function useFeed<T extends { error?: string }>(url: string, open: boolean
   }, [url]);
   useEffect(() => {
     if (!open) return;
-    void load();
-    const t = window.setInterval(() => void load(), 5 * 60_000);
-    return () => window.clearInterval(t);
+    return startPolling(load, 5 * 60_000);
   }, [open, load]);
   return { data, loading, failed, reload: load };
 }

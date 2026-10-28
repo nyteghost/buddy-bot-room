@@ -16,11 +16,14 @@ export const BACKUP_KEYS = [
   "pixel-pals-campaign-v1",
   "pixel-pals-workspace-v1",
   "pixel-pals-voice-v1",
+  "pixel-pals-smart-v1",
+  "pixel-pals-characters-v1",
+  "pixel-pals-projects-v1",
 ] as const;
 /** Keys that follow a signed-in account on the self-hosted build. Saved chats are excluded: the server store handles those. */
 export const SYNC_JSON_KEYS: readonly string[] = BACKUP_KEYS.filter((k) => k !== "pixel-pals-saved-discussions-v1");
 /** Small plain-string settings (theme, assistant switch, local model, notes folder). */
-export const SYNC_PLAIN_KEYS: readonly string[] = ["pixel-pals-character-mode-v1", "pixel-pals-assistant-mode-v1", "pixel-pals-local-model-v1", "pixel-pals-notes-dir-v1", "pixel-pals-autosearch-v1", "pixel-pals-appearance-v1"];
+export const SYNC_PLAIN_KEYS: readonly string[] = ["pixel-pals-character-mode-v1", "pixel-pals-assistant-mode-v1", "pixel-pals-local-model-v1", "pixel-pals-notes-dir-v1", "pixel-pals-autosearch-v1", "pixel-pals-appearance-v1", "pixel-pals-active-project-v1"];
 export const SYNC_KEYS: readonly string[] = [...SYNC_JSON_KEYS, ...SYNC_PLAIN_KEYS];
 export const SYNC_MAX_BYTES = 1_800_000;
 

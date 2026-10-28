@@ -15,7 +15,7 @@ export async function handleEmbed(request: Request): Promise<Response> {
     if (res.status === 404) return json({ error: `The embedding model ${embedModel()} isn't downloaded. Download it in the Local AI panel (More models) or add it to OLLAMA_MODELS.` }, 503);
     if (!res.ok) return json({ error: `Ollama answered ${res.status}.` }, 502);
     const data = (await res.json()) as { embeddings?: number[][] };
-    return data.embeddings?.length === texts.length ? json({ embeddings: data.embeddings }) : json({ error: "Unexpected answer from Ollama." }, 502);
+    return data.embeddings?.length === texts.length ? json({ embeddings: data.embeddings, model: embedModel() }) : json({ error: "Unexpected answer from Ollama." }, 502);
   } catch {
     return json({ error: "Couldn't reach Ollama." }, 502);
   }

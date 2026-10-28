@@ -47,6 +47,7 @@ services:
       BUDDY_BACKUP_DIR: /backups
       BUDDY_BACKUP_TIME: ${BUDDY_BACKUP_TIME:-03:30}
       BUDDY_BACKUP_KEEP: ${BUDDY_BACKUP_KEEP:-14}
+      LOCAL_ONLY_AI: ${LOCAL_ONLY_AI:-off}   # "on" = only your own Ollama is ever used (no cloud AI at all); off = the engine you pick in the app
       OLLAMA_URL: ${OLLAMA_URL:-}   # Local AI engine: http://ollama:11434 if you turn on the ollama profile, or http://<other-machine>:11434
       ALLOW_PRIVATE_CUSTOM: ${ALLOW_PRIVATE_CUSTOM:-}   # 1 = Custom provider may use LAN addresses
       PROVIDER_FEED: ${PROVIDER_FEED:-1}   # 0 = never fetch the community list of free LLM APIs
@@ -79,6 +80,8 @@ services:
       - ${APPDATA:-/mnt/user/appdata/pixelpals}/data:/data   # saved chats and the server log live here
       # Nightly backups. Set BUDDY_BACKUP_PATH to a folder on another machine (e.g. a mounted Unraid share) to survive a disk failure.
       - ${BUDDY_BACKUP_PATH:-/mnt/user/appdata/pixelpals/backups}:/backups
+      # Optional: your Obsidian vault, so the Notes tab can open and edit it. Then set OBSIDIAN_VAULT_DIR=/vault in Settings → Obsidian.
+      - ${OBSIDIAN_VAULT_HOST:-/mnt/user/appdata/obsidian/vaults/Homelab}:/vault
     healthcheck:
       test: ["CMD", "bun", "-e", "fetch('http://localhost:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -95,7 +98,7 @@ services:
     restart: unless-stopped
     runtime: ${OLLAMA_RUNTIME:-runc}   # set OLLAMA_RUNTIME=nvidia to use an NVIDIA GPU
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"   # 11435 so it never collides with an Ollama already running on the host (11434)
+      - "${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434"   # 11435 so it never collides with an Ollama already running on the host (11434)
     environment:
       OLLAMA_HOST: 0.0.0.0
       OLLAMA_ORIGINS: "*"   # Pixel Pals calls Ollama from your browser
@@ -103,6 +106,12 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - ${APPDATA:-/mnt/user/appdata/pixelpals}/ollama:/root/.ollama
+    healthcheck:   # "healthy" means the Ollama server answers; it does not mean a model is loaded
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # One-shot helper: downloads the models in OLLAMA_MODELS (space separated) the first time, then exits.
   ollama-pull:

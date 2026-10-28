@@ -1,48 +1,7 @@
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
-import { Puzzle,
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  CircleHelp,
-  Copy,
-  Download,
-  ListTodo,
-  Pencil,
-  Scale,
-  MessageSquare,
-  Mic,
-  LayoutGrid,
-  History,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Gamepad2,
-  FlaskConical,
-  Wrench,
-  Minus,
-  Play,
-  Plus,
-  Radio,
-  Swords,
-  RotateCcw,
-  Search,
-  Settings2,
-  Square,
-  Users,
-  X,
-  Bug,
-  GitBranch,
-  RefreshCw,
-  Volume2,
-  VolumeX,
-  Ellipsis,
-  Maximize2,
-  Minimize2,
-  Mail,
-  CalendarDays,
-  CheckSquare,
-  Sun,
-} from "lucide-react";
+import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -66,12 +25,6 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import {
-  Message,
-  MessageAction,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message";
-import {
   PromptInput,
   PromptInputTextarea,
   PromptInputFooter,
@@ -79,6 +32,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
+import { MessageRow, type RowActions } from "./message-row";
 import { ThinkingProp } from "./thinking-prop";
 import { OfficePal } from "./office-pal";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
@@ -106,22 +60,22 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { chainAfter, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
+import { benchProvider, chainAfter, cloudFallbackChain, isBenched, orderByHealth, providerNames, type Bench, freeModels, palEngineLabel, providerLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
 import mascot from "@/assets/mascot.png";
-import { LinuxActions } from "./linux-actions";
 import { UpdatePopup } from "./update-popup";
 import { UpdateBanner } from "./update-banner";
 import { linuxContext } from "@/lib/linux";
 import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
-import { ShowServicesTools } from "./work-tools";
-import { PlaytestsPanel } from "./playtests-panel";
+// Secondary windows load their code the first time they are opened, so the first screen has less to download and run.
+const ShowServicesTools = lazy(() => import("./work-tools").then((m) => ({ default: m.ShowServicesTools })));
+const PlaytestsPanel = lazy(() => import("./playtests-panel").then((m) => ({ default: m.PlaytestsPanel })));
 import { WorkspaceWindow } from "./workspace-window";
 import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
@@ -129,13 +83,12 @@ import { priceReply } from "@/lib/work-tools";
 import { cn } from "@/lib/utils";
 import { parseSlash, slashSuggestions, helpText, modeNames, themeNames, type SlashAction } from "@/lib/slash-commands";
 import { freshRecall, promptHistory, recallStep, type RecallState } from "@/lib/prompt-recall";
-import { replaceEmojiShortcodes } from "@/lib/emoji-shortcodes";
 import { celebrate } from "@/lib/confetti";
 import { CompareDialog } from "./compare-dialog";
 import { SeerrDialog } from "./seerr-dialog";
 import { NotesPanel } from "./notes-panel";
 import { DebugLogDialog } from "./debug-log-dialog";
-import { installGlobalLogging, logClient } from "@/lib/debug-log";
+import { buildRecentReport, clientLog, installGlobalLogging, logClient } from "@/lib/debug-log";
 import { warmOllama } from "@/lib/ollama-models";
 import { CommandPalette, type PaletteAction } from "./command-palette";
 import { matchShortcut, shortcutList } from "@/lib/shortcuts";
@@ -148,6 +101,8 @@ import { weatherText, type Weather } from "@/lib/weather";
 import { eventLinks, icsQuery, parseEventArgs } from "@/lib/events";
 import { whenLabel } from "@/lib/when";
 import { CalendarPanel, MailPanel } from "@/components/inbox-panels";
+import { DocumentsPanel } from "@/components/doc-viewer/documents-panel";
+import { DocumentModalHost } from "@/components/doc-viewer/document-modal";
 import { MailAlertPopup, ReminderPopup } from "@/components/mail-alerts";
 import { AddonWindows, useAddons } from "@/components/addons";
 import { TasksPanel, TodayPanel } from "@/components/day-panels";
@@ -161,13 +116,19 @@ import { SearchPanel } from "@/components/search-panel";
 import { setHideSecrets, getHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import { MicButton } from "@/components/mic-button";
 import { smartRetrieve } from "@/lib/smart-docs";
+import { createThrottle, systemClock } from "@/lib/stream-throttle";
+import { createDebouncedSaver } from "@/lib/debounced-save";
 import { installUuidPolyfill } from "@/lib/uuid-polyfill";
 import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
+import { getOverrides, mayUseRealData, memoryAccess, useOverrides } from "@/lib/character-overrides";
+import { runClientMigrations } from "@/lib/migrate-client";
+import { chatSlice, lowPower, useEverTrue, usePowerAttributes } from "@/lib/power";
+import { getProjects, logRun, projectBrief, updateProject, useProjects } from "@/lib/projects";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
-import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign, type DmRole } from "@/lib/campaign";
+import { addFact, addRoll, campaignContext, endCampaign, getCampaign, removeFact, setCharacter, startCampaign, statusText, updateCampaign } from "@/lib/campaign";
 import { parseDice, rollDice, secureRng } from "@/lib/dice";
 import { diagnoseTopic, NOT_SET_UP, statusMarkdown, type UnraidReply } from "@/lib/unraid";
 import { UnraidBanner } from "./unraid-banner";
@@ -181,46 +142,26 @@ import { RoomLive } from "@/components/room-live";
 import { awardXp } from "@/lib/progress-store";
 import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
-import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
-import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContext, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
+import { extractSteps } from "@/lib/solve-steps";
+import { defaultOpenModes, modeHelp, modeLabel, modePlaceholder, modeSuggestions, perMode, suggestions } from "@/lib/mode-meta";
+import { planTurns } from "@/lib/turn-plan";
+import { dispatchTurn } from "@/lib/turn-dispatch";
+import { buildHandoff, cleanSmartConfig, defaultSmartConfig, isRepeat, outOfTime, shouldRun, SMART_ROLES, type SmartConfig, type SmartRole } from "@/lib/smart-team";
+import { addEntry, addPalMemory, addTodo, clearDone, getWorkbench, removePalMemory, listText, promptContextFor, removeAt, toggleTodo, updateWorkbench } from "@/lib/workbench";
+import { pickMemories, visibleMemories } from "@/lib/memory-rank";
+import { memoryBoost } from "@/lib/memory-boost";
+import { activeProject } from "@/lib/prefs";
 
+runClientMigrations();
 const storageKey = "pixel-pals-conversation-v1";
-const suggestions = [
-  "What would a city designed by AI look like?",
-  "Is creativity uniquely human?",
-  "Pitch the next big indie game",
-];
 const chatsKey = "pixel-pals-conversations-v2";
-const defaultOpenModes: Record<Mode, boolean> = { roundtable: true, broadcast: false, direct: false, solve: false, debate: false };
-const modeLabel: Record<Mode, string> = { roundtable: "Roundtable", broadcast: "Broadcast", direct: "One-on-one", solve: "Problem solving", debate: "Debate" };
-const modeHelp: Record<Mode, string> = {
-  roundtable: "Everyone hears everyone: pals react to each other, then one gives the verdict.",
-  broadcast: "Each pal answers on their own, without seeing the others. Optionally a judge ranks the answers.",
-  direct: "A private chat with one pal.",
-  solve: "A team with roles (Diagnoser, Fixer, Skeptic) that ends in a plan you can send to Tasks.",
-  debate: "Two pals argue for and against; a third judges who argued better.",
-};
-const modePlaceholder: Record<Mode, string> = {
-  roundtable: "Give your pals something to talk about…",
-  broadcast: "Ask a question and get independent answers…",
-  direct: "Message your pal…",
-  solve: "Describe the problem you need solved…",
-  debate: "State a claim for the pals to argue about…",
-};
-const modeSuggestions: Record<Mode, string[]> = {
-  roundtable: suggestions,
-  broadcast: ["Name my new indie game", "Best way to learn guitar in 3 months?", "Write a one-line pitch for a pixel café"],
-  direct: ["Help me plan my week", "Explain this like I'm new to it", "What should I cook tonight?"],
-  solve: ["My Plex server keeps buffering on one TV", "My Docker container restarts every few minutes", "I can't focus when I work from home"],
-  debate: ["Remote work beats the office", "Cats make better pets than dogs", "AI should write first drafts of everything"],
-};
 
 installUuidPolyfill(); // plain-http pages have no crypto.randomUUID
 
 export function Room() {
   // Each conversation mode (Roundtable, Broadcast, One-on-one, Problem solving, Debate) has its own window, chat and draft.
-  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>({ roundtable: [], broadcast: [], direct: [], solve: [], debate: [] });
-  const [drafts, setDrafts] = useState<Record<Mode, string>>({ roundtable: "", broadcast: "", direct: "", solve: "", debate: "" });
+  const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>(() => perMode(() => []));
+  const [drafts, setDrafts] = useState<Record<Mode, string>>(() => perMode(() => ""));
   /** The mode window you are working in; plain "messages" and "topic" below mean that window's. */
   const [mode, setMode] = useState<Mode>("roundtable");
   const messages = chats[mode];
@@ -233,6 +174,14 @@ export function Room() {
   }
   const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
   const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
+  useOverrides();
+  usePowerAttributes();
+  const rowActions = useRef({} as RowActions);
+  const [shownCount, setShownCount] = useState<Record<string, number>>({});
+  const projectsAll = useProjects();
+  const activeName = activeProject.use();
+  // Resume: when a project with assigned pals is active (including right after a restart), seat exactly those pals.
+  const seatKey = activeName && projectsAll[activeName]?.status !== "done" ? (projectsAll[activeName]?.agents ?? []).join(",") : "";
   const characterMode = useCharacterMode();
   const assistantOn = useAssistantMode();
   const assistantRef = useRef(assistantOn);
@@ -292,12 +241,20 @@ export function Room() {
   }, []);
   const [rounds, setRounds] = useState(2);
   const [judgeOn, setJudgeOn] = useState(false);
+  // Smart Team settings (how many pals, time limit, who plays which role). Remembered on this device.
+  const [smartCfg, setSmartCfgState] = useState<SmartConfig>(defaultSmartConfig);
+  useEffect(() => { try { setSmartCfgState(cleanSmartConfig(JSON.parse(localStorage.getItem("pixel-pals-smart-v1") ?? "null"))); } catch { /* optional storage */ } }, []);
+  const setSmartCfg = (patch: Partial<SmartConfig>) => setSmartCfgState((cur) => { const next = cleanSmartConfig({ ...cur, ...patch }); try { localStorage.setItem("pixel-pals-smart-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   // "Short answers" per mode window: cheaper and quicker replies. Remembered on this device.
-  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
+  const [shortOn, setShortOn] = useState<Record<Mode, boolean>>(() => perMode(() => false));
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem("pixel-pals-short-v1") ?? "null"); if (v && typeof v === "object") setShortOn((cur) => ({ ...cur, ...Object.fromEntries(ALL_MODES.map((m) => [m, v[m] === true])) })); } catch { /* optional storage */ } }, []);
   const setShort = (m: Mode, on: boolean) => setShortOn((cur) => { const next = { ...cur, [m]: on }; try { localStorage.setItem("pixel-pals-short-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   const [partner, setPartner] = useState<AgentId>("claude");
   const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan").map((a) => a.id)); // Saiyan joins when you switch him on
+  useEffect(() => {
+    const ids = seatKey.split(",").filter(Boolean) as AgentId[];
+    if (ids.length) setEnabled(agents.filter((a) => ids.includes(a.id)).map((a) => a.id));
+  }, [seatKey]);
   const direct = mode === "direct";
   const mentionTarget = resolveMention(topic, characterMode);
   const tooFew = !direct && !mentionTarget && enabled.length < 2;
@@ -345,17 +302,16 @@ export function Room() {
   const savedPrompts = usePrompts();
   useEffect(() => {
     // Things you sent from your phone (Telegram, share sheet) are waiting on the server; fold them into notes and tasks.
-    const collect = async () => {
+    const collect = async (): Promise<boolean> => {
       try {
         const res = await fetch("/api/capture", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "take" }) });
-        if (!res.ok) return;
+        if (!res.ok) return false;
         const { items } = (await res.json()) as { items?: Capture[] };
         if (items?.length) updateWorkbench((w) => mergeCaptures(w, items));
-      } catch { /* offline or not the owner */ }
+        return true;
+      } catch { return false; /* offline or not the owner: ask less often */ }
     };
-    void collect();
-    const t = window.setInterval(() => void collect(), 60_000);
-    return () => window.clearInterval(t);
+    return startPolling(collect, 60_000, { maxMs: 600_000 });
   }, []);
   const speakingMessage = useSpeakingId();
   const [canSpeak, setCanSpeak] = useState(false);
@@ -389,19 +345,22 @@ export function Room() {
   const setConversationOpen = (value: boolean) => { if (value) showMode(mode); };
   const resetModes = () => setOpenModes(defaultOpenModes);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsSeen = useEverTrue(toolsOpen);
+  const playtestsSeen = useEverTrue(playtestsOpen);
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
   function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
-    setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false });
+    setOpenModes(perMode(() => false));
     setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
     setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
     setToolsOpen(false); setFunOpen(false); setSetupOpen(false); setSearchOpen(false); setRecorderOpen(false);
     if (tab === "chat") showMode(mode);
   }
   const [mailOpen, setMailOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const { addons } = useAddons();
@@ -411,8 +370,10 @@ export function Room() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  /** AIs that failed recently: later turns skip them (see orderByHealth). */
+  const benchRef = useRef<Bench>(new Map());
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>({ roundtable: 0, broadcast: 0, direct: 0, solve: 0, debate: 0 });
+  const [forkSignals, setForkSignals] = useState<Record<Mode, number>>(() => perMode(() => 0));
   const bumpFork = (m: Mode) => setForkSignals((f) => ({ ...f, [m]: f[m] + 1 }));
   const [runningMode, setRunningMode] = useState<Mode | null>(null);
   const [regen, setRegen] = useState<{ text: string; mode: Mode } | null>(null);
@@ -476,14 +437,28 @@ export function Room() {
       replayRef.current?.abort();
     };
   }, []);
-  useEffect(() => {
-    if (!ready || cloud) return;
+  // Saving rewrites every conversation, so it waits for a quiet moment (and at most 2 s during a long reply) instead of running per token.
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
+  const saverRef = useRef<ReturnType<typeof createDebouncedSaver> | null>(null);
+  saverRef.current ??= createDebouncedSaver(() => {
     try {
-      localStorage.setItem(chatsKey, JSON.stringify(chats));
+      localStorage.setItem(chatsKey, JSON.stringify(chatsRef.current));
     } catch {
       setSaveError("Browser storage is full. This conversation could not be saved.");
     }
+  }, 400, 2000, systemClock);
+  useEffect(() => {
+    if (!ready || cloud) return;
+    saverRef.current?.schedule();
   }, [chats, ready, cloud]);
+  useEffect(() => {
+    const flush = () => saverRef.current?.flush();
+    const hidden = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", hidden);
+    return () => { window.removeEventListener("pagehide", flush); document.removeEventListener("visibilitychange", hidden); flush(); };
+  }, []);
 
   const stop = () => {
     stopSpeaking();
@@ -606,8 +581,24 @@ export function Room() {
     inputRef.current?.focus();
     // Chat with your files: pull the passages that best match this question (no AI call needed).
     const notesNow = getNotes();
-    const docsNow = getDocs();
+    const personasNow = getOverrides();
+    const projectNow = getProjects()[activeProject.get()];
+    // When the active project lists its own documents, only those are searched.
+    const docsAll = getDocs();
+    const docsNow = projectNow?.docs.length && docsAll.some((d) => projectNow.docs.includes(d.name)) ? docsAll.filter((d) => projectNow.docs.includes(d.name)) : docsAll;
     let docText = docsNow.length ? docContext(await smartRetrieve(allChunks(docsNow), topic)) : "";
+    // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
+    let memBoost: ReadonlyMap<string, number> | undefined;
+    {
+      const wbNow = getWorkbench();
+      const project = activeProject.get() || undefined;
+      const ids = (direct ? [partner] : enabled) as string[];
+      if (ids.some((id) => pickMemories(wbNow, topic, { pal: id, project, access: memoryAccess(personasNow, id) }).ranked)) {
+        const seen = new Map<string, string>();
+        for (const id of ids) for (const v of visibleMemories(wbNow, { pal: id, project, access: memoryAccess(personasNow, id) })) seen.set(v.entry.id, v.entry.text);
+        memBoost = await memoryBoost([...seen].map(([id, text]) => ({ id, text })), topic);
+      }
+    }
     // Optional: let the pals look things up themselves when the question needs current facts (/web on).
     if (autoSearch.get() && wantsWeb(topic)) {
       try {
@@ -629,7 +620,7 @@ export function Room() {
       };
     })());
     const realDataFor = async (id: AgentId): Promise<string | undefined> => {
-      if (!wantsAny(want)) return undefined;
+      if (!wantsAny(want) || !mayUseRealData(personasNow, id)) return undefined;
       const day = want.calendar && want.mail && want.tasks;
       const r = await loadReal();
       // A mentioned job pal gets just its own data; "my day" gives everyone the lot.
@@ -641,31 +632,23 @@ export function Room() {
       const seated = direct
         ? agents.filter((a) => a.id === partner)
         : agents.filter((a) => enabled.includes(a.id));
-      const turns: { agent: (typeof agents)[number]; round: number; verdict: boolean; dmRole?: DmRole; role?: string; side?: "for" | "against"; summary?: boolean }[] = [];
-      // Dungeon Master mode: the first seated pal narrates, the rest react as the party, one pass per action.
-      const campaign = getCampaign();
-      if (extra?.summary && seated[0]) turns.push({ agent: seated[0], round: 1, verdict: false, summary: true });
-      else if (campaign.active) seated.forEach((agent, i) => turns.push({ agent, round: 1, verdict: false, dmRole: i === 0 ? "dm" : "party" }));
-      else {
-        if (mode === "debate" && !direct) {
-          // Two pals take the sides; the next pal (or the first, with only two) judges.
-          const debaters = seated.slice(0, 2);
-          for (let r = 1; r <= rounds; r++)
-            debaters.forEach((agent, i) => turns.push({ agent, round: r, verdict: false, side: i === 0 ? "for" : "against" }));
-          const judge = seated[2] ?? seated[0];
-          if (judge && debaters.length === 2) turns.push({ agent: judge, round: rounds, verdict: true });
-        } else {
-          for (let r = 1; r <= (direct ? 1 : rounds); r++)
-            seated.forEach((agent, i) => turns.push({ agent, round: r, verdict: false, ...(mode === "solve" && !direct ? { role: SOLVE_ROLE_ORDER[i % SOLVE_ROLE_ORDER.length] } : {}) }));
-          const lead = seated[0];
-          if ((mode === "roundtable" || mode === "solve" || (mode === "broadcast" && judgeOn)) && !direct && seated.length > 1 && lead)
-            turns.push({ agent: lead, round: rounds, verdict: true });
-        }
-      }
+      const smartDone: { role: SmartRole; name: string; text: string }[] = [];
+      const smartStarted = Date.now();
+      const { turns, smartPlan } = planTurns({ seated, mode, direct, rounds, judgeOn, campaignActive: getCampaign().active, summary: !!extra?.summary, topic, smart: smartCfg });
+      if (smartPlan) logClient("info", `Smart team: ${smartPlan.why}`);
       {
         for (const [turnIndex, { agent, round: currentRound, verdict, dmRole, role, side, summary }] of turns.entries()) {
           setRound(currentRound);
           if (controller.signal.aborted) return;
+          const smartRole = smartPlan && role && (SMART_ROLES as string[]).includes(role) ? (role as SmartRole) : null;
+          if (smartPlan && smartRole && smartDone.length) {
+            if (!shouldRun({ agentId: agent.id, role: smartRole }, smartPlan, smartDone)) { logClient("info", `Smart team: ${smartRole} not needed`); continue; }
+            if (outOfTime(smartStarted, Date.now(), smartCfg)) {
+              transcript = [...transcript, { id: crypto.randomUUID(), role: "assistant", metadata: { agentId: "echo", characterMode: modeRef.current }, parts: [{ type: "text", text: `Smart team stopped: the ${smartCfg.maxSeconds}s time limit was reached. You can raise it in the Smart team settings.` }] }];
+              setMessages(transcript);
+              break;
+            }
+          }
           setSpeaking(agent.id);
           const began = performance.now();
           // Read the theme live so switching themes mid-discussion applies to the very next speaker.
@@ -681,14 +664,16 @@ export function Room() {
             // In a campaign every pal needs to see the whole table, even in one-on-one.
             mode: dmRole || summary ? ("roundtable" as Mode) : direct ? ("direct" as Mode) : mode,
             ...(role ? { role } : {}),
+            ...(smartRole ? { handoff: buildHandoff(smartDone) } : {}),
             ...(side ? { side } : {}),
             ...(summary ? { summary: true } : {}),
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: promptContext(getWorkbench(), 1500, agent.id),
+            memoryContext: [projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost })].filter(Boolean).join("\n\n"),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
+            ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
             docContext: docText,
             linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
             realData: await realDataFor(agent.id),
@@ -715,7 +700,10 @@ export function Room() {
             });
           let answer: RoomMessage | undefined;
           const answerId = crypto.randomUUID();
-          const consume = async (stream: Awaited<ReturnType<typeof runLocal>>) => {
+          const consume = async (stream: Awaited<ReturnType<typeof runLocal>>, via?: string) => {
+            // The first token shows at once; after that the screen updates at most every 50 ms, and the last one is always delivered.
+            const ui = createThrottle<RoomMessage[]>((list) => setMessages(list), 50);
+            try {
             for await (const partial of readUIMessageStream<RoomMessage>({ stream, terminateOnError: true })) {
               if (controller.signal.aborted) break;
               answer = {
@@ -723,6 +711,7 @@ export function Room() {
                 id: answerId,
                 metadata: {
                   ...partial.metadata,
+                  ...(via ? { via } : {}),
                   agentId: agent.id,
                   characterMode: turnMode,
                   assistant: assistantRef.current,
@@ -735,19 +724,21 @@ export function Room() {
                   elapsed: (performance.now() - began) / 1000,
                 },
               };
-              setMessages([...transcript, answer]);
+              ui.push([...transcript, answer]);
             }
+            } finally { ui.flush(); }
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
           const blockPaid = isOverCap(engine.spendCapUsd, { inPerM: engine.customPriceIn, outPerM: engine.customPriceOut });
           const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
-            const chain = [first, ...chainAfter(engine, first, blockPaid)];
+            const chain = orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
+            const failures: string[] = [];
             let lastError: unknown;
             for (const p of chain) {
               try {
-                await consume(await runCloud(p));
+                await consume(await runCloud(p), providerLabel(p));
                 const outText = answer ? messageText(answer) : "";
                 const inChars = Math.min(transcript.reduce((n, m) => n + messageText(m).length, 0), requestBody.contextChars) + 2000;
                 recordUsage({ kind: p.kind, model: p.model ?? (p.kind in freeModels ? freeModels[p.kind as keyof typeof freeModels] : p.kind), inTok: estimateTokens(inChars), outTok: estimateTokens(outText.length) });
@@ -755,11 +746,36 @@ export function Room() {
               } catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
-                lastError = err;
-                logClient("warn", `${p.kind} failed, trying the next provider`, err);
+                failures.push(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                lastError = new Error(failures.join(" · "));
+                benchProvider(benchRef.current, p, err);
+                logClient("warn", `${p.kind} failed, skipping it for a few minutes and trying the next AI`, err);
               }
             }
             throw lastError;
+          };
+          // Your own Ollama didn't answer: skip it and use the next AI you have set up (Local-Only mode on the server still blocks cloud AI).
+          const cloudFallback = async (why: unknown) => {
+            if (controller.signal.aborted || (answer && messageText(answer).trim())) throw why;
+            // Mail, calendar and task details never go to a cloud AI, so with those in the question there is nothing to fall back to.
+            if (requestBody.realData) throw why;
+            const rest = orderByHealth(cloudFallbackChain(engine, blockPaid), benchRef.current);
+            if (!rest.length) throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} No other AI is set up to take over: add a free key in AI engine settings (or switch the engine to Auto) and chats will fall back to it.`);
+            answer = undefined;
+            logClient("warn", "Ollama didn't answer, trying the next AI", why);
+            const failures: string[] = [];
+            let lastError: unknown = why;
+            for (const p of rest) {
+              try { await consume(await runCloud(p), providerLabel(p)); return; }
+              catch (err) {
+                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
+                answer = undefined;
+                failures.push(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                lastError = new Error(failures.join(" · "));
+                benchProvider(benchRef.current, p, err);
+              }
+            }
+            throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} The cloud AIs didn't answer either (${lastError instanceof Error ? lastError.message : String(lastError)}).`);
           };
           const runOllama = async () =>
             consume(
@@ -769,58 +785,34 @@ export function Room() {
                 { agentId: agent.id, round: currentRound },
                 controller.signal,
               ),
+              `Ollama · ${engine.ollamaModel}`,
             );
-          // Your own mail, calendar and tasks are only ever read by your own Ollama: free API tokens aren't spent on them and the details never go to a cloud AI.
-          const keepLocal = !!requestBody.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server";
-          if (keepLocal) {
-            try {
-              if (engine.kind === "auto-ollama") await runOllama();
-              else await runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }));
-            } catch (err) {
-              if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
-              throw new Error("Your own AI (Ollama) isn't reachable, so I didn't send your mail, calendar or task details to a cloud AI. Check Local AI in Settings, or ask without @mail, @calendar or @tasks.");
-            }
-          } else if (engine.kind === "auto-ollama") {
-            // Free keys first; local Ollama takes over when no key is set or a key fails before any text.
-            if (!provider) await runOllama();
-            else {
-              try {
-                await runChain(provider);
-              } catch (err) {
-                if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
-                answer = undefined;
-                await runOllama();
-              }
-            }
-          } else if (engine.kind === "local-server") {
-            if (!provider) throw new Error("Local AI isn't available.");
-            await runChain(provider);
-          } else if (engine.kind === "ollama") {
-            await consume(
-              await ollamaTurn(
-                await fetchPrompt(),
-                { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
-                { agentId: agent.id, round: currentRound },
-                controller.signal,
-              ),
-            );
-          } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
-            await consume(await runLocal());
-          } else if (!provider) {
-            throw new Error(blockPaid ? "Your monthly spend cap is reached and no free provider is set up. Raise the cap in AI engine settings, add a free key, or choose In-browser." : "Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
-          } else if (engine.kind === "auto") {
-            // Auto: free keys are far faster; the in-browser model takes over when a key hits its limit.
-            try {
-              await runChain(provider);
-            } catch (err) {
-              if (controller.signal.aborted || !hasWebGPU() || (answer && messageText(answer).trim())) throw err;
-              answer = undefined;
-              await consume(await runLocal());
-            }
-          } else {
-            await runChain(provider);
-          }
+          const ollamaKey = { kind: "ollama-server" as const, baseUrl: engine.ollamaUrl };
+          await dispatchTurn({
+            engine,
+            provider,
+            realData: !!requestBody.realData,
+            blockPaid,
+            hasWebGpu: hasWebGPU(),
+            aborted: () => controller.signal.aborted,
+            hasAnswer: () => !!(answer && messageText(answer).trim()),
+            clearAnswer: () => { answer = undefined; },
+            runChain,
+            localChain: () => runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" })),
+            runOllama,
+            runBrowserModel: async () => consume(await runLocal(), "In-browser model"),
+            cloudFallback,
+            ollamaBenchedWithBackup: () => isBenched(benchRef.current, ollamaKey) && cloudFallbackChain(engine, blockPaid).length > 0,
+            benchOllama: (err) => { if (!controller.signal.aborted && !isBenched(benchRef.current, ollamaKey)) benchProvider(benchRef.current, ollamaKey, err); },
+            log: (level, msg, err) => logClient(level, msg, err),
+          });
           if (answer && messageText(answer).trim()) {
+            if (smartRole) {
+              const said = messageText(answer);
+              // A pal that only repeats what an earlier one said is dropped instead of cluttering the chat.
+              if (isRepeat(said, smartDone.map((d) => d.text))) { logClient("info", `Smart team: dropped a repeated ${smartRole} reply`); setMessages(transcript); continue; }
+              smartDone.push({ role: smartRole, name: agent.name, text: said });
+            }
             transcript = [...transcript, answer];
             setMessages(transcript);
           } else if (!controller.signal.aborted)
@@ -828,6 +820,11 @@ export function Room() {
         }
       }
       if (!controller.signal.aborted) awardXp(Math.min(10, turns.length));
+      // Keep a short run history for the active project so it can be resumed after a restart.
+      if (!controller.signal.aborted && projectNow) {
+        const lastReply = [...transcript].reverse().find((m) => m.role === "assistant" && m.metadata?.agentId !== "echo");
+        updateProject(projectNow.name, (p) => logRun(p, { topic, mode: String(mode), pals: [...new Set(turns.map((t) => agentName(t.agent.id, false, false, "normal")))], gist: lastReply ? messageText(lastReply).replace(/\s+/g, " ").slice(0, 200) : "" }));
+      }
       if (mode === "solve" && !direct && !controller.signal.aborted) celebrate();
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -932,6 +929,7 @@ export function Room() {
         return say(command, "Cleared the finished to-dos.");
       case "tasks": setNotesOpen(true); return;
       case "log": setLogOpen(true); return;
+      case "logfile": void downloadRecentLog(action.seconds, command); return;
       case "library": void library(action.query, command); return;
       case "plex": void plex(action.query, command, null); return;
       case "watch": void plex("", command, action.mood); return;
@@ -970,6 +968,11 @@ export function Room() {
         if (!next) return say(command, "Use light, dark or auto for the colours, and small, normal or large for the text size, for example /appearance light large.");
         setAppearance(next);
         return say(command, `Appearance: ${next.scheme} colours, ${next.size} text.${next.scheme !== "dark" ? " (Light applies to the Normal theme; other themes keep their own palettes.)" : ""}`);
+      }
+      case "lowpower": {
+        const on = action.on ?? !lowPower.get();
+        lowPower.set(on);
+        return say(command, on ? "Low-power mode is on: background timers are slower, decorative animations are paused and the app polls less often. Replies and features are unchanged. /lowpower off turns it off." : "Low-power mode is off.");
       }
       case "panel": {
         if (action.panel === "calendar") setCalendarOpen(true); else if (action.panel === "mail") setMailOpen(true); else if (action.panel === "today") setTodayOpen(true); else if (action.panel === "setup") setSetupOpen(true); else if (action.panel === "search") setSearchOpen(true); else setTasksOpen(true);
@@ -1229,8 +1232,19 @@ export function Room() {
     link.href = url; link.download = name; link.click();
     URL.revokeObjectURL(url);
   }
+  async function downloadRecentLog(seconds: number, command: string) {
+    const nowMs = Date.now();
+    const server = await fetch("/api/debuglog").then((r) => (r.ok ? r.text() : "")).catch(() => "");
+    const report = buildRecentReport({
+      app: `${__APP_VERSION__} · ${__APP_COMMIT__}`, seconds, nowMs, server, client: clientLog(),
+      context: [`engine: ${engine.kind}${engine.kind.includes("ollama") ? ` (${engine.ollamaUrl} · ${engine.ollamaModel})` : ""}`, `last error shown: ${error || "none"}`],
+    });
+    download(`pixel-pals-log-${new Date(nowMs).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.txt`, report, "text/plain");
+    const empty = report.includes("(no server events in the last") && report.includes("(nothing logged in this browser");
+    say(command, empty ? `Downloaded, but nothing was logged in the last ${seconds} seconds. If the problem happened earlier, try @log 60.` : `Downloaded the log lines from the last ${seconds} seconds.`);
+  }
   function exportSettings(includeKeys: boolean) {
-    download(includeKeys ? "pixel-pals-backup-with-keys.json" : "pixel-pals-backup.json", JSON.stringify(buildBackup(localStorage, includeKeys), null, 2), "application/json");
+    saverRef.current?.flush(); download(includeKeys ? "pixel-pals-backup-with-keys.json" : "pixel-pals-backup.json", JSON.stringify(buildBackup(localStorage, includeKeys), null, 2), "application/json");
     say("/backup", includeKeys ? "Backup downloaded, including your API keys. Keep that file private." : "Backup downloaded. API keys were left out for safety.");
   }
   async function importSettings(file: File | undefined) {
@@ -1263,6 +1277,7 @@ export function Room() {
     { id: "win-tasks", group: "Windows", label: "Open Tasks and reminders", keywords: "todo to-do remind reminder checklist", run: () => setTasksOpen(true) },
     { id: "win-calendar", group: "Windows", label: "Open Calendar (next 7 days)", keywords: "schedule events agenda ics google outlook", run: () => setCalendarOpen(true) },
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
+    { id: "win-docs", group: "Windows", label: "Open Documents (PDF and Excel viewer)", keywords: "pdf excel xlsx csv viewer file spreadsheet", run: () => setDocsOpen(true) },
     { id: "win-fun", group: "Windows", label: "Open Fun (Dungeon Master campaign)", keywords: "dnd rpg adventure dice dungeon master games", run: () => setFunOpen(true) },
     { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
@@ -1274,6 +1289,7 @@ export function Room() {
     ...modeNames.map((m): PaletteAction => ({ id: `mode-${m}`, group: "Mode", label: `Mode: ${m}`, run: () => { setMode(m as Mode); showMode(m as Mode); } })),
     ...themeNames.map((t): PaletteAction => ({ id: `theme-${t}`, group: "Theme", label: `Theme: ${t}`, run: () => setCharacterMode(t as CharacterMode) })),
     { id: "next", group: "Chat", label: "What should we watch next? (Trakt list)", keywords: "trakt list watchlist movie show tv", run: () => void trakt("", "/next", "") },
+    { id: "lowpower-toggle", group: "View", label: "Low-power mode: on / off", keywords: "battery save power phone animation", run: () => runSlash({ type: "lowpower", on: null }, "/lowpower") },
     { id: "appearance-light", group: "View", label: "Appearance: light colours", keywords: "light mode bright theme", run: () => runSlash({ type: "appearance", words: "light" }, "/appearance light") },
     { id: "appearance-dark", group: "View", label: "Appearance: dark colours", keywords: "dark mode", run: () => runSlash({ type: "appearance", words: "dark" }, "/appearance dark") },
     { id: "appearance-large", group: "View", label: "Text size: larger", keywords: "font zoom bigger accessibility", run: () => runSlash({ type: "appearance", words: "large" }, "/appearance large") },
@@ -1350,6 +1366,8 @@ export function Room() {
   const suggestions_ = slashSuggestions(topic);
   const activeAgent = agents.find((a) => a.id === speaking);
   const lastMessage = messages[messages.length - 1];
+  // Rows are memoised; this one object keeps their click handlers current without changing identity.
+  Object.assign(rowActions.current, { regenerate, branchFrom, editAndRetry, addStepsToTasks, speak: (items: { id: string; text: string; agentId: string }[]) => void speakItems(items), stopSpeaking });
   const liveText =
     running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
   const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
@@ -1357,7 +1375,7 @@ export function Room() {
   function renderModeWindow(wm: Mode) {
     const msgs = chats[wm];
     const busyHere = running && runningMode === wm;
-    const icons: Record<Mode, ReactNode> = { roundtable: <Users className="size-4" />, broadcast: <Radio className="size-4" />, direct: <MessageSquare className="size-4" />, solve: <Wrench className="size-4" />, debate: <Swords className="size-4" /> };
+    const icons: Record<Mode, ReactNode> = { roundtable: <Users className="size-4" />, broadcast: <Radio className="size-4" />, direct: <MessageSquare className="size-4" />, solve: <Wrench className="size-4" />, debate: <Swords className="size-4" />, smart: <Workflow className="size-4" /> };
     return (
       <WorkspaceWindow id={`mode-${wm}`} className={cn("window-conversation window-mode", `window-mode-${wm}`, wm === mode && "window-mode-active")} title={modeLabel[wm]} icon={icons[wm]} open={openModes[wm]} onClose={() => setOpenModes((o) => ({ ...o, [wm]: false }))} resetVersion={resetVersion}>
         <section className="conversation-panel" onPointerDownCapture={() => { if (mode !== wm) setMode(wm); }}>
@@ -1417,7 +1435,7 @@ export function Room() {
           </div>
           <div className="mobile-modes" role="tablist" aria-label="Conversation mode">
             {ALL_MODES.map((m) => (
-              <button key={m} type="button" role="tab" aria-selected={m === wm} disabled={running && m !== wm} onClick={() => { setMode(m); setOpenModes({ roundtable: false, broadcast: false, direct: false, solve: false, debate: false, [m]: true }); }}>{modeLabel[m]}</button>
+              <button key={m} type="button" role="tab" aria-selected={m === wm} disabled={running && m !== wm} onClick={() => { setMode(m); setOpenModes(perMode((k) => k === m)); }}>{modeLabel[m]}</button>
             ))}
           </div>
           <SavedDiscussions perMode openRequest={wm === mode ? historyRequest : 0} forkSignal={forkSignals[wm]} messages={msgs} mode={wm} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessagesIn(wm, items); setCharacterMode(theme); setMode(wm); setRound(0); setError(""); void discussionMode; }} />
@@ -1450,95 +1468,14 @@ export function Room() {
                   <span className="empty-caption">FOUR PERSONALITIES. ENDLESS POSSIBILITIES.</span>
                 </div>
               ) : (
-                msgs.map((m) => {
-                  const a = agents.find((a) => a.id === m.metadata?.agentId);
-                  const messageMode = m.metadata?.characterMode ?? characterMode;
-                  const sideTag = m.metadata?.side === "for" ? " · FOR" : m.metadata?.side === "against" ? " · AGAINST" : "";
-                  const roleTag = m.metadata?.role ? ` · ${String(m.metadata.role).toUpperCase()}` : "";
-                  const name = a
-                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror", messageMode)
-                    : "You";
-                  return (
-                    <Message
-                      key={m.id}
-                      from={m.role}
-                      className={cn("room-message", m.metadata?.verdict && "verdict-message")}
-                    >
-                      {a && (
-                        <div className={`message-avatar agent-${a.id}`}>
-                          <PixelCharacter id={a.id} mode={messageMode} />
-                        </div>
-                      )}
-                      <div className="message-main">
-                        <div className="message-heading">
-                          <b className={a ? `agent-${a.id}` : "text-primary"}>{name}</b>
-                          <span>
-                            {!a
-                              ? "THE TOPIC"
-                              : m.metadata?.dm === "dm"
-                                ? "DUNGEON MASTER"
-                                : m.metadata?.dm === "party"
-                                  ? "PARTY"
-                                  : m.metadata?.verdict
-                                ? "THE VERDICT"
-                                : m.metadata?.summary ? "SUMMARY" : m.metadata?.verdict && wm === "debate" ? "THE JUDGE" : m.metadata?.verdict && wm === "broadcast" ? "THE JUDGE" : `ROUND ${m.metadata?.round ?? 1}${sideTag}${roleTag}`}
-                          </span>
-                          {m.metadata?.elapsed && (
-                            <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
-                          )}
-                        </div>
-                        <MessageContent className={cn(m.role === "user" && "user-message-content")}>
-                          {m.parts.map((part, i) =>
-                            part.type === "text" ? (
-                              <div key={i}>
-                                <MessageResponse>{m.role === "assistant" ? replaceEmojiShortcodes(part.text) : part.text}</MessageResponse>
-                                {m.role === "assistant" && (m.metadata?.assistant ?? (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant")) && !running && <LinuxActions text={part.text} canRun={desktopApp} />}
-                              </div>
-                            ) : part.type === "reasoning" ? (
-                              <details className="reasoning" key={i}>
-                                <summary>Thinking</summary>
-                                <MessageResponse>{part.text}</MessageResponse>
-                              </details>
-                            ) : null,
-                          )}
-                        </MessageContent>
-                        {!running && (
-                          <div className="message-actions">
-                            {m.role === "assistant" ? (
-                              <>
-                                <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
-                                  <Copy size={13} />
-                                </MessageAction>
-                                {canSpeak && (
-                                  <MessageAction tooltip={speakingMessage === m.id ? "Stop reading" : "Read aloud"} label={speakingMessage === m.id ? "Stop reading" : "Read aloud"} onClick={() => { if (speakingMessage === m.id) stopSpeaking(); else void speakItems([{ id: m.id, text: messageText(m), agentId: String(m.metadata?.agentId ?? "echo") }]); }}>
-                                    {speakingMessage === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                                  </MessageAction>
-                                )}
-                                {m.id === lastMessage?.id && m.metadata?.agentId !== "echo" && (
-                                  <MessageAction tooltip="Regenerate" label="Regenerate answer" onClick={() => regenerate(wm)}>
-                                    <RefreshCw size={13} />
-                                  </MessageAction>
-                                )}
-                                {wm === "solve" && m.metadata?.verdict && extractSteps(messageText(m)).length > 0 && (
-                                  <MessageAction tooltip="Add these steps to Tasks" label="Add these steps to Tasks" onClick={() => addStepsToTasks(m)}>
-                                    <ListTodo size={13} />
-                                  </MessageAction>
-                                )}
-                                <MessageAction tooltip="Branch a new chat from here" label="Branch from here" onClick={() => branchFrom(wm, m.id)}>
-                                  <GitBranch size={13} />
-                                </MessageAction>
-                              </>
-                            ) : (
-                              <MessageAction tooltip="Edit and resend" label="Edit and resend" onClick={() => editAndRetry(wm, m.id)}>
-                                <Pencil size={13} />
-                              </MessageAction>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </Message>
-                  );
-                })
+                <>
+                {(() => { const sl = chatSlice(msgs, shownCount[wm] ?? 0); return sl.hidden > 0 ? (
+                  <button type="button" className="show-earlier" onClick={() => setShownCount((c) => ({ ...c, [wm]: msgs.length - sl.hidden + 60 }))}>Show {Math.min(60, sl.hidden)} earlier messages ({sl.hidden} hidden to keep the page fast)</button>
+                ) : null; })()}
+                {chatSlice<RoomMessage>(msgs, shownCount[wm] ?? 0).items.map((m) => (
+                  <MessageRow key={m.id} m={m} wm={wm} characterMode={characterMode} running={running} isLast={m.id === lastMessage?.id} speaking={speakingMessage === m.id} canSpeak={canSpeak} desktopApp={desktopApp} act={rowActions.current} />
+                ))}
+                </>
               )}
               {busyHere && (
                 <div className="thinking-row">
@@ -1658,6 +1595,24 @@ export function Room() {
               <label className="judge-toggle" title="Replies of 1–3 sentences: faster and cheaper">
                 <input type="checkbox" checked={shortOn[wm]} disabled={running} onChange={(e) => setShort(wm, e.target.checked)} /> Short answers
               </label>
+              {wm === "smart" && (
+                <details className="judge-toggle" title="Smart team settings">
+                  <summary>Team settings</summary>
+                  <div className="grid gap-1 p-1 text-xs">
+                    <label>Most pals per answer <input type="number" min={1} max={6} value={smartCfg.maxTurns} disabled={running} onChange={(e) => setSmartCfg({ maxTurns: Number(e.target.value) })} style={{ width: "3.5rem" }} /></label>
+                    <label>Time limit (seconds) <input type="number" min={20} max={900} value={smartCfg.maxSeconds} disabled={running} onChange={(e) => setSmartCfg({ maxSeconds: Number(e.target.value) })} style={{ width: "4.5rem" }} /></label>
+                    <label><input type="checkbox" checked={smartCfg.singleOnly} disabled={running} onChange={(e) => setSmartCfg({ singleOnly: e.target.checked })} /> Always use just one pal</label>
+                    {SMART_ROLES.map((r) => (
+                      <label key={r} className="capitalize">{r}{" "}
+                        <select value={smartCfg.assign[r] ?? "auto"} disabled={running} onChange={(e) => setSmartCfg({ assign: { ...smartCfg.assign, [r]: e.target.value } })}>
+                          <option value="auto">auto</option>
+                          {agents.filter((a) => enabled.includes(a.id)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              )}
               {wm === "broadcast" && (
                 <label className="judge-toggle" title="After everyone answers, one pal ranks the answers and picks the best">
                   <input type="checkbox" checked={judgeOn} disabled={running} onChange={(e) => setJudgeOn(e.target.checked)} /> Judge picks the best
@@ -1675,7 +1630,7 @@ export function Room() {
                 disabled={running ? !busyHere : !drafts[wm].trim() || (!characterModeCommand(drafts[wm]) && tooFewFor(wm)) || !ready}
               >
                 {busyHere ? <Square /> : <Play fill="currentColor" />}
-                {busyHere ? "Stop" : wm === "direct" ? "Send" : wm === "debate" ? "Start debate" : wm === "solve" ? "Solve it" : wm === "broadcast" ? "Ask everyone" : "Start discussion"}
+                {busyHere ? "Stop" : wm === "direct" ? "Send" : wm === "debate" ? "Start debate" : wm === "solve" ? "Solve it" : wm === "smart" ? "Ask the team" : wm === "broadcast" ? "Ask everyone" : "Start discussion"}
               </Button>
             </div>
             {tooFewFor(wm) && <p className="validation-note">Invite at least two pals to start.</p>}
@@ -1774,7 +1729,7 @@ export function Room() {
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
           {ALL_MODES.map((m) => (
-            <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : <Swords />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
+            <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : m === "debate" ? <Swords /> : <Workflow />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
           ))}
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
@@ -1786,6 +1741,7 @@ export function Room() {
             <Button key={a.id} variant="ghost" className="sidebar-item" title={`Add-on: ${a.name}`} aria-pressed={addonOpen === a.id} onClick={() => setAddonOpen((v) => (v === a.id ? null : a.id))}><Puzzle /><span>{a.window?.title ?? a.name}</span></Button>
           ))}
           <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Documents: read PDF and Excel files" aria-pressed={docsOpen} onClick={() => setDocsOpen((value) => !value)}><FileText /><span>Documents</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Work tools, recorder, compare models and the debug log" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More</span></Button>
           {moreOpen && <>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
@@ -1961,10 +1917,10 @@ export function Room() {
             </WorkspaceWindow>
             {ALL_MODES.map((wm) => <Fragment key={wm}>{renderModeWindow(wm)}</Fragment>)}
             <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
-              <ShowServicesTools />
+              {toolsSeen && <Suspense fallback={<div className="p-4 text-sm opacity-70" role="status">Loading…</div>}><ShowServicesTools /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="playtests" title="Betas & playtests" icon={<FlaskConical className="size-4" />} open={playtestsOpen} onClose={() => setPlaytestsOpen(false)} resetVersion={resetVersion}>
-              <PlaytestsPanel />
+              {playtestsSeen && <Suspense fallback={<div className="p-4 text-sm opacity-70" role="status">Loading…</div>}><PlaytestsPanel /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="recorder" title="Echo’s recorder" icon={<Mic className="size-4" />} open={recorderOpen} onClose={() => setRecorderOpen(false)} resetVersion={resetVersion}>
               <MicRecorder onClose={() => setRecorderOpen(false)} />
@@ -1996,7 +1952,11 @@ export function Room() {
             <WorkspaceWindow id="mail" title="Mail" icon={<Mail className="size-4" />} open={mailOpen} onClose={() => setMailOpen(false)} resetVersion={resetVersion}>
               <MailPanel open={mailOpen} />
             </WorkspaceWindow>
-            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
+            <WorkspaceWindow id="documents" title="Documents" icon={<FileText className="size-4" />} open={docsOpen} onClose={() => setDocsOpen(false)} resetVersion={resetVersion}>
+              <DocumentsPanel />
+            </WorkspaceWindow>
+            <DocumentModalHost />
+            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !docsOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
           </main>
         </div>
       </div>

@@ -3,6 +3,7 @@ import type { CharacterMode } from "./hellraiser";
 import { parseDice } from "./dice";
 import { parsePromptArgs } from "./prompts";
 import { parseWrite } from "./trakt-write";
+import { parseWindowSeconds } from "./debug-log";
 
 /** Room controls you can type instead of click. Pure parsing only — the Room runs the action. */
 export type ThemeId = Exclude<CharacterMode, "assistant">;
@@ -29,6 +30,7 @@ export type SlashAction =
   | { type: "research"; query: string }
   | { type: "compare"; question: string }
   | { type: "log" }
+  | { type: "logfile"; seconds: number }
   | { type: "library"; query: string }
   | { type: "roll"; expr: string }
   | { type: "plex"; query: string }
@@ -50,6 +52,7 @@ export type SlashAction =
   | { type: "panel"; panel: "calendar" | "mail" | "today" | "tasks" | "setup" | "search" }
   | { type: "hide"; mode: "on" | "off" | "toggle" }
   | { type: "appearance"; words: string }
+  | { type: "lowpower"; on: boolean | null }
   | { type: "m365"; op: string }
   | { type: "schedule"; op: "list" | "add" | "remove" | "run"; text: string }
   | { type: "web"; mode: "on" | "off" | "toggle" }
@@ -74,6 +77,10 @@ const MODES: Record<string, Mode> = {
   "problem-solving": "solve",
   problemsolving: "solve",
   debate: "debate",
+  smart: "smart",
+  team: "smart",
+  "smart-team": "smart",
+  smartteam: "smart",
 };
 const THEMES: Record<string, ThemeId> = {
   normal: "normal", default: "normal",
@@ -86,12 +93,12 @@ const THEMES: Record<string, ThemeId> = {
   dcc: "dcc", carl: "dcc",
   linux: "linux",
 };
-export const modeNames = ["roundtable", "broadcast", "direct", "solve", "debate"];
+export const modeNames = ["roundtable", "broadcast", "direct", "solve", "debate", "smart"];
 export const themeNames = ["normal", "hellraiser", "horror", "matrix", "finalfantasy", "devteam", "cyberpunk", "dcc", "linux"];
 
 export const slashCommands = [
   { name: "help", usage: "/help", description: "List every command" },
-  { name: "mode", usage: "/mode <roundtable|broadcast|direct|solve|debate>", description: "Switch conversation mode" },
+  { name: "mode", usage: "/mode <roundtable|broadcast|direct|solve|debate|smart>", description: "Switch conversation mode" },
   { name: "rounds", usage: `/rounds <${MIN_ROUNDS}-${MAX_ROUNDS}>`, description: "How many rounds the pals debate" },
   { name: "theme", usage: "/theme <name>", description: "Swap the whole cast" },
   { name: "assistant", usage: "/assistant [on|off]", description: "Office look on or off (same as /theme linux)" },
@@ -114,6 +121,7 @@ export const slashCommands = [
   { name: "schedule", usage: "/schedule add 08:00 weekdays <question> | list | remove N | run N", description: "Have the pals answer something on a schedule and send it to your phone (owner only; free keys and Local AI only)" },
   { name: "m365", usage: "/m365 connect | status | today | mail | summary | disconnect", description: "Read-only work calendar and unread mail subjects (Microsoft 365). Summaries use Local AI only" },
   { name: "appearance", usage: "/appearance light|dark|auto · small|normal|large", description: "Colour scheme (light applies to the Normal theme) and text size" },
+  { name: "lowpower", usage: "/lowpower on|off", description: "Low-power mode: slower background timers, decorative animations paused, less frequent polling (good for phones and battery)" },
   { name: "calendar", usage: "/calendar", description: "Open the Calendar window (next 7 days)" },
   { name: "mail", usage: "/mail", description: "Open the Mail window (unread subjects)" },
   { name: "find", usage: "/find", description: "Search your saved chats, notes, tasks, memories and reminders" },
@@ -140,6 +148,7 @@ export const slashCommands = [
   { name: "dm", usage: "/dm start <premise>", description: "Dungeon Master mode: start, end, status, character, fact" },
   { name: "roll", usage: "/roll <2d6+3|d20 adv>", description: "Roll dice" },
   { name: "library", usage: "/library <title|recent>", description: "Look in your Jellyfin library (needs JELLYFIN_URL)" },
+  { name: "@log", usage: "@log [10s|2m]", description: "Download the browser and server log lines from the last 10 seconds (or the time you give)" },
   { name: "log", usage: "/log", description: "Open the debug log to copy for a bug report" },
   { name: "compare", usage: "/compare <question>", description: "Blind side-by-side model test" },
 ] as const;
@@ -149,6 +158,11 @@ const slug = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
 /** Returns null when the text isn't a slash command at all (including paths like /etc/fstab). */
 export function parseSlash(input: string): SlashResult | null {
   const text = input.trim();
+  const logFile = text.match(/^@log\b\s*([\s\S]*)$/i);
+  if (logFile) {
+    const seconds = parseWindowSeconds(logFile[1] ?? "");
+    return seconds ? { ok: true, action: { type: "logfile", seconds } } : { ok: false, error: "Type @log for the last 10 seconds, or @log 60 / @log 2m for longer (up to 60 minutes)." };
+  }
   const match = text.match(/^\/([^\s]*)\s*([\s\S]*)$/);
   if (!match) return null;
   const name = (match[1] ?? "").toLowerCase();
@@ -240,6 +254,9 @@ export function parseSlash(input: string): SlashResult | null {
       return { ok: true, action: { type: "m365", op: arg } };
     case "appearance": case "theme-color": case "textsize":
       return rawArg ? { ok: true, action: { type: "appearance", words: rawArg } } : fail("Try /appearance light, /appearance dark, /appearance auto, or /appearance large.");
+    case "lowpower": case "low-power": case "battery":
+      if (arg && !["on", "off", "toggle"].includes(arg)) return fail("Try /lowpower on or /lowpower off.");
+      return { ok: true, action: { type: "lowpower", on: arg === "on" ? true : arg === "off" ? false : null } };
     case "calendar": case "agenda":
       return { ok: true, action: { type: "panel", panel: "calendar" } };
     case "find": case "lookup":
@@ -358,7 +375,7 @@ export function slashSuggestions(input: string): SlashSuggestion[] {
   if (space === -1) {
     const typed = body.toLowerCase();
     return slashCommands
-      .filter((c) => c.name.startsWith(typed))
+      .filter((c) => !c.name.startsWith("@") && c.name.startsWith(typed))
       .map((c) => ({ label: c.usage, insert: `/${c.name} `, description: c.description }));
   }
   const name = body.slice(0, space).toLowerCase();

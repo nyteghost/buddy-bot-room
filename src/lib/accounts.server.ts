@@ -1,4 +1,5 @@
 import { readCookie, safeEqual } from "./cookies";
+import { createLimiter } from "./rate-limit";
 import {
   SESSION_COOKIE, SESSION_SECONDS, checkPassword, hashToken, newToken, checkUsername, hashPassword, normalizeUsername, randomHex,
   readSession, signSession, toPublic, verifyPassword, type PublicUser, type StoredUser,
@@ -111,18 +112,11 @@ export async function authPage(message = ""): Promise<Response> {
   return (await userCount()) ? page("signin", message) : page("setup", message, !!(await firstRunSetupCode()));
 }
 
-const fails = new Map<string, { n: number; first: number }>();
-const MAX_FAILS = 8;
-const WINDOW_MS = 10 * 60 * 1000;
-function limited(ip: string, now: number): boolean {
-  const seen = fails.get(ip);
-  if (seen && now - seen.first > WINDOW_MS) fails.delete(ip);
-  return (fails.get(ip)?.n ?? 0) >= MAX_FAILS;
-}
-function fail(ip: string, now: number) {
-  const cur = fails.get(ip);
-  fails.set(ip, { n: (cur?.n ?? 0) + 1, first: cur?.first ?? now });
-}
+/** 8 wrong tries per address, 40 for the whole server in 10 minutes (the address header can be faked by anyone who reaches the port). */
+const limiter = createLimiter({ max: 8, windowMs: 10 * 60 * 1000, globalMax: 40 });
+export const accountLimiter = limiter;
+const limited = (ip: string, now: number): boolean => limiter.blocked(ip, now);
+const fail = (ip: string, now: number): void => limiter.fail(ip, now);
 const ipOf = (r: Request) => r.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 const isHttps = (r: Request) => (r.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || new URL(r.url).protocol.replace(":", "")) === "https";
 
@@ -156,7 +150,7 @@ export async function handleAccounts(request: Request, now = Date.now()): Promis
     // Hash even for unknown names so timing doesn't reveal which usernames exist.
     const ok = user ? await verifyPassword(password, user) : (await hashPassword(password, "00".repeat(16)), false);
     if (!user || !ok) { fail(ip, now); return page("signin", "Wrong username or password."); }
-    fails.delete(ip);
+    limiter.clear(ip);
     return startSession(request, user.username, now);
   }
   if (url.pathname === "/__signup" && post) {
