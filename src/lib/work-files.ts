@@ -173,6 +173,7 @@ const serialToIso = (n: number) => new Date(Math.round((n - 25569) * 86400000)).
 export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_NAME): Promise<{ shifts: Shift[]; people: string[] }> {
   // Read workbook cells through ExcelJS rather than the vulnerable legacy SheetJS parser.
   // The file is only needed for shift lookup: avoid materializing a second 2D grid.
+  if (/\.xls$/i.test(file.name)) throw new Error("Legacy .xls files are not supported by the secure reader. Please save a copy as .xlsx in Excel or LibreOffice.");
   if (file.size > 20_000_000) throw new Error("That workbook is too large (20 MB maximum).");
   const module = await import("exceljs");
   const ExcelJS = module.default ?? module;
@@ -193,7 +194,9 @@ export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_N
       if (!dayRow && String(value(row.getCell(2)) ?? "").trim().toUpperCase() === "MON") dayRow = n;
     });
     if (!dayRow) continue;
-    for (let r = dayRow + 2; r <= ws.rowCount; r++) {
+    // ExcelJS getCell() creates missing rows; snapshot the bound before traversing.
+    const lastRow = ws.rowCount;
+    for (let r = dayRow + 2; r <= lastRow; r++) {
       const label = String(value(ws.getCell(r, 1)) ?? "").trim();
       const next = String(value(ws.getCell(r + 1, 1)) ?? "").trim();
       if (label && /^\\d{3}$/.test(next)) people.add(label);
