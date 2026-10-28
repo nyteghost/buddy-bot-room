@@ -39,6 +39,11 @@ Each milestone is a single commit on `upgrade/local-first`; `git revert <sha>` u
 - `ollama-bench.ts` (pure: prompt set, `measure`, `summarize`, `avoidModels`, `measuredBest`, defensive `cleanResults`), `ollama-bench.server.ts` (`runSuite` with an injected `BenchApi`, real `httpBenchApi`, file store with atomic write, one-at-a-time lock). `/api/ollama` actions: `bench-suite` (NDJSON progress stream), `bench-results`, `bench-clear`. `resolveLocalModel` passes the avoid list to `bestInstalled`.
 - Storage: `ollama-bench.json` in the data volume, newest 400 results (60 per model), schema version `v`; other versions are ignored. Deleting the file is always safe.
 
+## Frontend efficiency (Release 3 item 17)
+- `message-row.tsx`: one chat message as a `memo` component. Props are the message object (identity is stable for finished messages) plus a few primitives; click handlers go through `rowActions`, one object whose methods are refreshed every render so they never go stale.
+- `power.ts` / `power-pure.ts`: `useCalmInterval` (decorative timers; stop when hidden, slower in low-power), `usePowerAttributes` (sets `data-hidden` / `data-lowpower` on `<html>` for CSS), `chatSlice` (newest 60 messages unless the user asks for more), `useEverTrue` (load a window's code on first open). Low-power is per device (`pixel-pals-lowpower-v1`, deliberately not in backups or account sync). `startPolling` multiplies waits by `env.scale()`.
+- Code splitting: `ai-elements/message-markdown.tsx` holds streamdown and its plugins and is loaded by `React.lazy`; Work tools and Betas windows are lazy and mount on first open.
+
 ## Security boundaries (audit, Release 3 item 12)
 Already in place before this pass: optional shared-password gate or built-in accounts (signed sessions, owner-only windows), secrets kept server-side in `app-secrets.json` (mode 600, never returned to the browser), `redact()` on logs/bug reports, Local-Only AI enforced on the server, SSRF checks on custom provider URLs, read-only Unraid monitoring (no admin or shell operations exist, so nothing needs approval), mail attachments served `private, no-store` with a sandbox CSP.
 

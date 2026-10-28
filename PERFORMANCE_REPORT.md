@@ -127,3 +127,30 @@ Anything Ollama does not report is stored as `null` and shown as "not measured".
 **How it informs choices:** after 3 or more runs, a model that failed in at least half of them or generates under 5 tokens/s is skipped by "Automatic (by task)" whenever another installed model is available; the results table shows the best measured model per task. Results older than 90 days are ignored. Only one benchmark runs at a time, and with accounts on only the owner can run or delete them.
 
 **Not measured yet:** this report contains no benchmark numbers from the RTX 3080 box because no Ollama was reachable from the build environment. Run it on the server and the numbers appear in the panel; nothing here is estimated. Unit tests (13) cover the arithmetic, null handling, failure recording, summaries, the avoid rule and the suite flow with a fake Ollama, not real hardware.
+
+## R3-17. Frontend efficiency
+
+**How measured:** `tools/smoke/profile.mjs`, run as an informational step in the CI `smoke` job (headless Chromium on a GitHub runner, production build, no GPU, no real model). It seeds a 400-message chat (Markdown, lists, code blocks), then types 40 characters into the message box and records the time from each keystroke until the next painted frame, plus DOM node count. A second measurement counts the JavaScript the browser downloads before the first screen is usable. The CI run for the final commit of PR #12 produced these numbers; the earlier rows come from earlier commits of the same PR.
+
+| 400-message chat | DOM nodes | typing latency median / p95 / max (ms) |
+|---|---|---|
+| Before: every message drawn, rows re-rendered on each keystroke | 26,618 | 87.9 / 104.6 / 199.5 |
+| Only the newest 60 drawn (rows still re-rendered) | 5,811 | 23.3 / 30.9 / 34.7 |
+| Newest 60 drawn + memoised rows | 5,703 | 16.7 / 19.5 / 21.0 |
+| All 400 drawn + memoised rows | 26,514 | 18.7 / 33.2 / 35.5 |
+
+16-17 ms is one display frame, so typing is frame-bound after the change. The cap of 60 still matters for memory and page size (26.5k vs 5.7k nodes) and for the first draw of a long chat; the memoised rows are what fixed the typing lag.
+
+**Startup JavaScript (uncompressed, files fetched before the first screen):**
+
+| | files | total |
+|---|---|---|
+| Before | about 46 (the first measurement counted each file twice) | about 3,049 KB (6,098 KB raw / 2, assumption: every file was counted twice, as the top ten were) |
+| After lazy-loading Work tools and Betas windows | 15 | 2,970 KB (measured, de-duplicated) |
+| After loading the Markdown renderer (streamdown with its code, maths and diagram plugins) on demand | 14 | 1,368 KB (measured, de-duplicated) |
+
+The renderer is fetched as soon as the first reply is drawn; until it arrives the text shows plain. A signed-in user with saved chats therefore still downloads it right after the first paint. The gain is a faster first screen, not less data overall.
+
+**Also done (not benchmarked because headless CI cannot show them):** decorative timers pause while the tab is hidden; opt-in low-power mode (`/lowpower`) slows them 4x, polls 3x less often and pauses decorative CSS loops. The CI profile reported 0 running CSS animations in all three states, so it cannot show a difference; I make no claim about battery or CPU use.
+
+**Not measured / not done:** streaming-token render cost (needs a mock model stream), real phone behaviour, initial render time of the first draw, further splitting of the 723 KB main route chunk and the 359 KB `index` chunk, and virtualising (windowing by scroll position) instead of the simple "newest 60 + Show earlier" cap.
