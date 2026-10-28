@@ -230,6 +230,11 @@ export type RoomMessage = UIMessage<{
   elapsed?: number;
   characterMode?: CharacterMode;
   assistant?: boolean;
+  /** Which AI wrote this reply, in words ("Groq · gpt-oss-120b"). Set by the app as the reply arrives. */
+  via?: string;
+  /** The model the server actually used, and the one it was asked for when memory ran out and a smaller one took over. */
+  model?: string;
+  fellBackFrom?: string;
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;

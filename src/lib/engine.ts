@@ -230,6 +230,18 @@ export function palEngineLabel(s: EngineSettings, rosterIndex: number): string {
   return `${providerNames[p.kind]}${model ? ` · ${shortModel(model)}` : ""}`;
 }
 
+/** "Groq · gpt-oss-120b" for a provider on this turn (same words as palEngineLabel). */
+export function providerLabel(p: Pick<TurnProvider, "kind"> & { model?: string | undefined }): string {
+  const model = p.model ?? (p.kind === "groq" || p.kind === "gemini" || p.kind === "openrouter" || p.kind === "nvidia" ? freeModels[p.kind] : "");
+  return `${providerNames[p.kind]}${model ? ` · ${shortModel(model)}` : ""}`;
+}
+
+/** What to show under a reply: who wrote it, and when a smaller local model took over because the first one did not fit, say so. */
+export function answeredLabel(o: { via?: string | undefined; model?: string | undefined; fellBackFrom?: string | undefined }): string {
+  if (o.fellBackFrom && o.model) return `Ollama · ${shortModel(o.model)} (smaller model: ${shortModel(o.fellBackFrom)} didn't fit)`;
+  return o.via ?? "";
+}
+
 export const freeModels = {
   groq: "openai/gpt-oss-120b",
   gemini: "gemini-2.5-flash",

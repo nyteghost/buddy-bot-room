@@ -108,7 +108,7 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { benchProvider, chainAfter, cloudFallbackChain, isBenched, orderByHealth, providerNames, type Bench, freeModels, palEngineLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
+import { benchProvider, chainAfter, cloudFallbackChain, isBenched, orderByHealth, providerNames, type Bench, freeModels, palEngineLabel, answeredLabel, providerLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
@@ -737,7 +737,7 @@ export function Room() {
             });
           let answer: RoomMessage | undefined;
           const answerId = crypto.randomUUID();
-          const consume = async (stream: Awaited<ReturnType<typeof runLocal>>) => {
+          const consume = async (stream: Awaited<ReturnType<typeof runLocal>>, via?: string) => {
             // The first token shows at once; after that the screen updates at most every 50 ms, and the last one is always delivered.
             const ui = createThrottle<RoomMessage[]>((list) => setMessages(list), 50);
             try {
@@ -748,6 +748,7 @@ export function Room() {
                 id: answerId,
                 metadata: {
                   ...partial.metadata,
+                  ...(via ? { via } : {}),
                   agentId: agent.id,
                   characterMode: turnMode,
                   assistant: assistantRef.current,
@@ -774,7 +775,7 @@ export function Room() {
             let lastError: unknown;
             for (const p of chain) {
               try {
-                await consume(await runCloud(p));
+                await consume(await runCloud(p), providerLabel(p));
                 const outText = answer ? messageText(answer) : "";
                 const inChars = Math.min(transcript.reduce((n, m) => n + messageText(m).length, 0), requestBody.contextChars) + 2000;
                 recordUsage({ kind: p.kind, model: p.model ?? (p.kind in freeModels ? freeModels[p.kind as keyof typeof freeModels] : p.kind), inTok: estimateTokens(inChars), outTok: estimateTokens(outText.length) });
@@ -802,7 +803,7 @@ export function Room() {
             const failures: string[] = [];
             let lastError: unknown = why;
             for (const p of rest) {
-              try { await consume(await runCloud(p)); return; }
+              try { await consume(await runCloud(p), providerLabel(p)); return; }
               catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
@@ -821,6 +822,7 @@ export function Room() {
                 { agentId: agent.id, round: currentRound },
                 controller.signal,
               ),
+              `Ollama · ${engine.ollamaModel}`,
             );
           // Your own mail, calendar and tasks are only ever read by your own Ollama: free API tokens aren't spent on them and the details never go to a cloud AI.
           const keepLocal = !!requestBody.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server";
@@ -865,13 +867,14 @@ export function Room() {
                   { agentId: agent.id, round: currentRound },
                   controller.signal,
                 ),
+                `Ollama · ${engine.ollamaModel}`,
               );
             } catch (err) {
               if (!controller.signal.aborted && !isBenched(benchRef.current, ollamaKey)) benchProvider(benchRef.current, ollamaKey, err);
               await cloudFallback(err);
             }
           } else if (engine.kind === "local" || (engine.kind === "auto" && !provider)) {
-            await consume(await runLocal());
+            await consume(await runLocal(), "In-browser model");
           } else if (!provider) {
             throw new Error(blockPaid ? "Your monthly spend cap is reached and no free provider is set up. Raise the cap in AI engine settings, add a free key, or choose In-browser." : "Add at least one free key in AI engine settings (Groq, Gemini or OpenRouter), or choose In-browser.");
           } else if (engine.kind === "auto") {
@@ -881,7 +884,7 @@ export function Room() {
             } catch (err) {
               if (controller.signal.aborted || !hasWebGPU() || (answer && messageText(answer).trim())) throw err;
               answer = undefined;
-              await consume(await runLocal());
+              await consume(await runLocal(), "In-browser model");
             }
           } else {
             await runChain(provider);
@@ -1563,7 +1566,10 @@ export function Room() {
                                 : m.metadata?.summary ? "SUMMARY" : m.metadata?.verdict && wm === "debate" ? "THE JUDGE" : m.metadata?.verdict && wm === "broadcast" ? "THE JUDGE" : `ROUND ${m.metadata?.round ?? 1}${sideTag}${roleTag}`}
                           </span>
                           {m.metadata?.elapsed && (
-                            <span className="ml-auto">{m.metadata.elapsed.toFixed(1)}s</span>
+                            <span className="ml-auto">
+                              {m.role === "assistant" && answeredLabel(m.metadata) ? <span className="mr-2 opacity-70" data-testid="answered-by">{answeredLabel(m.metadata)}</span> : null}
+                              {m.metadata.elapsed.toFixed(1)}s
+                            </span>
                           )}
                         </div>
                         <MessageContent className={cn(m.role === "user" && "user-message-content")}>

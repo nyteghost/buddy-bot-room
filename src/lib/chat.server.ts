@@ -248,7 +248,7 @@ export async function handleChat(request: Request) {
         ...(answeredBy ? { headers: { "x-pixelpals-model": answeredBy.model, ...(answeredBy.fellBack ? { "x-pixelpals-fallback-from": answeredBy.requested } : {}) } } : {}),
         originalMessages: messages,
         messageMetadata: ({ part }) =>
-          part.type === "start" ? { agentId: agent.id, round: body.round } : undefined,
+          part.type === "start" ? { agentId: agent.id, round: body.round, ...(answeredBy ? { model: answeredBy.model, ...(answeredBy.fellBack ? { fellBackFrom: answeredBy.requested } : {}) } : {}) } : undefined,
         onError: (e) => { logServer("error", `${engine.kind} stream failed`, e); return safeError(e); },
       });
     }

@@ -29,7 +29,7 @@ Release 1 is complete pending your live check and CI.
 ## Release 2 — milestones
 - [x] R2-1 Context budgeting: `context-budget.ts`, digest of older turns, per-engine window cap, `scripts/bench-context.mts`, `src/test/context-budget.test.ts`.
 - [x] R2-2 Ollama resource manager: `ollama-runtime.server.ts` (prepare model: already loaded? load with keep-alive; on out-of-memory use the largest smaller downloaded model, or explain plainly), keep-alive re-armed after each reply, settings `OLLAMA_VRAM_GB`/`OLLAMA_RAM_GB`/`OLLAMA_KEEP_ALIVE`, `/api/ollama` reports the Ollama host's GPU (a remote Ollama no longer uses this server's GPU for suggestions), reply headers `x-pixelpals-model` / `x-pixelpals-fallback-from`. Tests: `ollama-runtime.test.ts` (fake Ollama; real GPU behaviour untested here). Request queue: Ollama already serialises per model, so none added.
-- [ ] R2-3 Routing and "which model answered".
+- [x] R2-3 "Which model answered": every AI reply header shows who wrote it (`Groq · gpt-oss-120b`, `Ollama · qwen2.5:7b`, `In-browser model`), including the cloud fallback chain and, for local Ollama, the smaller model that took over when the first one did not fit (`answeredLabel`/`providerLabel` in `engine.ts`; server sends `model`/`fellBackFrom` in the message metadata). Routing itself was already in place (task-based `auto:` model choice, health-ordered fallback chain, `keepLocal` for mail/calendar), so nothing new was added there. Tests: `answered-by.test.ts`. Older saved replies have no label.
 - [ ] R2-4 Smart multi-agent mode.
 - [ ] R2-5 Memory (search, edit, explain, project/agent scopes).
 
