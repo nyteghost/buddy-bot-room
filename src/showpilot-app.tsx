@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Menu, Moon, Sun, ChevronRight, ShieldCheck, PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 import { ShowServicesTools, type WorkTabId } from "@/components/work-tools";
+import { BackupPanel } from "@/components/showpilot-backup";
 
 type Screen = "dashboard" | WorkTabId;
 const sections: { id: WorkTabId; label: string; desc: string; Icon: typeof CalendarDays; note: string }[] = [
@@ -78,6 +79,7 @@ export function App() {
                   <strong>{label}</strong><p>{desc}</p><small>{note}</small>
                 </button>)}
               </div>
+              <BackupPanel />
               <div className="sp-note">Beta: event imports accept recognized convention-center spaces. Unknown rooms are held for manual review; CEPAC rows are excluded. Direct Google Calendar sync and automated online vendor refresh are not yet connected; .ics export and offline vendor quotes are available.</div>
             </div>
           : <section className="sp-panel"><ShowServicesTools selectedTab={screen} hideTabBar page venueOnly/></section>
