@@ -103,7 +103,7 @@ export function presetWindowRects(preset: WorkspacePreset, bounds: { width: numb
   const full = { x: 0, y: 0, w, h };
   if (preset === "chat") return w >= 700 ? { room: first, "mode-roundtable": second } : { room: full, "mode-roundtable": full };
   if (preset === "mail") return { mail: full };
-  if (preset === "work") return w >= 700 ? { tools: first, docs: second } : { tools: full, docs: full };
+  if (preset === "work") return w >= 700 ? { tools: first, documents: second } : { tools: full, documents: full };
   return w >= 700 ? { today: first, setup: second } : { today: full, setup: full };
 }
 
