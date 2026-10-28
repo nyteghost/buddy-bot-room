@@ -23,6 +23,26 @@ async function build(entries: EventEntry[], existing?: File) {
   return { wb, ws, room };
 }
 
+describe("ShowPilot venue-specific exports", () => {
+  it("brands newly generated sheets for Cobb Convention Center-Atlanta and excludes CEPAC placeholders", async () => {
+    const { ws, room } = await build([event("Hall A")]);
+    expect(String(ws.getCell("A1").value)).toBe("COBB CONVENTION CENTER-ATLANTA");
+    expect(room("CCC").value).toBeTruthy();
+    const labels: string[] = [];
+    ws.eachRow((row) => { labels.push(String(row.getCell(1).value ?? "")); });
+    expect(labels).not.toContain("CEPAC");
+    expect(labels).not.toContain("CGC BARS");
+  });
+  it("preserves old convention-center schedule rows when merging into a historic template", async () => {
+    const { wb, ws } = await build([event("Hall A")]);
+    const cccRow = ws.getRow(6); cccRow.getCell(1).value = "CGC";
+    ws.getCell("B6").value = null;
+    const oldFile = new File([await wb.xlsx.writeBuffer()], "legacy.xlsx");
+    const updated = await build([event("Hall A")], oldFile);
+    expect(updated.room("CGC").value).toBeTruthy();
+  });
+});
+
 describe("schedule legend colours", () => {
   it("follows the legend: show day alone is bold with no fill", () => {
     expect(legendFill(["S"])).toBeUndefined();
