@@ -14,12 +14,13 @@ const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
 const out = (k, v) => console.log(`PROFILE ${k} ${JSON.stringify(v)}`);
 
 const loaded = [];
+const bodies = new Map();
 page.on("response", async (res) => {
   const u = res.url();
   if (!/\.js(\?|$)/.test(u)) return;
   const file = u.split("/").pop().split("?")[0];
   if (loaded.some((f) => f.file === file)) return; // the same file can be seen twice (preload and import)
-  try { loaded.push({ file, kb: Math.round((await res.body()).length / 1024) }); } catch { /* streamed or cancelled */ }
+  try { const buf = await res.body(); loaded.push({ file, kb: Math.round(buf.length / 1024) }); if (buf.length > 150 * 1024) bodies.set(file, buf.toString("utf8")); } catch { /* streamed or cancelled */ }
 });
 
 async function signIn() {
@@ -73,6 +74,9 @@ async function measure(label) {
 try {
   await signIn();
   loaded.sort((a, b) => b.kb - a.kb);
+  // Which well-known heavy libraries ended up inside the big startup files (a hint for the next round of code splitting).
+  const markers = { exceljs: /ExcelJS|exceljs/, xlsx: /SheetJS|XLSX\.|xlsx/, cytoscape: /cytoscape/i, katex: /katex/i, pdfjs: /pdfjs|PDFWorker/i, shiki: /textmate|shiki/i, mermaid: /mermaid/i, streamdown: /streamdown/i, recharts: /recharts/i, xterm: /xterm/i };
+  out("startup-contents", Object.fromEntries([...bodies].map(([f, t]) => [f, Object.entries(markers).filter(([, r]) => r.test(t)).map(([k]) => k)])));
   out("startup-js", { files: loaded.length, totalKb: loaded.reduce((n, f) => n + f.kb, 0), largest: loaded.slice(0, 10).map((f) => `${f.file} ${f.kb}k`) });
   await page.evaluate(seed, COUNT);
   await page.reload({ waitUntil: "domcontentloaded" });
