@@ -18,12 +18,13 @@ const OTHER_BUILDING = /\b(?:cepac|cobb\s*energy|performing\s*arts(?:\s*centre|\
 
 export type VenueScope<T> = { accepted: T[]; excluded: T[]; needsReview: T[] };
 
-export function scopeShowPilotRows<T extends Pick<EventRow, "space">>(rows: readonly T[]): VenueScope<T> {
+export function scopeShowPilotRows<T extends Pick<EventRow, "space">>(rows: readonly T[], approvedSpaces: readonly string[] = []): VenueScope<T> {
   const accepted: T[] = [], excluded: T[] = [], needsReview: T[] = [];
+  const approved = new Set(approvedSpaces.map((s) => s.trim().toLowerCase()).filter(Boolean));
   for (const row of rows) {
     const space = (row.space ?? "").trim();
     if (OTHER_BUILDING.test(space)) excluded.push(row);
-    else if (CONVENTION_SPACES.some((p) => p.test(space))) accepted.push(row);
+    else if (CONVENTION_SPACES.some((p) => p.test(space)) || approved.has(space.toLowerCase())) accepted.push(row);
     else needsReview.push(row);
   }
   return { accepted, excluded, needsReview };
