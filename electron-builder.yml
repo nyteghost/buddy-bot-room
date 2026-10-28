@@ -1,0 +1,16 @@
+appId: com.showpilot.worktools
+productName: ShowPilot
+asar: true
+directories:
+  output: release
+files:
+  - dist/**
+  - desktop/**
+  - package.json
+  - "!**/*.map"
+  - "!**/*.ts"
+win:
+  target:
+    - target: dir
+      arch:
+        - x64
