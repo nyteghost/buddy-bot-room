@@ -17,7 +17,9 @@ const loaded = [];
 page.on("response", async (res) => {
   const u = res.url();
   if (!/\.js(\?|$)/.test(u)) return;
-  try { loaded.push({ file: u.split("/").pop().split("?")[0], kb: Math.round((await res.body()).length / 1024) }); } catch { /* streamed or cancelled */ }
+  const file = u.split("/").pop().split("?")[0];
+  if (loaded.some((f) => f.file === file)) return; // the same file can be seen twice (preload and import)
+  try { loaded.push({ file, kb: Math.round((await res.body()).length / 1024) }); } catch { /* streamed or cancelled */ }
 });
 
 async function signIn() {

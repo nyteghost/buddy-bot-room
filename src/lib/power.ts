@@ -50,3 +50,10 @@ export function usePowerAttributes(): void {
   }, [hidden, low]);
 }
 
+
+/** Becomes true the first time `value` is true and stays true (used to load a window's code only once it has been opened). */
+export function useEverTrue(value: boolean): boolean {
+  const seen = useRef(false);
+  if (value) seen.current = true;
+  return seen.current;
+}

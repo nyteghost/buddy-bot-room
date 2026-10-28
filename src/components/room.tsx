@@ -73,8 +73,9 @@ import { linuxContext } from "@/lib/linux";
 import { isTauri } from "@/lib/local-llm";
 const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
-import { ShowServicesTools } from "./work-tools";
-import { PlaytestsPanel } from "./playtests-panel";
+// Secondary windows load their code the first time they are opened, so the first screen has less to download and run.
+const ShowServicesTools = lazy(() => import("./work-tools").then((m) => ({ default: m.ShowServicesTools })));
+const PlaytestsPanel = lazy(() => import("./playtests-panel").then((m) => ({ default: m.PlaytestsPanel })));
 import { WorkspaceWindow } from "./workspace-window";
 import { MicRecorder } from "./mic-recorder";
 import { deckReply } from "@/lib/deck-solver";
@@ -122,7 +123,7 @@ import { wantsWeb, webContext } from "@/lib/web-context";
 import { autoSearch } from "@/lib/prefs";
 import { getNotes } from "@/lib/agent-notes";
 import { getOverrides, mayUseRealData, memoryAccess, useOverrides } from "@/lib/character-overrides";
-import { chatSlice, lowPower, usePowerAttributes } from "@/lib/power";
+import { chatSlice, lowPower, useEverTrue, usePowerAttributes } from "@/lib/power";
 import { getProjects, logRun, projectBrief, updateProject, useProjects } from "@/lib/projects";
 import { applyBackup, buildBackup } from "@/lib/settings-io";
 import { libraryMarkdown, type LibraryItem } from "@/lib/jellyfin";
@@ -342,6 +343,8 @@ export function Room() {
   const setConversationOpen = (value: boolean) => { if (value) showMode(mode); };
   const resetModes = () => setOpenModes(defaultOpenModes);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsSeen = useEverTrue(toolsOpen);
+  const playtestsSeen = useEverTrue(playtestsOpen);
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -1912,10 +1915,10 @@ export function Room() {
             </WorkspaceWindow>
             {ALL_MODES.map((wm) => <Fragment key={wm}>{renderModeWindow(wm)}</Fragment>)}
             <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
-              <ShowServicesTools />
+              {toolsSeen && <Suspense fallback={<div className="p-4 text-sm opacity-70" role="status">Loading…</div>}><ShowServicesTools /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="playtests" title="Betas & playtests" icon={<FlaskConical className="size-4" />} open={playtestsOpen} onClose={() => setPlaytestsOpen(false)} resetVersion={resetVersion}>
-              <PlaytestsPanel />
+              {playtestsSeen && <Suspense fallback={<div className="p-4 text-sm opacity-70" role="status">Loading…</div>}><PlaytestsPanel /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="recorder" title="Echo’s recorder" icon={<Mic className="size-4" />} open={recorderOpen} onClose={() => setRecorderOpen(false)} resetVersion={resetVersion}>
               <MicRecorder onClose={() => setRecorderOpen(false)} />
