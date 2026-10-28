@@ -2285,8 +2285,9 @@ import { extractSteps, SOLVE_ROLE_ORDER } from "@/lib/solve-steps";
 import { ALL_MODES } from "@/lib/agents";
 
 describe("conversation mode windows", () => {
-  it("has five modes including debate", () => {
-    expect(ALL_MODES).toEqual(["roundtable", "broadcast", "direct", "solve", "debate"]);
+  it("has six modes including debate and smart team", () => {
+    expect(ALL_MODES).toEqual(["roundtable", "broadcast", "direct", "solve", "debate", "smart"]);
+    expect(parseSlash("/mode smart")).toEqual({ ok: true, action: { type: "mode", mode: "smart" } });
     expect(modeNames).toEqual([...ALL_MODES]);
     expect(parseSlash("/mode debate")).toEqual({ ok: true, action: { type: "mode", mode: "debate" } });
   });
