@@ -30,24 +30,50 @@ export function useOllamaModels(url: string, enabled = true): string[] {
   return models;
 }
 
-const warmed = new Set<string>();
-/** Ask Ollama to load a model now (and keep it for 30 minutes) so the first reply isn't slow. Best effort. */
+/** Native Ollama defaults to 30m. Refresh a little before then, but only when the
+ * user returns to the app; never hold VRAM open with a perpetual timer. */
+export const OLLAMA_WARM_REFRESH_MS = 25 * 60_000;
+const MAX_WARM_ENTRIES = 48;
+const warmed = new Map<string, { until: number; pending?: Promise<boolean> }>();
+
+/** Best-effort preload. Reuses concurrent requests, expires old success records and
+ * retries on failure. Memory is bounded even if the URL/model settings change often. */
 export async function warmOllama(url: string, model: string): Promise<boolean> {
-  const key = `${url}|${model}`;
-  if (!model.trim() || warmed.has(key) || isTauri()) return false;
-  warmed.add(key);
-  try {
-    const base = url.replace(/\/v1\/?$/, "").replace(/\/$/, "");
-    const res = await fetch(`${base}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt: "", keep_alive: "30m", stream: false }),
-      signal: AbortSignal.timeout(120000),
-    });
-    if (!res.ok) warmed.delete(key);
-    return res.ok;
-  } catch {
-    warmed.delete(key);
-    return false;
+  const base = url.trim().replace(/\/v1\/?$/, "").replace(/\/$/, "");
+  const name = model.trim();
+  if (!base || !name || isTauri()) return false;
+  const key = `${base}|${name}`;
+  const now = Date.now();
+  const existing = warmed.get(key);
+  if (existing?.pending) return existing.pending;
+  if (existing && existing.until > now) return false;
+
+  // Remove expired entries and cap successful model records.
+  for (const [id, record] of warmed) if (!record.pending && record.until <= now) warmed.delete(id);
+  if (warmed.size >= MAX_WARM_ENTRIES) {
+    const oldest = [...warmed].find(([, record]) => !record.pending)?.[0];
+    if (oldest) warmed.delete(oldest);
   }
+
+  const pending = (async () => {
+    try {
+      const res = await fetch(`${base}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: name, prompt: "", keep_alive: "30m", stream: false }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!res.ok) {
+        warmed.delete(key);
+        return false;
+      }
+      warmed.set(key, { until: Date.now() + OLLAMA_WARM_REFRESH_MS });
+      return true;
+    } catch {
+      warmed.delete(key);
+      return false;
+    }
+  })();
+  warmed.set(key, { until: 0, pending });
+  return pending;
 }
