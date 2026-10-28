@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "package:win": "vite build && electron-builder --win dir --x64"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
@@ -36,6 +37,9 @@
     "typescript": "^5.8.3",
     "vite": "^8.1.5",
     "vite-tsconfig-paths": "^6.0.2",
-    "vitest": "^4.1.10"
-  }
+    "vitest": "^4.1.10",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "main": "desktop/main.cjs"
 }
