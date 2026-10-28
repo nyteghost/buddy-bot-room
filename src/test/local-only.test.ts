@@ -3,8 +3,16 @@ import { blockedMessage, engineAllowed, isLocalOnly, sameEndpoint } from "@/lib/
 import { assertInferenceAllowed, LocalOnlyError, localOnlyOn } from "@/lib/ai/guard.server";
 import { handleChat } from "@/lib/chat.server";
 import { agents, models } from "@/lib/agents";
+import { askChain } from "@/lib/ask.server";
+import { handleKeyTest } from "@/lib/keytest.server";
+import { engineFromJson } from "@/lib/engine";
 
-afterEach(() => { delete process.env["LOCAL_ONLY_AI"]; vi.restoreAllMocks(); });
+const savedOllama = process.env["OLLAMA_URL"];
+afterEach(() => {
+  delete process.env["LOCAL_ONLY_AI"];
+  if (savedOllama === undefined) delete process.env["OLLAMA_URL"]; else process.env["OLLAMA_URL"] = savedOllama;
+  vi.restoreAllMocks();
+});
 
 describe("Local-Only AI mode", () => {
   it("is OFF by default and only on when explicitly turned on", () => {
@@ -85,5 +93,56 @@ describe("Local-Only AI mode", () => {
     expect(res.status).toBe(400);
     expect(fetchSpy).not.toHaveBeenCalled();
     if (prev !== undefined) process.env["OLLAMA_URL"] = prev;
+  });
+
+  it("a spending limit of 0 (or none sent) never lets a paid engine through in Local-Only mode", async () => {
+    process.env["LOCAL_ONLY_AI"] = "on";
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    for (const spendCapUsd of [0, undefined, 1_000_000]) {
+      const res = await handleChat(new Request("http://local/api/chat", { method: "POST", body: JSON.stringify({
+        agentId: agents[0]!.id, model: models[0]!.id, mode: "direct",
+        messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hello" }] }],
+        engine: { kind: "anthropic", apiKey: "sk-ant-test-0000000000000000", model: "claude-haiku-5-5", spendCapUsd },
+      }) }));
+      expect(res.status).toBe(403);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("the key-test button sends no key to a cloud provider while Local-Only is on", async () => {
+    process.env["LOCAL_ONLY_AI"] = "on";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    const call = () => handleKeyTest(new Request("http://local/api/keytest", { method: "POST", body: JSON.stringify({ provider: "groq", key: "gsk_" + "a".repeat(30) }) }));
+    const blocked = await call();
+    expect(blocked.status).toBe(403);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    delete process.env["LOCAL_ONLY_AI"];
+    expect(((await (await call()).json()) as { ok: boolean }).ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe("scheduled jobs and the phone bot (askChain)", () => {
+    const settings = engineFromJson(JSON.stringify({ kind: "auto", groqKey: "gsk_" + "a".repeat(30), geminiKey: "AIza" + "a".repeat(35), anthropicKey: "sk-ant-test-0000000000000000", claudeMode: "fallback", spendCapUsd: 0, localChat: "qwen2.5:7b" }));
+    it("uses only the stack's Ollama when Local-Only is on, even with free and paid keys saved", () => {
+      process.env["LOCAL_ONLY_AI"] = "on";
+      process.env["OLLAMA_URL"] = "http://ollama:11434";
+      expect(askChain(settings, "hi").map((p) => p.kind)).toEqual(["ollama-server"]);
+    });
+    it("has nothing to run (instead of falling back to the cloud) when Ollama is not set up", () => {
+      process.env["LOCAL_ONLY_AI"] = "on";
+      delete process.env["OLLAMA_URL"];
+      expect(askChain(settings, "hi")).toEqual([]);
+    });
+    it("stays local when the caller asks for it, even with Local-Only off", () => {
+      process.env["OLLAMA_URL"] = "http://ollama:11434";
+      expect(askChain(settings, "hi", true).map((p) => p.kind)).toEqual(["ollama-server"]);
+    });
+    it("with Local-Only off, free keys come first and paid engines are never used unattended", () => {
+      process.env["OLLAMA_URL"] = "http://ollama:11434";
+      const kinds = askChain(settings, "hi").map((p) => p.kind);
+      expect(kinds).toContain("groq");
+      expect(kinds).not.toContain("anthropic");
+      expect(kinds.at(-1)).toBe("ollama-server");
+    });
   });
 });

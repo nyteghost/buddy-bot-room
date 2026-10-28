@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { engineFromJson, freeModels, localServerProvider, turnProviders, type TurnProvider } from "./engine";
+import { engineFromJson, freeModels, localServerProvider, turnProviders, type EngineSettings, type TurnProvider } from "./engine";
 import { accountFileName } from "./local-account";
 import { ownerName } from "./accounts.server";
 import { ollamaBase, resolveLocalModel } from "./ollama.server";
@@ -45,15 +45,21 @@ function modelFor(p: TurnProvider): { base: string; model: string; key: string }
   return null; // paid/custom providers are never used unattended
 }
 
+/** The engines an unattended question may use, in order. In Local-Only mode (or when asked to stay local) that is the stack's own Ollama and nothing else. */
+export function askChain(s: EngineSettings, prompt: string, forceLocal = false): TurnProvider[] {
+  const local = s.kind === "local-server" || forceLocal || localOnlyOn();
+  const chain: TurnProvider[] = local ? [] : turnProviders(s, true).filter((p) => modelFor(p));
+  if ((local || chain.length) && ollamaBase() && s.localChat) chain.push(localServerProvider(s, { text: prompt }));
+  return chain;
+}
+
 export type AskResult = { ok: true; text: string; via: string } | { ok: false; error: string };
 
 export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean } = {}): Promise<AskResult> {
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
   const s = engineFromJson(raw);
-  const local = s.kind === "local-server" || opts.localOnly === true || localOnlyOn();
-  const chain: TurnProvider[] = local ? [] : turnProviders(s, true).filter((p) => modelFor(p));
-  if ((local || chain.length) && ollamaBase() && s.localChat) chain.push(localServerProvider(s, { text: prompt }));
+  const chain = askChain(s, prompt, opts.localOnly === true);
   if (!chain.length) return { ok: false, error: opts.localOnly || localOnlyOn() ? "Local-Only AI mode is on and Local AI (Ollama) isn't available on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
 
   let system = opts.system ?? "You are the Pixel Pals assistant answering a scheduled or phone request for the owner. Reply in plain text, no markdown headings, under 150 words unless asked for more. Be concrete. If you don't know something current, say so instead of guessing.";
