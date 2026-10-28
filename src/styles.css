@@ -1660,10 +1660,16 @@ h1 {
 .window-recorder { left: var(--window-x, 16%); top: var(--window-y, 48px); width: min(540px, 84%); height: min(540px, calc(100% - 48px)); }
 .workspace-window.window-sized { width: var(--window-w); height: var(--window-h); }
 .workspace-window.window-expanded { left: 0; top: 0; width: 100%; height: 100%; }
-.window-resize { position: absolute; z-index: 2; touch-action: none; }
-.window-resize-e { top: 43px; right: 0; bottom: 12px; width: 8px; cursor: ew-resize; }
-.window-resize-s { left: 0; right: 12px; bottom: 0; height: 8px; cursor: ns-resize; }
-.window-resize-se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--muted-foreground) 50%, var(--muted-foreground) 58%, transparent 58%, transparent 72%, var(--muted-foreground) 72%, var(--muted-foreground) 80%, transparent 80%); opacity: 0.6; }
+.window-resize { position: absolute; z-index: 5; touch-action: none; user-select: none; }
+.window-resize-e { top: 14px; right: 0; bottom: 14px; width: 8px; cursor: ew-resize; }
+.window-resize-w { top: 14px; left: 0; bottom: 14px; width: 8px; cursor: ew-resize; }
+.window-resize-n { top: 0; left: 14px; right: 14px; height: 8px; cursor: ns-resize; }
+.window-resize-s { bottom: 0; left: 14px; right: 14px; height: 8px; cursor: ns-resize; }
+.window-resize-ne, .window-resize-nw, .window-resize-se, .window-resize-sw { width: 16px; height: 16px; z-index: 6; }
+.window-resize-ne { top: 0; right: 0; cursor: nesw-resize; }
+.window-resize-nw { top: 0; left: 0; cursor: nwse-resize; }
+.window-resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.window-resize-se { right: 0; bottom: 0; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--muted-foreground) 50%, var(--muted-foreground) 58%, transparent 58%, transparent 72%, var(--muted-foreground) 72%, var(--muted-foreground) 80%, transparent 80%); opacity: 0.6; }
 .window-resize-se:hover { opacity: 1; }
 @media (max-width: 700px) { .window-resize { display: none; } .workspace-window.window-sized { width: 100%; height: 100%; } }
 .window-titlebar { height: 43px; min-height: 43px; display: flex; align-items: center; padding: 0 10px 0 14px; gap: 12px; background: var(--muted); border-bottom: 1px solid var(--border); cursor: grab; touch-action: none; user-select: none; }
