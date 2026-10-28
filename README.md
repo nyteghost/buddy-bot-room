@@ -124,7 +124,7 @@ Your data lives in the `buddy-data` volume and survives updates.
 
 ## 3. First run: accounts and HTTPS
 
-1. **Create your account right after deploying.** The first visit shows *Create your account*. That account becomes the **owner**. Until it exists, whoever reaches the page first could create it. If you set `BUDDY_PASSWORD`, it acts as a *setup password* the form asks for.
+1. **Create your account right after deploying.** The first visit shows *Create your account*. That account becomes the **owner**. The first account requires a setup code so unauthenticated visitors cannot claim ownership. If you set `BUDDY_PASSWORD`, it is the setup code; otherwise a one-time random code is generated and printed in the app container logs (e.g. run `docker logs buddy-bot-room`). The generated code is also stored temporarily at `BUDDY_DATA_DIR/initial-setup.code` and removed after the first account is created. If you set `BUDDY_PASSWORD`, it acts as a *setup password* the form asks for.
 2. After that, the page shows *Sign in*. There is no sign-up button by design; the owner adds people (see [section 9](#9-accounts-sharing-and-saved-settings)).
 3. **HTTPS (recommended, needed for phone install and notifications).** With Tailscale on the host:
    ```sh
