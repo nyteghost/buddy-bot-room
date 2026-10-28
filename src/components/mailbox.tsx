@@ -1,19 +1,32 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, FolderInput, Loader2, MailOpen, MailPlus, PenLine, RefreshCw, Reply, Search, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { forwardableQuote, gmailLink, replySubject, type Folder, type MailMessage, type MailSummary } from "@/lib/mailbox";
 import { replyPrompt } from "@/lib/mail-reply";
 
-type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; account?: string; gmail?: boolean; error?: string };
+type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; offset?: number; account?: string; gmail?: boolean; error?: string };
 type Draft = { to: string; cc: string; subject: string; text: string; inReplyTo: string; references: string };
 const blank: Draft = { to: "", cc: "", subject: "", text: "", inReplyTo: "", references: "" };
 
-async function call<T>(url: string, body?: unknown): Promise<T & { error?: string }> {
+async function call<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T & { error?: string; aborted?: boolean }> {
   try {
-    const res = await fetch(url, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : undefined);
+    const init: RequestInit = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {};
+    if (signal) init.signal = signal;
+    const res = await fetch(url, init);
     return (await res.json()) as T & { error?: string };
-  } catch { return { error: "Couldn't reach the server." } as T & { error?: string }; }
+  } catch (e) {
+    if (signal?.aborted || (e instanceof DOMException && e.name === "AbortError")) return { aborted: true } as T & { aborted: boolean };
+    return { error: "Couldn't reach the server." } as T & { error?: string };
+  }
+}
+
+/** Lists already seen this session, so a folder you've visited shows at once while the fresh copy loads. Bounded; never persisted. */
+const seenLists = new Map<string, ListData>();
+const listKey = (f: string, q: string, u: boolean) => `${f}\u0000${q.trim()}\u0000${u ? 1 : 0}`;
+function remember(key: string, d: ListData) {
+  seenLists.delete(key); seenLists.set(key, d);
+  while (seenLists.size > 12) seenLists.delete(seenLists.keys().next().value as string);
 }
 
 const when = (d: string) => (d && !Number.isNaN(Date.parse(d)) ? new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
@@ -25,6 +38,7 @@ export function Mailbox({ open }: { open: boolean }) {
   const [q, setQ] = useState("");
   const [data, setData] = useState<ListData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [more, setMore] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<MailMessage | null>(null);
@@ -35,13 +49,39 @@ export function Mailbox({ open }: { open: boolean }) {
   const [moveTo, setMoveTo] = useState("");
   const [intent, setIntent] = useState<string | null>(null);
 
-  const load = useCallback(async (f = folder, search = q, onlyUnread = unread) => {
-    setLoading(true);
-    const params = new URLSearchParams({ op: "list", folder: f, ...(search.trim() ? { q: search.trim() } : {}), ...(onlyUnread ? { unread: "1" } : {}) });
-    const res = await call<ListData>(`/api/mailbox?${params}`);
-    if (res.error) setError(res.error); else { setData(res); setError(""); setFolder(res.folder); }
+  // Only the newest list request may update the screen: switching folders quickly cancels the older request, and a late answer is ignored.
+  const listReq = useRef<{ id: number; ctl: AbortController | null }>({ id: 0, ctl: null });
+  const load = useCallback(async (f = folder, search = q, onlyUnread = unread, fresh = false) => {
+    listReq.current.ctl?.abort();
+    const ctl = new AbortController();
+    const id = ++listReq.current.id;
+    listReq.current.ctl = ctl;
+    const key = listKey(f, search, onlyUnread);
+    const seen = fresh ? undefined : seenLists.get(key);
+    if (seen) { setData(seen); setError(""); }
+    setLoading(true); setMore(false);
+    const params = new URLSearchParams({ op: "list", folder: f, ...(search.trim() ? { q: search.trim() } : {}), ...(onlyUnread ? { unread: "1" } : {}), ...(fresh ? { fresh: "1" } : {}) });
+    const res = await call<ListData>(`/api/mailbox?${params}`, undefined, ctl.signal);
+    if (id !== listReq.current.id || res.aborted) return;
+    if (res.error) setError(res.error); else { setData(res); remember(key, res); setError(""); }
     setLoading(false);
   }, [folder, q, unread]);
+
+  const loadOlder = async () => {
+    if (!data || more) return;
+    setMore(true);
+    const params = new URLSearchParams({ op: "list", folder: data.folder, offset: String(data.messages.length), ...(q.trim() ? { q: q.trim() } : {}), ...(unread ? { unread: "1" } : {}) });
+    const res = await call<ListData>(`/api/mailbox?${params}`);
+    setMore(false);
+    if (res.error || res.aborted) { if (res.error) setError(res.error); return; }
+    setData((d) => {
+      if (!d || d.folder !== res.folder) return d; // the folder changed while this was loading
+      const have = new Set(d.messages.map((m) => m.uid));
+      const next = { ...d, total: res.total, messages: [...d.messages, ...res.messages.filter((m) => !have.has(m.uid))] };
+      remember(listKey(d.folder, q, unread), next);
+      return next;
+    });
+  };
 
   const openByRef = useCallback(async (f: string, uid: number) => {
     setBusy(`open${uid}`); setNote("");
@@ -70,6 +110,7 @@ export function Mailbox({ open }: { open: boolean }) {
     if (res.error || !res.message) { setError(res.error ?? "Couldn't open it."); return; }
     setMsg(res.message); setView("read"); setConfirm(""); setMoveTo(""); setIntent(null);
     setData((d) => (d ? { ...d, messages: d.messages.map((x) => (x.uid === m.uid ? { ...x, seen: true } : x)) } : d));
+    seenLists.clear();
   };
 
   const act = async (what: string, body: Record<string, unknown>, done: string) => {
@@ -81,7 +122,8 @@ export function Mailbox({ open }: { open: boolean }) {
     return true;
   };
 
-  const backToList = async (refresh = true) => { setView("list"); setMsg(null); setConfirm(""); if (refresh) await load(); };
+  // Back from a message keeps the list you were on (no reload); after delete, move or mark-unread the list is fetched fresh.
+  const backToList = async (refresh = true) => { setView("list"); setMsg(null); setConfirm(""); if (refresh) { seenLists.clear(); await load(folder, q, unread, true); } };
 
   const startReply = (m: MailMessage) => {
     setDraft({ to: m.fromAddr, cc: "", subject: replySubject(m.subject), text: forwardableQuote(m.from, m.date, m.text), inReplyTo: m.messageId, references: [m.references, m.messageId].filter(Boolean).join(" ").slice(-600) });
@@ -135,7 +177,7 @@ export function Mailbox({ open }: { open: boolean }) {
     return (
       <div className="grid gap-2">
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => void backToList()}><ArrowLeft className="size-4" /> Back</Button>
+          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => void backToList(false)}><ArrowLeft className="size-4" /> Back</Button>
           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{msg.from}{msg.fromAddr ? ` <${msg.fromAddr}>` : ""}</span>
           {data?.gmail && data.account && gmailLink(data.account, msg.messageId) && <a href={gmailLink(data.account, msg.messageId) ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs hover:bg-accent/40"><ExternalLink className="size-3" /> Open in Gmail</a>}
         </div>
@@ -179,14 +221,14 @@ export function Mailbox({ open }: { open: boolean }) {
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Folder" className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" value={folder} onChange={(e) => { setFolder(e.target.value); void load(e.target.value); }}>
+        <select aria-label="Folder" className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" value={folder} onChange={(e) => { setFolder(e.target.value); setNote(""); void load(e.target.value); }}>
           {(data?.folders ?? [{ name: "INBOX", label: "INBOX", special: "inbox" as const }]).map((f) => <option key={f.name} value={f.name}>{f.special === "inbox" ? "Inbox" : f.label}</option>)}
         </select>
-        <Button size="sm" variant="ghost" className="h-8" onClick={() => void load()} disabled={loading} aria-label="Refresh"><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /></Button>
+        <Button size="sm" variant="ghost" className="h-8" onClick={() => void load(folder, q, unread, true)} aria-label="Refresh"><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /></Button>
         <Button size="sm" className="h-8" onClick={() => { setDraft(blank); setConfirm(""); setMsg(null); setView("compose"); }}><MailPlus className="size-4" /> Write</Button>
       </div>
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void load(folder, q, unread); }}>
-        <Input aria-label="Search mail" placeholder="Search this folder" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input aria-label="Search mail" placeholder="Search this folder, e.g. from:anna subject:invoice since:2026-10-01" title="Words search the whole message. Also: from: to: subject: since:YYYY-MM-DD before:YYYY-MM-DD is:unread is:read" value={q} onChange={(e) => setQ(e.target.value)} />
         <Button type="submit" size="sm" variant="outline" className="h-9" aria-label="Search"><Search className="size-4" /></Button>
       </form>
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -207,7 +249,12 @@ export function Mailbox({ open }: { open: boolean }) {
           </div>
         );
       })}
-      {data && data.total > data.messages.length && <span className="text-xs text-muted-foreground">Showing the newest {data.messages.length} of {data.total}. Use search to find older ones.</span>}
+      {data && data.total > data.messages.length && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" className="h-8" disabled={more} onClick={() => void loadOlder()}>{more ? <Loader2 className="size-3 animate-spin" /> : null} Load older</Button>
+          <span className="text-xs text-muted-foreground">Showing the newest {data.messages.length} of {data.total}.</span>
+        </div>
+      )}
     </div>
   );
 }

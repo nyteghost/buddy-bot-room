@@ -16,7 +16,7 @@ export type FakeFolder = { name: string; attrs?: string; uidvalidity: number; ui
 export type FakeOptions = { user?: string; pass?: string; rttMs?: number; maxConnections?: number; idleKillMs?: number };
 
 let cached: { key: string; cert: string } | undefined;
-function pem(): { key: string; cert: string } {
+export function pem(): { key: string; cert: string } {
   if (cached) return cached;
   const made = mkdtempSync(join(tmpdir(), "pp-cert-"));
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", join(made, "key.pem"), "-out", join(made, "cert.pem"), "-days", "2", "-subj", "/CN=localhost"], { stdio: "ignore" });
