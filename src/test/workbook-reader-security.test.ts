@@ -22,6 +22,11 @@ describe("readScheduleWorkbook (ExcelJS)", () => {
     expect(result.shifts[0]?.raw).toBe("6a-2:30p");
   });
 
+  it("rejects legacy binary .xls files instead of parsing them with an unsafe library", async () => {
+    const file = { name: "legacy.xls", size: 10, arrayBuffer: async () => { throw new Error("must not read"); } } as unknown as File;
+    await expect(readScheduleWorkbook(file)).rejects.toThrow(/save a copy as \.xlsx/i);
+  });
+
   it("rejects oversized workbooks before parsing", async () => {
     const file = { size: 20_000_001, arrayBuffer: async () => { throw new Error("must not read"); } } as unknown as File;
     await expect(readScheduleWorkbook(file)).rejects.toThrow(/too large/);
