@@ -1,51 +1,7 @@
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
-import { Puzzle,
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  CircleHelp,
-  Copy,
-  Download,
-  ListTodo,
-  Pencil,
-  Scale,
-  MessageSquare,
-  Mic,
-  LayoutGrid,
-  History,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Gamepad2,
-  FlaskConical,
-  Wrench,
-  Minus,
-  Play,
-  Plus,
-  Radio,
-  Swords,
-  RotateCcw,
-  Search,
-  Settings2,
-  Square,
-  Users,
-  X,
-  Bug,
-  GitBranch,
-  RefreshCw,
-  Volume2,
-  VolumeX,
-  Ellipsis,
-  Maximize2,
-  Minimize2,
-  Mail,
-  CalendarDays,
-  CheckSquare,
-  Sun,
-  FileText,
-  Workflow,
-} from "lucide-react";
+import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -69,12 +25,6 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import {
-  Message,
-  MessageAction,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message";
-import {
   PromptInput,
   PromptInputTextarea,
   PromptInputFooter,
@@ -82,6 +32,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PixelCharacter } from "./pixel-character";
+import { MessageRow, type RowActions } from "./message-row";
 import { ThinkingProp } from "./thinking-prop";
 import { OfficePal } from "./office-pal";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
@@ -109,14 +60,13 @@ import cyberRoomImage from "@/assets/cyberpunk-room.jpg";
 import hellRoomImage from "@/assets/hellraiser-room.jpg";
 import horrorRoomImage from "@/assets/horror-room.jpg";
 import dccRoomImage from "@/assets/dcc-room.jpg";
-import { benchProvider, chainAfter, cloudFallbackChain, isBenched, orderByHealth, providerNames, type Bench, freeModels, palEngineLabel, answeredLabel, providerLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
+import { benchProvider, chainAfter, cloudFallbackChain, isBenched, orderByHealth, providerNames, type Bench, freeModels, palEngineLabel, providerLabel, providerForTurn, localServerProvider, replyTokens, useEngine } from "@/lib/engine";
 import { estimateTokens } from "@/lib/usage";
 import { isOverCap, recordUsage } from "@/lib/usage-store";
 import { hasWebGPU, localTurn, ollamaTurn } from "@/lib/local-llm";
 import { AutoModelDownload, EngineSettingsDialog, WebGpuUsageBox } from "./engine-settings";
 import { OllamaMascot } from "./ollama-mascot";
 import mascot from "@/assets/mascot.png";
-import { LinuxActions } from "./linux-actions";
 import { UpdatePopup } from "./update-popup";
 import { UpdateBanner } from "./update-banner";
 import { linuxContext } from "@/lib/linux";
@@ -132,7 +82,6 @@ import { priceReply } from "@/lib/work-tools";
 import { cn } from "@/lib/utils";
 import { parseSlash, slashSuggestions, helpText, modeNames, themeNames, type SlashAction } from "@/lib/slash-commands";
 import { freshRecall, promptHistory, recallStep, type RecallState } from "@/lib/prompt-recall";
-import { replaceEmojiShortcodes } from "@/lib/emoji-shortcodes";
 import { celebrate } from "@/lib/confetti";
 import { CompareDialog } from "./compare-dialog";
 import { SeerrDialog } from "./seerr-dialog";
@@ -224,6 +173,7 @@ export function Room() {
   const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
   useOverrides();
   usePowerAttributes();
+  const rowActions = useRef({} as RowActions);
   const [shownCount, setShownCount] = useState<Record<string, number>>({});
   const projectsAll = useProjects();
   const activeName = activeProject.use();
@@ -1411,6 +1361,8 @@ export function Room() {
   const suggestions_ = slashSuggestions(topic);
   const activeAgent = agents.find((a) => a.id === speaking);
   const lastMessage = messages[messages.length - 1];
+  // Rows are memoised; this one object keeps their click handlers current without changing identity.
+  Object.assign(rowActions.current, { regenerate, branchFrom, editAndRetry, addStepsToTasks, speak: (items: { id: string; text: string; agentId: string }[]) => void speakItems(items), stopSpeaking });
   const liveText =
     running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
   const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
@@ -1515,98 +1467,9 @@ export function Room() {
                 {(() => { const sl = chatSlice(msgs, shownCount[wm] ?? 0); return sl.hidden > 0 ? (
                   <button type="button" className="show-earlier" onClick={() => setShownCount((c) => ({ ...c, [wm]: msgs.length - sl.hidden + 60 }))}>Show {Math.min(60, sl.hidden)} earlier messages ({sl.hidden} hidden to keep the page fast)</button>
                 ) : null; })()}
-                {chatSlice<RoomMessage>(msgs, shownCount[wm] ?? 0).items.map((m) => {
-                  const a = agents.find((a) => a.id === m.metadata?.agentId);
-                  const messageMode = m.metadata?.characterMode ?? characterMode;
-                  const sideTag = m.metadata?.side === "for" ? " · FOR" : m.metadata?.side === "against" ? " · AGAINST" : "";
-                  const roleTag = m.metadata?.role ? ` · ${String(m.metadata.role).toUpperCase()}` : "";
-                  const name = a
-                    ? agentName(a.id, messageMode === "hellraiser", messageMode === "horror", messageMode)
-                    : "You";
-                  return (
-                    <Message
-                      key={m.id}
-                      from={m.role}
-                      className={cn("room-message", m.metadata?.verdict && "verdict-message")}
-                    >
-                      {a && (
-                        <div className={`message-avatar agent-${a.id}`}>
-                          <PixelCharacter id={a.id} mode={messageMode} />
-                        </div>
-                      )}
-                      <div className="message-main">
-                        <div className="message-heading">
-                          <b className={a ? `agent-${a.id}` : "text-primary"}>{name}</b>
-                          <span>
-                            {!a
-                              ? "THE TOPIC"
-                              : m.metadata?.dm === "dm"
-                                ? "DUNGEON MASTER"
-                                : m.metadata?.dm === "party"
-                                  ? "PARTY"
-                                  : m.metadata?.verdict
-                                ? "THE VERDICT"
-                                : m.metadata?.summary ? "SUMMARY" : m.metadata?.verdict && wm === "debate" ? "THE JUDGE" : m.metadata?.verdict && wm === "broadcast" ? "THE JUDGE" : `ROUND ${m.metadata?.round ?? 1}${sideTag}${roleTag}`}
-                          </span>
-                          {m.metadata?.elapsed && (
-                            <span className="ml-auto">
-                              {m.role === "assistant" && answeredLabel(m.metadata) ? <span className="mr-2 opacity-70" data-testid="answered-by">{answeredLabel(m.metadata)}</span> : null}
-                              {m.metadata.elapsed.toFixed(1)}s
-                            </span>
-                          )}
-                        </div>
-                        <MessageContent className={cn(m.role === "user" && "user-message-content")}>
-                          {m.parts.map((part, i) =>
-                            part.type === "text" ? (
-                              <div key={i}>
-                                <MessageResponse>{m.role === "assistant" ? replaceEmojiShortcodes(part.text) : part.text}</MessageResponse>
-                                {m.role === "assistant" && (m.metadata?.assistant ?? (m.metadata?.characterMode === "linux" || m.metadata?.characterMode === "assistant")) && !running && <LinuxActions text={part.text} canRun={desktopApp} />}
-                              </div>
-                            ) : part.type === "reasoning" ? (
-                              <details className="reasoning" key={i}>
-                                <summary>Thinking</summary>
-                                <MessageResponse>{part.text}</MessageResponse>
-                              </details>
-                            ) : null,
-                          )}
-                        </MessageContent>
-                        {!running && (
-                          <div className="message-actions">
-                            {m.role === "assistant" ? (
-                              <>
-                                <MessageAction tooltip="Copy reply" label="Copy reply" onClick={() => void navigator.clipboard?.writeText(messageText(m))}>
-                                  <Copy size={13} />
-                                </MessageAction>
-                                {canSpeak && (
-                                  <MessageAction tooltip={speakingMessage === m.id ? "Stop reading" : "Read aloud"} label={speakingMessage === m.id ? "Stop reading" : "Read aloud"} onClick={() => { if (speakingMessage === m.id) stopSpeaking(); else void speakItems([{ id: m.id, text: messageText(m), agentId: String(m.metadata?.agentId ?? "echo") }]); }}>
-                                    {speakingMessage === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                                  </MessageAction>
-                                )}
-                                {m.id === lastMessage?.id && m.metadata?.agentId !== "echo" && (
-                                  <MessageAction tooltip="Regenerate" label="Regenerate answer" onClick={() => regenerate(wm)}>
-                                    <RefreshCw size={13} />
-                                  </MessageAction>
-                                )}
-                                {wm === "solve" && m.metadata?.verdict && extractSteps(messageText(m)).length > 0 && (
-                                  <MessageAction tooltip="Add these steps to Tasks" label="Add these steps to Tasks" onClick={() => addStepsToTasks(m)}>
-                                    <ListTodo size={13} />
-                                  </MessageAction>
-                                )}
-                                <MessageAction tooltip="Branch a new chat from here" label="Branch from here" onClick={() => branchFrom(wm, m.id)}>
-                                  <GitBranch size={13} />
-                                </MessageAction>
-                              </>
-                            ) : (
-                              <MessageAction tooltip="Edit and resend" label="Edit and resend" onClick={() => editAndRetry(wm, m.id)}>
-                                <Pencil size={13} />
-                              </MessageAction>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </Message>
-                  );
-                })}
+                {chatSlice<RoomMessage>(msgs, shownCount[wm] ?? 0).items.map((m) => (
+                  <MessageRow key={m.id} m={m} wm={wm} characterMode={characterMode} running={running} isLast={m.id === lastMessage?.id} speaking={speakingMessage === m.id} canSpeak={canSpeak} desktopApp={desktopApp} act={rowActions.current} />
+                ))}
                 </>
               )}
               {busyHere && (
