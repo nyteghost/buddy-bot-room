@@ -24,8 +24,8 @@ async function signIn() {
   await page.waitForTimeout(2500);
 }
 
-const body = (i) => `Message ${i}. Here is a **reply** with a list:\n\n- first point about the server\n- second point with \`inline code\`\n- third point\n\n\`\`\`bash\ndocker compose pull && docker compose up -d\n\`\`\`\n\n` + "More words to make the paragraph a realistic length. ".repeat(6);
 const seed = (n) => {
+  const body = (i) => `Message ${i}. Here is a **reply** with a list:\n\n- first point about the server\n- second point with \`inline code\`\n- third point\n\n\`\`\`bash\ndocker compose pull && docker compose up -d\n\`\`\`\n\n` + "More words to make the paragraph a realistic length. ".repeat(6);
   const agents = ["nova", "byte", "sage", "pip"];
   const list = [];
   for (let i = 0; i < n; i++) {
