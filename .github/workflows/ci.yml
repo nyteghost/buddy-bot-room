@@ -13,6 +13,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - name: Validate beta installer and Compose configuration
+        run: |
+          if [ -f scripts/install-unraid-beta.sh ]; then
+            bash -n scripts/install-unraid-beta.sh
+            docker compose -f docker-compose.unraid-beta.yml config --quiet
+          fi
       - name: Tests
         run: bun run test
       - name: Build

@@ -1,0 +1,27 @@
+# Pixel Pals BETA: separate stack for Unraid Compose Manager.
+# Stable :latest at port 8090 and its appdata are untouched.
+name: pixelpals-beta
+services:
+  pixelpals-beta:
+    image: ghcr.io/nyteghost/buddy-bot-room:beta
+    container_name: pixelpals-beta
+    restart: unless-stopped
+    ports:
+      - "8091:8090"
+    environment:
+      BUDDY_ACCOUNTS: "1"
+      BUDDY_TZ: America/New_York
+      BUDDY_BACKUP_DIR: /backups
+      OLLAMA_URL: ${BETA_OLLAMA_URL:-}
+      NVIDIA_VISIBLE_DEVICES: none
+    volumes:
+      - /mnt/user/appdata/pixelpals-beta/data:/data
+      - /mnt/user/appdata/pixelpals-beta/backups:/backups
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

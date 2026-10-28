@@ -1,0 +1,87 @@
+name: Publish beta image
+
+# Beta images are published only after their tests, build and browser smoke test pass.
+# Never pushes :latest, which belongs exclusively to the main branch.
+on:
+  push:
+    branches: [beta]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-beta-image
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: github.ref == 'refs/heads/beta'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      - run: bun run build
+
+  smoke:
+    if: github.ref == 'refs/heads/beta'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Build self-hosted production image
+        run: bun run build
+        env:
+          BUDDY_SELF_HOSTED: "1"
+          NITRO_PRESET: node-server
+          NODE_ENV: production
+      - name: Install browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" playwright@1.49.1 --no-audit --no-fund
+          npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
+      - name: Start test server
+        run: |
+          mkdir -p "$RUNNER_TEMP/data"
+          BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
+          for i in $(seq 1 40); do curl -fsS http://localhost:8090/__health >/dev/null && exit 0; sleep 1; done
+          cat server.log; exit 1
+      - name: Browser smoke test
+        run: node tools/smoke/smoke.mjs
+        env:
+          PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
+          SMOKE_URL: http://localhost:8090
+          SMOKE_SETUP_CODE: "Smoke-CI-Setup-Only"
+      - name: Server log if smoke fails
+        if: failure()
+        run: tail -n 80 server.log || true
+
+  publish:
+    if: github.ref == 'refs/heads/beta'
+    needs: [test, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/buddy-bot-room:beta
+            ghcr.io/${{ github.repository_owner }}/buddy-bot-room:beta-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
