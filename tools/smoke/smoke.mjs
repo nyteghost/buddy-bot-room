@@ -184,6 +184,9 @@ await step("workspace layouts save, switch, and restore the open windows", async
   const picker = page.getByRole("combobox", { name: "Workspace layout" });
   await picker.selectOption("mail");
   await page.locator('[data-window-id="mail"]').waitFor({ state: "visible" });
+  await picker.selectOption("work");
+  await page.locator('[data-window-id="tools"]').waitFor({ state: "visible" });
+  await page.locator('[data-window-id="documents"]').waitFor({ state: "visible" });
   await picker.selectOption("chat");
   await page.locator('[data-window-id="room"]').waitFor({ state: "visible" });
   await page.locator('[data-window-id="mode-roundtable"]').waitFor({ state: "visible" });
