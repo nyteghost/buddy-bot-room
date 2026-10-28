@@ -171,29 +171,43 @@ const serialToIso = (n: number) => new Date(Math.round((n - 25569) * 86400000)).
 
 /** Reads every "Week #" sheet and returns the shifts in the named person's row. */
 export async function readScheduleWorkbook(file: File, name = DEFAULT_SCHEDULE_NAME): Promise<{ shifts: Shift[]; people: string[] }> {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  // Read workbook cells through ExcelJS rather than the vulnerable legacy SheetJS parser.
+  // The file is only needed for shift lookup: avoid materializing a second 2D grid.
+  if (/\.xls$/i.test(file.name)) throw new Error("Legacy .xls files are not supported by the secure reader. Please save a copy as .xlsx in Excel or LibreOffice.");
+  if (file.size > 20_000_000) throw new Error("That workbook is too large (20 MB maximum).");
+  const module = await import("exceljs");
+  const ExcelJS = module.default ?? module;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
   const shifts: Shift[] = [];
   const people = new Set<string>();
   const target = name.trim().toLowerCase();
-  for (const sheetName of wb.SheetNames) {
-    if (!/week/i.test(sheetName)) continue;
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName]!, { header: 1, raw: true, defval: "" });
-    const dayRow = grid.findIndex((r) => String(r[1]).trim().toUpperCase() === "MON");
-    if (dayRow < 0) continue;
-    const dates = grid[dayRow + 1] ?? [];
-    for (let r = dayRow + 2; r < grid.length; r++) {
-      const cells = grid[r] ?? [];
-      const label = String(cells[0] ?? "").trim();
-      const next = String(grid[r + 1]?.[0] ?? "").trim();
+  const value = (cell: import("exceljs").Cell): unknown => {
+    const v = cell.value;
+    return v && typeof v === "object" && "result" in v ? v.result : v;
+  };
+  for (const ws of wb.worksheets) {
+    if (!/week/i.test(ws.name)) continue;
+    if (ws.rowCount > 20_000 || ws.columnCount > 256) throw new Error("That worksheet is too large to inspect.");
+    let dayRow = 0;
+    ws.eachRow((row, n) => {
+      if (!dayRow && String(value(row.getCell(2)) ?? "").trim().toUpperCase() === "MON") dayRow = n;
+    });
+    if (!dayRow) continue;
+    // ExcelJS getCell() creates missing rows; snapshot the bound before traversing.
+    const lastRow = ws.rowCount;
+    for (let r = dayRow + 2; r <= lastRow; r++) {
+      const label = String(value(ws.getCell(r, 1)) ?? "").trim();
+      const next = String(value(ws.getCell(r + 1, 1)) ?? "").trim();
       if (label && /^\d{3}$/.test(next)) people.add(label);
       if (label.toLowerCase() !== target) continue;
-      for (let c = 1; c <= 7; c++) {
-        const raw = String(cells[c] ?? "").trim();
+      for (let c = 2; c <= 8; c++) {
+        const raw = String(value(ws.getCell(r, c)) ?? "").trim();
         const time = parseShift(raw);
-        const d = dates[c];
-        if (!time || typeof d !== "number") continue;
-        shifts.push({ date: serialToIso(d), ...time, raw });
+        const d = value(ws.getCell(dayRow + 1, c));
+        const date = typeof d === "number" ? serialToIso(d) : d instanceof Date ? d.toISOString().slice(0, 10) : "";
+        if (!time || !date) continue;
+        shifts.push({ date, ...time, raw });
       }
     }
   }

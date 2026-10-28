@@ -41,6 +41,7 @@ await step("create the first account", async () => {
     await boxes.nth(0).fill(USER);
     await boxes.nth(1).fill(PASS);
     await boxes.nth(2).fill(PASS);
+    if (await boxes.count() > 3) await boxes.nth(3).fill(process.env.SMOKE_SETUP_CODE || "");
     await create.click();
   } else {
     const signIn = page.getByRole("button", { name: /sign in/i });

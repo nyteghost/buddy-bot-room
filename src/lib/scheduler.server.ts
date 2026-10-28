@@ -17,7 +17,7 @@ import { tickMailAlerts } from "./mail-alerts.server";
 import { tickAddons } from "./addons.server";
 
 /** One 30-second ticker for the daily jobs. Idempotent. Does nothing unless a job is configured. */
-type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string; lastReviewDay?: string };
+type S = { timer?: ReturnType<typeof setInterval>; lastBackupDay: string; lastBriefDay: string; lastReviewDay?: string; running?: boolean };
 const dataDir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim();
 const holder = globalThis as unknown as { __buddyScheduler?: S };
 
@@ -29,7 +29,7 @@ export function startScheduler(): void {
   if (!backupConfig() && !briefConfig() && !weeklyConfig() && !dataDir()) return;
   const s: S = (holder.__buddyScheduler ??= { lastBackupDay: "", lastBriefDay: "" });
   logServer("info", "Scheduler started");
-  s.timer = setInterval(() => { void tick(s); }, 30_000);
+  s.timer = setInterval(() => { void tickOnce(s); }, 30_000);
   (s.timer as { unref?: () => void }).unref?.();
   // After a restart: if the newest backup is more than a day old (or there is none), make one soon.
   const t = setTimeout(async () => {
@@ -39,6 +39,15 @@ export function startScheduler(): void {
     if (age === null || age > 25 * 3600 * 1000) { s.lastBackupDay = zonedParts(new Date(), cfg.tz).day; await runBackup(cfg); }
   }, 45_000);
   (t as { unref?: () => void }).unref?.();
+}
+
+/** Prevent overlapping ticks when a mail server, backup, or local model is slow. */
+async function tickOnce(s: S): Promise<void> {
+  if (s.running) return;
+  s.running = true;
+  try { await tick(s); }
+  catch (error) { logServer("error", "Scheduler tick failed", error); }
+  finally { s.running = false; }
 }
 
 async function tick(s: S): Promise<void> {

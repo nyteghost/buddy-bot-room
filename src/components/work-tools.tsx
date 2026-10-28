@@ -302,7 +302,7 @@ function ShiftsTab() {
         <Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Name on schedule" />
         {file && <Button variant="outline" onClick={() => load(file)}>Re-read</Button>}
       </div>
-      <FilePick accept=".xlsx,.xls" label="Drop a monthly schedule workbook (.xlsx)" onFile={(f) => load(f)} />
+      <FilePick accept=".xlsx" label="Drop a monthly schedule workbook (.xlsx)" onFile={(f) => load(f)} />
       <details className="rounded-md border border-border p-3">
         <summary className="cursor-pointer text-sm text-muted-foreground">…or paste your rows from Excel</summary>
         <div className="mt-2 space-y-2">

@@ -43,7 +43,7 @@ jobs:
       - name: Start the app
         run: |
           mkdir -p "$RUNNER_TEMP/data"
-          BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
+          BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
           for i in $(seq 1 40); do curl -fsS http://localhost:8090/__health >/dev/null && exit 0; sleep 1; done
           cat server.log; exit 1
       - name: Smoke test
@@ -56,6 +56,7 @@ jobs:
         env:
           PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
           SMOKE_URL: http://localhost:8090
+          SMOKE_SETUP_CODE: "Smoke-CI-Setup-Only"
           SMOKE_SHOT: ${{ runner.temp }}/smoke.png
       - name: Server log
         if: always()

@@ -1,4 +1,6 @@
 import { readHardware } from "./hardware.server";
+import { accountsEnabled } from "./accounts";
+import { currentUser } from "./accounts.server";
 import { bestInstalled, isModelName, parseAutoMarker } from "./model-catalog";
 import { logServer } from "./server-log.server";
 import { currentFeed, feedEnabled, refreshFeed } from "./model-feed.server";
@@ -39,6 +41,9 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
     }
   }
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  // Model downloads, deletion and benchmarks consume disk/GPU resources. Do not let non-owner accounts mutate Ollama.
+  if (accountsEnabled(process.env) && !(await currentUser(request))?.owner)
+    return json({ error: "Only the owner account can manage Local AI models." }, 403);
   let body: { action?: unknown; model?: unknown } = {};
   try { body = (await request.json()) as typeof body; } catch { return json({ error: "Bad request." }, 400); }
   if (body.action === "refresh-feed") return feedEnabled() ? json({ feed: await refreshFeed() }) : json({ error: "Model list updates are turned off (MODEL_FEED=0)." }, 400);

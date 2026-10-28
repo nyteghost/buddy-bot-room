@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, FolderInput, Loader2, MailOpen, MailPlus, PenLine, RefreshCw, Reply, Search, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,9 @@ type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; to
 type Draft = { to: string; cc: string; subject: string; text: string; inReplyTo: string; references: string };
 const blank: Draft = { to: "", cc: "", subject: "", text: "", inReplyTo: "", references: "" };
 
-async function call<T>(url: string, body?: unknown): Promise<T & { error?: string }> {
+async function call<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T & { error?: string }> {
   try {
-    const res = await fetch(url, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : undefined);
+    const res = await fetch(url, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal } : { signal });
     return (await res.json()) as T & { error?: string };
   } catch { return { error: "Couldn't reach the server." } as T & { error?: string }; }
 }
@@ -34,18 +34,31 @@ export function Mailbox({ open }: { open: boolean }) {
   const [confirm, setConfirm] = useState<"" | "send" | "delete">("");
   const [moveTo, setMoveTo] = useState("");
   const [intent, setIntent] = useState<string | null>(null);
+  const listRequest = useRef<AbortController | null>(null);
+  const readRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => { listRequest.current?.abort(); readRequest.current?.abort(); }, []);
 
   const load = useCallback(async (f = folder, search = q, onlyUnread = unread) => {
+    listRequest.current?.abort();
+    const controller = new AbortController();
+    listRequest.current = controller;
     setLoading(true);
     const params = new URLSearchParams({ op: "list", folder: f, ...(search.trim() ? { q: search.trim() } : {}), ...(onlyUnread ? { unread: "1" } : {}) });
-    const res = await call<ListData>(`/api/mailbox?${params}`);
+    const res = await call<ListData>(`/api/mailbox?${params}`, undefined, controller.signal);
+    if (listRequest.current !== controller || controller.signal.aborted) return;
     if (res.error) setError(res.error); else { setData(res); setError(""); setFolder(res.folder); }
     setLoading(false);
+    listRequest.current = null;
   }, [folder, q, unread]);
 
   const openByRef = useCallback(async (f: string, uid: number) => {
+    readRequest.current?.abort();
+    const controller = new AbortController();
+    readRequest.current = controller;
     setBusy(`open${uid}`); setNote("");
-    const res = await call<{ message: MailMessage }>(`/api/mailbox?op=read&folder=${encodeURIComponent(f)}&uid=${uid}`);
+    const res = await call<{ message: MailMessage }>(`/api/mailbox?op=read&folder=${encodeURIComponent(f)}&uid=${uid}`, undefined, controller.signal);
+    if (readRequest.current !== controller || controller.signal.aborted) return;
+    readRequest.current = null;
     setBusy("");
     if (res.error || !res.message) { setError(res.error ?? "Couldn't open it."); return; }
     setFolder(f); setMsg(res.message); setView("read"); setConfirm(""); setMoveTo(""); setIntent(null);
@@ -64,8 +77,13 @@ export function Mailbox({ open }: { open: boolean }) {
   useEffect(() => { if (open) void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open]);
 
   const openMessage = async (m: MailSummary) => {
+    readRequest.current?.abort();
+    const controller = new AbortController();
+    readRequest.current = controller;
     setBusy(`open${m.uid}`); setNote("");
-    const res = await call<{ message: MailMessage }>(`/api/mailbox?op=read&folder=${encodeURIComponent(folder)}&uid=${m.uid}`);
+    const res = await call<{ message: MailMessage }>(`/api/mailbox?op=read&folder=${encodeURIComponent(folder)}&uid=${m.uid}`, undefined, controller.signal);
+    if (readRequest.current !== controller || controller.signal.aborted) return;
+    readRequest.current = null;
     setBusy("");
     if (res.error || !res.message) { setError(res.error ?? "Couldn't open it."); return; }
     setMsg(res.message); setView("read"); setConfirm(""); setMoveTo(""); setIntent(null);
@@ -81,7 +99,7 @@ export function Mailbox({ open }: { open: boolean }) {
     return true;
   };
 
-  const backToList = async (refresh = true) => { setView("list"); setMsg(null); setConfirm(""); if (refresh) await load(); };
+  const backToList = async (refresh = false) => { readRequest.current?.abort(); setView("list"); setMsg(null); setConfirm(""); if (refresh || !data) await load(); };
 
   const startReply = (m: MailMessage) => {
     setDraft({ to: m.fromAddr, cc: "", subject: replySubject(m.subject), text: forwardableQuote(m.from, m.date, m.text), inReplyTo: m.messageId, references: [m.references, m.messageId].filter(Boolean).join(" ").slice(-600) });
@@ -97,12 +115,12 @@ export function Mailbox({ open }: { open: boolean }) {
 
   const doDelete = async () => {
     if (confirm !== "delete") { setConfirm("delete"); return; }
-    if (msg && (await act("delete", { op: "delete", uid: msg.uid }, "Moved to Trash."))) await backToList();
+    if (msg && (await act("delete", { op: "delete", uid: msg.uid }, "Moved to Trash."))) await backToList(true);
     setConfirm("");
   };
 
   const doMove = async () => {
-    if (msg && moveTo && (await act("move", { op: "move", uid: msg.uid, to: moveTo }, "Moved."))) await backToList();
+    if (msg && moveTo && (await act("move", { op: "move", uid: msg.uid, to: moveTo }, "Moved."))) await backToList(true);
   };
 
   const inTrash = data?.folders.find((f) => f.name === folder)?.special === "trash" || data?.folders.find((f) => f.name === folder)?.special === "junk";
@@ -150,7 +168,7 @@ export function Mailbox({ open }: { open: boolean }) {
             {busy === "delete" ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />} {confirm === "delete" ? (inTrash ? "Delete for good?" : "Move to Trash?") : "Delete"}
           </Button>
           {confirm === "delete" && <Button size="sm" variant="ghost" onClick={() => setConfirm("")}>Cancel</Button>}
-          <Button size="sm" variant="outline" disabled={busy === "seen"} onClick={async () => { if (await act("seen", { op: "seen", uid: msg.uid, seen: false }, "Marked unread.")) await backToList(); }}><MailOpen className="size-3" /> Mark unread</Button>
+          <Button size="sm" variant="outline" disabled={busy === "seen"} onClick={async () => { if (await act("seen", { op: "seen", uid: msg.uid, seen: false }, "Marked unread.")) await backToList(true); }}><MailOpen className="size-3" /> Mark unread</Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <FolderInput className="size-4 text-muted-foreground" />
