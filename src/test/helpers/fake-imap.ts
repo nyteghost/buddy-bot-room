@@ -11,7 +11,7 @@ import type { AddressInfo } from "node:net";
  * EXPUNGE, APPEND, CREATE, NOOP, LOGOUT. `rttMs` adds a delay to every reply and twice that before the greeting (TCP + TLS handshake),
  * so connection cost shows up the way it does on a real network. This is a SIMULATION: it never measures a real provider.
  */
-export type FakeMessage = { uid: number; flags: string[]; from: string; to: string; subject: string; date: string; body: string; messageId: string };
+export type FakeMessage = { raw?: string; uid: number; flags: string[]; from: string; to: string; subject: string; date: string; body: string; messageId: string };
 export type FakeFolder = { name: string; attrs?: string; uidvalidity: number; uidnext: number; messages: FakeMessage[] };
 export type FakeOptions = { user?: string; pass?: string; rttMs?: number; maxConnections?: number; idleKillMs?: number };
 
@@ -196,7 +196,9 @@ export class FakeImapServer {
         const headerFew = `From: ${x.from}\r\nSubject: ${x.subject}\r\nDate: ${x.date}\r\n`;
         const flags = `FLAGS (${x.flags.join(" ")})`;
         const uidPart = items.toUpperCase().includes("UID") || isUid ? `UID ${x.uid} ` : "";
-        if (whole) { const text = `${headerAll}\r\n${x.body}`.slice(0, whole[1] ? Number(whole[1]) : undefined); out += `* ${i + 1} FETCH (${uidPart}${flags} BODY[] {${text.length}}\r\n${text})\r\n`; }
+        const fullText = x.raw ?? `${headerAll}\r\n${x.body}`;
+        if (/RFC822\.SIZE/i.test(items) && !whole) { out += `* ${i + 1} FETCH (${uidPart}RFC822.SIZE ${fullText.length})\r\n`; continue; }
+        if (whole) { const text = fullText.slice(0, whole[1] ? Number(whole[1]) : undefined); out += `* ${i + 1} FETCH (${uidPart}${flags} BODY[] {${text.length}}\r\n${text})\r\n`; }
         else { const h = /FROM TO SUBJECT/i.test(items) ? headerAll : headerFew; out += `* ${i + 1} FETCH (${uidPart}${flags} BODY[HEADER.FIELDS (X)] {${h.length + 2}}\r\n${h}\r\n)\r\n`; }
       }
       return ok(out);
