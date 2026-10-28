@@ -2282,3 +2282,24 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
   .workspace-sidebar .sidebar-divider { margin-block: 7px; }
   .workspace-sidebar .sidebar-bottom { padding-top: 10px; }
 }
+
+
+/* Resize-aware layouts and edge snapping. Preview never intercepts mouse/touch. */
+.window-snap-preview {
+  position: fixed; z-index: 9999; pointer-events: none;
+  border: 2px solid var(--primary); border-radius: 8px;
+  background: color-mix(in oklab, var(--primary) 17%, transparent);
+  box-shadow: inset 0 0 0 1px var(--card), 0 0 0 2px color-mix(in oklab, var(--primary) 25%, transparent);
+}
+.workspace-layout-menu { display: grid; gap: 6px; padding: 4px 2px 8px; min-width: 0; max-width: 100%; }
+.workspace-layout-menu label { font-size: 10px; color: var(--muted-foreground); }
+.workspace-layout-menu select {
+  width: 100%; min-width: 0; max-width: 100%; padding: 6px 4px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card); color: var(--foreground); font-size: 11px;
+}
+.workspace-layout-menu button { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; white-space: normal; }
+.workspace-layout-notice { font-size: 10px; line-height: 1.4; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.sidebar-collapsed .workspace-layout-menu { display: none; }
+@media (max-width: 1050px) { .workspace-sidebar .workspace-layout-menu { display: none; } }
+@media (max-width: 700px) { .window-snap-preview { display: none; } }
