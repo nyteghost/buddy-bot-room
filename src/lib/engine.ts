@@ -233,7 +233,7 @@ export function palEngineLabel(s: EngineSettings, rosterIndex: number): string {
 export const freeModels = {
   groq: "openai/gpt-oss-120b",
   gemini: "gemini-2.5-flash",
-  openrouter: "meta-llama/llama-3.3-70b-instruct:free",
+  openrouter: "openrouter/free",
   nvidia: "meta/llama-3.1-70b-instruct",
   local: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
 } as const;

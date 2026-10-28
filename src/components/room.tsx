@@ -766,6 +766,7 @@ export function Room() {
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
             const chain = orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
+            const failures: string[] = [];
             let lastError: unknown;
             for (const p of chain) {
               try {
@@ -777,7 +778,8 @@ export function Room() {
               } catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
-                lastError = new Error(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                failures.push(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                lastError = new Error(failures.join(" · "));
                 benchProvider(benchRef.current, p, err);
                 logClient("warn", `${p.kind} failed, skipping it for a few minutes and trying the next AI`, err);
               }
@@ -793,12 +795,15 @@ export function Room() {
             if (!rest.length) throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} No other AI is set up to take over: add a free key in AI engine settings (or switch the engine to Auto) and chats will fall back to it.`);
             answer = undefined;
             logClient("warn", "Ollama didn't answer, trying the next AI", why);
+            const failures: string[] = [];
             let lastError: unknown = why;
             for (const p of rest) {
               try { await consume(await runCloud(p)); return; }
               catch (err) {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
-                answer = undefined; lastError = new Error(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                answer = undefined;
+                failures.push(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
+                lastError = new Error(failures.join(" · "));
                 benchProvider(benchRef.current, p, err);
               }
             }

@@ -224,7 +224,7 @@ export async function handleChat(request: Request) {
         catch (e) { logServer("warn", "ollama not reachable", e); return Response.json({ error: friendlyAiError(e), code: "ollama-down" }, { status: 503 }); }
       }
       const free = streamText({
-        model: provider(custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "meta-llama/llama-3.3-70b-instruct:free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
+        model: provider(custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "openrouter/free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
         abortSignal: localServer ? AbortSignal.any([request.signal, AbortSignal.timeout(LOCAL_REPLY_LIMIT_MS)]) : request.signal,
