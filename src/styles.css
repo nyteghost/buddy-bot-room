@@ -2193,3 +2193,16 @@ html[data-hide-secrets="1"] .secret:focus, html[data-hide-secrets="1"] .secret:f
   .deck-planner .print-layout-key tbody tr:nth-child(even) td { background: #f5f5f5 !important; }
   .deck-planner .print-document { font-family: ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif; }
 }
+
+/* ---- Document viewer (PDF text layer, search highlight, print) ---- */
+.pp-textlayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-align: initial; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; opacity: 1; }
+.pp-textlayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.pp-textlayer span.markedContent { top: 0; height: 0; }
+.pp-textlayer ::selection { background: rgb(0 100 255 / 0.3); }
+.pp-textlayer .pp-hit { background: rgb(255 214 0 / 0.5); border-radius: 2px; }
+.pp-print-root { display: none; }
+@media print {
+  body > *:not(.pp-print-root) { display: none !important; }
+  .pp-print-root { display: block !important; }
+  .pp-print-root img { display: block; width: 100%; break-after: page; page-break-after: always; }
+}
