@@ -673,6 +673,21 @@ Then just type a question. `/status` checks your services. It uses long-polling,
 
 ---
 
+### Desktop window layouts and snapping
+
+The **Workspace** sidebar adapts to the screen width; Ollama status and long labels should no longer create a horizontal scrollbar. On a desktop, use **Window layouts** in the left sidebar to choose:
+
+- **Chat:** pixel room beside Roundtable.
+- **Mail:** Mail fills the workspace.
+- **Work:** Show Services tools beside Documents.
+- **Server:** Today beside Settings (including Unraid diagnostics).
+
+Move any floating window by dragging its titlebar. Drag the titlebar to the **left** or **right** edge to snap into half the workspace, or to the **top** edge to fill it. A translucent preview shows where it will land. Drag a snapped window to undock it, or use its Restore button. Window borders and corners remain resizable.
+
+**Save current layout** stores visible windows and their sizes **in this browser**. Choose **My saved layout** to restore them, including after resizing your browser. This custom layout is device-local and is not an account-synced layout preset. Use **Reset layout** to return windows to their defaults.
+
+---
+
 ## 10. Using it on your phone
 
 - **Install:** open your HTTPS address in Safari → **Share → Add to Home Screen**. (Android Chrome: menu → *Install app*.) It opens full screen with its own icon.
