@@ -295,14 +295,14 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
     return row;
   };
   ws.mergeCells("A1:I1"); ws.mergeCells("A2:I2");
-  put(1, ["COBB GALLERIA CENTRE and COBB ENERGY PERFORMING ARTS CENTRE "]);
+  put(1, ["COBB CONVENTION CENTER-ATLANTA"]);
   put(2, ["Engineering Schedule (Subject to Change)"]);
   put(3, [null, null, "FROM:", { formula: "B5" }, "TO:", { formula: "H5" }]);
   put(4, ["DAY", ...DAYS, "TOTAL"]);
   put(5, [null, ...w.dates.map(toDate)]);
   for (let c = 2; c <= 8; c++) ws.getRow(5).getCell(c).numFmt = "m/d/yy";
   ws.getRow(3).getCell(4).numFmt = "m/d/yy"; ws.getRow(3).getCell(6).numFmt = "m/d/yy";
-  put(6, ["CGC", ...w.cgc], false); put(7, ["CEPAC"]); put(8, ["CGC BARS", null, null, null, null, null, null, null, "CGC BARS"]);
+  put(6, ["CCC", ...w.cgc], false); put(7, ["CCC BARS", null, null, null, null, null, null, null, "CCC BARS"]);
   let r = 9;
   for (const p of ENGINEER_ROSTER) {
     put(r, [p.name, ...w.dates.map((d) => engineerCell(plans, p.name, d)?.top || null)]);
@@ -330,7 +330,7 @@ function writeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
   };
   section("HALLS", HALL_ROWS);
   section("BALLROOM", BALLROOM_ROWS);
-  section("LOCATION", ["CEPAC", "Theatre", "Ballroom", ...w.other.filter((o) => !/^(cepac|theatre|ballroom)$/i.test(o)), "OTHER"]);
+  if (w.other.length) section("OTHER SPACES", w.other);
   for (let i = 3; i < r; i++) ws.getRow(i).height = 54;
   mergeEventSpaces(ws, w, byLabel, new Map(w.dates.map((d, i) => [d, i + 2])));
   fitRows(ws);
@@ -424,7 +424,7 @@ function mergeWeekSheet(ws: XSheet, w: WeekLayout, tasks: TaskNote[] = [], plans
     if (codes) paint(cell, codes);
   };
   w.dates.forEach((_, i) => {
-    if (w.cgc[i] !== "DARK") write("CGC", i, w.cgc[i]!); write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!, ["MI"]);
+    if (w.cgc[i] !== "DARK") { write("CGC", i, w.cgc[i]!); write("CCC", i, w.cgc[i]!); } write("Escalator", i, w.escalator[i]!); write("Service Desk", i, w.serviceDesk[i]!, ["MI"]);
     for (const [label, cells] of Object.entries(w.rows)) write(label, i, cells[i]!.text, cells[i]!.codes);
   });
   // Task suggestions go in the empty cells of the Tasks row under HALLS and BALLROOM; anything already typed there is kept.
