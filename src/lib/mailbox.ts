@@ -395,3 +395,55 @@ export function parseNote(uid: number, raw: string): PhoneNote {
   if (first && (first === title || title.startsWith(first) || first.startsWith(title))) text = text.split("\n").slice(1).join("\n").replace(/^\n+/, "");
   return { uid, uuid: headerGet(h, "X-Universally-Unique-Identifier").trim().slice(0, 64), title: title || first || "Untitled", text, date: headerGet(h, "Date").slice(0, 60) };
 }
+
+// ---------- selecting a folder, paging and searching ----------
+
+export type SelectInfo = { exists: number; uidvalidity: string; uidnext: number };
+/** What SELECT/EXAMINE tells us about the folder: how many messages, and the numbers that show whether it changed. */
+export function parseSelectInfo(reply: string): SelectInfo {
+  return {
+    exists: Number(/^\* (\d+) EXISTS/m.exec(reply)?.[1] ?? 0),
+    uidvalidity: /\[UIDVALIDITY (\d+)\]/i.exec(reply)?.[1] ?? "",
+    uidnext: Number(/\[UIDNEXT (\d+)\]/i.exec(reply)?.[1] ?? 0),
+  };
+}
+/** Changes whenever mail arrives, leaves, or the folder was rebuilt (UIDVALIDITY). Flag-only changes don't alter it. */
+export const folderSignature = (i: SelectInfo): string => `${i.uidvalidity}|${i.uidnext}|${i.exists}`;
+
+/** Sequence numbers of the newest `limit` messages, skipping the newest `offset`. Message numbers run 1..exists, oldest first. */
+export function newestRange(exists: number, limit: number, offset = 0): { lo: number; hi: number } | null {
+  const hi = exists - Math.max(0, offset);
+  if (exists < 1 || hi < 1) return null;
+  return { lo: Math.max(1, hi - Math.max(1, limit) + 1), hi };
+}
+
+const IMAP_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const quoteTerm = (t: string): string => `"${t.replace(/[\\"]/g, "\\$&")}"`;
+
+/**
+ * Turns what you typed into IMAP SEARCH keys so the server does the work. Plain words search the whole message (as before).
+ * Also understood: from:x  to:x  subject:x  since:2026-10-01  before:2026-10-31  is:unread  is:read  (quote several words: subject:"big sale").
+ */
+export function buildSearch(q: string, unread = false): { criteria: string; error?: string } {
+  const keys: string[] = [unread ? "UNSEEN" : ""];
+  const words: string[] = [];
+  const re = /(?:(from|to|cc|subject|since|before|is):)?(?:"([^"]*)"|(\S+))/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(q.trim()))) {
+    const op = (m[1] ?? "").toLowerCase();
+    const val = (m[2] ?? m[3] ?? "").trim();
+    if (!val) continue;
+    if (op === "from" || op === "to" || op === "cc" || op === "subject") keys.push(`${op.toUpperCase()} ${quoteTerm(val)}`);
+    else if (op === "since" || op === "before") {
+      const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(val);
+      if (!d || Number(d[2]) < 1 || Number(d[2]) > 12 || Number(d[3]) < 1 || Number(d[3]) > 31) return { criteria: "ALL", error: `Write dates like ${op}:2026-10-31.` };
+      keys.push(`${op.toUpperCase()} ${Number(d[3])}-${IMAP_MONTHS[Number(d[2]) - 1]}-${d[1]}`);
+    } else if (op === "is") {
+      if (val.toLowerCase() === "unread") keys.push("UNSEEN"); else if (val.toLowerCase() === "read") keys.push("SEEN");
+      else return { criteria: "ALL", error: "Use is:unread or is:read." };
+    } else words.push(val);
+  }
+  if (words.length) keys.push(`TEXT ${quoteTerm(words.join(" "))}`);
+  const out = [...new Set(keys.filter(Boolean))];
+  return { criteria: out.length ? out.join(" ") : "ALL" };
+}

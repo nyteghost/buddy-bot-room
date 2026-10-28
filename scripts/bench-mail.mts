@@ -5,6 +5,8 @@
 import { FakeImapServer, makeMessages } from "../src/test/helpers/fake-imap.ts";
 const client = (await import("../src/lib/imap-client.server.ts")) as { closeAllImap?: () => void; imapStats?: () => unknown }; // older checkouts have no pool
 const closeAllImap = client.closeAllImap ?? (() => undefined);
+const mailbox = (await import("../src/lib/mailbox.server.ts")) as { clearMailboxCaches?: () => void };
+const clearCaches = mailbox.clearMailboxCaches ?? (() => undefined); // older checkouts cache nothing
 const imapStats = client.imapStats ?? (() => null);
 import { listMessages, readMessage, setMailTlsOverrides } from "../src/lib/mailbox.server.ts";
 
@@ -21,10 +23,12 @@ type Row = { name: string; ms: number; connections: number; logins: number; comm
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)]!;
 const results: Row[] = [];
 
-async function measure(name: string, fn: () => Promise<unknown>, warm = false): Promise<void> {
+/** cold: new connection and empty caches. pool: connection reused, caches empty. all: connection and caches warm. */
+async function measure(name: string, fn: () => Promise<unknown>, mode: "cold" | "pool" | "all" = "cold"): Promise<void> {
   const times: number[] = []; let last: Row | undefined;
   for (let i = 0; i < RUNS; i++) {
-    if (!warm) closeAllImap(); // cold: nothing reusable carried over from the last run
+    if (mode === "cold") closeAllImap();
+    if (mode !== "all") clearCaches();
     await new Promise((r) => setTimeout(r, 30));
     srv.resetCounters();
     const t0 = performance.now();
@@ -41,14 +45,19 @@ await measure("1 Inbox open (30 newest)", () => listMessages(cfg, { folder: "INB
 await measure("2 Open a message", () => readMessage(cfg, "INBOX", N - 3, false));
 await measure("3 Switch folder (Sent)", () => listMessages(cfg, { folder: "[Gmail]/Sent Mail", limit: 30 }));
 await measure("4 Search (subject text)", () => listMessages(cfg, { folder: "INBOX", q: `m subject ${N - 10}`, limit: 30 }));
-// Warm: the connection from the step before is still open (what a user clicking around actually gets).
+// Connection kept open between runs, caches emptied: the saving from the pool alone.
 await listMessages(cfg, { folder: "INBOX", limit: 30 });
-await measure("1w Inbox open, warm", () => listMessages(cfg, { folder: "INBOX", limit: 30 }), true);
-await measure("2w Open a message, warm", () => readMessage(cfg, "INBOX", N - 3, false), true);
-await measure("3w Switch folder, warm", () => listMessages(cfg, { folder: "[Gmail]/Sent Mail", limit: 30 }), true);
-await measure("4w Search, warm", () => listMessages(cfg, { folder: "INBOX", q: `m subject ${N - 10}`, limit: 30 }), true);
+await measure("1p Inbox open, pooled connection", () => listMessages(cfg, { folder: "INBOX", limit: 30 }), "pool");
+await measure("2p Open a message, pooled", () => readMessage(cfg, "INBOX", N - 3, false), "pool");
+await measure("3p Switch folder, pooled", () => listMessages(cfg, { folder: "[Gmail]/Sent Mail", limit: 30 }), "pool");
+await measure("4p Search, pooled", () => listMessages(cfg, { folder: "INBOX", q: `m subject ${N - 10}`, limit: 30 }), "pool");
+// Everything warm: a repeat of something just done (cache hit, only the freshness check goes to the server).
+await measure("1c Inbox open, repeat", () => listMessages(cfg, { folder: "INBOX", limit: 30 }), "all");
+await measure("2c Open a message, repeat", () => readMessage(cfg, "INBOX", N - 3, false), "all");
+await measure("3c Switch folder, repeat", () => listMessages(cfg, { folder: "[Gmail]/Sent Mail", limit: 30 }), "all");
+await measure("4c Search, repeat", () => listMessages(cfg, { folder: "INBOX", q: `m subject ${N - 10}`, limit: 30 }), "all");
 // A realistic session: open inbox, read three messages, switch folder and back. Connections are NOT reset between steps.
-closeAllImap(); await new Promise((r) => setTimeout(r, 30)); srv.resetCounters();
+closeAllImap(); clearCaches(); await new Promise((r) => setTimeout(r, 30)); srv.resetCounters();
 const s0 = performance.now();
 await listMessages(cfg, { folder: "INBOX", limit: 30 });
 for (const id of [N, N - 1, N - 2]) await readMessage(cfg, "INBOX", id, false);
