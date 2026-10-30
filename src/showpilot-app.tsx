@@ -7,7 +7,7 @@ import { ShowServicesTools, type WorkTabId } from "@/components/work-tools";
 import { BackupPanel } from "@/components/showpilot-backup";
 import { ShowPilotAiSettings } from "@/components/showpilot-ai-settings";
 import { GoogleCalendarSettings } from "@/components/showpilot-calendar-settings";
-import showpilotIcon from "./assets/showpilot-icon.svg";
+import showpilotIcon from "./assets/showpilot-approved.webp";
 
 type Screen = "dashboard" | "settings" | WorkTabId;
 const sections: { id: WorkTabId; label: string; desc: string; Icon: typeof CalendarDays; note: string }[] = [
