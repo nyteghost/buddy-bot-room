@@ -21,7 +21,8 @@ function stageDiagram(stage:CrewPrintStage):string {
   ];
   const decks=stage.decks.map((d,i)=>{
     const [x,y,w,h]=shape(d.x,d.y,d.w,d.h);
-    return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+(d.isBridge?"#edf1f5":"#fff")+'" stroke="#111827" stroke-width=".16" vector-effect="non-scaling-stroke"><title>Deck '+(i+1)+'</title></rect>';
+    const bridgeLabel=d.isBridge ? '<text x="'+fmt(num(d.x)+num(d.w)/2)+'" y="'+fmt(num(d.y)+num(d.h)/2)+'" font-size=".75" font-family="Arial,sans-serif" font-weight="700" fill="#111827" dominant-baseline="middle" text-anchor="middle">BRIDGE</text>' : "";
+    return '<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+(d.isBridge?"#edf1f5":"#fff")+'" stroke="#111827" stroke-width=".16" vector-effect="non-scaling-stroke"><title>'+(d.isBridge?"Bridge deck ":"Deck ")+(i+1)+'</title></rect>'+bridgeLabel+'</g>';
   }).join("");
   const holders=stage.holders.map((h,i)=>{
     const [x,y,w,hh]=shape(h.x,h.y,h.w,h.h);
@@ -52,6 +53,8 @@ export function crewPrintDocument(eventName:string, stages:readonly CrewPrintSta
   const title=escape(eventName.trim()||"Stage Plan");
   const pages=stages.map((s,index)=>{
     const tally=crewPrintData(s);
+    const bridgeCount=s.decks.filter(d=>d.isBridge).length;
+    const bridgeInfo=bridgeCount ? '<p class="loose"><b>Bridge decks:</b> '+bridgeCount+' of the '+tally.decks+' total decks (marked BRIDGE on diagram). Verify approved bridge support before assembly.</p>' : '';
     const note=s.valid?"":"<p class=\"warning\">CHECK PLAN: layout cannot be built from current stock.</p>";
     const loose=tally.loose>0?'<p class="loose">Includes '+tally.loose+' extra loose deck'+(tally.loose===1?"":"s")+' not shown in the diagram.</p>':"";
     return '<article class="sheet" data-stage="'+(index+1)+'">'+
@@ -68,7 +71,7 @@ export function crewPrintDocument(eventName:string, stages:readonly CrewPrintSta
       '<div><span>1-DECK HOLDERS</span><strong>'+tally.holders[1]+'</strong></div></div>'+
       '<div class="drawing"><h3>DECK PLACEMENT · TOP VIEW</h3>'+stageDiagram(s)+'</div>'+
       '<div class="legend"><b>Diagram key:</b> solid outline = 1-deck holder · dashed = 2-deck holder · double = 3-deck holder. Outlines show individual decks. Deck size is stated once in the materials summary.</div>'+
-      loose+note+
+      bridgeInfo+loose+note+
       '<div class="footer">STAGE '+(index+1)+' OF '+stages.length+' · '+escape(s.name||"Stage")+'</div></article>';
   }).join("");
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>'+title+' — Stage Crew Sheets</title>'+
