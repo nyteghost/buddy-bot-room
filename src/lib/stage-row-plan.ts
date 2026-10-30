@@ -30,14 +30,14 @@ function bestCounts(cells:number, stock:Stock, allowTwo:boolean):Counts|null {
   }
   if(!candidates.length)return null;
   candidates.sort((a,b)=>
-    // Primary: use the fewest holders. Bridges reduce equipment, not deck count.
+    // Minimize the total number of holders first. Among equal-equipment plans,
+    // favor the crew's preferred 3-deck assemblies and avoid multiple singles.
     (a.holders-b.holders)
-    // Secondary: among equally economical layouts, use as many safe bridge
-    // positions as possible (matches the user's two-stage 92x8 method).
-    || (b.bridges-a.bridges)
     || (prefsAvoidSingles(a.one)-prefsAvoidSingles(b.one))
-    // Keep large holders together to simplify carrying and setup.
     || (b.three-a.three)
+    // Then maximize bridge decks. More bridges with the same holder count
+    // aren't automatically easier if they require extra 1-deck assemblies.
+    || (b.bridges-a.bridges)
     || (a.one-b.one)
   );
   return candidates[0];
