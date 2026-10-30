@@ -1,7 +1,7 @@
 import { accountsEnabled } from "./accounts";
 import { currentUser } from "./accounts.server";
 import { askPals } from "./ask.server";
-import { cleanStartStep, cleanStartTask, fallbackStartStep, firstStepPrompt, FOCUS_SYSTEM_PROMPT, START_ACTIONS, type StartAction } from "./focus-assist";
+import { cleanStartStep, cleanStartTask, cleanStartNumber, cleanCompletedSteps, fallbackStartStep, firstStepPrompt, FOCUS_SYSTEM_PROMPT, START_ACTIONS, usefulStartStep, type StartAction } from "./focus-assist";
 
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -13,7 +13,7 @@ export async function handleJustStart(request: Request): Promise<Response> {
     return reply({ error: "Sign in as the owner to use Focus Assist." }, 403);
   if (Number(request.headers.get("content-length") ?? 0) > 2048) return reply({ error: "Task is too long." }, 413);
 
-  let body: { task?: unknown; action?: unknown; previous?: unknown };
+  let body: { task?: unknown; action?: unknown; previous?: unknown; stepNumber?: unknown; completed?: unknown };
   try {
     const raw = await request.text();
     if (raw.length > 2048) return reply({ error: "Task is too long." }, 413);
@@ -25,16 +25,18 @@ export async function handleJustStart(request: Request): Promise<Response> {
   if (!START_ACTIONS.includes(body.action as StartAction)) return reply({ error: "Invalid start action." }, 400);
   const action = body.action as StartAction;
   const previous = cleanStartStep(body.previous) ?? "";
-  const basic = fallbackStartStep(task, action);
+  const stepNumber = cleanStartNumber(body.stepNumber);
+  const completed = cleanCompletedSteps(body.completed);
+  const basic = fallbackStartStep(task, action, previous, stepNumber);
   try {
-    const answer = await askPals(firstStepPrompt(task, action, previous), {
+    const answer = await askPals(firstStepPrompt(task, action, previous, stepNumber, completed), {
       system: FOCUS_SYSTEM_PROMPT,
-      maxTokens: 100,
+      maxTokens: 120,
       localOnly: true,
     });
     if (answer.ok) {
       const step = cleanStartStep(answer.text);
-      if (step) return reply({ step, source: "local-ai" });
+      if (step && usefulStartStep(task, step, previous)) return reply({ step, source: "local-ai" });
     }
   } catch { /* No inference is required to start. */ }
   return reply({ step: basic, source: "quick-start" });

@@ -100,16 +100,24 @@ await step("Just Start opens and remembers progress", async () => {
   await dialog.getByRole("textbox", { name: "What are you trying to start?" }).fill("Finish tomorrow's show schedule");
   await dialog.getByRole("button", { name: "Help me start" }).click();
   await dialog.getByText("Open tomorrow's show schedule.").waitFor({ timeout: 10000 });
+  await dialog.getByText("Step 1", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Smaller step" }).click();
   await dialog.getByText("Locate the schedule file.").waitFor({ timeout: 10000 });
+  await dialog.getByText("Step 1", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "I started" }).click();
   await dialog.getByText(/You started. That counts/).waitFor();
+  await dialog.getByText("Step 2", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "Try a different step" }).click();
+  await dialog.getByText("Step 2", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "One more small step" }).click();
+  await dialog.getByText("Step 3", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Optional 2-minute timer" }).click();
   await dialog.getByRole("button", { name: "Stop timer" }).waitFor();
   await dialog.getByRole("button", { name: "Close" }).click();
   await page.getByRole("button", { name: "Just Start" }).first().click();
   const restored = page.getByRole("dialog", { name: "Just Start" });
   await restored.getByText(/You started. That counts/).waitFor();
+  await restored.getByText("Step 3", { exact: true }).waitFor();
   await restored.getByRole("button", { name: "New start" }).click();
   if (await restored.getByRole("textbox", { name: "What are you trying to start?" }).inputValue()) throw Error("New start failed to clear task");
   await restored.getByRole("button", { name: "Close" }).click();
@@ -126,10 +134,12 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await dialog.getByRole("textbox", { name: "What are you trying to start?" }).fill("Review tomorrow's schedule");
   await dialog.getByRole("button", { name: "Help me start" }).click();
   await dialog.getByRole("button", { name: "I started" }).click();
+  await dialog.getByText("Step 2", { exact: true }).waitFor();
   await dialog.getByRole("combobox", { name: "Your work buddy" }).selectOption("byte");
   await dialog.getByRole("button", { name: "Stay with me" }).click();
   const companion = page.getByRole("complementary", { name: "Focus Assist work companion" });
   await companion.getByText(/Review tomorrow's schedule/).waitFor();
+  await companion.getByText(/Step 2 · Your next tiny step/).waitFor();
   const roomEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomEntry.getAttribute("aria-pressed") !== "true") await roomEntry.click();
   const activity = page.getByRole("region", { name: "Pal Room activities" });
@@ -142,13 +152,44 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await roomEntry.click();
   await companion.getByRole("button", { name: "Done with step" }).click();
   await companion.getByText("Check the next event.").waitFor();
+  await companion.getByText(/Step 3 · Your next tiny step/).waitFor();
   await companion.getByRole("button", { name: "Save my place" }).click();
   await companion.getByRole("button", { name: "Pause companion" }).click();
   const checkpoint = page.getByRole("complementary", { name: "Saved Focus Assist checkpoint" });
   await checkpoint.getByRole("button", { name: /Resume with/ }).click();
   await companion.getByText("Check the next event.").waitFor();
+  await companion.getByText(/Step 3 · Your next tiny step/).waitFor();
   await companion.getByRole("button", { name: "Finish & clear" }).click();
   if (await checkpoint.count()) throw Error("Companion checkpoint was not cleared");
+  await page.unroute("**/api/just-start");
+});
+
+await step("Just Start fallback handles swingset as three distinct numbered steps", async () => {
+  await page.route("**/api/just-start", async (route) => {
+    const request = route.request().postDataJSON();
+    const number = request.stepNumber ?? 1;
+    const steps = [
+      "Find the assembly manual and place it next to the parts.",
+      "Lay out the pieces where you can see them, without assembling anything yet.",
+      "Separate the bolts, washers, and brackets into small groups.",
+    ];
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ step: steps[Math.min(number - 1, 2)], source: "quick-start" }) });
+  });
+  await page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Just Start\s*$/i }).click();
+  const dialog = page.getByRole("dialog", { name: "Just Start" });
+  await dialog.getByRole("textbox", { name: "What are you trying to start?" }).fill("Build a swingset");
+  await dialog.getByRole("button", { name: "Help me start" }).click();
+  await dialog.getByText("Step 1", { exact: true }).waitFor();
+  await dialog.getByText(/Find the assembly manual/).waitFor();
+  await dialog.getByText(/What counts as done/).waitFor();
+  await dialog.getByRole("button", { name: "I started" }).click();
+  await dialog.getByText("Step 2", { exact: true }).waitFor();
+  await dialog.getByText(/Lay out the pieces/).waitFor();
+  await dialog.getByRole("button", { name: "One more small step" }).click();
+  await dialog.getByText("Step 3", { exact: true }).waitFor();
+  await dialog.getByText(/Separate the bolts/).waitFor();
+  await dialog.getByRole("button", { name: "New start" }).click();
+  await dialog.getByRole("button", { name: "Close" }).click();
   await page.unroute("**/api/just-start");
 });
 

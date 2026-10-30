@@ -6,21 +6,21 @@ import { makeFocusSession, type CompanionMode, type FocusSession } from "@/lib/f
 import { useCharacterMode } from "@/lib/hellraiser";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cleanStartStep, cleanStartTask, fallbackStartStep, type StartAction, type StartStage } from "@/lib/focus-assist";
+import { cleanCompletedSteps, cleanStartNumber, cleanStartStep, cleanStartTask, fallbackStartStep, whatCountsAsDone, type StartAction, type StartStage } from "@/lib/focus-assist";
 
 const SESSION_KEY = "pixel-pals-just-start-v1";
-type Saved = { task: string; step: string; stage: StartStage };
+type Saved = { task: string; step: string; stage: StartStage; stepNumber: number; completed: string[]; source: "local-ai" | "quick-start" };
 type StepResponse = { step?: string; source?: "local-ai" | "quick-start"; error?: string };
 const readSaved = (): Saved | null => {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw || raw.length > 1000) return null;
+    if (!raw || raw.length > 2600) return null;
     const data = JSON.parse(raw) as Partial<Saved>;
     const task = cleanStartTask(data.task);
     if (!task || !["entry", "step", "started"].includes(data.stage ?? "")) return null;
     const stage = data.stage as StartStage;
     const step = cleanStartStep(data.step) ?? "";
-    return { task, step, stage: stage === "entry" || step ? stage : "entry" };
+    return { task, step, stage: stage === "entry" || step ? stage : "entry", stepNumber: cleanStartNumber(data.stepNumber), completed: cleanCompletedSteps(data.completed), source: data.source === "local-ai" ? "local-ai" : "quick-start" };
   } catch { return null; }
 };
 
@@ -39,6 +39,9 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
   const [task, setTask] = useState("");
   const [step, setStep] = useState("");
   const [stage, setStage] = useState<StartStage>("entry");
+  const [stepNumber, setStepNumber] = useState(1);
+  const [completed, setCompleted] = useState<string[]>([]);
+  const [stepSource, setStepSource] = useState<"local-ai" | "quick-start">("quick-start");
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -54,6 +57,9 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
     setTask(chosen ?? saved?.task ?? "");
     setStep(saved?.step ?? "");
     setStage(saved?.stage ?? "entry");
+    setStepNumber(saved?.stepNumber ?? 1);
+    setCompleted(saved?.completed ?? []);
+    setStepSource(saved?.source ?? "quick-start");
     setNote("");
     setBusy(false);
     setTimerDone(false);
@@ -63,10 +69,10 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
   useEffect(() => {
     if (!open || !loaded) return;
     try {
-      if (cleanStartTask(task)) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ task, step, stage }));
+      if (cleanStartTask(task)) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ task, step, stage, stepNumber, completed, source: stepSource }));
       else sessionStorage.removeItem(SESSION_KEY);
     } catch { /* optional browser storage */ }
-  }, [open, loaded, task, step, stage]);
+  }, [open, loaded, task, step, stage, stepNumber, completed, stepSource]);
 
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => {
@@ -93,16 +99,24 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
     const controller = new AbortController();
     pending.current = controller;
     const previous = step;
-    const quick = fallbackStartStep(validTask, action);
+    const nextNumber = action === "next" ? Math.min(999, stepNumber + 1) : stepNumber;
+    const alreadyDone = action === "next" && cleanStartStep(previous)
+      ? [...completed, cleanStartStep(previous)!].slice(-8) : completed;
+    const quick = fallbackStartStep(validTask, action, previous, nextNumber);
+    setStepNumber(nextNumber);
+    setCompleted(alreadyDone);
     setStep(quick);
-    setStage("step");
-    setNote("Here's something you can do now. Asking Local AI for a more specific step…");
+    setStepSource("quick-start");
+    setStage((current) => action === "next" || current === "started" ? "started" : "step");
+    setNote(action === "next"
+      ? "That start counts. Here is one more tiny step while Local AI refines it…"
+      : "You can try this now. Asking Local AI for a more specific step…");
     setBusy(true);
     try {
       const response = await fetch("/api/just-start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: validTask, action, previous }),
+        body: JSON.stringify({ task: validTask, action, previous, stepNumber: nextNumber, completed: alreadyDone.slice(-4) }),
         signal: controller.signal,
       });
       const data = await response.json() as StepResponse;
@@ -112,7 +126,8 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
         return;
       }
       setStep(cleanStartStep(data.step) ?? quick);
-      setNote(data.source === "local-ai" ? "One small step from Local AI." : "A simple quick-start step (Local AI unavailable).");
+      setStepSource(data.source === "local-ai" ? "local-ai" : "quick-start");
+      setNote(data.source === "local-ai" ? "Your local AI suggested a task-specific step." : "Offline suggestion — Local AI unavailable.");
     } catch {
       if (!controller.signal.aborted) setNote("Local AI couldn't connect. You can still use the quick-start step.");
     } finally {
@@ -123,6 +138,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
   const changeTask = (next: string) => {
     pending.current?.abort(); pending.current = null;
     setTask(next); setStage("entry"); setStep(""); setNote(""); setBusy(false);
+    setStepNumber(1); setCompleted([]); setStepSource("quick-start");
     setTimerUntil(null); setTimerDone(false);
   };
 
@@ -153,20 +169,21 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
       ) : (
         <section className="grid gap-3 rounded-lg border bg-muted/30 p-3" aria-label="Your next small step">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">One small step</span>
-            {busy && <span role="status" className="text-xs text-muted-foreground">Refining…</span>}
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {stepNumber}</span>
+            <span className="text-xs text-muted-foreground">{busy ? "Refining…" : stepSource === "local-ai" ? "Local AI suggestion" : "Offline quick-start"}</span>
           </div>
           <p className="text-base font-medium leading-relaxed" aria-live="polite">{step}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground"><strong>What counts as done?</strong> {whatCountsAsDone(step)}</p>
           {stage === "started" ? (
             <div className="grid gap-2">
-              <p className="text-sm text-muted-foreground"><Check className="mr-1 inline size-4" /> You started. That counts. Continuing is optional.</p>
+              <p className="text-sm text-muted-foreground"><Check className="mr-1 inline size-4" /> You started. That counts. Continuing is optional. {completed.length} small {completed.length === 1 ? "win" : "wins"} so far.</p>
               <Button className="w-fit" variant="outline" onClick={() => void ask("next")}>One more small step</Button>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => { pending.current?.abort(); pending.current = null; setBusy(false); setStage("started"); setNote(""); }}><Check className="size-4" /> I started</Button>
-              <Button variant="outline" onClick={() => void ask("smaller")}>Smaller step</Button>
-              <Button variant="outline" onClick={() => void ask("stuck")}>I'm stuck</Button>
+              <Button onClick={() => void ask("next")}><Check className="size-4" /> I started</Button>
+              <Button variant="outline" disabled={busy} onClick={() => void ask("smaller")}>Smaller step</Button>
+              <Button variant="outline" disabled={busy} onClick={() => void ask("stuck")}>I'm stuck</Button>
             </div>
           )}
         </section>
@@ -176,7 +193,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
           <span className="text-xs text-muted-foreground">How was that step?</span>
           <Button variant="ghost" size="sm" disabled={busy} onClick={() => void ask("smaller")}>Too big</Button>
           <Button variant="ghost" size="sm" onClick={() => setNote("Good to know. You can keep going at your own pace.")}>That helped</Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void ask("alternate")}>Try another approach</Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void ask("alternate")}>Try a different step</Button>
         </div>
       )}
       {stage === "started" && onCompanionStart && (
@@ -202,7 +219,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
             </select>
           </div>
           <Button onClick={() => {
-            const session = makeFocusSession(task, step, pal, companionMode);
+            const session = makeFocusSession(task, step, pal, companionMode, stepNumber, completed);
             if (session) { onCompanionStart(session); close(false); }
           }}><Users className="size-4" /> Stay with me</Button>
           <p className="text-xs text-muted-foreground">Animated companionship, not screen tracking. Your Pal cannot see or change work in other apps. Saving your place is always your choice.</p>

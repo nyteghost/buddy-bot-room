@@ -1,5 +1,5 @@
 import { agents, type AgentId } from "./agents";
-import { cleanStartStep, cleanStartTask } from "./focus-assist";
+import { cleanCompletedSteps, cleanStartNumber, cleanStartStep, cleanStartTask } from "./focus-assist";
 
 /** Saved only by an explicit "Save my place" action, in this browser's localStorage. */
 export const FOCUS_CHECKPOINT_KEY = "pixel-pals-focus-checkpoint-v1";
@@ -12,13 +12,14 @@ export type FocusSession = {
   pal: AgentId;
   mode: CompanionMode;
   completed: string[];
+  stepNumber: number;
 };
 
-export function makeFocusSession(task: unknown, step: unknown, pal: AgentId, mode: CompanionMode): FocusSession | null {
+export function makeFocusSession(task: unknown, step: unknown, pal: AgentId, mode: CompanionMode, stepNumber = 1, completed: string[] = []): FocusSession | null {
   const validTask = cleanStartTask(task);
   const validStep = cleanStartStep(step);
   if (!validTask || !validStep) return null;
-  return { task: validTask, step: validStep, pal, mode, completed: [] };
+  return { task: validTask, step: validStep, pal, mode, completed: cleanCompletedSteps(completed), stepNumber: cleanStartNumber(stepNumber) };
 }
 
 /** Treat localStorage as untrusted input: validate lengths, identifiers and structure. */
@@ -31,11 +32,9 @@ export function readFocusCheckpoint(raw: string | null): FocusSession | null {
     const step = cleanStartStep(data.step);
     if (!task || !step || !agents.some((a) => a.id === data.pal)) return null;
     if (!COMPANION_MODES.includes(data.mode as CompanionMode)) return null;
-    const completed = Array.isArray(data.completed)
-      ? data.completed.filter((item): item is string => typeof item === "string")
-          .slice(-8).map((item) => cleanStartStep(item)).filter((item): item is string => item !== null)
-      : [];
-    return { task, step, pal: data.pal as AgentId, mode: data.mode as CompanionMode, completed };
+    const completed = cleanCompletedSteps(data.completed);
+    const stepNumber = cleanStartNumber(data.stepNumber ?? Math.min(999, completed.length + 1));
+    return { task, step, pal: data.pal as AgentId, mode: data.mode as CompanionMode, completed, stepNumber };
   } catch { return null; }
 }
 

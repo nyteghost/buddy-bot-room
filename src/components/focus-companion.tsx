@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { agents, agentName } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
 import { hasFacingArt } from "@/lib/pal-art";
-import { cleanStartStep, fallbackStartStep } from "@/lib/focus-assist";
+import { cleanStartStep, fallbackStartStep, whatCountsAsDone } from "@/lib/focus-assist";
 import { COMPANION_MODES, FOCUS_CHECKPOINT_KEY, companionActivity, readFocusCheckpoint, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
 
@@ -57,7 +57,8 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
     pending.current = controller;
     const previous = session.step;
     const completed = [...session.completed, previous].slice(-8);
-    const next = { ...session, completed };
+    const stepNumber = Math.min(999, session.stepNumber + 1);
+    const next = { ...session, completed, stepNumber };
     onChange(next);
     setBusy(true);
     setCheckin(false);
@@ -66,17 +67,17 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
       const response = await fetch("/api/just-start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: session.task, action: "next", previous }),
+        body: JSON.stringify({ task: session.task, action: "next", previous, stepNumber, completed: completed.slice(-4) }),
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("Unavailable");
       const data = await response.json() as { step?: string; source?: string };
       if (controller.signal.aborted || pending.current !== controller) return;
-      onChange({ ...next, step: cleanStartStep(data.step) ?? fallbackStartStep(session.task, "next") });
+      onChange({ ...next, step: cleanStartStep(data.step) ?? fallbackStartStep(session.task, "next", previous, stepNumber) });
       setNote(data.source === "local-ai" ? "Your Pal suggested a small next step." : "A quick step you can use without Local AI.");
     } catch {
       if (!controller.signal.aborted) {
-        onChange({ ...next, step: fallbackStartStep(session.task, "next") });
+        onChange({ ...next, step: fallbackStartStep(session.task, "next", previous, stepNumber) });
         setNote("Local AI is unavailable, so here's a simple next step.");
       }
     } finally {
@@ -92,7 +93,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
         <Button variant="ghost" size="sm" aria-label="Forget saved place" onClick={forget}><X className="size-4" /></Button>
       </div>
       <p className="text-sm font-medium">{saved.task}</p>
-      <p className="text-xs text-muted-foreground">Next: {saved.step}</p>
+      <p className="text-xs text-muted-foreground">Step {saved.stepNumber}: {saved.step}</p>
       <Button size="sm" onClick={() => { onChange(saved); setNote(""); }}>Resume with {agentName(saved.pal, false, false, theme)}</Button>
       <p className="text-xs text-muted-foreground">Saved in this browser only.</p>
     </aside>
@@ -115,8 +116,9 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
       <p className="text-xs font-semibold text-muted-foreground">{paused ? "On a break from" : "Working alongside you on"}</p>
       <p className="text-sm font-medium focus-companion-task">{session.task}</p>
       <div className="focus-companion-step">
-        <p className="text-xs text-muted-foreground">Your next tiny step</p>
+        <p className="text-xs text-muted-foreground">Step {session.stepNumber} · Your next tiny step</p>
         <p className="text-sm">{session.step}</p>
+        <p className="text-xs text-muted-foreground"><strong>What counts as done?</strong> {whatCountsAsDone(session.step)}</p>
       </div>
       {session.mode === "steps" && <p className="text-xs text-muted-foreground">When you finish this step, ask for just one more. No whole-task pressure.</p>}
       {checkin && <div className="focus-companion-checkin" role="status">
