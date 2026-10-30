@@ -65,6 +65,16 @@ describe("ShowPilot short crew printouts",()=>{
     expect((html.match(/4 × 8 DECKS/g)||[])).toHaveLength(1);
     expect(html).toContain("Outlines show individual decks");
   });
+  it("labels actual bridge decks on the printed diagram without changing the total count",()=>{
+    const a=stage("Bridge Platform");
+    a.decks[1]={...a.decks[1],isBridge:true};
+    const html=crewPrintDocument("Demo",[a]);
+    expect(html).toContain("Bridge decks:");
+    expect(html).toContain("marked BRIDGE on diagram");
+    expect(html).toContain("Verify approved bridge support");
+    expect(html).toContain(">BRIDGE</text>");
+    expect(crewPrintData(a).decks).toBe(4);
+  });
   it("flags invalid stages rather than silently claiming they can be built",()=>{
     const html=crewPrintDocument("Event",[{...stage("Incomplete"),valid:false}]);
     expect(html).toContain("CHECK PLAN");
