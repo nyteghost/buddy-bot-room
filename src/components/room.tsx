@@ -1666,7 +1666,7 @@ export function Room() {
             <span className="brand-chat"> / chat</span>
           </span>
         </a>
-        <Button variant="outline" size="sm" className="just-start-header" onClick={() => beginFocusTask()} title="Just Start: one small action at a time"><Sparkles className="size-4" /> <span>Just Start</span></Button>
+        <Button variant="outline" size="sm" className="just-start-header" aria-label="Just Start" onClick={() => beginFocusTask()} title="Just Start: one small action at a time"><Sparkles className="size-4" /> <span>Just Start</span></Button>
         <Button variant="ghost" size="icon" className="header-focus-btn" aria-label={focusMode ? "Leave focus mode" : "Focus mode"} aria-pressed={focusMode} title={focusMode ? "Leave focus mode (Ctrl+Shift+F)" : "Focus mode: just the chat (Ctrl+Shift+F)"} onClick={() => setFocusMode((v) => !v)}>{focusMode ? <Minimize2 /> : <Maximize2 />}</Button>
         <Button variant="ghost" size="icon" className="header-menu-btn" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Ellipsis /></Button>
         <div
