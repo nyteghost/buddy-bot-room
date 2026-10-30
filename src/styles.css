@@ -6,3 +6,8 @@
 
 /* Stage Deck Planner: stronger secondary text contrast on screen; crew print CSS is isolated and solid black. */
 .deck-planner .text-muted-foreground{color:#334155}.dark .deck-planner .text-muted-foreground{color:#d2dae5}
+
+/* Show Services brand emblem: recognizable stage/truss mark at sidebar and taskbar scale. */
+.sp-logo{background:transparent;overflow:hidden;flex-shrink:0;display:grid;place-items:center}
+.sp-logo img{display:block;width:100%;height:100%;object-fit:contain}
+.sp-banner>img{border-radius:12px;flex-shrink:0}
