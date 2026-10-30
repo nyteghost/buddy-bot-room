@@ -20,7 +20,7 @@ async function remindCall(op: "list" | "add" | "remove" | "snooze", text = "", e
 }
 
 /** To-dos (kept in this browser, the list the pals see) plus reminders (kept on the server, pushed to your phone). */
-export function TasksPanel({ open }: { open: boolean }) {
+export function TasksPanel({ open, onJustStart }: { open: boolean; onJustStart?: (task: string) => void }) {
   const { todos } = useWorkbench();
   const [text, setText] = useState("");
   const [when, setWhen] = useState("");
@@ -52,6 +52,7 @@ export function TasksPanel({ open }: { open: boolean }) {
           <div key={t.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
             <input type="checkbox" checked={t.done} onChange={() => updateWorkbench((w) => ({ ...w, todos: toggleTodo(w.todos, i + 1) }))} aria-label={`Done: ${t.text}`} />
             <span className={t.done ? "min-w-0 flex-1 truncate text-muted-foreground line-through" : "min-w-0 flex-1 truncate"}>{t.text}</span>
+            {!t.done && onJustStart && <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" aria-label={`Just Start: ${t.text}`} onClick={() => onJustStart(t.text)}>Just Start</Button>}
             <Button size="sm" variant="ghost" className="h-7 px-1" aria-label="Remove" onClick={() => updateWorkbench((w) => ({ ...w, todos: removeAt(w.todos, i + 1) }))}><Trash2 className="size-3.5" /></Button>
           </div>
         ))}
