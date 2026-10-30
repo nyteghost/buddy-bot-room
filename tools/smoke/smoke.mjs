@@ -146,10 +146,20 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await companion.getByText(/Review tomorrow's schedule/).waitFor();
   await companion.getByRole("region", { name: "Tiny wins" }).waitFor();
   await companion.getByText(/Step 2 · Your next tiny step/).waitFor();
+  await page.route("**/api/pal-work", async (route) => {
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({draft:"Sample plan:\n- Review the first shift",source:"offline-example"})});
+  });
+  await companion.getByRole("button", { name: "Pal: make a sample" }).click();
+  await companion.getByRole("textbox", { name: "Pal draft to review and copy" }).waitFor();
+  if (!(await companion.getByRole("textbox", { name: "Pal draft to review and copy" }).inputValue()).includes("Review the first shift")) throw Error("Pal didn't prepare sample work");
+  await page.unroute("**/api/pal-work");
   const roomEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomEntry.getAttribute("aria-pressed") !== "true") await roomEntry.click();
   const activity = page.getByRole("region", { name: "Pal Room activities" });
   await activity.getByText(/Byte is working beside you/).waitFor();
+  const quest = page.getByRole("region", { name: "Tiny Quest Corner" });
+  await quest.getByRole("button", { name: "Enable quests" }).click();
+  await quest.getByText(/decorating a cozy corner/).waitFor();
   await activity.getByRole("button", { name: "Break together" }).click();
   await activity.getByRole("button", { name: "I'm back" }).waitFor();
   if (await companion.getByRole("button", { name: "Done with step" }).isEnabled()) throw Error("Work step wasn't paused during a break");
@@ -245,6 +255,17 @@ await step("Today future overview and important Brain Dump alert", async () => {
   });
   const todayItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i });
   if (await todayItem.getAttribute("aria-pressed") !== "true") await todayItem.click();
+  const hub = page.getByRole("region", { name: "ADHD home and task picker" });
+  await hub.getByText("One thing at a time").waitFor();
+  await hub.getByRole("combobox", { name: "Your energy today" }).selectOption("low");
+  await hub.getByRole("combobox", { name: "Available minutes" }).selectOption("5");
+  await hub.getByRole("button", { name: "Gentle 2-minute pause" }).click();
+  await hub.getByRole("button", { name: /Pause:/ }).waitFor();
+  await hub.getByRole("button", { name: /Pause:/ }).click();
+  await hub.getByRole("button", { name: /Open daily check-in/ }).click();
+  await hub.getByPlaceholder("A single priority is enough.").fill("Review one event");
+  await hub.getByRole("button", { name: "Save today's note" }).click();
+  await hub.getByText(/Saved in this browser for today/).waitFor();
   const overview = page.getByRole("navigation", { name: "Day overview" });
   await overview.getByRole("button", { name: "Tomorrow" }).click();
   await overview.getByRole("button", { name: "Day after" }).click();
@@ -252,6 +273,8 @@ await step("Today future overview and important Brain Dump alert", async () => {
   const dump = page.getByRole("region", { name: "Brain Dump" });
   await dump.getByRole("textbox", { name: "Brain dump tasks" }).fill("Review next week's show schedule");
   await dump.getByRole("button", { name: "Capture thoughts" }).click();
+  await dump.getByRole("group", { name: "Choose a day for Review next week's show schedule" }).getByRole("button", { name: "Tomorrow" }).click();
+  await dump.getByRole("group", { name: "Choose a day for Review next week's show schedule" }).getByRole("button", { name: "Today" }).click();
   await dump.getByRole("checkbox", { name: "Important: Review next week's show schedule" }).check();
   const future = await page.evaluate(() => {
     const dt = new Date(Date.now() + 5 * 86_400_000);

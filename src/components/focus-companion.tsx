@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./focus-companion-size.css";
-import { Bookmark, Check, ChevronDown, Coffee, Play, RotateCcw, X } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Coffee, Play, RotateCcw, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agents, agentName } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
@@ -22,13 +22,19 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [celebrationToken, setCelebrationToken] = useState(0);
+  const [workDraft, setWorkDraft] = useState("");
+  const [workSource, setWorkSource] = useState("");
+  const [workBusy, setWorkBusy] = useState(false);
+  const workPending = useRef<AbortController | null>(null);
+  const [workNote, setWorkNote] = useState("");
   const pending = useRef<AbortController | null>(null);
   const theme = useCharacterMode();
   useEffect(() => {
     try { setSaved(readFocusCheckpoint(localStorage.getItem(FOCUS_CHECKPOINT_KEY))); }
     catch { setSaved(null); }
   }, []);
-  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => () => { pending.current?.abort(); workPending.current?.abort(); }, []);
+  useEffect(() => { workPending.current?.abort(); setWorkDraft(""); setWorkSource(""); setWorkNote(""); setWorkBusy(false); }, [session?.task]);
   useEffect(() => {
     setCheckin(false);
     if (session?.mode !== "checkins" || paused) return;
@@ -52,6 +58,28 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
     setSaved(null);
   };
   const end = () => { pending.current?.abort(); pending.current = null; setBusy(false); setNote(""); forget(); onChange(null); };
+  const workTogether = async () => {
+    if (!session || workBusy) return;
+    workPending.current?.abort();
+    const controller = new AbortController();
+    workPending.current = controller;
+    setWorkBusy(true);
+    setWorkNote("Making a small example with local AI when available…");
+    try {
+      const response = await fetch("/api/pal-work", { method:"POST", headers:{"content-type":"application/json"},
+        body:JSON.stringify({task:session.task}),signal:controller.signal });
+      if (!response.ok) throw new Error("Unavailable");
+      const value = await response.json() as {draft?:string;source?:string};
+      if (controller.signal.aborted || workPending.current !== controller) return;
+      setWorkDraft((value.draft ?? "").slice(0,1100));
+      setWorkSource(value.source === "local-ai" ? "Local AI draft" : "Offline example");
+      setWorkNote("Review or edit it yourself before using it. Nothing was changed or sent.");
+    } catch {
+      if (!controller.signal.aborted) setWorkNote("Couldn't reach local help. Your focus steps still work offline.");
+    } finally {
+      if (workPending.current === controller) { workPending.current = null; setWorkBusy(false); }
+    }
+  };
   const nextStep = async () => {
     if (!session || busy || paused) return;
     pending.current?.abort();
@@ -133,7 +161,14 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
         <Button size="sm" disabled={busy || paused} onClick={() => void nextStep()}><Check className="size-4" /> Done with step</Button>
         {onPauseChange && <Button variant="outline" size="sm" onClick={() => onPauseChange(!paused)}>{paused ? <Play className="size-4" /> : <Coffee className="size-4" />}{paused ? " I am back" : " Break together"}</Button>}
         <Button variant="outline" size="sm" onClick={save}><Bookmark className="size-4" /> Save my place</Button>
+        <Button variant="outline" size="sm" disabled={workBusy || paused} onClick={() => void workTogether()}><FileText className="size-4" /> {workBusy ? "Preparing…" : "Pal: make a sample"}</Button>
       </div>
+      {workDraft && <section className="grid gap-2 rounded-md border p-2" aria-label="Pal's sample work">
+        <p className="text-xs font-semibold">{workSource} · Sample work beside you</p>
+        <textarea readOnly aria-label="Pal draft to review and copy" rows={5} className="w-full resize-y rounded-md border bg-background p-2 text-xs" value={workDraft} onFocus={e => e.currentTarget.select()} />
+        <p className="text-xs text-muted-foreground">Copy or edit this manually. Your Pal cannot read, change or send anything from another app.</p>
+      </section>}
+      {workNote && <p className="text-xs text-muted-foreground" role="status">{workNote}</p>
       <label className="focus-companion-mode text-xs text-muted-foreground">
         Companion style
         <span className="relative inline-flex items-center">

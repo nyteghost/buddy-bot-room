@@ -6,6 +6,7 @@ import { humanSize, mailAttachmentUrl } from "@/lib/doc-viewer/doc-source";
 import { Input } from "@/components/ui/input";
 import { forwardableQuote, gmailLink, replySubject, type Folder, type MailMessage, type MailSummary } from "@/lib/mailbox";
 import { replyPrompt } from "@/lib/mail-reply";
+import { followupHint, mailToTask } from "@/lib/mail-followups";
 import { blankMailDraft, hasMailDraft, readMailDraft, writeMailDraft, type MailDraft } from "@/lib/mail-draft";
 
 type ListData = { folder: string; folders: Folder[]; messages: MailSummary[]; total: number; offset?: number; account?: string; gmail?: boolean; error?: string };
@@ -38,6 +39,7 @@ const when = (d: string) => (d && !Number.isNaN(Date.parse(d)) ? new Date(d).toL
 export function Mailbox({ open }: { open: boolean }) {
   const [folder, setFolder] = useState("INBOX");
   const [unread, setUnread] = useState(false);
+  const [followupsOnly, setFollowupsOnly] = useState(false);
   const [q, setQ] = useState("");
   const [data, setData] = useState<ListData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -283,20 +285,29 @@ export function Mailbox({ open }: { open: boolean }) {
         <Input aria-label="Search mail" placeholder="Search this folder, e.g. from:anna subject:invoice since:2026-10-01" title="Words search the whole message. Also: from: to: subject: since:YYYY-MM-DD before:YYYY-MM-DD is:unread is:read" value={q} onChange={(e) => setQ(e.target.value)} />
         <Button type="submit" size="sm" variant="outline" className="h-9" aria-label="Search"><Search className="size-4" /></Button>
       </form>
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" checked={unread} onChange={(e) => { setUnread(e.target.checked); void load(folder, q, e.target.checked); }} /> Unread only
-      </label>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={unread} onChange={(e) => { setUnread(e.target.checked); void load(folder, q, e.target.checked); }} /> Unread only
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={followupsOnly} onChange={(e) => setFollowupsOnly(e.target.checked)} /> Possible follow-ups
+        </label>
+      </div>
+      <p className="text-xs text-muted-foreground">Possible follow-ups are based only on subject keywords. Read the message to decide; no automatic AI analysis, replies or task creation.</p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       {note && <p className="text-xs text-green-600 dark:text-green-400">✅ {note}</p>}
-      {data && !data.messages.length && !error && <p className="text-muted-foreground">{q || unread ? "Nothing matches." : "This folder is empty."}</p>}
-      {data?.messages.map((m) => {
+      {data && !(followupsOnly ? data.messages.filter(m => followupHint(m)).length : data.messages.length) && !error && <p className="text-muted-foreground">{followupsOnly ? "No obvious follow-up subjects in these loaded messages." : q || unread ? "Nothing matches." : "This folder is empty."}</p>}
+      {data?.messages.filter(m => !followupsOnly || followupHint(m)).map((m) => {
         const link = data.gmail && data.account ? gmailLink(data.account, m.messageId) : null;
         return (
           <div key={m.uid} className="flex items-stretch gap-1">
             <button type="button" onClick={() => void openMessage(m)} className="grid min-w-0 flex-1 gap-0.5 rounded-md border px-3 py-2 text-left hover:bg-accent/40" disabled={busy === `open${m.uid}`}>
               <span className={`truncate ${m.seen ? "" : "font-semibold"}`}>{!m.seen && <span className="mr-1 text-primary">●</span>}{m.subject}</span>
               <span className="truncate text-xs text-muted-foreground">{m.from}{when(m.date) ? ` · ${when(m.date)}` : ""}</span>
+              {followupHint(m) && <span className="text-xs text-muted-foreground">Possible follow-up</span>}
             </button>
+            <Button type="button" size="sm" variant="ghost" className="h-auto shrink-0 px-2 text-xs" title="Copy this subject into Brain Dump for your review" aria-label={"Brain dump email: " + m.subject}
+              onClick={() => { window.dispatchEvent(new CustomEvent("pixelpals:mail-to-brain", { detail: { text: mailToTask(m) } })); setNote("Ready in Brain Dump. Review it before capturing."); }}>Brain Dump</Button>
             {link && <a href={link} target="_blank" rel="noopener noreferrer" title="Open in Gmail" aria-label={`Open "${m.subject}" in Gmail`} className="flex w-9 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-accent/40 hover:text-foreground"><ExternalLink className="size-4" /></a>}
           </div>
         );

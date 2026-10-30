@@ -56,6 +56,7 @@ import { JustStartDialog } from "./just-start-dialog";
 import { FocusCompanion } from "./focus-companion";
 import { PalRoomActivities } from "./pal-room-activities";
 import { LivingTaskBoard } from "./living-task-board";
+import { QuestCorner } from "./quest-corner";
 import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
 import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
@@ -411,6 +412,16 @@ export function Room() {
   const [mailOpen, setMailOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
+  useEffect(() => {
+    const forwardMail = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (!text || text.length > 240) return;
+      setTodayOpen(true);
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("pixelpals:brain-dump", { detail: { text } })), 120);
+    };
+    window.addEventListener("pixelpals:mail-to-brain", forwardMail);
+    return () => window.removeEventListener("pixelpals:mail-to-brain", forwardMail);
+  }, []);
   const [justStartOpen, setJustStartOpen] = useState(false);
   const [justStartTask, setJustStartTask] = useState("");
   const [focusCompanion, setFocusCompanion] = useState<FocusSession | null>(null);
@@ -1956,6 +1967,7 @@ export function Room() {
           </div>
           <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} />
           <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
+          <QuestCorner session={focusCompanion} />
           <div className="section-heading">
             <button
               type="button"
@@ -2064,7 +2076,7 @@ export function Room() {
               <SetupPanel open={setupOpen} />
             </WorkspaceWindow>
             <WorkspaceWindow id="today" title="Today" icon={<Sun className="size-4" />} open={todayOpen} onClose={() => setTodayOpen(false)} resetVersion={resetVersion}>
-              <TodayPanel open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} />
+              <TodayPanel open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} onJustStart={beginFocusTask} />
             </WorkspaceWindow>
             <WorkspaceWindow id="tasks" title="Tasks & reminders" icon={<CheckSquare className="size-4" />} open={tasksOpen} onClose={() => setTasksOpen(false)} resetVersion={resetVersion}>
               <TasksPanel open={tasksOpen} onJustStart={beginFocusTask} />

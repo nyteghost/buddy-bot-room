@@ -1,0 +1,4 @@
+.focus-hub{display:grid;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--card);min-width:0}
+.focus-hub button{white-space:normal}
+.focus-hub textarea{font-family:inherit}
+@media(prefers-reduced-motion:reduce){.focus-hub *{scroll-behavior:auto}}

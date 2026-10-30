@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { addTodo, updateWorkbench, useWorkbench, type Todo } from "@/lib/workbench";
 import { whenLabel } from "@/lib/when";
 import { localDateTimeValue, parseBrainDumpLine } from "@/lib/brain-dump-parse";
+import { categorizeTask, isDuplicateTask } from "@/lib/task-category";
+import { offsetDateKey, zoneDateKey } from "@/lib/day-overview";
 
 type AlertReply = { id?: string; text?: string; error?: string };
 async function alertCall(body: Record<string, unknown>): Promise<AlertReply> {
@@ -54,10 +56,12 @@ export function BrainDump() {
       setNote("One entry needs a task name. Try adding what you need to do."); return;
     }
     const created: Todo[] = [];
+    let skipped = 0;
     updateWorkbench((w) => {
       let list = w.todos;
       for (const item of parsed) {
         if (!item) continue;
+        if (isDuplicateTask(list, item.title, item.dueDate)) { skipped += 1; continue; }
         list = addTodo(list, item.title, now, "brain-dump", {
           ...(item.dueDate ? { dueDate: item.dueDate } : {}),
           ...(item.scheduledAt ? { scheduledAt: item.scheduledAt } : {}),
@@ -71,7 +75,7 @@ export function BrainDump() {
     setInput("");
     const toAlert = created.filter((task) => task.important && task.scheduledAt && task.scheduledAt > Date.now() + 10_000);
     if (!toAlert.length) {
-      setNote("Captured " + created.length + " task(s). Time and day were assigned where provided; alerts require Important.");
+      setNote("Captured " + created.length + " task(s)." + (skipped ? " Skipped " + skipped + " duplicate(s)." : "") + " Times and days do not require alerts.");
       return;
     }
     setCapturing(true);
@@ -194,12 +198,28 @@ export function BrainDump() {
             <input type="checkbox" checked={task.done} disabled={!!busyId} aria-label={"Done: " + task.text} onChange={() => void complete(task)} className="mt-1 size-4" />
             <span className={"min-w-0 flex-1 break-words text-sm " + (task.done ? "text-muted-foreground line-through" : "")}>
               {task.text}
+              <span className="mt-0.5 block text-xs text-muted-foreground">{categorizeTask(task.text)}</span>
               {(task.scheduledAt || task.dueDate) && <span className="mt-0.5 block text-xs text-muted-foreground">{task.scheduledAt ? whenLabel(task.scheduledAt, timezone) : task.dueDate}</span>}
             </span>
             <Button variant="ghost" size="sm" disabled={!!busyId} aria-label={"Remove: " + task.text} className="h-7 px-1" onClick={() => void remove(task)}><Trash2 className="size-3.5" /></Button>
           </div>
           {!task.done && (
             <>
+              <div className="flex flex-wrap items-center gap-1" role="group" aria-label={"Choose a day for " + task.text}>
+                <span className="mr-1 text-xs text-muted-foreground">Plan for:</span>
+                {(["Today","Tomorrow","Day after","Anytime"] as const).map((label, idx) => {
+                  const today = zoneDateKey(Date.now(), timezone);
+                  const selected = idx === 3 ? !task.dueDate && !task.scheduledAt : task.dueDate === offsetDateKey(today, idx);
+                  return <Button key={label} type="button" variant={selected ? "secondary" : "ghost"} size="sm" className="h-7 px-2 text-xs"
+                    disabled={!!busyId}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      if (task.reminderId) { setNote("This task has a scheduled alert. To change its reminder time, use Change alert instead."); return; }
+                      change(task.id, { dueDate: idx === 3 ? undefined : offsetDateKey(today, idx), scheduledAt: undefined });
+                      setNote("Planning day updated. No alert was created.");
+                    }}>{label}</Button>;
+                })}
+              </div>
               <label className="flex items-center gap-2 text-xs">
                 <input type="checkbox" aria-label={"Important: " + task.text} disabled={!!busyId} checked={!!task.important} onChange={(e) => void toggleImportant(task, e.target.checked)} />
                 <Flag className="size-3.5" /> Important — alert me at a chosen time
