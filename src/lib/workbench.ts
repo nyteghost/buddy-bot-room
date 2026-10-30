@@ -7,7 +7,7 @@ import { nearDuplicate, pickMemories } from "./memory-rank";
  * they can be tested without a DOM.
  */
 export type Entry = { id: string; text: string; at: number; /** Always sent to the pals, never dropped to save space. */ pinned?: boolean; /** A condensed line standing in for older memories. */ digest?: boolean };
-export type Todo = Entry & { done: boolean };
+export type Todo = Entry & { done: boolean; source?: "brain-dump"; important?: boolean; reminderAt?: number; reminderId?: string };
 /** `pal` holds memories only one pal sees, keyed by agent id. */
 export type Workbench = { memories: Entry[]; notes: Entry[]; todos: Todo[]; pal?: Record<string, Entry[]> | undefined; /** Memories that only apply while that project is active. */ project?: Record<string, Entry[]> | undefined };
 
@@ -50,10 +50,10 @@ export function setProjectMemories(w: Workbench, project: string, list: Entry[])
   if (list.length) rest[project] = list; else delete rest[project];
   return { ...w, project: rest };
 }
-export function addTodo(list: Todo[], text: string, at = Date.now()): Todo[] {
+export function addTodo(list: Todo[], text: string, at = Date.now(), source?: "brain-dump"): Todo[] {
   const value = clean(text);
   if (!value) return list;
-  return [...list, { id: newId(), text: value, at, done: false }].slice(-MAX_ITEMS);
+  return [...list, { id: newId(), text: value, at, done: false, ...(source ? { source } : {}) }].slice(-MAX_ITEMS);
 }
 /** 1-based, matching the numbers shown to the user. Out-of-range leaves the list unchanged. */
 export function removeAt<T>(list: T[], n: number): T[] {

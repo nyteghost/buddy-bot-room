@@ -111,6 +111,40 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await page.unroute("**/api/just-start");
 });
 
+await step("Today future overview and important Brain Dump alert", async () => {
+  await page.route("**/api/reminders", async (route) => {
+    const body = route.request().postDataJSON();
+    if (body.op === "add-at") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "abc12345", text: "Alert scheduled.", items: [] }) });
+    } else if (body.op === "cancel") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Alert cancelled.", items: [] }) });
+    } else {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
+    }
+  });
+  await page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i }).click();
+  const overview = page.getByRole("navigation", { name: "Day overview" });
+  await overview.getByRole("button", { name: "Tomorrow" }).click();
+  await overview.getByRole("button", { name: "Day after" }).click();
+  await overview.getByRole("button", { name: "Today" }).click();
+  const dump = page.getByRole("region", { name: "Brain Dump" });
+  await dump.getByRole("textbox", { name: "Brain dump tasks" }).fill("Review next week's show schedule");
+  await dump.getByRole("button", { name: "Capture thoughts" }).click();
+  await dump.getByRole("checkbox", { name: "Important: Review next week's show schedule" }).check();
+  const future = await page.evaluate(() => {
+    const dt = new Date(Date.now() + 5 * 86_400_000);
+    dt.setHours(10, 0, 0, 0);
+    const pad = (v) => String(v).padStart(2, "0");
+    return dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()) + "T10:00";
+  });
+  await dump.getByLabel("Alert time: Review next week's show schedule").fill(future);
+  await dump.getByRole("button", { name: "Set alert" }).click();
+  await dump.getByText(/Alert set:/).waitFor();
+  await dump.getByRole("checkbox", { name: "Done: Review next week's show schedule" }).check();
+  await dump.getByText(/Marked done/).waitFor();
+  await page.unroute("**/api/reminders");
+});
+
 await step("expand the sidebar More group", async () => {
   const more = page.locator(".sidebar-item", { hasText: /^\s*More\s*$/i }).first();
   if (await more.count()) await more.click({ timeout: 8000 });

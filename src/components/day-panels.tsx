@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { Flag, ListChecks, Plus, Trash2 } from "lucide-react";
+import { Flag, ListChecks, Plus, Trash2, CalendarDays } from "lucide-react";
+import { BrainDump } from "./brain-dump";
+import { eventsOnDay, offsetDateKey, zoneDateKey } from "@/lib/day-overview";
+import { describeCode as forecastDescription } from "@/lib/weather";
 import { Button } from "@/components/ui/button";
 import { dailyPicks } from "@/lib/brief";
 import { watchQueue } from "@/lib/pick-reason";
 import type { TraktItem } from "@/lib/trakt";
-import { addTodo, clearDone, removeAt, toggleTodo, updateWorkbench, useWorkbench } from "@/lib/workbench";
+import { addTodo, clearDone, updateWorkbench, useWorkbench } from "@/lib/workbench";
 import { describeCode, weatherLine, type Weather } from "@/lib/weather";
 import { whenLabel } from "@/lib/when";
 import { clock, dayLabel } from "./inbox-panels";
@@ -12,7 +15,7 @@ import { clock, dayLabel } from "./inbox-panels";
 type Remind = { id: string; at: number; text: string; repeat?: string | undefined; repeatName?: string | undefined; notes?: string | undefined; important?: boolean | undefined };
 type RemindReply = { text?: string; error?: string; items?: Remind[] };
 
-async function remindCall(op: "list" | "add" | "remove" | "snooze", text = "", extra: { notes?: string; important?: boolean } = {}): Promise<RemindReply> {
+async function remindCall(op: "list" | "add" | "remove" | "snooze" | "cancel", text = "", extra: { notes?: string; important?: boolean; id?: string } = {}): Promise<RemindReply> {
   try {
     const res = await fetch("/api/reminders", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op, text, ...extra }) });
     return (await res.json()) as RemindReply;
@@ -32,6 +35,19 @@ export function TasksPanel({ open, onJustStart }: { open: boolean; onJustStart?:
   const load = useCallback(async () => { const r = await remindCall("list"); if (r.items) setReminders(r.items); else if (r.error) setNote(r.error); }, []);
   useEffect(() => { if (open) void load(); }, [open, load]);
   const addTask = () => { if (!text.trim()) return; updateWorkbench((w) => ({ ...w, todos: addTodo(w.todos, text) })); setText(""); };
+  const changeTodo = async (id: string, remove: boolean) => {
+    const task = todos.find((t) => t.id === id);
+    if (!task) return;
+    if (task.reminderId) {
+      const result = await remindCall("cancel", "", { id: task.reminderId });
+      if (result.error) { setNote("Could not cancel this task's scheduled alert: " + result.error); return; }
+      if (result.items) setReminders(result.items);
+    }
+    updateWorkbench((w) => ({
+      ...w, todos: remove ? w.todos.filter((t) => t.id !== id) :
+        w.todos.map((t) => t.id === id ? { ...t, done: !t.done, important: t.done ? t.important : false, reminderId: undefined, reminderAt: undefined } : t),
+    }));
+  };
   const addReminder = async () => {
     if (!when.trim()) return;
     const r = await remindCall("add", when, { ...(details.trim() ? { notes: details } : {}), ...(important ? { important: true } : {}) });
@@ -48,12 +64,12 @@ export function TasksPanel({ open, onJustStart }: { open: boolean; onJustStart?:
           <Button type="submit" size="sm" aria-label="Add task"><Plus className="size-4" /></Button>
         </form>
         {!todos.length && <p className="text-muted-foreground">Nothing to do. Nice.</p>}
-        {todos.map((t, i) => (
+        {todos.map((t) => (
           <div key={t.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
-            <input type="checkbox" checked={t.done} onChange={() => updateWorkbench((w) => ({ ...w, todos: toggleTodo(w.todos, i + 1) }))} aria-label={`Done: ${t.text}`} />
+            <input type="checkbox" checked={t.done} onChange={() => void changeTodo(t.id, false)} aria-label={`Done: ${t.text}`} />
             <span className={t.done ? "min-w-0 flex-1 truncate text-muted-foreground line-through" : "min-w-0 flex-1 truncate"}>{t.text}</span>
             {!t.done && onJustStart && <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" aria-label={`Just Start: ${t.text}`} onClick={() => onJustStart(t.text)}>Just Start</Button>}
-            <Button size="sm" variant="ghost" className="h-7 px-1" aria-label="Remove" onClick={() => updateWorkbench((w) => ({ ...w, todos: removeAt(w.todos, i + 1) }))}><Trash2 className="size-3.5" /></Button>
+            <Button size="sm" variant="ghost" className="h-7 px-1" aria-label="Remove" onClick={() => void changeTodo(t.id, true)}><Trash2 className="size-3.5" /></Button>
           </div>
         ))}
         {todos.some((t) => t.done) && <Button size="sm" variant="ghost" className="justify-start" onClick={() => updateWorkbench((w) => ({ ...w, todos: clearDone(w.todos) }))}>Clear finished</Button>}
@@ -106,52 +122,79 @@ const Quiet = ({ children }: { children: React.ReactNode }) => <p className="tex
 /** Everything for today in one place: weather, calendar, unread mail, tasks and a watch pick. Each part quietly says how to set it up if it isn't. */
 export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks }: { open: boolean; onOpenMail?: () => void; onOpenCalendar?: () => void; onOpenTasks?: () => void }) {
   const [tick, setTick] = useState(0);
+  const [dayOffset, setDayOffset] = useState<0 | 1 | 2>(0);
   useEffect(() => { if (!open) return; const t = window.setInterval(() => setTick((n) => n + 1), 5 * 60_000); return () => window.clearInterval(t); }, [open]);
   const { todos } = useWorkbench();
   const weather = useOnce<{ weather?: Weather }>("/api/weather", open, tick);
-  const cal = useOnce<{ tz: string; configured: boolean; items: { title: string; start: number; end: number; allDay: boolean }[] }>("/api/calendar?days=1", open, tick);
+  const cal = useOnce<{ tz: string; configured: boolean; items: { title: string; start: number; end: number; allDay: boolean }[] }>("/api/calendar?days=4", open, tick);
   const mail = useOnce<{ configured: boolean; items: { subject: string; from: string }[] }>("/api/mail", open, tick);
   const trakt = useOnce<{ items?: TraktItem[] }>("/api/trakt?plex=1", open, tick);
   const [reminders, setReminders] = useState<Remind[]>([]);
-  useEffect(() => { if (open) void remindCall("list").then((r) => setReminders(r.items ?? [])); }, [open, tick]);
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    const refresh = () => { void remindCall("list").then((r) => { if (alive && r.items) setReminders(r.items); }); };
+    refresh();
+    window.addEventListener("pixelpals:reminders-changed", refresh);
+    return () => { alive = false; window.removeEventListener("pixelpals:reminders-changed", refresh); };
+  }, [open, tick]);
   const tz = cal.data?.tz ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(Date.now());
-  const events = (cal.data?.items ?? []).filter((e) => e.end >= Date.now() || e.allDay);
-  const open_ = todos.filter((t) => !t.done);
-  const todayReminders = reminders.filter((r) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(r.at) === day);
-  const pick = dailyPicks(trakt.data?.items ?? [], day, 1)[0];
+  const todayKey = zoneDateKey(Date.now(), tz);
+  const day = offsetDateKey(todayKey, dayOffset);
+  const events = eventsOnDay(cal.data?.items ?? [], day, tz);
+  const open_ = todos.filter((t) => !t.done && (dayOffset === 0
+    ? (!t.reminderAt || zoneDateKey(t.reminderAt, tz) === day)
+    : !!t.reminderAt && zoneDateKey(t.reminderAt, tz) === day));
+  const todayReminders = reminders.filter((r) => zoneDateKey(r.at, tz) === day);
+  const forecast = weather.data?.weather?.days.find((item) => item.date === day);
+  const pick = dailyPicks(trakt.data?.items ?? [], todayKey, 1)[0];
   const queue = watchQueue(trakt.data?.items ?? [], 6);
   return (
     <div className="grid gap-3 p-3 text-sm">
       <div className="flex items-center justify-between gap-2">
-        <div className="font-medium">{dayLabel(Date.now(), tz)} · {new Intl.DateTimeFormat(undefined, { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(Date.now())}</div>
+        <div className="font-medium">{dayOffset === 0 ? dayLabel(Date.now(), tz) : dayOffset === 1 ? "Tomorrow" : "Day after tomorrow"} · {new Intl.DateTimeFormat(undefined, { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" }).format(new Date(day + "T12:00:00Z"))}</div>
         <Button size="sm" variant="outline" title="Open the full /today planner: your plan, times, week and focus timer" onClick={() => window.location.assign("/today")}><ListChecks className="size-4" /> /today</Button>
       </div>
-      <Block title="Weather">
-        {weather.data?.weather ? <p>{describeCode(weather.data.weather.now.code).icon} {weather.data.weather.place}: {weatherLine(weather.data.weather)}</p> : <Quiet>{weather.error || "Loading…"}</Quiet>}
+      <nav className="grid grid-cols-3 gap-1.5" aria-label="Day overview">
+        {([0, 1, 2] as const).map((offset) => (
+          <Button key={offset} size="sm" variant={dayOffset === offset ? "default" : "outline"} aria-pressed={dayOffset === offset} onClick={() => setDayOffset(offset)} className="min-w-0 px-1.5 text-xs">
+            {offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : "Day after"}
+          </Button>
+        ))}
+      </nav>
+      <p className="text-xs text-muted-foreground" aria-live="polite">
+        <CalendarDays className="mr-1 inline size-3.5" />
+        {events.length} calendar {events.length === 1 ? "event" : "events"} · {todayReminders.length} scheduled {todayReminders.length === 1 ? "reminder" : "reminders"}
+        {forecast ? " · " + forecastDescription(forecast.code).text : ""}
+      </p>
+      <Block title={dayOffset === 0 ? "Weather" : "Weather forecast"}>
+        {dayOffset === 0 && weather.data?.weather ? <p>{describeCode(weather.data.weather.now.code).icon} {weather.data.weather.place}: {weatherLine(weather.data.weather)}</p>
+          : forecast ? <p>{forecastDescription(forecast.code).icon} {weather.data?.weather?.place}: {forecastDescription(forecast.code).text}, {forecast.hi}°/{forecast.lo}°{forecast.rain >= 30 ? " · " + forecast.rain + "% chance of rain" : ""}</p>
+          : <Quiet>{weather.error || "Forecast not available for this day yet."}</Quiet>}
       </Block>
       <Block title="Calendar">
         {cal.data?.configured === false && <Quiet>No calendar connected. Open Calendar for the one-minute setup.</Quiet>}
-        {cal.data?.configured && !events.length && <Quiet>Nothing else on today.</Quiet>}
+        {cal.data?.configured && !events.length && <Quiet>No calendar events for this day.</Quiet>}
         {events.map((e, i) => <button key={`${e.start}-${i}`} type="button" className="flex min-w-0 gap-3 rounded-sm text-left hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={onOpenCalendar} title="Open Calendar"><span className="w-16 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : clock(e.start, tz)}</span><span className="truncate">{e.title}</span></button>)}
         {!cal.data && <Quiet>{cal.error || "Loading…"}</Quiet>}
       </Block>
-      <Block title="Mail">
+      {dayOffset === 0 && <Block title="Mail">
         {mail.data?.configured === false && <Quiet>No mailbox connected. Open Mail for setup.</Quiet>}
-        {mail.data?.configured && <p>{mail.data.items.length ? `${mail.data.items.length} unread` : "No unread mail."}</p>}
+        {mail.data?.configured && <p>{mail.data.items.length ? mail.data.items.length + " unread" : "No unread mail."}</p>}
         {mail.data?.items.slice(0, 3).map((m, i) => <button key={i} type="button" className="block w-full truncate rounded-sm text-left text-xs text-muted-foreground hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-ring" title="Open Mail inbox" onClick={onOpenMail}>{m.subject} · {m.from}</button>)}
         {!mail.data && <Quiet>{mail.error || "Loading…"}</Quiet>}
-      </Block>
+      </Block>}
       <Block title="Tasks">
-        {!open_.length && !todayReminders.length && <Quiet>Nothing open. Add some in Tasks.</Quiet>}
+        {!open_.length && !todayReminders.length && <Quiet>{dayOffset === 0 ? "Nothing open. Add something in Brain Dump or Tasks." : "No timed tasks or reminders for this day."}</Quiet>}
         {todayReminders.map((r) => <button type="button" key={r.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>⏰ {whenLabel(r.at, tz)} — {r.text}</button>)}
         {open_.slice(0, 6).map((t) => <button type="button" key={t.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>☐ {t.text}</button>)}
       </Block>
-      <Block title="Tonight">
-        {pick ? <p>{pick.kind === "show" ? "📺" : "🎬"} {pick.title}{pick.year ? ` (${pick.year})` : ""}{pick.inPlex ? " · in Plex" : ""}</p> : <Quiet>{trakt.error ? "Connect Trakt to get a pick." : trakt.data ? "Nothing unwatched on your list." : "Loading…"}</Quiet>}
+      <BrainDump />
+      {dayOffset === 0 && <Block title="Tonight">
+        {pick ? <p>{pick.kind === "show" ? "📺" : "🎬"} {pick.title}{pick.year ? " (" + pick.year + ")" : ""}{pick.inPlex ? " · in Plex" : ""}</p> : <Quiet>{trakt.error ? "Connect Trakt to get a pick." : trakt.data ? "Nothing unwatched on your list." : "Loading…"}</Quiet>}
         {pick && <Quiet>{queue.find((q) => q.item.title === pick.title)?.reason}</Quiet>}
-      </Block>
-      {queue.length > 0 && (
+      </Block>}
+      {dayOffset === 0 && queue.length > 0 && (
         <Block title="Watch queue">
           {queue.map((q) => (
             <div key={`${q.item.kind}-${q.item.title}`} className="flex items-center gap-2">

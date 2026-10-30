@@ -140,6 +140,33 @@ export async function handleReminders(request: Request): Promise<Response> {
     }
     return out("Done.", await readReminders());
   }
+  // Browser Brain Dump: store an exact timestamp, not an AI-parsed or rounded time.
+  if (body.op === "add-at") {
+    const at = Number((body as { at?: unknown }).at);
+    const title = text.replace(/\s+/g, " ").trim();
+    if (!title || title.length > 200) return Response.json({ error: "Give the alert a short task name (200 characters max)." }, { status: 400 });
+    if (!Number.isSafeInteger(at) || at < Date.now() + 10_000 || at > Date.now() + 366 * 86_400_000)
+      return Response.json({ error: "Choose a future time within the next year." }, { status: 400 });
+    const id = crypto.randomUUID().slice(0, 8);
+    const added = await updateReminders(async (current) => {
+      const result = addReminder(current, at, title, id, undefined, { important: body.important === true });
+      return result.ok
+        ? { list: result.list, result: { ok: true as const } }
+        : { list: current, result: { ok: false as const, error: result.error } };
+    });
+    if (!added.ok) return Response.json({ error: added.error }, { status: 400 });
+    const where = process.env["TELEGRAM_BOT_TOKEN"] ? "Telegram" : process.env["NTFY_URL"] ? "ntfy" : "";
+    return Response.json({ id, text: `Alert scheduled for ${whenLabel(at, tz())}.${where ? "" : " Set NTFY_URL or TELEGRAM_BOT_TOKEN to receive phone notifications."}`, items: (await readReminders()).map((r) => ({ id: r.id, at: r.at, text: r.text, important: r.important })) });
+  }
+  // Also dismiss a reminder that has already fired and is in the active popup queue.
+  if (body.op === "cancel") {
+    const id = String(body.id ?? "").trim();
+    if (!/^[a-f0-9-]{8,24}$/i.test(id)) return Response.json({ error: "Invalid reminder ID." }, { status: 400 });
+    const removed = await updateReminders(async (current) => ({ list: current.filter((r) => r.id !== id), result: 0 }));
+    void removed;
+    await updateActive((current) => ({ list: current.filter((r) => r.id !== id), result: 0 }));
+    return out("Alert cancelled.", await readReminders());
+  }
   if (body.op === "add") {
     const reply = await createReminder(text, { notes: typeof body.notes === "string" ? body.notes.slice(0, 2000) : "", important: body.important === true });
     return out(reply, await readReminders());

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import "./focus-companion-size.css";
 import { Bookmark, Check, ChevronDown, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agents, agentName } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
+import { hasFacingArt } from "@/lib/pal-art";
 import { cleanStartStep, fallbackStartStep } from "@/lib/focus-assist";
 import { COMPANION_MODES, FOCUS_CHECKPOINT_KEY, companionActivity, readFocusCheckpoint, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
@@ -102,7 +104,7 @@ export function FocusCompanion({ session, onChange }: Props) {
   return (
     <aside className="focus-companion" aria-label="Focus Assist work companion">
       <div className="flex items-start gap-2">
-        <div className="focus-companion-pal" aria-hidden="true"><PixelCharacter id={session.pal} mode={theme} animated /></div>
+        <div className={`focus-companion-pal${hasFacingArt(session.pal) ? " focus-companion-pal-directional" : ""}`} aria-hidden="true"><PixelCharacter id={session.pal} mode={theme} animated /></div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{name} is here with you</p>
           <p className="text-xs text-muted-foreground">{pal?.role} · Illustrated body double</p>

@@ -1,0 +1,30 @@
+/* Scale the companion Pal itself, including Saiyan's smaller directional artwork. */
+.focus-companion .focus-companion-pal {
+  width: 96px;
+  height: 104px;
+  min-width: 96px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.focus-companion .focus-companion-pal.focus-companion-pal-directional {
+  width: 112px;
+  height: 120px;
+  min-width: 112px;
+}
+.focus-companion .focus-companion-pal > .pixel-character,
+.focus-companion .focus-companion-pal > .pal-art,
+.focus-companion .focus-companion-pal > img,
+.focus-companion .focus-companion-pal > svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+@media (max-width: 420px) {
+  .focus-companion .focus-companion-pal { width: 76px; height: 88px; min-width: 76px; }
+  .focus-companion .focus-companion-pal.focus-companion-pal-directional { width: 92px; height: 100px; min-width: 92px; }
+}
