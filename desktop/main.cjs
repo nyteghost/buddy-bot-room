@@ -1,6 +1,8 @@
 const {app,BrowserWindow,shell} = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const { setupAiIpc } = require("./ai-vault.cjs");
+const { setupGoogleCalendarIpc } = require("./google-calendar.cjs");
 let win;
 function openApp(){
  win=new BrowserWindow({
@@ -8,7 +10,7 @@ function openApp(){
   width:1360,height:860,minWidth:820,minHeight:580,
   backgroundColor:"#142338",
   show:false,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}
+  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,preload:path.join(__dirname,"preload.cjs")}
  });
  win.once("ready-to-show",()=>win.show());
  const file=path.join(__dirname,"..","dist","index.html");
@@ -25,5 +27,5 @@ function openApp(){
  });
  win.on("closed",()=>{win=null});
 }
-app.whenReady().then(()=>{openApp();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)openApp()})});
+app.whenReady().then(()=>{setupAiIpc();setupGoogleCalendarIpc();openApp();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)openApp()})});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});
