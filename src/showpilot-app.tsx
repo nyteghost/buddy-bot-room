@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   BriefcaseBusiness, CalendarDays, CalendarClock, Layers3, Store, Map,
-  LayoutDashboard, Menu, Moon, Sun, ChevronRight, ShieldCheck, PanelLeftClose, PanelLeftOpen
+  LayoutDashboard, Menu, Moon, Sun, ChevronRight, ShieldCheck, PanelLeftClose, PanelLeftOpen, Settings2
 } from "lucide-react";
 import { ShowServicesTools, type WorkTabId } from "@/components/work-tools";
 import { BackupPanel } from "@/components/showpilot-backup";
+import { ShowPilotAiSettings } from "@/components/showpilot-ai-settings";
 
-type Screen = "dashboard" | WorkTabId;
+type Screen = "dashboard" | "settings" | WorkTabId;
 const sections: { id: WorkTabId; label: string; desc: string; Icon: typeof CalendarDays; note: string }[] = [
   {id:"events",label:"Event Schedule",desc:"Import Ungerboeck reports, plan engineering coverage and export Excel",Icon:CalendarDays,note:"Reports & staffing"},
   {id:"shifts",label:"My Shifts",desc:"Read, edit and export your personal shifts to Google Calendar",Icon:CalendarClock,note:"Calendar tools"},
@@ -22,7 +23,7 @@ function saved(key:string,fallback:string) {
 export function App() {
   const [screen,setScreen] = useState<Screen>(()=>{
     const v=saved("showpilot:screen","dashboard");
-    return v==="dashboard"||sections.some(s=>s.id===v)?v as Screen:"dashboard";
+    return v==="dashboard"||v==="settings"||sections.some(s=>s.id===v)?v as Screen:"dashboard";
   });
   const [dark,setDark] = useState(()=>saved("showpilot:theme","light")==="dark");
   const [expanded,setExpanded] = useState(()=>saved("showpilot:sidebar","true")!=="false");
@@ -48,6 +49,7 @@ export function App() {
         {expanded&&<span className="sp-nav-label">WORKSPACE</span>}
         <button title="Dashboard" className={"sp-nav-item "+(screen==="dashboard"?"sp-selected":"")} onClick={()=>select("dashboard")}><LayoutDashboard size={19}/>{expanded&&<span>Dashboard</span>}</button>
         {sections.map(({id,label,Icon})=><button title={label} key={id} className={"sp-nav-item "+(screen===id?"sp-selected":"")} onClick={()=>select(id)}><Icon size={19}/>{expanded&&<span>{label}</span>}</button>)}
+        <button title="Settings & AI Providers" className={"sp-nav-item "+(screen==="settings"?"sp-selected":"")} onClick={()=>select("settings")}><Settings2 size={19}/>{expanded&&<span>Settings & AI</span>}</button>
       </div>
       <div className="sp-sidebar-footer">
         {expanded&&<span>Cobb Convention Center-Atlanta</span>}
@@ -59,7 +61,7 @@ export function App() {
     <div className="sp-body">
       <header className="sp-header">
         <button className="sp-mobile-menu" onClick={()=>setMobileOpen(true)} aria-label="Open navigation"><Menu size={20}/></button>
-        <div className="sp-breadcrumb">SHOWPILOT <ChevronRight size={14}/> {current?.label??"Dashboard"}</div>
+        <div className="sp-breadcrumb">SHOWPILOT <ChevronRight size={14}/> {current?.label??(screen==="settings"?"Settings & AI":"Dashboard")}</div>
         <div className="sp-header-actions">
           <span className="sp-local"><ShieldCheck size={15}/> Local workspace</span>
           <button className="sp-icon-button" onClick={()=>setDark(v=>!v)} aria-label={dark?"Use light theme":"Use dark theme"}>{dark?<Sun size={19}/>:<Moon size={19}/>}</button>
@@ -67,10 +69,11 @@ export function App() {
       </header>
       <main className="sp-main">
         <div className="sp-page-head">
-          <div><p className="sp-eyebrow">COBB CONVENTION CENTER-ATLANTA</p><h1>{current?.label??"Operations Overview"}</h1>
-            <p className="sp-subtitle">{current?.desc??"Your venue operations tools, together in one workspace."}</p></div>
+          <div><p className="sp-eyebrow">COBB CONVENTION CENTER-ATLANTA</p><h1>{current?.label??(screen==="settings"?"Settings & AI Providers":"Operations Overview")}</h1>
+            <p className="sp-subtitle">{current?.desc??(screen==="settings"?"Configure on-device GPU AI and encrypted online provider keys.":"Your venue operations tools, together in one workspace.")}</p></div>
         </div>
-        {screen==="dashboard"
+        {screen==="settings" ? <section className="sp-panel"><ShowPilotAiSettings /></section>
+        : screen==="dashboard"
           ? <div className="space-y-5">
               <div className="sp-banner"><BriefcaseBusiness size={26}/><div><h2>Welcome to ShowPilot</h2><p>Open a tool below to begin. Scheduling and reports run locally, with no uploaded report data sent to a server.</p></div></div>
               <div className="sp-cards">
