@@ -60,6 +60,8 @@ type SavedApp = {
   showFourth?: boolean;
   showFifth?: boolean;
   eventName?: string;
+  showDate?: string;
+  buildByDate?: string;
 };
 
 
@@ -1256,6 +1258,10 @@ export function DeckPlanner() {
   const [rebuildKey, setRebuildKey] = useState(0);
   const [eventName, setEventName] = useState("");
   const [eventNameDraft, setEventNameDraft] = useState("");
+  const [showDate, setShowDate] = useState("");
+  const [buildByDate, setBuildByDate] = useState("");
+  const [showDateDraft, setShowDateDraft] = useState("");
+  const [buildByDateDraft, setBuildByDateDraft] = useState("");
   const [showEventModal, setShowEventModal] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [clearKey, setClearKey] = useState(0);
@@ -1292,8 +1298,8 @@ export function DeckPlanner() {
     .filter(stage => !stage.id.includes("-bridge-"))
     .map(stage => ({ ...stage, extraDecks: stage.id.includes("-copy-") ? 0 : (stage.looseBridges ?? 0) }));
   const [crewPrintError, setCrewPrintError] = useState("");
-  const printCrew = (name: string) => {
-    try { printCrewPages(name, crewPrintStages); setCrewPrintError(""); }
+  const printCrew = (name: string, dates = {showDate, buildByDate}) => {
+    try { printCrewPages(name, crewPrintStages, dates); setCrewPrintError(""); }
     catch(e) { setCrewPrintError((e as Error).message); }
   };
 
@@ -1313,6 +1319,8 @@ export function DeckPlanner() {
       setStageCount(count);
     }
     if (typeof s.eventName === "string") setEventName(s.eventName);
+    if (typeof s.showDate === "string") setShowDate(s.showDate);
+    if (typeof s.buildByDate === "string") setBuildByDate(s.buildByDate);
     skipAppSave.current = true;
   }, []);
   useEffect(() => {
@@ -1320,8 +1328,8 @@ export function DeckPlanner() {
       skipAppSave.current = false;
       return;
     }
-    writeStored(APP_STORE_KEY, { stageCount, eventName });
-  }, [stageCount, eventName]);
+    writeStored(APP_STORE_KEY, { stageCount, eventName, showDate, buildByDate });
+  }, [stageCount, eventName, showDate, buildByDate]);
 
   // Chain stock only through the stages that are still enabled, in order.
   const { remainingBefore, remainingFinal } = useMemo(() => {
@@ -1404,7 +1412,7 @@ export function DeckPlanner() {
       const title = eventName.trim() || "Stage plan";
       // The printed crew sheet, as a self-contained page: the planner as it prints (light, black and white), openable and printable anywhere.
       // Attach the same concise, one-stage-per-page crew document used by Print.
-      const printHtml = crewPrintDocument(eventName, crewPrintStages);
+      const printHtml = crewPrintDocument(eventName, crewPrintStages, {showDate, buildByDate});
       const htmlBytes = new TextEncoder().encode(printHtml);
       let hbin = ""; for (let i = 0; i < htmlBytes.length; i += 0x8000) hbin += String.fromCharCode(...htmlBytes.subarray(i, i + 0x8000));
       const stagesOut = enabledIds.flatMap((id) => { const st = layoutStages[id]; return st ? [`- ${st.name}: ${st.width}' x ${st.length}' x ${st.heightIn}" high${(st.quantity ?? 1) > 1 ? ` (x${st.quantity})` : ""}${st.valid ? "" : " - CANNOT BUILD FROM STOCK"}`] : []; });
@@ -1433,6 +1441,8 @@ export function DeckPlanner() {
     const a = snap.app ?? {};
     setStageCount(typeof a.stageCount === "number" && a.stageCount >= 1 && a.stageCount <= 10 ? Math.floor(a.stageCount) : 1);
     setEventName(typeof a.eventName === "string" ? a.eventName : "");
+    setShowDate(typeof a.showDate === "string" ? a.showDate : "");
+    setBuildByDate(typeof a.buildByDate === "string" ? a.buildByDate : "");
     skipAppSave.current = true;
     setUsedByStage([]);
     setPartsByStage({});
@@ -1669,6 +1679,8 @@ export function DeckPlanner() {
           type="button"
           onClick={() => {
             setEventNameDraft(eventName);
+            setShowDateDraft(showDate);
+            setBuildByDateDraft(buildByDate);
             setShowEventModal(true);
           }}
           className="no-print mb-6 ml-3 rounded-md border border-border bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
@@ -1798,7 +1810,7 @@ export function DeckPlanner() {
         {showEventModal && createPortal(
           <div className="no-print fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-lg">
-              <div className="mb-4 text-lg font-semibold">Enter Event Name</div>
+              <div className="mb-4 text-lg font-semibold">Crew Sheet Details</div>
               <input
                 type="text"
                 value={eventNameDraft}
@@ -1806,8 +1818,10 @@ export function DeckPlanner() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     setEventName(eventNameDraft);
+                    setShowDate(showDateDraft);
+                    setBuildByDate(buildByDateDraft);
                     setShowEventModal(false);
-                    setTimeout(() => printCrew(eventNameDraft), 0);
+                    setTimeout(() => printCrew(eventNameDraft, {showDate:showDateDraft, buildByDate:buildByDateDraft}), 0);
                   }
                   if (e.key === "Escape") {
                     setShowEventModal(false);
@@ -1817,6 +1831,15 @@ export function DeckPlanner() {
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
                 autoFocus
               />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold">Build By Date
+                  <input type="date" value={buildByDateDraft} onChange={(e) => setBuildByDateDraft(e.target.value)} aria-label="Build by date" className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                </label>
+                <label className="block text-sm font-semibold">Show Date
+                  <input type="date" value={showDateDraft} onChange={(e) => setShowDateDraft(e.target.value)} aria-label="Show date" className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Dates appear on every stage crew sheet and are saved with your stage plan.</p>
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   type="button"
@@ -1829,8 +1852,10 @@ export function DeckPlanner() {
                   type="button"
                   onClick={() => {
                     setEventName(eventNameDraft);
+                    setShowDate(showDateDraft);
+                    setBuildByDate(buildByDateDraft);
                     setShowEventModal(false);
-                    setTimeout(() => printCrew(eventNameDraft), 0);
+                    setTimeout(() => printCrew(eventNameDraft, {showDate:showDateDraft, buildByDate:buildByDateDraft}), 0);
                   }}
                   className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
                 >
@@ -1870,6 +1895,10 @@ export function DeckPlanner() {
                     setStageCount(1);
                     setEventName("");
                     setEventNameDraft("");
+                    setShowDate("");
+                    setBuildByDate("");
+                    setShowDateDraft("");
+                    setBuildByDateDraft("");
                     setLayoutStages({});
                     setRebuildKey((k) => k + 1);
                     setClearKey((k) => k + 1);
