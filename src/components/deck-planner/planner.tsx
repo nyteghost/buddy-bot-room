@@ -990,7 +990,7 @@ function StagePanel({
                 <>
                   <div className="mb-1 text-sm font-semibold">Top view (plan)</div>
                   <div className="mb-3 text-xs text-muted-foreground">
-                    Each thin rectangle is one 4&#39;×8&#39; deck. Holders are outlined: solid = 1-deck, dashed = 2-deck, double line = 3-deck.
+                    Each tile is one 4&#39;×8&#39; deck. <span className="font-semibold text-yellow-500">Yellow B = bridge deck</span>. Holders: solid = 1-deck, dashed = 2-deck, double line = 3-deck.
                   </div>
 
                   <div
@@ -1035,7 +1035,7 @@ function StagePanel({
                           }}
                           title={d.isBridge ? "Bridge deck (no holder)" : `${d.w}ft × ${d.h}ft deck`}
                         >
-                          {d.isBridge ? "BRIDGE" : `${d.w}×${d.h}`}
+                          {d.isBridge ? ((d.w * scale < 40 || d.h * scale < 20) ? "B" : "BRIDGE") : ((d.w * scale < 40 || d.h * scale < 20) ? "" : `${d.w}×${d.h}`)}
                         </div>
                       ))}
                       {result.holders.map((h, i) => (
