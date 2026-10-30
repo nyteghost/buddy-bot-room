@@ -209,7 +209,9 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
     }catch(e){setStatus("Could not open ShowPilot project: "+(e as Error).message);}
   }
   async function load(files: File[]) {
-    setStatus("Reading…"); setBlob(null); setApprovedSpaces([]); setVenueReview([]); setVenueExcluded(0);
+    ++compileRef.current;
+    setStatus("Reading…"); setBlob(null); setFreshBlob(null); setSource(null); setSuggestedEntries([]);
+    setApprovedSpaces([]); setVenueReview([]); setVenueExcluded(0);
     const head = [`ShowPilot Events report · ${new Date().toISOString()}`, `build: ${__APP_VERSION__} ${__APP_COMMIT__} ${__APP_BUILD_DATE__}`];
     setReport(head.join("\n"));
     try {
@@ -246,7 +248,8 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
   const { deliver } = useDeliver();
   return (
     <div className="space-y-3 pt-2">
-      <FilePick accept="application/pdf,.xlsx" label="Drop the For Scheduling report (.xlsx or PDF) — add your monthly schedule .xlsx to fill it in" onFiles={load} />
+      <FilePick accept="application/pdf,.xlsx" label="1. Import Ungerboeck For Scheduling PDF/Excel — optionally also drop your existing monthly Excel template" onFiles={load} />
+      <FilePick accept=".json,application/json" label="Or resume a saved ShowPilot review project (.json)" onFile={(f) => { void loadProject(f); }} />
       <p className="text-xs text-muted-foreground">S = show · Exmi = exhibitor move in / service desk · MI = move in · MO = move out · Food = meal or reception after the show · MTG = meeting · MO? = no move-out line in the report; guessed as 3 hours after the show ends, so check it. Combined halls split into each hall. Escalators = 1 hr before first show to 1 hr after.</p>
       {status && <p className={`text-sm ${/^Could not|^No /.test(status) ? "text-destructive" : ""}`} role="status">{status}</p>}
       {report && /^Could not|^No /.test(status) && (
@@ -273,10 +276,12 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
           <span><span className="font-medium">Include {pending.length} not-yet-definite events</span> (left out unless checked): {pending.slice(0, 8).join("; ")}{pending.length > 8 ? ` +${pending.length - 8} more` : ""}</span>
         </label>
       )}
-      {entries.length === 0 && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop one or more Ungerboeck event PDFs.</li><li>Optional: drop your monthly schedule .xlsx in the same box to fill it in (engineer shifts are kept).</li><li>Download the Excel file.</li></ol>}
-      {entries.length > 0 && (
+      {suggestedEntries.length === 0 && !status && <ol className="list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground"><li>Drop one or more Ungerboeck event PDFs.</li><li>Optional: drop your monthly schedule .xlsx in the same box to fill it in (engineer shifts are kept).</li><li>Download the Excel file.</li></ol>}
+      {source && (
         <>
-          <div className="max-h-72 overflow-y-auto rounded-md border border-border">
+          <ScheduleReview originalRows={source.rows} proposed={suggestedEntries} suggestedTasks={suggestedTasks} draft={draft} onChange={reviewChanged} onSaveProject={saveProject} />
+          <details className="text-xs"><summary className="cursor-pointer font-medium">Preview final Excel entries ({entries.length})</summary>
+          <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-border">
             <table className="w-full text-sm">
               <thead className="bg-muted text-left"><tr><th className="p-2">Day</th><th className="p-2">Space</th><th className="p-2">Entry</th></tr></thead>
               <tbody>{entries.map((e, i) => (
@@ -284,6 +289,7 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
               ))}</tbody>
             </table>
           </div>
+          </details>
           {shared.length > 0 && (
             <details className="rounded-md border border-amber-500 p-2 text-xs">
               <summary className="cursor-pointer font-medium">{shared.length} rooms are shared by more than one event</summary>
@@ -296,7 +302,11 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
               <ul className="mt-1 space-y-0.5">{tasks.map((t, i) => <li key={i}><span className="text-muted-foreground">{dayLabel(t.date)}:</span> {t.text}</li>)}</ul>
             </details>
           )}
-          {blob && <Button size="sm" onClick={() => deliver(blob, merged ? "schedule-updated.xlsx" : "engineering-schedule.xlsx")}><Download className="size-4" /> Download Excel</Button>}
+          <div className="flex flex-wrap gap-2">
+            {freshBlob && <Button size="sm" onClick={() => deliver(freshBlob, "showpilot-reviewed-schedule.xlsx")}><Download className="size-4" /> Download reviewed schedule (fresh)</Button>}
+            {blob && merged && <Button variant="outline" size="sm" onClick={() => deliver(blob, "showpilot-updated-template.xlsx")}><Download className="size-4" /> Update original Excel template</Button>}
+          </div>
+          {merged && <p className="text-xs text-amber-700 dark:text-amber-300">Updating an existing workbook preserves its typed shifts, PTO and task cells. Removed or changed events may remain in nonempty legacy cells; use the fresh reviewed export for an exact record of accepted events.</p>}
         </>
       )}
     </div>
