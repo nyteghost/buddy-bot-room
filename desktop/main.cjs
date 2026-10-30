@@ -9,6 +9,7 @@ function openApp(){
   title:"ShowPilot - Cobb Convention Center-Atlanta",
   width:1360,height:860,minWidth:820,minHeight:580,
   backgroundColor:"#142338",
+  icon:path.join(__dirname,"showpilot.png"),
   show:false,
   webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,preload:path.join(__dirname,"preload.cjs")}
  });
