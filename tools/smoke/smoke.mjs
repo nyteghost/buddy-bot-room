@@ -329,7 +329,7 @@ await step("workspace layouts save, switch, and restore the open windows", async
   await page.locator('[data-window-id="documents"]').waitFor({ state: "visible" });
   await picker.selectOption("chat");
   await page.locator('[data-window-id="room"]').waitFor({ state: "visible" });
-  await page.locator('[data-window-id="mode-roundtable"]').waitFor({ state: "visible" });
+  await page.locator('[data-window-id="chat-my-pals"]').waitFor({ state: "visible" });
   if (await page.locator('[data-window-id="mail"]').isVisible()) throw new Error("Mail stayed open in Chat layout");
   await page.getByRole("button", { name: "Save current layout" }).click();
   await picker.selectOption("mail");

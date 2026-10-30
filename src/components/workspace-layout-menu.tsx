@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { fitWindowRect, presetWindowRects, readWorkspaceLayout, scaleWorkspaceLayout, WORKSPACE_LAYOUT_EVENT, type WindowRect, type WorkspaceLayout, type WorkspacePreset } from "@/lib/workspace";
+import { fitWindowRect, normalizeChatLayoutRects, presetWindowRects, readWorkspaceLayout, scaleWorkspaceLayout, WORKSPACE_LAYOUT_EVENT, type WindowRect, type WorkspaceLayout, type WorkspacePreset } from "@/lib/workspace";
 
 const KEY = "pixel-pals-custom-window-layout-v1";
 type Choice = "" | WorkspacePreset | "saved";
@@ -18,8 +18,9 @@ export function WorkspaceLayoutMenu({ onShow }: { onShow: (visibleIds: string[])
   const canvas = () => document.querySelector<HTMLElement>(".window-canvas");
   const apply = (rects: Record<string, WindowRect>) => {
     // Every WorkspaceWindow listens for the same layout event, including hidden windows.
-    window.dispatchEvent(new CustomEvent(WORKSPACE_LAYOUT_EVENT, { detail: { windows: rects } }));
-    onShow(Object.keys(rects));
+    const normalized = normalizeChatLayoutRects(rects);
+    window.dispatchEvent(new CustomEvent(WORKSPACE_LAYOUT_EVENT, { detail: { windows: normalized } }));
+    onShow(Object.keys(normalized));
   };
 
   function select(value: Choice) {
@@ -66,7 +67,7 @@ export function WorkspaceLayoutMenu({ onShow }: { onShow: (visibleIds: string[])
     <label htmlFor={labelId}>Window layouts</label>
     <select id={labelId} aria-label="Workspace layout" value={choice} onChange={(e) => select(e.target.value as Choice)}>
       <option value="">Choose a layout…</option>
-      <option value="chat">Chat · room + Roundtable</option>
+      <option value="chat">Chat · Pal Room + My Pals</option>
       <option value="mail">Mail · full workspace</option>
       <option value="work">Work · tools + documents</option>
       <option value="server">Server · Today + settings</option>

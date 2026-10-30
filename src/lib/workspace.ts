@@ -101,7 +101,7 @@ export function presetWindowRects(preset: WorkspacePreset, bounds: { width: numb
   const first = { x: 0, y: 0, w: half, h };
   const second = { x: half, y: 0, w: w - half, h };
   const full = { x: 0, y: 0, w, h };
-  if (preset === "chat") return w >= 700 ? { room: first, "mode-roundtable": second } : { room: full, "mode-roundtable": full };
+  if (preset === "chat") return w >= 700 ? { room: first, "chat-my-pals": second } : { room: full, "chat-my-pals": full };
   if (preset === "mail") return { mail: full };
   if (preset === "work") return w >= 700 ? { tools: first, documents: second } : { tools: full, documents: full };
   return w >= 700 ? { today: first, setup: second } : { today: full, setup: full };
@@ -130,4 +130,18 @@ export function scaleWorkspaceLayout(layout: WorkspaceLayout, bounds: { width: n
   return Object.fromEntries(Object.entries(layout.windows).map(([id, rect]) => [id, fitWindowRect({
     x: rect.x * scaleX, y: rect.y * scaleY, w: rect.w * scaleX, h: rect.h * scaleY,
   }, bounds)]));
+}
+
+
+/** Previous releases saved six separate chat window IDs. Map their positions into
+ * the two new chat rooms without discarding the user's entire saved layout. */
+export function normalizeChatLayoutRects(input: Record<string, WindowRect>): Record<string, WindowRect> {
+  const output: Record<string, WindowRect> = {};
+  // Explicit two-room rectangles win over legacy IDs if both are present.
+  for (const [id, rect] of Object.entries(input)) {
+    const canonical = /^(?:mode-smart|mode-direct|mode-solve)$/.test(id) ? "chat-my-pals"
+      : /^(?:mode-roundtable|mode-broadcast|mode-debate)$/.test(id) ? "chat-pal-lounge" : id;
+    if (!(canonical in output) || canonical === id) output[canonical] = rect;
+  }
+  return output;
 }

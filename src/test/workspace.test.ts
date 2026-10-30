@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampWindowPosition, readWindowPosition, resizeWindowRect, type WindowResizeEdge } from "@/lib/workspace";
+import { clampWindowPosition, normalizeChatLayoutRects, presetWindowRects, readWindowPosition, resizeWindowRect, type WindowResizeEdge } from "@/lib/workspace";
 
 describe("movable workspace", () => {
   it("keeps a dragged window within the workspace", () => {
@@ -51,5 +51,20 @@ describe("four-side window resizing", () => {
   it("fits available space on a canvas smaller than the minimum window size", () => {
     const r = resizeWindowRect({ x: 0, y: 0, w: 260, h: 190 }, { x: 40, y: 40 }, "se", { width: 260, height: 190 });
     expect(r).toEqual({ x: 0, y: 0, w: 260, h: 190 });
+  });
+});
+
+describe("two-room layout migration", () => {
+  it("opens the new My Pals window in the Chat preset", () => {
+    const layout = presetWindowRects("chat", { width: 1200, height: 800 });
+    expect(Object.keys(layout)).toEqual(["room", "chat-my-pals"]);
+  });
+  it("restores positions saved by older six-chat releases", () => {
+    const a = { x: 0, y: 0, w: 600, h: 500 };
+    const b = { x: 600, y: 0, w: 600, h: 500 };
+    expect(normalizeChatLayoutRects({ "mode-smart": a, "mode-roundtable": b, today: a })).toEqual({
+      "chat-my-pals": a, "chat-pal-lounge": b, today: a,
+    });
+    expect(normalizeChatLayoutRects({ "mode-smart": a, "chat-my-pals": b })["chat-my-pals"]).toEqual(b);
   });
 });
