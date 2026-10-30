@@ -331,6 +331,45 @@ function AddAllToCalendar({ shifts, onStatus, onDownload }: {
   }}><CalendarPlus className="size-4"/> Download .ics for Google Calendar</Button>;
 }
 
+/** One action adds or updates every shift managed by ShowPilot in the connected Google Calendar. */
+function UpdateInGoogle({ shifts, title, onStatus }: {
+  shifts: Shift[]; title: string; onStatus: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    if (!window.showpilotCalendar) {
+      onStatus("Update in Google needs the portable Windows ShowPilot app. Use Download all (.ics) in the browser version.");
+      return;
+    }
+    if (busy || !shifts.length) return;
+    setBusy(true);
+    try {
+      const bridge = window.showpilotCalendar;
+      const state = await bridge.status();
+      if (!state.available) throw new Error("Secure Windows credential storage is unavailable. Use .ics export.");
+      if (!state.configured) {
+        onStatus("One-time Google setup required: open Settings & AI → Google Calendar and import a Google Desktop OAuth JSON file.");
+        return;
+      }
+      if (!window.confirm("Update all " + shifts.length + " shifts in Google Calendar? ShowPilot will create missing shifts and update matching ShowPilot events. It will NOT delete any events.")) return;
+      if (!state.connected) {
+        onStatus("Opening Google sign-in in your browser. Complete approval, then return to ShowPilot.");
+        await bridge.connect();
+      }
+      onStatus("Updating " + shifts.length + " shift(s) in Google Calendar…");
+      const response = await bridge.updateAll({ title, shifts: withShiftIds(shifts) });
+      onStatus(response.message + (response.errors.length ? " Problems: " + response.errors.join(" · ") : ""));
+    } catch (e) {
+      onStatus("Could not update Google Calendar: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <Button size="sm" disabled={!shifts.length || busy} onClick={() => void run()}>
+    <CalendarSync className="size-4" /> {busy ? "Updating Google…" : "Update in Google"}
+  </Button>;
+}
+
 function ShiftsTab() {
   const [name, setNameRaw] = useState(DEFAULT_SCHEDULE_NAME);
   useEffect(() => { try { const n = localStorage.getItem("pixelpals:work-name"); if (n) setNameRaw(n); } catch { /* ignore */ } }, []);
@@ -406,11 +445,12 @@ function ShiftsTab() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={ics} disabled={!shifts.length}><Download className="size-4" /> Download all (.ics)</Button>
+            <UpdateInGoogle shifts={shifts} title={title.trim() || "Mark Work"} onStatus={setStatus} />
             <AddAllToCalendar onDownload={() => void ics()} shifts={shifts} title={title.trim() || "Mark Work"} remove={removed} onPushed={() => setRemoved([])} onStatus={setStatus} />
             <Button size="sm" variant="outline" onClick={add}>Add a shift</Button>
           </div>
-          {removed.length > 0 && <p className="text-xs text-muted-foreground">{removed.length} removed shift{removed.length === 1 ? "" : "s"} will be omitted from the next .ics export; already imported Google Calendar events are not deleted automatically.</p>}
-          <p className="text-xs text-muted-foreground">Press Edit on a shift to change its date, times or note. Save a new .ics after editing. Manual re-imports can create duplicates.</p>
+          {removed.length > 0 && <p className="text-xs text-muted-foreground">{removed.length} removed shift{removed.length === 1 ? "" : "s"} will be omitted from the next .ics export; already imported Google Calendar events are not deleted automatically by either Google sync or .ics export.</p>}
+          <p className="text-xs text-muted-foreground">Press Edit on a shift to change its date, times or note. After editing, use Update in Google to update all ShowPilot-managed calendar events at once. Manually imported .ics events may create duplicates.</p>
           <ul className="max-h-80 space-y-1 overflow-y-auto text-sm">
             {shifts.map((s, i) => (
               <li key={s.id ?? `${s.date}-${i}`} className="rounded border border-border px-2 py-1">
