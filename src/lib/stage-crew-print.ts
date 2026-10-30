@@ -38,8 +38,17 @@ function stageDiagram(stage:CrewPrintStage):string {
     decks+holders+'</svg>';
 }
 
+/** Stable date-only rendering: never shift the show date across local time zones. */
+export type CrewScheduleDates = { showDate?: string; buildByDate?: string };
+function crewDate(value?: string): string {
+  if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return "Not set";
+  const parsed = new Date(value + "T12:00:00Z");
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0,10) !== value) return "Not set";
+  return new Intl.DateTimeFormat("en-US", {weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(parsed);
+}
+
 /** Self-contained HTML: independent of the planner CSS and page chrome. */
-export function crewPrintDocument(eventName:string, stages:readonly CrewPrintStage[]):string {
+export function crewPrintDocument(eventName:string, stages:readonly CrewPrintStage[], dates: CrewScheduleDates = {}):string {
   const title=escape(eventName.trim()||"Stage Plan");
   const pages=stages.map((s,index)=>{
     const tally=crewPrintData(s);
@@ -48,6 +57,8 @@ export function crewPrintDocument(eventName:string, stages:readonly CrewPrintSta
     return '<article class="sheet" data-stage="'+(index+1)+'">'+
       '<div class="eyebrow">COBB CONVENTION CENTER-ATLANTA · STAGE CREW SHEET</div>'+
       '<h1>'+title+'</h1><h2>'+escape(s.name||"Stage "+(index+1))+'</h2>'+
+      '<div class="crew-dates"><div><span>BUILD BY</span><strong>'+crewDate(dates.buildByDate)+'</strong></div>'+
+      '<div><span>SHOW DATE</span><strong>'+crewDate(dates.showDate)+'</strong></div></div>'+
       '<div class="dimensions"><div><span>WIDTH</span><strong>'+fmt(s.width)+' ft</strong></div>'+
       '<div><span>LENGTH</span><strong>'+fmt(s.length)+' ft</strong></div>'+
       '<div><span>HEIGHT</span><strong>'+fmt(s.heightIn)+' in</strong></div></div>'+
@@ -65,7 +76,8 @@ export function crewPrintDocument(eventName:string, stages:readonly CrewPrintSta
     '<style>@page{size:letter portrait;margin:.45in}*{box-sizing:border-box}html,body{margin:0;padding:0;background:white;color:#111827;font-family:Arial,Helvetica,sans-serif}'+
     '.sheet{height:9.75in;width:100%;padding:0;break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always;display:flex;flex-direction:column;overflow:hidden}'+
     '.sheet:last-child{break-after:auto;page-break-after:auto}.eyebrow{font-size:10px;font-weight:700;letter-spacing:.09em;border-bottom:2px solid #111827;padding-bottom:9px}'+
-    'h1{font-size:25px;line-height:1.15;margin:13px 0 3px;color:#000;overflow-wrap:anywhere}h2{font-size:19px;margin:0 0 17px;color:#111}'+
+    'h1{font-size:25px;line-height:1.15;margin:13px 0 3px;color:#000;overflow-wrap:anywhere}h2{font-size:19px;margin:0 0 10px;color:#111}'+
+    '.crew-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:11px}.crew-dates>div{padding:9px 11px;border:2px solid #111827;background:#f3f5f8}.crew-dates span{font-size:10px;font-weight:800;letter-spacing:.05em;display:block;color:#111827}.crew-dates strong{display:block;font-size:17px;color:#000;margin-top:3px}'+
     '.dimensions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:13px}.dimensions>div{border:2px solid #1f2937;padding:9px 13px}'+
     '.counts{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:8px;margin-bottom:12px}.counts>div{border:1px solid #374151;padding:9px 8px;min-height:67px}.counts .major{background:#eff3f7;border:2px solid #111827}'+
     '.dimensions span,.counts span{display:block;font-size:10px;font-weight:700;color:#20252d;letter-spacing:.04em}.dimensions strong,.counts strong{display:block;font-size:25px;color:#000;margin-top:5px}'+
@@ -79,7 +91,7 @@ export function crewPrintDocument(eventName:string, stages:readonly CrewPrintSta
 }
 
 /** A hidden print frame prevents printing the whole ShowPilot UI and extra blank pages. */
-export function printCrewPages(eventName:string,stages:readonly CrewPrintStage[]):void {
+export function printCrewPages(eventName:string,stages:readonly CrewPrintStage[],dates:CrewScheduleDates = {}):void {
   if(!stages.length)throw new Error("Set up at least one stage before printing.");
   const frame=document.createElement("iframe");
   frame.title="ShowPilot crew print document";
@@ -93,6 +105,6 @@ export function printCrewPages(eventName:string,stages:readonly CrewPrintStage[]
     w.focus();w.print();
   };
   // Assign srcdoc before attaching: avoid printing the initial empty iframe document.
-  frame.srcdoc=crewPrintDocument(eventName,stages);
+  frame.srcdoc=crewPrintDocument(eventName,stages,dates);
   document.body.appendChild(frame);
 }
