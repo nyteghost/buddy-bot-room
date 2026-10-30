@@ -55,6 +55,8 @@ import { WorkspaceLayoutMenu } from "./workspace-layout-menu";
 import { JustStartDialog } from "./just-start-dialog";
 import { FocusCompanion } from "./focus-companion";
 import { PalRoomActivities } from "./pal-room-activities";
+import { LivingTaskBoard } from "./living-task-board";
+import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
 import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
@@ -355,6 +357,20 @@ export function Room() {
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(true);
+  const [palRoomPlayful, setPalRoomPlayful] = useState(false);
+  const [palRoomPhase, setPalRoomPhase] = useState(0);
+  useEffect(() => {
+    try { setPalRoomPlayful(localStorage.getItem(PAL_ROOM_MOOD_KEY) === "1"); } catch { /* Private browsing: calm default */ }
+  }, []);
+  useEffect(() => {
+    if (!roomOpen || !palRoomPlayful || document.visibilityState === "hidden") return;
+    const tick = window.setInterval(() => setPalRoomPhase((n) => (n + 1) % 300), 25_000);
+    return () => window.clearInterval(tick);
+  }, [roomOpen, palRoomPlayful]);
+  const changePalRoomMood = (next: boolean) => {
+    setPalRoomPlayful(next);
+    try { localStorage.setItem(PAL_ROOM_MOOD_KEY, next ? "1" : "0"); } catch { /* optional setting */ }
+  };
   const [openModes, setOpenModes] = useState<Record<Mode, boolean>>(defaultOpenModes);
   const conversationOpen = ALL_MODES.some((m) => openModes[m]);
   const showMode = (m: Mode) => setOpenModes((o) => activateChatMode(o, m));
@@ -1898,7 +1914,7 @@ export function Room() {
               </span>
             </div>
             {agents.map((a, i) => assistantOn ? (
-              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} />
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} />
             ) : (
               <div
                 key={a.id}
@@ -1921,6 +1937,7 @@ export function Room() {
                 {focusCompanion?.pal === a.id && !focusBreak && speaking !== a.id && <span className="pal-room-task-bubble" aria-label="Pal working alongside you">💻</span>}
                 {focusCompanion?.pal === a.id && focusBreak && speaking !== a.id && <span className="pal-room-task-bubble" aria-label="Pal on break">☕</span>}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
+                {palRoomPlayful && !running && !focusCompanion && enabled.includes(a.id) && <span className="pal-room-idle-bubble" title={palActivity(a.id, palRoomPhase).text} aria-label={agentName(a.id, hell, horror, characterMode) + ": " + palActivity(a.id, palRoomPhase).text}>{palActivity(a.id, palRoomPhase).emoji}</span>}
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror, characterMode)}
                   {speaking === a.id && " ···"}
@@ -1937,7 +1954,8 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} />
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} />
+          <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
           <div className="section-heading">
             <button
               type="button"

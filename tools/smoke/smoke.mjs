@@ -180,6 +180,9 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   const dump = page.getByRole("region", { name: "Brain Dump" });
   await dump.getByRole("textbox", { name: "Brain dump tasks" }).fill("Organize the garage");
   await dump.getByRole("button", { name: "Capture thoughts" }).click();
+  // The Today window may be above the Pal Room; close it before selecting a board task.
+  const todayItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i });
+  if (await todayItem.getAttribute("aria-pressed") === "true") await todayItem.click();
   await board.getByRole("button", { name: "Start: Organize the garage" }).waitFor();
   await board.getByRole("button", { name: "Start: Organize the garage" }).click();
   const dialog = page.getByRole("dialog", { name: "Just Start" });
