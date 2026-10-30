@@ -5,6 +5,20 @@ let engine:Engine|null=null;
 let loading:Promise<Engine>|null=null;
 let worker:Worker|null=null;
 let loadedModel="";
+export type LocalAiRuntimeState = { status:"not-loaded"|"loading"|"ready"|"error"; model:string; message:string };
+let runtime:LocalAiRuntimeState = {status:"not-loaded",model:"",message:"No local AI model is loaded."};
+const listeners = new Set<(state:LocalAiRuntimeState)=>void>();
+export function getLocalAiRuntimeState():LocalAiRuntimeState { return {...runtime}; }
+export function subscribeLocalAiRuntimeState(listener:(state:LocalAiRuntimeState)=>void):()=>void {
+  listeners.add(listener);
+  listener(getLocalAiRuntimeState());
+  return ()=>{listeners.delete(listener)};
+}
+function publishRuntime(next:LocalAiRuntimeState){
+  runtime=next;
+  listeners.forEach(cb=>cb(getLocalAiRuntimeState()));
+}
+
 export async function gpuAvailable():Promise<boolean>{
  try{
   const nav=navigator as Navigator & {gpu?:{requestAdapter:()=>Promise<unknown>}};
@@ -19,18 +33,19 @@ export async function localModelOptions() {
  return [...new Set([...preferred.filter(m=>models.includes(m)),...short])].slice(0,10);
 }
 export async function loadLocalModel(model:string,onProgress:(message:string)=>void):Promise<void> {
- if(engine&&loadedModel===model)return;
- if(loading) {await loading;if(loadedModel===model)return;}
+ if(engine&&loadedModel===model){publishRuntime({status:"ready",model,message:"Local AI model loaded and ready."});return;}
+ if(loading) {await loading;if(loadedModel===model){publishRuntime({status:"ready",model,message:"Local AI model loaded and ready."});return;}}
  if(!await gpuAvailable())throw new Error("No supported WebGPU adapter found. Offline rule-based tasks remain available.");
+ publishRuntime({status:"loading",model,message:"Preparing local AI model..."});
  const webllm=await import("@mlc-ai/web-llm");
  if(!webllm.prebuiltAppConfig.model_list.some(x=>x.model_id===model))throw new Error("This model is not part of the supported local model list.");
  if(engine){await engine.unload();engine=null;}
  if(worker){worker.terminate();worker=null;}
  worker=new Worker(new URL("./showpilot-ai-worker.ts",import.meta.url),{type:"module"});
  const current=worker;
- loading=webllm.CreateWebWorkerMLCEngine(current,model,{initProgressCallback:(p)=>onProgress(p.text||"Loading model...")});
- try{engine=await loading;loadedModel=model;onProgress("Local AI ready. Cached models can be used offline.");}
- catch(err){current.terminate();if(worker===current)worker=null;throw err}
+ loading=webllm.CreateWebWorkerMLCEngine(current,model,{initProgressCallback:(p)=>{const message=p.text||"Loading model...";onProgress(message);publishRuntime({status:"loading",model,message})}});
+ try{engine=await loading;loadedModel=model;publishRuntime({status:"ready",model,message:"Local AI ready on this computer."});onProgress("Local AI ready. Cached models can be used offline.");}
+ catch(err){current.terminate();if(worker===current)worker=null;publishRuntime({status:"error",model,message:(err as Error).message||"Model failed to load."});throw err}
  finally{loading=null}
 }
 export async function runLocalTaskAI(input:AiTaskInput,model:string,onProgress:(message:string)=>void){
