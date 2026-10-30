@@ -44,6 +44,27 @@ describe("ShowPilot short crew printouts",()=>{
     expect(html).toContain("6</strong>");
     expect(html).toContain("2 extra loose decks not shown");
   });
+  it("shows the build deadline and show date clearly on every stage page",()=>{
+    const html=crewPrintDocument("Trade Show",[stage("Main"),stage("Side")],{
+      buildByDate:"2026-11-02",showDate:"2026-11-04",
+    });
+    expect((html.match(/BUILD BY/g)||[])).toHaveLength(2);
+    expect((html.match(/SHOW DATE/g)||[])).toHaveLength(2);
+    expect((html.match(/Mon, Nov 2, 2026/g)||[])).toHaveLength(2);
+    expect((html.match(/Wed, Nov 4, 2026/g)||[])).toHaveLength(2);
+    expect((html.match(/<article class="sheet"/g)||[])).toHaveLength(2);
+  });
+  it("uses an explicit not-set date instead of guessing or shifting dates",()=>{
+    const noDates=crewPrintDocument("Show",[stage("Main")]);
+    expect((noDates.match(/Not set/g)||[])).toHaveLength(2);
+    const bad=crewPrintDocument("Show",[stage("Main")],{showDate:"2026-02-31",buildByDate:"invalid"});
+    expect((bad.match(/Not set/g)||[])).toHaveLength(2);
+  });
+  it("only states the standard 4x8 deck size in the parts summary, not on each deck",()=>{
+    const html=crewPrintDocument("Show",[stage("Main")]);
+    expect((html.match(/4 × 8 DECKS/g)||[])).toHaveLength(1);
+    expect(html).toContain("Outlines show individual decks");
+  });
   it("flags invalid stages rather than silently claiming they can be built",()=>{
     const html=crewPrintDocument("Event",[{...stage("Incomplete"),valid:false}]);
     expect(html).toContain("CHECK PLAN");
