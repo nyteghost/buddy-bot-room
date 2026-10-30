@@ -1,0 +1,51 @@
+import {describe,it,expect} from "vitest";
+import {planStage,FULL_STOCK} from "@/lib/deck-solver";
+
+describe("ShowPilot operational bridge planning",()=>{
+  it("uses two supported bridge decks between three 3-deck holders for a 44x8 stage",()=>{
+    const r=planStage(44,8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.holderError).toBeUndefined();
+    expect(r.decks).toHaveLength(11);
+    expect(r.holders).toHaveLength(3);
+    expect(r.holders.map(h=>h.capacity)).toEqual([3,3,3]);
+    expect(r.bridges).toHaveLength(2);
+    expect(r.bridges.map(b=>b.x)).toEqual([12,28]);
+    expect(r.bridges.map(b=>b.between)).toEqual([["H1","H2"],["H2","H3"]]);
+  });
+
+  it("uses a single bridge between two 3-deck holders for a 28x8 stage",()=>{
+    const r=planStage(28,8);
+    expect(r.ok).toBe(true);
+    if(!r.ok)return;
+    expect(r.holderError).toBeUndefined();
+    expect(r.holders.map(h=>h.capacity)).toEqual([3,3]);
+    expect(r.bridges).toHaveLength(1);
+    expect(r.bridges[0]?.between).toEqual(["H1","H2"]);
+  });
+
+  it("never assigns a bridge without two distinct holders on either side",()=>{
+    for(const [w,l] of [[28,8],[44,8],[24,24],[32,16],[36,16],[20,16]]){
+      const r=planStage(w,l);
+      if(!r.ok||r.holderError)continue;
+      const ids=new Set(r.holders.map(h=>h.label));
+      expect(r.decks).toHaveLength(w*l/32);
+      expect(r.bridges).toHaveLength(r.decks.filter(d=>d.isBridge).length);
+      for(const b of r.bridges){
+        expect(ids.has(b.between[0])).toBe(true);
+        expect(ids.has(b.between[1])).toBe(true);
+        expect(b.between[0]).not.toBe(b.between[1]);
+      }
+    }
+  });
+  it("respects stock limits and avoids allocating extra holders",()=>{
+    const stock={...FULL_STOCK,three:2,two:0,one:0};
+    const r=planStage(28,8,stock);
+    expect(r.ok).toBe(true);
+    if(!r.ok)return;
+    expect(r.holderError).toBeUndefined();
+    expect(r.holders).toHaveLength(2);
+    expect(r.bridges).toHaveLength(1);
+  });
+});
