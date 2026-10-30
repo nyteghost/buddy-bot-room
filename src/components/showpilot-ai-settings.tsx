@@ -3,7 +3,7 @@ import {Download,KeyRound,Monitor,ShieldCheck,ShieldAlert,Trash2} from "lucide-r
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {AI_PROVIDERS,detectAiProvider,type AiProviderId} from "@/lib/showpilot-ai-providers";
-import {gpuAvailable,localModelOptions,loadLocalModel} from "@/lib/showpilot-ai-local";
+import {gpuAvailable,localModelOptions,loadLocalModel,subscribeLocalAiRuntimeState,getLocalAiRuntimeState,type LocalAiRuntimeState} from "@/lib/showpilot-ai-local";
 import type {AiStatus} from "@/lib/showpilot-ai-bridge";
 const NAME="showpilot:ai:local-model";
 export function ShowPilotAiSettings(){
@@ -15,6 +15,8 @@ export function ShowPilotAiSettings(){
  const [models,setModels]=useState<string[]>([]);
  const [model,setModel]=useState(()=>{try{return localStorage.getItem(NAME)||""}catch{return ""}});
  const [working,setWorking]=useState(false);
+ const [runtime,setRuntime]=useState<LocalAiRuntimeState>(()=>getLocalAiRuntimeState());
+ useEffect(()=>subscribeLocalAiRuntimeState(setRuntime),[]);
  const [status,setStatus]=useState("");
  const [progress,setProgress]=useState("");
  useEffect(()=>{
@@ -52,6 +54,19 @@ export function ShowPilotAiSettings(){
      </select>
      <div><Button onClick={()=>void load()} disabled={!gpu||!model||working}><Download size={16}/> {working?"Loading…":"Download / Load Local AI"}</Button></div>
      {progress&&<p role="status" className="text-xs text-muted-foreground">{progress}</p>}
+     <div className="rounded-lg border border-border bg-background/70 p-3 space-y-2" aria-label="Active local AI">
+       <div className="flex flex-wrap items-center justify-between gap-2">
+         <h3 className="text-sm font-semibold">Active AI</h3>
+         <span className="rounded-full border border-border px-2 py-0.5 text-xs font-semibold" role="status">{runtime.status==="ready"?"Ready":runtime.status==="loading"?"Loading":runtime.status==="error"?"Error":"Not loaded"}</span>
+       </div>
+       <div className="grid gap-2 sm:grid-cols-2">
+         <div><span className="block text-xs text-muted-foreground">Currently running</span><strong className="block text-sm break-all">{runtime.status==="ready"||runtime.status==="loading"?runtime.model:"None — no local model is loaded"}</strong></div>
+         <div><span className="block text-xs text-muted-foreground">Selected model</span><strong className="block text-sm break-all">{model||"Not selected"}</strong></div>
+       </div>
+       <p className="text-xs text-muted-foreground">{runtime.message}</p>
+       {runtime.status==="ready"&&runtime.model!==model&&<p className="text-xs text-amber-600">The selected model differs from the running model. Click Download / Load Local AI to switch.</p>}
+       <p className="text-xs text-muted-foreground">Inference: local GPU (WebGPU). When you choose Cloud in AI Task Assistant, the selected online provider handles that request instead.</p>
+     </div>
      <p className="text-xs text-muted-foreground">Large model downloads may need substantial space and GPU memory. Cached model data is separate from ShowPilot work-data backups. Unsupported computers can continue using offline task rules.</p>
    </div>
    <div className="rounded-xl border p-4 space-y-3">
