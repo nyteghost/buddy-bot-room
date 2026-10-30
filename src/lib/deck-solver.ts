@@ -2,6 +2,7 @@
 // Stage deck layout solver. ONE copy, used by the Deck tab (planner.tsx) and the `@deck 24x24x32` chat command,
 // so the two can never disagree. Ported from Deck Builder Pro.
 import { allocateSingleDeckStages } from "./single-deck-allocation";
+import { planSingleRowStage } from "./stage-row-plan";
 
 export const DECK_INVENTORY = { decks: 72, one: 4, two: 8, three: 8, s5: 1, s6: 2, s7: 5 };
 
@@ -124,6 +125,12 @@ export function planStage(
   if (decksNeeded > stock.decks) {
     return { ok: false, reason: `This stage needs ${decksNeeded} decks \u2014 only ${stock.decks} ${stock === FULL_STOCK ? "in the warehouse" : "left for this stage"}.` };
   }
+
+  // For 8ft-deep stage runs, use a holder-minimizing bridge layout first.
+  // It uses the stock passed by the parent planner, which already deducts
+  // equipment allocated to earlier stages in the same event.
+  const bridgedRow = planSingleRowStage(widthFt, lengthFt, stock, prefs);
+  if (bridgedRow) return bridgedRow;
 
   type Attempt = {
     decks: Deck[];
