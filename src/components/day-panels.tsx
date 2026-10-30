@@ -142,9 +142,11 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks }: { 
   const todayKey = zoneDateKey(Date.now(), tz);
   const day = offsetDateKey(todayKey, dayOffset);
   const events = eventsOnDay(cal.data?.items ?? [], day, tz);
-  const open_ = todos.filter((t) => !t.done && (dayOffset === 0
-    ? (!t.reminderAt || zoneDateKey(t.reminderAt, tz) === day)
-    : !!t.reminderAt && zoneDateKey(t.reminderAt, tz) === day));
+  const open_ = todos.filter((t) => {
+    if (t.done) return false;
+    const taskDay = t.dueDate ?? (t.scheduledAt ? zoneDateKey(t.scheduledAt, tz) : t.reminderAt ? zoneDateKey(t.reminderAt, tz) : null);
+    return taskDay ? taskDay === day : dayOffset === 0;
+  });
   const todayReminders = reminders.filter((r) => zoneDateKey(r.at, tz) === day);
   const forecast = weather.data?.weather?.days.find((item) => item.date === day);
   const pick = dailyPicks(trakt.data?.items ?? [], todayKey, 1)[0];

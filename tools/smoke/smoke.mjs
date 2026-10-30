@@ -111,6 +111,10 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await page.unroute("**/api/just-start");
 });
 
+await step("expand the sidebar More group", async () => {
+  const more = page.locator(".sidebar-item", { hasText: /^\s*More\s*$/i }).first();
+  if (await more.count()) await more.click({ timeout: 8000 });
+});
 await step("Today future overview and important Brain Dump alert", async () => {
   await page.route("**/api/reminders", async (route) => {
     const body = route.request().postDataJSON();
@@ -142,13 +146,18 @@ await step("Today future overview and important Brain Dump alert", async () => {
   await dump.getByText(/Alert set:/).waitFor();
   await dump.getByRole("checkbox", { name: "Done: Review next week's show schedule" }).check();
   await dump.getByText(/Marked done/).waitFor();
+  // Natural-language date/time capture must appear in tomorrow, not today.
+  await dump.getByRole("textbox", { name: "Brain dump tasks" }).fill("Pick up Kids @5pm, Tomorrow");
+  await dump.getByRole("button", { name: "Capture thoughts" }).click();
+  await dump.getByRole("checkbox", { name: "Important: Pick up Kids" }).check();
+  await dump.getByText(/Alert set:/).waitFor();
+  await overview.getByRole("button", { name: "Tomorrow" }).click();
+  await page.getByRole("button", { name: /Pick up Kids/ }).first().waitFor();
+  await dump.getByRole("checkbox", { name: "Done: Pick up Kids" }).check();
   await page.unroute("**/api/reminders");
 });
 
-await step("expand the sidebar More group", async () => {
-  const more = page.locator(".sidebar-item", { hasText: /^\s*More\s*$/i }).first();
-  if (await more.count()) await more.click({ timeout: 8000 });
-});
+
 for (const label of WINDOWS) {
   await step(`open "${label}"`, async () => {
     const item = page.locator(".sidebar-item", { hasText: new RegExp(`^\\s*${label}\\s*$`, "i") }).first();
