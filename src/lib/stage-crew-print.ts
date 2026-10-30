@@ -27,7 +27,7 @@ function stageDiagram(stage:CrewPrintStage):string {
     const [x,y,w,hh]=shape(h.x,h.y,h.w,h.h);
     const dash=h.capacity===2?' stroke-dasharray=".7 .4"':'';
     const extra=h.capacity===3?'<rect x="'+fmt(num(h.x)+.25)+'" y="'+fmt(num(h.y)+.25)+'" width="'+fmt(Math.max(.1,num(h.w)-.5))+'" height="'+fmt(Math.max(.1,num(h.h)-.5))+'" fill="none" stroke="#111827" stroke-width=".10" vector-effect="non-scaling-stroke"/>':'';
-    const labelSize=Math.max(.7,Math.min(1.3,w>0?Number(w)/4:1,hh>0?Number(hh)/3:1));
+    const labelSize=Math.max(.7,Math.min(1.3,h.w>0?h.w/4:1,h.h>0?h.h/3:1));
     return '<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+hh+'" fill="none" stroke="#111827" stroke-width=".38"'+dash+' vector-effect="non-scaling-stroke"/>'+extra+
       '<text x="'+fmt(num(h.x)+num(h.w)/2)+'" y="'+fmt(num(h.y)+num(h.h)/2)+'" font-size="'+fmt(labelSize)+'" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-weight="700" fill="#111827">'+h.capacity+'x</text></g>';
   }).join("");
