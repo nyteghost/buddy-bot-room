@@ -26,7 +26,7 @@ page.on("console", (m) => {
 
 async function step(name, fn) {
   try { await fn(); notes.push(`ok   ${name}`); }
-  catch (e) { problems.push(`${name}: ${String(e.message).split("\n")[0]}`); notes.push(`FAIL ${name}`); }
+  catch (e) { problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); }
 }
 
 await step("home page loads", async () => {
