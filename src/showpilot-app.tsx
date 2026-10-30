@@ -84,7 +84,7 @@ export function App() {
                 </button>)}
               </div>
               <BackupPanel />
-              <div className="sp-note">Beta: event imports accept recognized convention-center spaces. Unknown rooms are held for manual review; CEPAC rows are excluded. Direct Google Calendar sync and automated online vendor refresh are not yet connected; .ics export and offline vendor quotes are available.</div>
+              <div className="sp-note">Beta: event imports accept recognized convention-center spaces. Unknown rooms are held for manual review; CEPAC rows are excluded. Google Calendar bulk sync is available in the portable Windows app after one-time OAuth setup; .ics export works offline. Automated online vendor refresh is still pending.</div>
             </div>
           : <section className="sp-panel"><ShowServicesTools selectedTab={screen} hideTabBar page venueOnly/></section>
         }
