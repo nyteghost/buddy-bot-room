@@ -340,6 +340,18 @@ export const ENGINEER_ROSTER: { name: string; badge: string; title: string }[] =
 export const HALL_ROWS = ["Hall A", "Hall B", "Hall C", "Hall D"];
 export const BALLROOM_ROWS = ["BallRoom A", "BallRoom B", "BallRoom E", "BallRoom G", "BallRoom C", "BallRoom D", "BallRoom F"];
 
+/** Next Monday in the user's local calendar (even when today is Monday).
+ * Uses local noon so daylight saving changes and UTC date conversion do not shift the day. */
+export function nextMondayIso(today: Date = new Date()): string {
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
+  const untilMonday = ((8 - d.getDay()) % 7) || 7;
+  d.setDate(d.getDate() + untilMonday);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 /** Monday (ISO date) of the week containing the date. */
 export function mondayOf(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
