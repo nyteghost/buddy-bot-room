@@ -84,6 +84,33 @@ await step("Just Start opens and remembers progress", async () => {
   await restored.getByRole("button", { name: "Close" }).click();
   await page.unroute("**/api/just-start");
 });
+await step("Focus Assist body double and saved checkpoint", async () => {
+  await page.route("**/api/just-start", async (route) => {
+    const request = route.request().postDataJSON();
+    const step = request.action === "next" ? "Check the next event." : "Open tomorrow's schedule.";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ step, source: "local-ai" }) });
+  });
+  await page.getByRole("button", { name: "Just Start" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Just Start" });
+  await dialog.getByRole("textbox", { name: "What are you trying to start?" }).fill("Review tomorrow's schedule");
+  await dialog.getByRole("button", { name: "Help me start" }).click();
+  await dialog.getByRole("button", { name: "I started" }).click();
+  await dialog.getByRole("combobox", { name: "Your work buddy" }).selectOption("byte");
+  await dialog.getByRole("button", { name: "Stay with me" }).click();
+  const companion = page.getByRole("complementary", { name: "Focus Assist work companion" });
+  await companion.getByText(/Review tomorrow's schedule/).waitFor();
+  await companion.getByRole("button", { name: "Done with step" }).click();
+  await companion.getByText("Check the next event.").waitFor();
+  await companion.getByRole("button", { name: "Save my place" }).click();
+  await companion.getByRole("button", { name: "Pause companion" }).click();
+  const checkpoint = page.getByRole("complementary", { name: "Saved Focus Assist checkpoint" });
+  await checkpoint.getByRole("button", { name: /Resume with/ }).click();
+  await companion.getByText("Check the next event.").waitFor();
+  await companion.getByRole("button", { name: "Finish & clear" }).click();
+  if (await checkpoint.count()) throw Error("Companion checkpoint was not cleared");
+  await page.unroute("**/api/just-start");
+});
+
 await step("expand the sidebar More group", async () => {
   const more = page.locator(".sidebar-item", { hasText: /^\s*More\s*$/i }).first();
   if (await more.count()) await more.click({ timeout: 8000 });

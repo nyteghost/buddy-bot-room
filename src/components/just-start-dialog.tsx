@@ -1,5 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Clock3, RotateCcw, Sparkles } from "lucide-react";
+import { Check, Clock3, RotateCcw, Sparkles, Users } from "lucide-react";
+import { agents, agentName, type AgentId } from "@/lib/agents";
+import { PixelCharacter } from "./pixel-character";
+import { makeFocusSession, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
+import { useCharacterMode } from "@/lib/hellraiser";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cleanStartStep, cleanStartTask, fallbackStartStep, type StartAction, type StartStage } from "@/lib/focus-assist";
@@ -22,11 +26,15 @@ const readSaved = (): Saved | null => {
 
 /** Tiny, opt-in, local-first starting coach. Nothing is automatically added to Tasks
  * or sent to Mail/Calendar; the optional short session is stored in this tab only. */
-export function JustStartDialog({ open, onOpenChange, initialTask = "" }: {
+export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompanionStart }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialTask?: string;
+  onCompanionStart?: (session: FocusSession) => void;
 }) {
+  const theme = useCharacterMode();
+  const [pal, setPal] = useState<AgentId>("byte");
+  const [companionMode, setCompanionMode] = useState<CompanionMode>("quiet");
   const fieldId = useId();
   const [task, setTask] = useState("");
   const [step, setStep] = useState("");
@@ -124,7 +132,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "" }: {
   };
 
   return <Dialog open={open} onOpenChange={close}>
-    <DialogContent className="max-w-xl gap-4" aria-describedby="just-start-description">
+    <DialogContent className="max-h-[88vh] max-w-xl gap-4 overflow-y-auto" aria-describedby="just-start-description">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2"><Sparkles className="size-5 text-primary" /> Just Start</DialogTitle>
         <DialogDescription id="just-start-description">
@@ -161,6 +169,43 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "" }: {
               <Button variant="outline" onClick={() => void ask("stuck")}>I'm stuck</Button>
             </div>
           )}
+        </section>
+      )}
+      {stage !== "entry" && (
+        <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+          <span className="text-xs text-muted-foreground">How was that step?</span>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void ask("smaller")}>Too big</Button>
+          <Button variant="ghost" size="sm" onClick={() => setNote("Good to know. You can keep going at your own pace.")}>That helped</Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void ask("alternate")}>Try another approach</Button>
+        </div>
+      )}
+      {stage === "started" && onCompanionStart && (
+        <section className="grid gap-3 rounded-lg border p-3" aria-label="Start Together">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold"><Users className="size-4" /> Start Together</p>
+            <p className="text-xs text-muted-foreground">Choose a Pal to work alongside you while you use Pixel Pals.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <PixelCharacter id={pal} mode={theme} className="!h-14 !w-14 shrink-0" animated />
+            <label className="grid flex-1 gap-1 text-xs" htmlFor="focus-pal-choice">Your work buddy
+              <select id="focus-pal-choice" className="w-full rounded-md border bg-background px-2 py-2 text-sm" value={pal} onChange={(e) => setPal(e.target.value as AgentId)}>
+                {agents.map((a) => <option key={a.id} value={a.id}>{agentName(a.id, false, false, theme)}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="grid gap-1">
+            <label htmlFor="focus-companion-mode" className="text-xs">How should your Pal accompany you?</label>
+            <select id="focus-companion-mode" className="w-full rounded-md border bg-background px-2 py-2 text-sm" value={companionMode} onChange={(e) => setCompanionMode(e.target.value as CompanionMode)}>
+              <option value="quiet">Quiet company (no check-ins)</option>
+              <option value="checkins">Gentle check-ins (every 10 minutes)</option>
+              <option value="steps">Step-by-step (you control each next step)</option>
+            </select>
+          </div>
+          <Button onClick={() => {
+            const session = makeFocusSession(task, step, pal, companionMode);
+            if (session) { onCompanionStart(session); close(false); }
+          }}><Users className="size-4" /> Stay with me</Button>
+          <p className="text-xs text-muted-foreground">Animated companionship, not screen tracking. Your Pal cannot see or change work in other apps. Saving your place is always your choice.</p>
         </section>
       )}
       {stage !== "entry" && (

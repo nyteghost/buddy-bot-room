@@ -53,6 +53,8 @@ import type { SavedDiscussion } from "@/lib/saved-discussions";
 import { SavedDiscussions } from "./saved-discussions";
 import { WorkspaceLayoutMenu } from "./workspace-layout-menu";
 import { JustStartDialog } from "./just-start-dialog";
+import { FocusCompanion } from "./focus-companion";
+import type { FocusSession } from "@/lib/focus-companion";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
@@ -376,6 +378,7 @@ export function Room() {
   const [todayOpen, setTodayOpen] = useState(false);
   const [justStartOpen, setJustStartOpen] = useState(false);
   const [justStartTask, setJustStartTask] = useState("");
+  const [focusCompanion, setFocusCompanion] = useState<FocusSession | null>(null);
   const beginFocusTask = (task = "") => { setJustStartTask(task); setJustStartOpen(true); };
   const [tasksOpen, setTasksOpen] = useState(false);
   const { addons } = useAddons();
@@ -1734,7 +1737,8 @@ export function Room() {
         <span className="mobile-strip-hint">tap for the room</span>
       </button>
       <TaskSync />
-      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} />
+      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} onCompanionStart={setFocusCompanion} />
+      <FocusCompanion session={focusCompanion} onChange={setFocusCompanion} />
       {!desktopApp && <UpdateBanner />}
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />

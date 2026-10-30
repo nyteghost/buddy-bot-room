@@ -2311,3 +2311,36 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
   .modular-workspace .just-start-header { width: 38px; min-width: 38px; height: 40px; padding: 0; justify-content: center; }
   .modular-workspace .just-start-header span { display: none; }
 }
+
+
+/* Focus Assist 2.0: a small, nonmodal work companion that follows you between windows. */
+.focus-companion {
+  position: fixed;
+  z-index: 70;
+  right: 16px;
+  bottom: 16px;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(75vh, 660px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 14px 45px rgb(0 0 0 / 25%);
+}
+.focus-companion-pal { width: 62px; height: 68px; display: grid; place-items: center; flex: none; }
+.focus-companion-pal > * { max-width: 100%; max-height: 100%; object-fit: contain; }
+.focus-companion-activity { margin-top: 5px; font-size: 11px; color: var(--muted-foreground); }
+.focus-companion-pulse { display: inline-block; width: 7px; height: 7px; margin-right: 3px; border-radius: 100%; background: var(--primary); animation: focus-companion-pulse 2.5s ease-in-out infinite; }
+.focus-companion-task { overflow-wrap: anywhere; }
+.focus-companion-step, .focus-companion-checkin { padding: 10px; border-radius: 9px; background: var(--muted); display: grid; gap: 4px; }
+.focus-companion-mode { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.focus-companion-mode select { appearance: none; min-width: 0; max-width: 180px; padding: 6px 25px 6px 8px; border: 1px solid var(--border); background: var(--background); border-radius: 6px; color: var(--foreground); font-size: 12px; }
+@keyframes focus-companion-pulse { 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .focus-companion-pulse { animation: none; } }
+@media (max-width: 700px) {
+  .focus-companion { right: 8px; bottom: 8px; max-height: 58vh; padding: 10px; }
+}
