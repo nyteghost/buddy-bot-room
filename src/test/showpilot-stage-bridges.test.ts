@@ -39,6 +39,36 @@ describe("ShowPilot operational bridge planning",()=>{
       }
     }
   });
+  it("matches the two 92x8 stages using a shared finite inventory",()=>{
+    const first=planStage(92,8,FULL_STOCK);
+    expect(first.ok).toBe(true);
+    if(!first.ok)return;
+    expect(first.holderError).toBeUndefined();
+    expect(first.decks).toHaveLength(23);
+    expect(first.holders.filter(h=>h.capacity===3)).toHaveLength(6);
+    expect(first.holders).toHaveLength(6);
+    expect(first.bridges).toHaveLength(5);
+    const remaining={...FULL_STOCK,
+      decks:FULL_STOCK.decks-first.decks.length,
+      three:FULL_STOCK.three-first.holders.filter(h=>h.capacity===3).length,
+      two:FULL_STOCK.two-first.holders.filter(h=>h.capacity===2).length,
+      one:FULL_STOCK.one-first.holders.filter(h=>h.capacity===1).length,
+    };
+    const second=planStage(92,8,remaining);
+    expect(second.ok).toBe(true);
+    if(!second.ok)return;
+    expect(second.holderError).toBeUndefined();
+    expect(second.decks).toHaveLength(23);
+    expect(second.holders).toHaveLength(8);
+    expect(second.holders.filter(h=>h.capacity===3)).toHaveLength(2);
+    expect(second.holders.filter(h=>h.capacity===2)).toHaveLength(5);
+    expect(second.holders.filter(h=>h.capacity===1)).toHaveLength(1);
+    expect(second.bridges).toHaveLength(6);
+    expect([...first.bridges,...second.bridges]).toHaveLength(11);
+    expect(first.decks.length+second.decks.length).toBe(46);
+    // No piece is silently double-allocated across the two stages.
+    expect(first.holders.filter(h=>h.capacity===3).length+second.holders.filter(h=>h.capacity===3).length).toBe(FULL_STOCK.three);
+  });
   it("respects stock limits and avoids allocating extra holders",()=>{
     const stock={...FULL_STOCK,three:2,two:0,one:0};
     const r=planStage(28,8,stock);
