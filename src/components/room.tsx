@@ -1,7 +1,7 @@
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
-import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow } from "lucide-react";
+import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -52,6 +52,7 @@ import { listLocalOrServer } from "@/lib/chat-store";
 import type { SavedDiscussion } from "@/lib/saved-discussions";
 import { SavedDiscussions } from "./saved-discussions";
 import { WorkspaceLayoutMenu } from "./workspace-layout-menu";
+import { JustStartDialog } from "./just-start-dialog";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
 import roomImage from "@/assets/pixel-room.jpg";
@@ -373,6 +374,9 @@ export function Room() {
   const [mailOpen, setMailOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
+  const [justStartOpen, setJustStartOpen] = useState(false);
+  const [justStartTask, setJustStartTask] = useState("");
+  const beginFocusTask = (task = "") => { setJustStartTask(task); setJustStartOpen(true); };
   const [tasksOpen, setTasksOpen] = useState(false);
   const { addons } = useAddons();
   const [addonOpen, setAddonOpen] = useState<string | null>(null);
@@ -1662,6 +1666,7 @@ export function Room() {
             <span className="brand-chat"> / chat</span>
           </span>
         </a>
+        <Button variant="outline" size="sm" className="just-start-header" aria-label="Just Start" onClick={() => beginFocusTask()} title="Just Start: one small action at a time"><Sparkles className="size-4" /> <span>Just Start</span></Button>
         <Button variant="ghost" size="icon" className="header-focus-btn" aria-label={focusMode ? "Leave focus mode" : "Focus mode"} aria-pressed={focusMode} title={focusMode ? "Leave focus mode (Ctrl+Shift+F)" : "Focus mode: just the chat (Ctrl+Shift+F)"} onClick={() => setFocusMode((v) => !v)}>{focusMode ? <Minimize2 /> : <Maximize2 />}</Button>
         <Button variant="ghost" size="icon" className="header-menu-btn" aria-label="Menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Ellipsis /></Button>
         <div
@@ -1729,6 +1734,7 @@ export function Room() {
         <span className="mobile-strip-hint">tap for the room</span>
       </button>
       <TaskSync />
+      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} />
       {!desktopApp && <UpdateBanner />}
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
@@ -1743,6 +1749,7 @@ export function Room() {
             <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : m === "debate" ? <Swords /> : <Workflow />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
           ))}
           <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Just Start: help me start a task" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes and memories" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Fun: Dungeon Master campaigns" aria-pressed={funOpen} onClick={() => setFunOpen((value) => !value)}><Gamepad2 /><span>Fun</span></Button>
@@ -1974,7 +1981,7 @@ export function Room() {
               <TodayPanel open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} />
             </WorkspaceWindow>
             <WorkspaceWindow id="tasks" title="Tasks & reminders" icon={<CheckSquare className="size-4" />} open={tasksOpen} onClose={() => setTasksOpen(false)} resetVersion={resetVersion}>
-              <TasksPanel open={tasksOpen} />
+              <TasksPanel open={tasksOpen} onJustStart={beginFocusTask} />
             </WorkspaceWindow>
             <WorkspaceWindow id="calendar" title="Calendar" icon={<CalendarDays className="size-4" />} open={calendarOpen} onClose={() => setCalendarOpen(false)} resetVersion={resetVersion}>
               <CalendarPanel open={calendarOpen} />

@@ -2303,3 +2303,11 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
 .sidebar-collapsed .workspace-layout-menu { display: none; }
 @media (max-width: 1050px) { .workspace-sidebar .workspace-layout-menu { display: none; } }
 @media (max-width: 700px) { .window-snap-preview { display: none; } }
+
+/* Focus Assist: keep the start action visible without expanding the workspace. */
+.modular-workspace .just-start-header { min-height: 38px; flex-shrink: 0; white-space: nowrap; gap: 5px; }
+.modular-workspace .just-start-header svg { flex-shrink: 0; }
+@media (max-width: 440px) {
+  .modular-workspace .just-start-header { width: 38px; min-width: 38px; height: 40px; padding: 0; justify-content: center; }
+  .modular-workspace .just-start-header span { display: none; }
+}
