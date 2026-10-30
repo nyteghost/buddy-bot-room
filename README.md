@@ -4,7 +4,7 @@ Professional venue operations suite extracted from the existing Pixel Pals Work 
 
 ## Modules
 - Event schedule: import Ungerboeck PDF/XLSX, review unfamiliar rooms, generate staffing and export Excel (convention center only; excludes CEPAC).
-- My Shifts: read schedules, edit shifts, export .ics. Direct Google Calendar sync is planned but **not yet available**.
+- My Shifts: read or paste shifts, edit them, export .ics, and use **Update in Google** for a single-action create/update of all displayed shifts (after connecting a Google account in portable Windows ShowPilot).
 - Stage & Deck Planner: stage configurations and material calculations.
 - Floor Maps: work-order PDF + floor plan utility placement.
 - Vendors: offline quotes and local comparison. Automatic vendor web scraping and email integration are **not included yet**.
@@ -35,3 +35,15 @@ Report imports are processed locally. Use the dashboard's **Export work data** b
 
 ## Safety
 Never copy secrets, `.env` files, or unrelated Pixel Pals modules into this project. Scheduling rules should be reviewed with the venue manager before altering staffing demand or employee constraints.
+
+## Google Calendar — one-click shift updates (Windows beta)
+You can continue to use `.ics` export offline without setting up Google.
+
+For direct synchronization (internet required):
+1. In Google Cloud Console, enable **Google Calendar API**, configure OAuth consent, create an OAuth client with app type **Desktop app**, and **download its JSON**. Add your Google account as a test user if the OAuth consent app is in Testing status.
+2. In ShowPilot open **Settings & AI → Google Calendar**, select the downloaded Desktop OAuth JSON, and click **Connect Google Calendar**. Google sign-in opens in your default browser. ShowPilot never asks for your Google password.
+3. In **My Shifts**, upload a monthly schedule workbook or paste shifts, review the dates/times, and click **Update in Google**. Confirm to create or update every shift in the list.
+
+Shifts are created/updated using a private ShowPilot source marker; repeat syncs update matching managed calendar events rather than adding a copy. It does not automatically delete removed shifts or identify calendar events you previously added individually or imported manually through `.ics`, which may remain duplicates. The application operates in the **America/New_York** time zone for this venue.
+
+OAuth credentials and refresh tokens are stored in the app's **Windows-encrypted user data** file, not in source control, plain browser localStorage, or ShowPilot backups. The connection depends on your Google API access and organizational consent settings. The Google account connection has not yet been live-tested against the user's account.
