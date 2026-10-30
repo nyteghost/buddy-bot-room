@@ -4,7 +4,7 @@ on:
     branches: [feat/showpilot-standalone]
   workflow_dispatch:
 concurrency:
-  group: showpilot-standalone-beta
+  group: showpilot-calendar-beta-validation
   cancel-in-progress: true
 jobs:
   check:
@@ -14,6 +14,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --no-save
       - run: bun run check
+      - run: node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/google-calendar.cjs && node --check desktop/ai-vault.cjs
       - run: bun test
       - run: bun run build
       - name: Upload offline browser build
