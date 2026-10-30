@@ -3,6 +3,9 @@ on:
   push:
     branches: [feat/showpilot-standalone]
   workflow_dispatch:
+concurrency:
+  group: showpilot-standalone-beta
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
