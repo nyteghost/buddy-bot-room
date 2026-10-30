@@ -85,7 +85,6 @@ export function printCrewPages(eventName:string,stages:readonly CrewPrintStage[]
   frame.title="ShowPilot crew print document";
   frame.setAttribute("aria-hidden","true");
   frame.style.cssText="position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0";
-  document.body.appendChild(frame);
   const cleanup=()=>{try{frame.remove()}catch{}};
   frame.onload=()=>{
     const w=frame.contentWindow;
@@ -93,5 +92,7 @@ export function printCrewPages(eventName:string,stages:readonly CrewPrintStage[]
     w.addEventListener("afterprint",cleanup,{once:true});
     w.focus();w.print();
   };
+  // Assign srcdoc before attaching: avoid printing the initial empty iframe document.
   frame.srcdoc=crewPrintDocument(eventName,stages);
+  document.body.appendChild(frame);
 }
