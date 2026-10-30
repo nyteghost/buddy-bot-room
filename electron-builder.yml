@@ -10,6 +10,7 @@ files:
   - "!**/*.map"
   - "!**/*.ts"
 win:
+  icon: desktop/showpilot.ico
   target:
     - target: dir
       arch:
