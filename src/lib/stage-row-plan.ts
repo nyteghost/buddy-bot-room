@@ -12,6 +12,7 @@
 import type { Stock, Result, PlanPrefs, Deck, Holder, Bridge } from "./deck-solver";
 
 type Counts = { one:number; two:number; three:number; bridges:number; holders:number };
+const prefsAvoidSingles=(count:number)=>count>1?1:0;
 
 function bestCounts(cells:number, stock:Stock, allowTwo:boolean):Counts|null {
   const candidates:Counts[]=[];
@@ -29,13 +30,14 @@ function bestCounts(cells:number, stock:Stock, allowTwo:boolean):Counts|null {
   }
   if(!candidates.length)return null;
   candidates.sort((a,b)=>
+    // Primary: use the fewest holders. Bridges reduce equipment, not deck count.
     (a.holders-b.holders)
-    // Avoid using multiple awkward 1-deck holders when a solution with
-    // at most one exists, without wasting additional bridge opportunities.
-    || (Number(a.one>1)-Number(b.one>1))
-    // Prefer the largest holders, respecting the inventory left for this stage.
-    || (b.three-a.three)
+    // Secondary: among equally economical layouts, use as many safe bridge
+    // positions as possible (matches the user's two-stage 92x8 method).
     || (b.bridges-a.bridges)
+    || (prefsAvoidSingles(a.one)-prefsAvoidSingles(b.one))
+    // Keep large holders together to simplify carrying and setup.
+    || (b.three-a.three)
     || (a.one-b.one)
   );
   return candidates[0];
