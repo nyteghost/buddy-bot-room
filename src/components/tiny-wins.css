@@ -1,0 +1,9 @@
+/* Quiet, optional tiny-win delight. Motion is disabled when requested. */
+.tiny-wins { display: grid; gap: 6px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--muted); }
+.tiny-wins-trail { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.tiny-wins-dot { color: var(--primary); font-size: 15px; line-height: 1; }
+.tiny-wins-list { padding-left: 17px; font-size: 12px; color: var(--muted-foreground); display: grid; gap: 3px; overflow-wrap: anywhere; }
+.tiny-wins-celebrate { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 600; color: var(--foreground); }
+.tiny-wins-sparkles { color: var(--primary); animation: tiny-win-pop .65s ease-out both; white-space: nowrap; }
+@keyframes tiny-win-pop { 0% { opacity: 0; transform: translateY(7px) scale(.85); } 45% { opacity: 1; transform: translateY(-2px) scale(1.1); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .tiny-wins-sparkles { animation: none; } }

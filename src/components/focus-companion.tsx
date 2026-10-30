@@ -4,6 +4,7 @@ import { Bookmark, Check, ChevronDown, Coffee, Play, RotateCcw, X } from "lucide
 import { Button } from "@/components/ui/button";
 import { agents, agentName } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
+import { TinyWins } from "./tiny-wins";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cleanStartStep, fallbackStartStep, whatCountsAsDone } from "@/lib/focus-assist";
 import { COMPANION_MODES, FOCUS_CHECKPOINT_KEY, companionActivity, readFocusCheckpoint, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
@@ -20,6 +21,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   const [checkin, setCheckin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [celebrationToken, setCelebrationToken] = useState(0);
   const pending = useRef<AbortController | null>(null);
   const theme = useCharacterMode();
   useEffect(() => {
@@ -60,6 +62,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
     const stepNumber = Math.min(999, session.stepNumber + 1);
     const next = { ...session, completed, stepNumber };
     onChange(next);
+    setCelebrationToken((n) => n + 1);
     setBusy(true);
     setCheckin(false);
     setNote("Finding one more small step…");
@@ -120,6 +123,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
         <p className="text-sm">{session.step}</p>
         <p className="text-xs text-muted-foreground"><strong>What counts as done?</strong> {whatCountsAsDone(session.step)}</p>
       </div>
+      {session.completed.length > 0 && <TinyWins completed={session.completed} celebrationToken={celebrationToken} compact />}
       {session.mode === "steps" && <p className="text-xs text-muted-foreground">When you finish this step, ask for just one more. No whole-task pressure.</p>}
       {checkin && <div className="focus-companion-checkin" role="status">
         <p className="text-sm">Still here with you. Keep going, take a break, or save your place.</p>

@@ -31,3 +31,16 @@
   .pal-room-illustration .pixel-character { width: 60px !important; height: 68px !important; }
   .pal-room-activities { gap: 8px; padding: 8px; }
 }
+
+/* Brief Pal reaction to a user-marked tiny win; respects reduced-motion preferences. */
+.pal-room-illustration[data-activity="celebrating"] .pixel-character {
+  animation: pal-room-celebrate 650ms ease-out 2;
+}
+@keyframes pal-room-celebrate {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  40% { transform: translateY(-7px) rotate(-5deg); }
+  70% { transform: translateY(-3px) rotate(5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pal-room-illustration[data-activity="celebrating"] .pixel-character { animation: none; }
+}

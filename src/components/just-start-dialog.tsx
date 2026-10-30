@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, Clock3, RotateCcw, Sparkles, Users } from "lucide-react";
 import { agents, agentName, type AgentId } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
+import { TinyWins } from "./tiny-wins";
 import { makeFocusSession, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
   const [stepNumber, setStepNumber] = useState(1);
   const [completed, setCompleted] = useState<string[]>([]);
   const [stepSource, setStepSource] = useState<"local-ai" | "quick-start">("quick-start");
+  const [celebrationToken, setCelebrationToken] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -60,6 +62,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
     setStepNumber(saved?.stepNumber ?? 1);
     setCompleted(saved?.completed ?? []);
     setStepSource(saved?.source ?? "quick-start");
+    setCelebrationToken(0);
     setNote("");
     setBusy(false);
     setTimerDone(false);
@@ -105,6 +108,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
     const quick = fallbackStartStep(validTask, action, previous, nextNumber);
     setStepNumber(nextNumber);
     setCompleted(alreadyDone);
+    if (action === "next") setCelebrationToken((count) => count + 1);
     setStep(quick);
     setStepSource("quick-start");
     setStage((current) => action === "next" || current === "started" ? "started" : "step");
@@ -138,7 +142,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
   const changeTask = (next: string) => {
     pending.current?.abort(); pending.current = null;
     setTask(next); setStage("entry"); setStep(""); setNote(""); setBusy(false);
-    setStepNumber(1); setCompleted([]); setStepSource("quick-start");
+    setStepNumber(1); setCompleted([]); setStepSource("quick-start"); setCelebrationToken(0);
     setTimerUntil(null); setTimerDone(false);
   };
 
@@ -188,6 +192,7 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
           )}
         </section>
       )}
+      {stage !== "entry" && completed.length > 0 && <TinyWins completed={completed} celebrationToken={celebrationToken} />}
       {stage !== "entry" && (
         <div className="flex flex-wrap items-center gap-2 border-t pt-2">
           <span className="text-xs text-muted-foreground">How was that step?</span>

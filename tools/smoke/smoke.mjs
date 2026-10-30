@@ -105,6 +105,11 @@ await step("Just Start opens and remembers progress", async () => {
   await dialog.getByText("Locate the schedule file.").waitFor({ timeout: 10000 });
   await dialog.getByText("Step 1", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "I started" }).click();
+  const wins = dialog.getByRole("region", { name: "Tiny wins" });
+  await wins.getByText(/You showed up/).waitFor();
+  await wins.getByRole("button", { name: "See wins" }).click();
+  await wins.getByRole("list", { name: "Recent small actions" }).waitFor();
+  await wins.getByRole("button", { name: "Hide wins" }).click();
   await dialog.getByText(/You started. That counts/).waitFor();
   await dialog.getByText("Step 2", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Try a different step" }).click();
@@ -139,6 +144,7 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await dialog.getByRole("button", { name: "Stay with me" }).click();
   const companion = page.getByRole("complementary", { name: "Focus Assist work companion" });
   await companion.getByText(/Review tomorrow's schedule/).waitFor();
+  await companion.getByRole("region", { name: "Tiny wins" }).waitFor();
   await companion.getByText(/Step 2 · Your next tiny step/).waitFor();
   const roomEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomEntry.getAttribute("aria-pressed") !== "true") await roomEntry.click();
@@ -149,8 +155,9 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   if (await companion.getByRole("button", { name: "Done with step" }).isEnabled()) throw Error("Work step wasn't paused during a break");
   await activity.getByRole("button", { name: "I'm back" }).click();
   await activity.getByText(/Byte is working beside you/).waitFor();
-  await roomEntry.click();
   await companion.getByRole("button", { name: "Done with step" }).click();
+  await activity.getByRole("region", { name: "Tiny wins" }).getByText(/You showed up/).waitFor();
+  await roomEntry.click();
   await companion.getByText("Check the next event.").waitFor();
   await companion.getByText(/Step 3 · Your next tiny step/).waitFor();
   await companion.getByRole("button", { name: "Save my place" }).click();
