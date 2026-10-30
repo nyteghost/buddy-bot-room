@@ -12,8 +12,8 @@ describe("per-mode tables", () => {
       expect(typeof defaultOpenModes[m]).toBe("boolean");
     }
   });
-  it("opens only the roundtable by default", () => {
-    expect(ALL_MODES.filter((m) => defaultOpenModes[m])).toEqual(["roundtable"]);
+  it("opens only My Pals Smart chat by default", () => {
+    expect(ALL_MODES.filter((m) => defaultOpenModes[m])).toEqual(["smart"]);
   });
   it("perMode builds one independent value per mode", () => {
     const t = perMode(() => [] as number[]);
