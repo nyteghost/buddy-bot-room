@@ -29,5 +29,5 @@ function openApp(){
  });
  win.on("closed",()=>{win=null});
 }
-app.whenReady().then(()=>{setupAiIpc();setupGoogleCalendarIpc();openApp();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)openApp()})});
+app.whenReady().then(()=>{setupAiIpc();setupGoogleCalendarIpc();setupUpdates();openApp();app.on("activate",()=>{if(BrowserWindow.getAllWindows().length===0)openApp()})});
 app.on("window-all-closed",()=>{if(process.platform!=="darwin")app.quit()});
