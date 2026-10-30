@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ShowPilot convention-center stage and truss icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1a3556"/><stop offset=".54" stop-color="#071b30"/><stop offset="1" stop-color="#102944"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fcfeff"/><stop offset=".47" stop-color="#b9d3e8"/><stop offset="1" stop-color="#729ab8"/></linearGradient>
+    <linearGradient id="stage" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#29c4ff"/><stop offset="1" stop-color="#147ce5"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#176fb7" stop-opacity=".5"/><stop offset="1" stop-color="#176fb7" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="2" y="2" width="252" height="252" rx="52" fill="url(#bg)"/>
+  <rect x="8" y="8" width="240" height="240" rx="46" fill="none" stroke="#7dacca" stroke-opacity=".7" stroke-width="5"/>
+  <ellipse cx="127" cy="139" rx="104" ry="108" fill="url(#glow)"/>
+  <g stroke="url(#metal)" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" fill="none"><path d="M36 76 H220 M48 76 V152 M208 76 V152"/></g>
+  <g stroke="#71a5c6" stroke-width="4" fill="none" stroke-linecap="round"><path d="M48 81 l25 19 27-20 27 20 26-20 27 20 28-19"/><path d="M49 104 l19 18 -19 20 M207 104 l-19 18 19 20"/></g>
+  <g fill="#e2f7ff" stroke="#51cafa" stroke-width="2"><circle cx="81" cy="76" r="7"/><circle cx="128" cy="76" r="7"/><circle cx="175" cy="76" r="7"/></g>
+  <g fill="#29c4ff" opacity=".8"><path d="M78 88 L67 130 L89 130 Z" opacity=".13"/><path d="M128 88 L107 137 L149 137 Z" opacity=".16"/><path d="M176 88 L165 130 L187 130 Z" opacity=".13"/></g>
+  <path d="M40 155 L72 137 H185 L216 155 L201 177 H55 Z" fill="#052844" stroke="url(#metal)" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M40 155 H216 L201 176 H55 Z" fill="url(#stage)"/>
+  <path d="M72 138 L40 156 M184 138 L216 156 M128 138 V176" stroke="#9be8ff" stroke-opacity=".65" stroke-width="4"/>
+  <path d="M55 179 V214 H201 V179" fill="none" stroke="url(#metal)" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M55 214 L128 179 L201 214 M55 179 L128 214 L201 179" fill="none" stroke="#5aa4d9" stroke-width="7" stroke-linejoin="round"/>
+  <rect x="55" y="179" width="146" height="9" fill="#bfdbea"/>
+  <rect x="50" y="209" width="156" height="11" rx="4" fill="#dcecf6"/>
+  <path d="M139 100 L118 126 H132 L120 150 L153 115 H136 Z" fill="#ffbd50" stroke="#fff0b5" stroke-width="2.3" stroke-linejoin="round"/>
+</svg>
