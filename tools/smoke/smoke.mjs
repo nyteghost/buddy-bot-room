@@ -56,6 +56,34 @@ await step("create the first account", async () => {
 });
 await page.waitForTimeout(3000);
 // Some entries live under the sidebar's "More" group.
+// Focus Assist browser regression: one action, smaller step, optional timer and resume.
+await step("Just Start opens and remembers progress", async () => {
+  await page.route("**/api/just-start", async (route) => {
+    const request = route.request().postDataJSON();
+    const reply = request.action === "smaller" ? "Locate the schedule file." : "Open tomorrow's show schedule.";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ step: reply, source: "local-ai" }) });
+  });
+  await page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Just Start\s*$/i }).click();
+  const dialog = page.getByRole("dialog", { name: "Just Start" });
+  await dialog.waitFor({ state: "visible" });
+  await dialog.getByRole("textbox", { name: "What are you trying to start?" }).fill("Finish tomorrow's show schedule");
+  await dialog.getByRole("button", { name: "Help me start" }).click();
+  await dialog.getByText("Open tomorrow's show schedule.").waitFor({ timeout: 10000 });
+  await dialog.getByRole("button", { name: "Smaller step" }).click();
+  await dialog.getByText("Locate the schedule file.").waitFor({ timeout: 10000 });
+  await dialog.getByRole("button", { name: "I started" }).click();
+  await dialog.getByText(/You started. That counts/).waitFor();
+  await dialog.getByRole("button", { name: "Optional 2-minute timer" }).click();
+  await dialog.getByRole("button", { name: "Stop timer" }).waitFor();
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Just Start" }).first().click();
+  const restored = page.getByRole("dialog", { name: "Just Start" });
+  await restored.getByText(/You started. That counts/).waitFor();
+  await restored.getByRole("button", { name: "New start" }).click();
+  if (await restored.getByRole("textbox", { name: "What are you trying to start?" }).inputValue()) throw Error("New start failed to clear task");
+  await restored.getByRole("button", { name: "Close" }).click();
+  await page.unroute("**/api/just-start");
+});
 await step("expand the sidebar More group", async () => {
   const more = page.locator(".sidebar-item", { hasText: /^\s*More\s*$/i }).first();
   if (await more.count()) await more.click({ timeout: 8000 });
