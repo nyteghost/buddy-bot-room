@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { StageLayout, type LayoutStage } from "@/components/deck-planner/stage-layout";
+import { crewPrintDocument, printCrewPages, type CrewPrintStage } from "@/lib/stage-crew-print";
 import { allocateSingleDeckStages } from "@/lib/single-deck-allocation";
 import { EDGE_MODES, NO_EXTRAS, NO_PARTS, DEFAULT_HAVE, OPENING_FT, addParts, checkParts, parseHave, rampRunFt, stageParts } from "@/lib/stage-extras";
 import { INVENTORY, FULL_STOCK, STAIR_TYPES, DEFAULT_PREFS, planStage, type Deck, type Holder, type Bridge, type Result, type Stock, type PlanPrefs } from "@/lib/deck-solver";
@@ -61,13 +62,6 @@ type SavedApp = {
   eventName?: string;
 };
 
-/** Prints just the planner: a body class lets the print styles hide the rest of the app while the browser prints. */
-function printDeck() {
-  document.body.classList.add("printing-deck");
-  const done = () => { document.body.classList.remove("printing-deck"); window.removeEventListener("afterprint", done); };
-  window.addEventListener("afterprint", done);
-  window.print();
-}
 
 function readStored<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -1293,6 +1287,16 @@ export function DeckPlanner() {
     return [...copies, ...bridges];
   });
 
+  // Crew printing uses one physical stage per page, never standalone bridge tiles.
+  const crewPrintStages: CrewPrintStage[] = activeLayoutStages
+    .filter(stage => !stage.id.includes("-bridge-"))
+    .map(stage => ({ ...stage, extraDecks: stage.id.includes("-copy-") ? 0 : (stage.looseBridges ?? 0) }));
+  const [crewPrintError, setCrewPrintError] = useState("");
+  const printCrew = (name: string) => {
+    try { printCrewPages(name, crewPrintStages); setCrewPrintError(""); }
+    catch(e) { setCrewPrintError((e as Error).message); }
+  };
+
   // Persist which stages are enabled and the event name across reloads.
   const skipAppSave = useRef(true);
   useEffect(() => {
@@ -1399,16 +1403,8 @@ export function DeckPlanner() {
       let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       const title = eventName.trim() || "Stage plan";
       // The printed crew sheet, as a self-contained page: the planner as it prints (light, black and white), openable and printable anywhere.
-      let printHtml = "";
-      try {
-        const root = document.querySelector(".deck-planner");
-        if (root) {
-          const clone = root.cloneNode(true) as HTMLElement;
-          clone.querySelectorAll(".no-print, script, dialog").forEach((n) => n.remove());
-          const css = Array.from(document.styleSheets).map((ss) => { try { return Array.from(ss.cssRules).map((r) => r.cssText).join("\n"); } catch { return ""; } }).join("\n").replace(/@media print/g, "@media all");
-          printHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title.replace(/[<>&]/g, "")} crew sheet</title><style>${css}</style></head><body class="printing-deck" style="margin:0;background:#fff">${clone.outerHTML}</body></html>`;
-        }
-      } catch { printHtml = ""; }
+      // Attach the same concise, one-stage-per-page crew document used by Print.
+      const printHtml = crewPrintDocument(eventName, crewPrintStages);
       const htmlBytes = new TextEncoder().encode(printHtml);
       let hbin = ""; for (let i = 0; i < htmlBytes.length; i += 0x8000) hbin += String.fromCharCode(...htmlBytes.subarray(i, i + 0x8000));
       const stagesOut = enabledIds.flatMap((id) => { const st = layoutStages[id]; return st ? [`- ${st.name}: ${st.width}' x ${st.length}' x ${st.heightIn}" high${(st.quantity ?? 1) > 1 ? ` (x${st.quantity})` : ""}${st.valid ? "" : " - CANNOT BUILD FROM STOCK"}`] : []; });
@@ -1679,6 +1675,7 @@ export function DeckPlanner() {
         >
           Print crew sheet
         </button>
+        {crewPrintError && <p className="no-print mb-3 font-medium text-red-700" role="alert">{crewPrintError}</p>}
 
         <button
           type="button"
@@ -1810,7 +1807,7 @@ export function DeckPlanner() {
                   if (e.key === "Enter") {
                     setEventName(eventNameDraft);
                     setShowEventModal(false);
-                    setTimeout(printDeck, 0);
+                    setTimeout(() => printCrew(eventNameDraft), 0);
                   }
                   if (e.key === "Escape") {
                     setShowEventModal(false);
@@ -1833,7 +1830,7 @@ export function DeckPlanner() {
                   onClick={() => {
                     setEventName(eventNameDraft);
                     setShowEventModal(false);
-                    setTimeout(printDeck, 0);
+                    setTimeout(() => printCrew(eventNameDraft), 0);
                   }}
                   className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
                 >
