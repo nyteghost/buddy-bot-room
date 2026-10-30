@@ -621,8 +621,8 @@ function StagePanel({
       <div className="print-stage mb-10">
         <h2 className="mb-3 text-lg font-semibold tracking-tight">{displayTitle}</h2>
 
-        <div className="print-stage-body grid gap-6 md:grid-cols-[280px_1fr]">
-          <div className="print-hide rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="print-stage-body grid items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="print-hide deck-stage-controls rounded-lg border border-border bg-card p-5 shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto xl:overscroll-contain">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium">Stage name</label>
@@ -984,7 +984,7 @@ function StagePanel({
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
               {result.ok ? (
                 <>
