@@ -145,7 +145,7 @@ await step("Today future overview and important Brain Dump alert", async () => {
   await dump.getByLabel("Alert time: Review next week's show schedule").fill(future);
   await dump.getByRole("button", { name: "Set alert" }).click();
   await dump.getByText(/Alert set:/).waitFor();
-  await dump.getByRole("checkbox", { name: "Done: Review next week's show schedule" }).check();
+  await dump.getByRole("checkbox", { name: "Done: Review next week's show schedule" }).click();
   await dump.getByText(/Marked done/).waitFor();
   // Natural-language date/time capture must appear in tomorrow, not today.
   await dump.getByRole("textbox", { name: "Brain dump tasks" }).fill("Pick up Kids @5pm, Tomorrow");
@@ -154,7 +154,7 @@ await step("Today future overview and important Brain Dump alert", async () => {
   await dump.getByText(/Alert set:/).waitFor();
   await overview.getByRole("button", { name: "Tomorrow" }).click();
   await page.getByRole("button", { name: /Pick up Kids/ }).first().waitFor();
-  await dump.getByRole("checkbox", { name: "Done: Pick up Kids" }).check();
+  await dump.getByRole("checkbox", { name: "Done: Pick up Kids" }).click();
   await page.unroute("**/api/reminders");
 });
 
