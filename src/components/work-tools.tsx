@@ -9,6 +9,7 @@ import { StandaloneVendors } from "@/components/showpilot-vendors";
 import { FloorMapPanel } from "@/components/floor-map-panel";
 import { scopeShowPilotRows } from "@/lib/showpilot-venue";
 import { ScheduleReview } from "@/components/showpilot-review-panel";
+import { AiTaskAssistant } from "@/components/showpilot-ai-task-assistant";
 import { applyReview, emptyReviewDraft, fingerprintRows, parseDraft, parseReviewProject, storageKey, type ReviewDraft, type ReviewProject } from "@/lib/showpilot-review";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -280,6 +281,7 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
       {source && (
         <>
           <ScheduleReview originalRows={source.rows} proposed={suggestedEntries} suggestedTasks={suggestedTasks} draft={draft} onChange={reviewChanged} onSaveProject={saveProject} />
+          <AiTaskAssistant entries={entries} tasks={tasks} onApprove={task => reviewChanged({...draftRef.current,addedTasks:[...draftRef.current.addedTasks,{id:"ai-task:"+Date.now()+":"+Math.random().toString(36).slice(2),value:task}]})} />
           <details className="text-xs"><summary className="cursor-pointer font-medium">Preview final Excel entries ({entries.length})</summary>
           <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-border">
             <table className="w-full text-sm">
