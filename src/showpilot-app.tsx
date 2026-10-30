@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import {
-  BriefcaseBusiness, CalendarDays, CalendarClock, Layers3, Store, Map,
+  CalendarDays, CalendarClock, Layers3, Store, Map,
   LayoutDashboard, Menu, Moon, Sun, ChevronRight, ShieldCheck, PanelLeftClose, PanelLeftOpen, Settings2
 } from "lucide-react";
 import { ShowServicesTools, type WorkTabId } from "@/components/work-tools";
 import { BackupPanel } from "@/components/showpilot-backup";
 import { ShowPilotAiSettings } from "@/components/showpilot-ai-settings";
 import { GoogleCalendarSettings } from "@/components/showpilot-calendar-settings";
+import showpilotIcon from "./assets/showpilot-icon.svg";
 
 type Screen = "dashboard" | "settings" | WorkTabId;
 const sections: { id: WorkTabId; label: string; desc: string; Icon: typeof CalendarDays; note: string }[] = [
@@ -43,7 +44,7 @@ export function App() {
     {mobileOpen&&<button className="sp-backdrop" aria-label="Close navigation" onClick={()=>setMobileOpen(false)}/>}
     <aside className={"sp-sidebar "+(expanded?"":"sp-collapsed ")+(mobileOpen?"sp-open":"")}>
       <div className="sp-brand">
-        <span className="sp-logo"><BriefcaseBusiness size={23}/></span>
+        <span className="sp-logo"><img src={showpilotIcon} alt="ShowPilot stage and truss emblem" /></span>
         {expanded&&<div><strong>ShowPilot</strong><small>OPERATIONS SUITE</small></div>}
       </div>
       <div className="sp-nav">
@@ -76,7 +77,7 @@ export function App() {
         {screen==="settings" ? <section className="sp-panel space-y-5"><GoogleCalendarSettings /><ShowPilotAiSettings /></section>
         : screen==="dashboard"
           ? <div className="space-y-5">
-              <div className="sp-banner"><BriefcaseBusiness size={26}/><div><h2>Welcome to ShowPilot</h2><p>Open a tool below to begin. Scheduling and reports run locally, with no uploaded report data sent to a server.</p></div></div>
+              <div className="sp-banner"><img src={showpilotIcon} width={52} height={52} alt="" aria-hidden="true" /><div><h2>Welcome to ShowPilot</h2><p>Open a tool below to begin. Scheduling and reports run locally, with no uploaded report data sent to a server.</p></div></div>
               <div className="sp-cards">
                 {sections.map(({id,label,desc,Icon,note})=><button className="sp-card" key={id} onClick={()=>select(id)}>
                   <div className="sp-card-top"><span className="sp-card-icon"><Icon size={21}/></span><ChevronRight size={17}/></div>
