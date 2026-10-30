@@ -1,13 +1,13 @@
 /**
  * Generate multi-resolution Windows ICO and app-window PNG from the ShowPilot
- * SVG artwork. All frames are embedded in a single ICO (not a 256-only icon).
+ * user-approved cleaned ShowPilot original artwork. All frames are embedded in a single ICO (not a 256-only icon).
  * No external binary commands, installer or network service are needed at work.
  */
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-const src = new URL("../src/assets/showpilot-icon.svg", import.meta.url);
+const src = new URL("../src/assets/showpilot-approved.webp", import.meta.url);
 const out = path.resolve("desktop");
 await fs.mkdir(out, {recursive:true});
 const artwork = await fs.readFile(src);
