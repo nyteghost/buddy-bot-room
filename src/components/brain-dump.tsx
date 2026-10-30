@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, Flag, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addTodo, updateWorkbench, useWorkbench, type Todo } from "@/lib/workbench";
@@ -20,12 +20,26 @@ async function alertCall(body: Record<string, unknown>): Promise<AlertReply> {
 export function BrainDump() {
   const { todos } = useWorkbench();
   const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [note, setNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [times, setTimes] = useState<Record<string, string>>({});
   const tasks = todos.filter((t) => t.source === "brain-dump").slice(-12).reverse();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  useEffect(() => {
+    const onCapture = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      if (detail?.text?.trim()) {
+        const text = detail.text.trim().slice(0, 200);
+        setInput((previous) => previous.trim() ? previous + "\n" + text : text);
+      }
+      inputRef.current?.focus();
+      inputRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+    window.addEventListener("pixelpals:brain-dump", onCapture);
+    return () => window.removeEventListener("pixelpals:brain-dump", onCapture);
+  }, []);
 
   const capture = async () => {
     if (capturing) return;
@@ -160,7 +174,7 @@ export function BrainDump() {
         <p className="text-xs text-muted-foreground">Just write it naturally, one thought per line. Example: Pick up Kids @5pm, Tomorrow. Start with ! for an important alert.</p>
       </div>
       <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); capture(); }}>
-        <textarea aria-label="Brain dump tasks" className="min-h-20 w-full resize-y rounded-md border bg-background p-2 text-sm" rows={3} maxLength={2600} placeholder={"Pick up Kids @5pm, Tomorrow\n! Call dentist @9am on Monday\nClean the kitchen"} value={input} onChange={(event) => setInput(event.target.value)} />
+        <textarea ref={inputRef} aria-label="Brain dump tasks" className="min-h-20 w-full resize-y rounded-md border bg-background p-2 text-sm" rows={3} maxLength={2600} placeholder={"Pick up Kids @5pm, Tomorrow\n! Call dentist @9am on Monday\nClean the kitchen"} value={input} onChange={(event) => setInput(event.target.value)} />
         {input.trim() && (
           <div className="grid gap-1 rounded-md bg-muted/40 p-2 text-xs" aria-label="Brain dump interpretation preview">
             {input.split(/\r?\n/).filter((line) => line.trim()).slice(0, 12).map((line, i) => {

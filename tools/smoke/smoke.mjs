@@ -56,6 +56,37 @@ await step("create the first account", async () => {
 });
 await page.waitForTimeout(3000);
 // Some entries live under the sidebar's "More" group.
+await step("two chat rooms retain all six conversation styles", async () => {
+  const sidebar = page.locator(".workspace-sidebar");
+  const my = sidebar.locator(".sidebar-item", { hasText: /^\s*My Pals\s*$/i });
+  const lounge = sidebar.locator(".sidebar-item", { hasText: /^\s*Pal Lounge\s*$/i });
+  await my.waitFor();
+  if (await my.getAttribute("aria-pressed") !== "true") await my.click();
+  if (await sidebar.locator(".sidebar-item", { hasText: /^\s*Roundtable\s*$/i }).count()) {
+    throw Error("Legacy chat modes are still in the main sidebar.");
+  }
+  const first = page.getByRole("group", { name: "My Pals conversation style" });
+  await first.getByRole("button", { name: "Ask naturally" }).waitFor();
+  await first.getByRole("button", { name: "One Pal" }).click();
+  await first.getByRole("button", { name: "Solve together" }).click();
+  await first.getByRole("button", { name: "Ask naturally" }).click();
+  const quick = page.getByRole("group", { name: "My Pals quick actions" });
+  await quick.getByRole("button", { name: "Brain Dump" }).click();
+  const dump = page.getByRole("region", { name: "Brain Dump" });
+  await dump.getByRole("textbox", { name: "Brain dump tasks" }).waitFor();
+  const todayButton = sidebar.locator(".sidebar-item", { hasText: /^\s*Today\s*$/i });
+  if (await todayButton.getAttribute("aria-pressed") === "true") await todayButton.click();
+  await lounge.click();
+  const options = page.getByRole("group", { name: "Pal Lounge conversation style" });
+  await options.getByRole("button", { name: "Roundtable" }).waitFor();
+  await options.getByRole("button", { name: "Independent answers" }).click();
+  await options.getByRole("button", { name: "Debate" }).click();
+  await options.getByRole("button", { name: "Roundtable" }).click();
+  if (await first.getByRole("button", { name: "Ask naturally" }).getAttribute("aria-pressed") !== "true") throw Error("My Pals changed while switching Pal Lounge");
+  await lounge.click(); // close the optional room, keep My Pals open
+  if (await my.getAttribute("aria-pressed") !== "true") throw Error("Closing Pal Lounge closed My Pals");
+});
+
 // Focus Assist browser regression: one action, smaller step, optional timer and resume.
 await step("Just Start opens and remembers progress", async () => {
   await page.route("**/api/just-start", async (route) => {
@@ -99,6 +130,16 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await dialog.getByRole("button", { name: "Stay with me" }).click();
   const companion = page.getByRole("complementary", { name: "Focus Assist work companion" });
   await companion.getByText(/Review tomorrow's schedule/).waitFor();
+  const roomEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomEntry.getAttribute("aria-pressed") !== "true") await roomEntry.click();
+  const activity = page.getByRole("region", { name: "Pal Room activities" });
+  await activity.getByText(/Byte is working beside you/).waitFor();
+  await activity.getByRole("button", { name: "Break together" }).click();
+  await activity.getByRole("button", { name: "I'm back" }).waitFor();
+  if (await companion.getByRole("button", { name: "Done with step" }).isEnabled()) throw Error("Work step wasn't paused during a break");
+  await activity.getByRole("button", { name: "I'm back" }).click();
+  await activity.getByText(/Byte is working beside you/).waitFor();
+  await roomEntry.click();
   await companion.getByRole("button", { name: "Done with step" }).click();
   await companion.getByText("Check the next event.").waitFor();
   await companion.getByRole("button", { name: "Save my place" }).click();

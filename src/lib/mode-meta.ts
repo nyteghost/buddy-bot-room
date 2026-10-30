@@ -9,7 +9,7 @@ export const suggestions = [
   "Is creativity uniquely human?",
   "Pitch the next big indie game",
 ];
-export const defaultOpenModes: Record<Mode, boolean> = perMode((m) => m === "roundtable");
+export const defaultOpenModes: Record<Mode, boolean> = perMode((m) => m === "smart");
 export const modeLabel: Record<Mode, string> = { roundtable: "Roundtable", broadcast: "Broadcast", direct: "One-on-one", solve: "Problem solving", debate: "Debate", smart: "Smart team" };
 export const modeHelp: Record<Mode, string> = {
   roundtable: "Everyone hears everyone: pals react to each other, then one gives the verdict.",
@@ -33,6 +33,6 @@ export const modeSuggestions: Record<Mode, string[]> = {
   direct: ["Help me plan my week", "Explain this like I'm new to it", "What should I cook tonight?"],
   solve: ["My Plex server keeps buffering on one TV", "My Docker container restarts every few minutes", "I can't focus when I work from home"],
   debate: ["Remote work beats the office", "Cats make better pets than dogs", "AI should write first drafts of everything"],
-  smart: ["My Docker container restarts every few minutes", "What should I cook tonight?", "A script of mine fails with a permission error after a reboot"],
+  smart: ["Help me get started", "I have too much to do", "Help me plan today"],
 };
 

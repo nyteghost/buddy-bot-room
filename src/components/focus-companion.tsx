@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./focus-companion-size.css";
-import { Bookmark, Check, ChevronDown, RotateCcw, X } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Coffee, Play, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { agents, agentName } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
@@ -9,13 +9,13 @@ import { cleanStartStep, fallbackStartStep } from "@/lib/focus-assist";
 import { COMPANION_MODES, FOCUS_CHECKPOINT_KEY, companionActivity, readFocusCheckpoint, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
 
-type Props = { session: FocusSession | null; onChange: (value: FocusSession | null) => void };
+type Props = { session: FocusSession | null; onChange: (value: FocusSession | null) => void; paused?: boolean; onPauseChange?: (paused: boolean) => void };
 const modeNames: Record<CompanionMode, string> = {
   quiet: "Quiet company", checkins: "Gentle check-ins", steps: "Step-by-step",
 };
 
 /** Optional, nonmodal body double: the rest of Pixel Pals stays usable. */
-export function FocusCompanion({ session, onChange }: Props) {
+export function FocusCompanion({ session, onChange, paused = false, onPauseChange }: Props) {
   const [saved, setSaved] = useState<FocusSession | null>(null);
   const [checkin, setCheckin] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,12 +29,12 @@ export function FocusCompanion({ session, onChange }: Props) {
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => {
     setCheckin(false);
-    if (session?.mode !== "checkins") return;
+    if (session?.mode !== "checkins" || paused) return;
     const timer = window.setInterval(() => {
       if (!document.hidden) setCheckin(true);
     }, 10 * 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [session?.mode, session?.task]);
+  }, [session?.mode, session?.task, paused]);
 
   const save = () => {
     if (!session) return;
@@ -51,7 +51,7 @@ export function FocusCompanion({ session, onChange }: Props) {
   };
   const end = () => { pending.current?.abort(); pending.current = null; setBusy(false); setNote(""); forget(); onChange(null); };
   const nextStep = async () => {
-    if (!session || busy) return;
+    if (!session || busy || paused) return;
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
@@ -108,11 +108,11 @@ export function FocusCompanion({ session, onChange }: Props) {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{name} is here with you</p>
           <p className="text-xs text-muted-foreground">{pal?.role} · Illustrated body double</p>
-          <div className="focus-companion-activity"><span className="focus-companion-pulse" /> {companionActivity(session.task)}</div>
+          <div className="focus-companion-activity"><span className="focus-companion-pulse" /> {paused ? "Taking a break with you" : companionActivity(session.task)}</div>
         </div>
         <Button variant="ghost" size="sm" aria-label="Pause companion" title="Pause companion" onClick={() => { pending.current?.abort(); onChange(null); }}><X className="size-4" /></Button>
       </div>
-      <p className="text-xs font-semibold text-muted-foreground">Working alongside you on</p>
+      <p className="text-xs font-semibold text-muted-foreground">{paused ? "On a break from" : "Working alongside you on"}</p>
       <p className="text-sm font-medium focus-companion-task">{session.task}</p>
       <div className="focus-companion-step">
         <p className="text-xs text-muted-foreground">Your next tiny step</p>
@@ -124,7 +124,8 @@ export function FocusCompanion({ session, onChange }: Props) {
         <Button variant="ghost" size="sm" onClick={() => setCheckin(false)}>I'm okay</Button>
       </div>}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy} onClick={() => void nextStep()}><Check className="size-4" /> Done with step</Button>
+        <Button size="sm" disabled={busy || paused} onClick={() => void nextStep()}><Check className="size-4" /> Done with step</Button>
+        {onPauseChange && <Button variant="outline" size="sm" onClick={() => onPauseChange(!paused)}>{paused ? <Play className="size-4" /> : <Coffee className="size-4" />}{paused ? " I am back" : " Break together"}</Button>}
         <Button variant="outline" size="sm" onClick={save}><Bookmark className="size-4" /> Save my place</Button>
       </div>
       <label className="focus-companion-mode text-xs text-muted-foreground">

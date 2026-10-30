@@ -1,0 +1,11 @@
+
+/* In-room task and break cues use the Pal's existing scene; no screen monitoring. */
+.room-scene .pal-room-active-buddy {
+  filter: drop-shadow(0 0 8px var(--primary));
+}
+.room-scene .pal-room-task-bubble {
+  position: absolute; top: -14px; right: -8px; z-index: 6;
+  font-size: 16px; padding: 1px 4px;
+  border-radius: 7px; background: var(--card); color: var(--card-foreground);
+  border: 1px solid var(--border); box-shadow: 0 3px 10px rgba(0,0,0,.2);
+}

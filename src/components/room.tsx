@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow, Sparkles } from "lucide-react";
@@ -54,6 +54,8 @@ import { SavedDiscussions } from "./saved-discussions";
 import { WorkspaceLayoutMenu } from "./workspace-layout-menu";
 import { JustStartDialog } from "./just-start-dialog";
 import { FocusCompanion } from "./focus-companion";
+import { PalRoomActivities } from "./pal-room-activities";
+import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
 import fantasyRoomImage from "@/assets/final-fantasy-room.jpg";
@@ -148,6 +150,7 @@ import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
 import { extractSteps } from "@/lib/solve-steps";
 import { defaultOpenModes, modeHelp, modeLabel, modePlaceholder, modeSuggestions, perMode, suggestions } from "@/lib/mode-meta";
+import { MY_PALS_MODES, PAL_LOUNGE_MODES, activateChatMode, activeChatMode, chatModeNames, chatModesForRoom, chatRoomForMode, closeChatRoom, isChatRoomOpen, suggestAssist, type ChatRoom } from "@/lib/chat-room-layout";
 import { planTurns } from "@/lib/turn-plan";
 import { dispatchTurn } from "@/lib/turn-dispatch";
 import { buildHandoff, cleanSmartConfig, defaultSmartConfig, isRepeat, outOfTime, shouldRun, SMART_ROLES, type SmartConfig, type SmartRole } from "@/lib/smart-team";
@@ -163,11 +166,11 @@ const chatsKey = "pixel-pals-conversations-v2";
 installUuidPolyfill(); // plain-http pages have no crypto.randomUUID
 
 export function Room() {
-  // Each conversation mode (Roundtable, Broadcast, One-on-one, Problem solving, Debate) has its own window, chat and draft.
+  // Two visible chat rooms preserve all six original modes, histories and individual drafts.
   const [chats, setChats] = useState<Record<Mode, RoomMessage[]>>(() => perMode(() => []));
   const [drafts, setDrafts] = useState<Record<Mode, string>>(() => perMode(() => ""));
   /** The mode window you are working in; plain "messages" and "topic" below mean that window's. */
-  const [mode, setMode] = useState<Mode>("roundtable");
+  const [mode, setMode] = useState<Mode>("smart");
   const messages = chats[mode];
   const topic = drafts[mode];
   function setMessagesIn(target: Mode, value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) {
@@ -354,10 +357,26 @@ export function Room() {
   const [roomOpen, setRoomOpen] = useState(true);
   const [openModes, setOpenModes] = useState<Record<Mode, boolean>>(defaultOpenModes);
   const conversationOpen = ALL_MODES.some((m) => openModes[m]);
-  const showMode = (m: Mode) => setOpenModes((o) => (o[m] ? o : { ...o, [m]: true }));
-  const toggleMode = (m: Mode) => setOpenModes((o) => ({ ...o, [m]: !o[m] }));
+  const showMode = (m: Mode) => setOpenModes((o) => activateChatMode(o, m));
+  const myPalsMode = activeChatMode(openModes, "my-pals");
+  const loungeMode = activeChatMode(openModes, "pal-lounge");
+  const openChatRoom = (room: ChatRoom) => {
+    const selected = room === "my-pals" ? myPalsMode : loungeMode;
+    showMode(selected);
+    setMode(selected);
+  };
+  const toggleChatRoom = (room: ChatRoom) => {
+    if (isChatRoomOpen(openModes, room)) setOpenModes((o) => closeChatRoom(o, room));
+    else openChatRoom(room);
+  };
+  const selectChatMode = (target: Mode, from?: Mode) => {
+    if (running && runningMode !== target) return;
+    if (from && drafts[from].trim() && !drafts[target].trim()) setDraftIn(target, drafts[from]);
+    setMode(target);
+    showMode(target);
+  };
   const setConversationOpen = (value: boolean) => { if (value) showMode(mode); };
-  const resetModes = () => setOpenModes(defaultOpenModes);
+  const resetModes = () => { setOpenModes(defaultOpenModes); setMode("smart"); };
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsSeen = useEverTrue(toolsOpen);
   const playtestsSeen = useEverTrue(playtestsOpen);
@@ -371,7 +390,7 @@ export function Room() {
     setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
     setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
     setToolsOpen(false); setFunOpen(false); setSetupOpen(false); setSearchOpen(false); setRecorderOpen(false);
-    if (tab === "chat") showMode(mode);
+    if (tab === "chat") { showMode(myPalsMode); setMode(myPalsMode); }
   }
   const [mailOpen, setMailOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
@@ -379,6 +398,8 @@ export function Room() {
   const [justStartOpen, setJustStartOpen] = useState(false);
   const [justStartTask, setJustStartTask] = useState("");
   const [focusCompanion, setFocusCompanion] = useState<FocusSession | null>(null);
+  const [focusBreak, setFocusBreak] = useState(false);
+  const changeFocusCompanion = (next: FocusSession | null) => { if (!next) setFocusBreak(false); setFocusCompanion(next); };
   const beginFocusTask = (task = "") => { setJustStartTask(task); setJustStartOpen(true); };
   const [tasksOpen, setTasksOpen] = useState(false);
   const { addons } = useAddons();
@@ -405,14 +426,29 @@ export function Room() {
     try {
       const saved = JSON.parse(localStorage.getItem("pixel-pals-workspace-v1") ?? "null");
       if (saved) {
-        setRoomOpen(saved.roomOpen !== false);
-        if (saved.openModes && typeof saved.openModes === "object") setOpenModes({ ...defaultOpenModes, ...Object.fromEntries(ALL_MODES.map((m) => [m, saved.openModes[m] === true])) });
-        else setOpenModes({ ...defaultOpenModes, roundtable: saved.conversationOpen !== false });
+        setRoomOpen(localStorage.getItem("pixel-pals-two-chat-rooms-v1") === "1" ? saved.roomOpen !== false : false);
+        // Migrate the old six-window layout once. Conversation history is untouched.
+        if (!localStorage.getItem("pixel-pals-two-chat-rooms-v1")) {
+          setOpenModes(defaultOpenModes);
+          setMode("smart");
+          localStorage.setItem("pixel-pals-two-chat-rooms-v1", "1");
+        } else if (saved.openModes && typeof saved.openModes === "object") {
+          const old = { ...defaultOpenModes, ...Object.fromEntries(ALL_MODES.map((m) => [m, saved.openModes[m] === true])) } as Record<Mode, boolean>;
+          const my = activeChatMode(old, "my-pals"), lounge = activeChatMode(old, "pal-lounge");
+          let next = perMode((m) => m === my && isChatRoomOpen(old, "my-pals"));
+          if (isChatRoomOpen(old, "pal-lounge")) next = activateChatMode(next, lounge);
+          setOpenModes(next);
+          setMode(isChatRoomOpen(next, "my-pals") ? my : lounge);
+        } else setOpenModes(defaultOpenModes);
         setSidebarCompact(saved.sidebarCompact === true);
         if (saved.todayOpen !== undefined) setTodayOpen(saved.todayOpen === true);
       } else {
-        // First visit: Today is the front page.
+        // First visit: Today and My Pals are the front page.
         setTodayOpen(true);
+        setRoomOpen(false);
+        setOpenModes(defaultOpenModes);
+        setMode("smart");
+        localStorage.setItem("pixel-pals-two-chat-rooms-v1", "1");
         if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
       }
     } catch { /* optional layout preferences */ }
@@ -1389,18 +1425,19 @@ export function Room() {
   const liveText =
     running && lastMessage?.metadata?.agentId === speaking ? messageText(lastMessage).trim() : "";
   const bubbleText = liveText.length > 70 ? `…${liveText.slice(-70)}` : liveText;
-  /** One window per conversation mode, each with its own chat and message box. */
+  /** Exactly two chat windows; each switches among preserved independent mode histories. */
   function renderModeWindow(wm: Mode) {
+    const chatRoom = chatRoomForMode(wm);
+    const roomLabel = chatRoom === "my-pals" ? "My Pals" : "Pal Lounge";
     const msgs = chats[wm];
     const busyHere = running && runningMode === wm;
-    const icons: Record<Mode, ReactNode> = { roundtable: <Users className="size-4" />, broadcast: <Radio className="size-4" />, direct: <MessageSquare className="size-4" />, solve: <Wrench className="size-4" />, debate: <Swords className="size-4" />, smart: <Workflow className="size-4" /> };
     return (
-      <WorkspaceWindow id={`mode-${wm}`} className={cn("window-conversation window-mode", `window-mode-${wm}`, wm === mode && "window-mode-active")} title={modeLabel[wm]} icon={icons[wm]} open={openModes[wm]} onClose={() => setOpenModes((o) => ({ ...o, [wm]: false }))} resetVersion={resetVersion}>
+      <WorkspaceWindow id={`chat-${chatRoom}`} className={cn("window-conversation window-mode", `window-mode-${wm}`, wm === mode && "window-mode-active")} title={roomLabel} icon={chatRoom === "my-pals" ? <MessageSquare className="size-4" /> : <Gamepad2 className="size-4" />} open={isChatRoomOpen(openModes, chatRoom)} onClose={() => setOpenModes((o) => closeChatRoom(o, chatRoom))} resetVersion={resetVersion}>
         <section className="conversation-panel" onPointerDownCapture={() => { if (mode !== wm) setMode(wm); }}>
           <div className="conversation-header">
             <h2>
               <MessageSquare size={18} />
-              {modeLabel[wm]}
+              {roomLabel}
               <span className="message-count">
                 {msgs.filter((m) => m.role === "assistant").length}
               </span>
@@ -1451,11 +1488,22 @@ export function Room() {
               </Dialog>
             </div>
           </div>
-          <div className="mobile-modes" role="tablist" aria-label="Conversation mode">
-            {ALL_MODES.map((m) => (
-              <button key={m} type="button" role="tab" aria-selected={m === wm} disabled={running && m !== wm} onClick={() => { setMode(m); setOpenModes(perMode((k) => k === m)); }}>{modeLabel[m]}</button>
+          <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-xs" role="group" aria-label={roomLabel + " conversation style"}>
+            <span className="text-muted-foreground">{chatRoom === "my-pals" ? "Chat style" : "Lounge activity"}</span>
+            {chatModesForRoom(chatRoom).map((m) => (
+              <Button key={m} type="button" size="sm" variant={m === wm ? "secondary" : "ghost"} className="min-h-8 text-xs" aria-pressed={m === wm} disabled={running && m !== wm} onClick={() => selectChatMode(m, wm)}>
+                {chatModeNames[m]}
+              </Button>
             ))}
           </div>
+          {chatRoom === "my-pals" && (
+            <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2" role="group" aria-label="My Pals quick actions">
+              <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => beginFocusTask()}><Sparkles className="size-3.5" /> Just Start</Button>
+              <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }}><ListTodo className="size-3.5" /> Brain Dump</Button>
+              <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => beginFocusTask()}><Users className="size-3.5" /> Focus Together</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setTodayOpen(true)}><Sun className="size-3.5" /> Today</Button>
+            </div>
+          )}
           <SavedDiscussions perMode openRequest={wm === mode ? historyRequest : 0} forkSignal={forkSignals[wm]} messages={msgs} mode={wm} theme={characterMode} running={running} onOpen={(items, theme, discussionMode) => { setMessagesIn(wm, items); setCharacterMode(theme); setMode(wm); setRound(0); setError(""); void discussionMode; }} />
           <div className="conversation-subhead">
             <span className="status-dot" />
@@ -1483,7 +1531,7 @@ export function Room() {
                   </h3>
                   <p>{modeHelp[wm]}</p>
                   <span className="empty-divider" />
-                  <span className="empty-caption">FOUR PERSONALITIES. ENDLESS POSSIBILITIES.</span>
+                  <span className="empty-caption">{chatRoom === "my-pals" ? "YOUR SPACE TO THINK, START AND GET THINGS DONE." : "THE ORIGINAL PIXEL PALS PLAYGROUND."}</span>
                 </div>
               ) : (
                 <>
@@ -1552,8 +1600,8 @@ export function Room() {
               <PromptInput onSubmit={() => start(undefined, undefined, wm)} className="topic-composer">
                 <PromptInputTextarea
                   ref={(el) => { inputEls.current[wm] = el; }}
-                  aria-label={`${modeLabel[wm]} message`}
-                  placeholder={modePlaceholder[wm]}
+                  aria-label={`${roomLabel} message`}
+                  placeholder={wm === "smart" ? "What is on your mind? Ask, plan, or get unstuck…" : modePlaceholder[wm]}
                   value={drafts[wm]}
                   onFocus={() => setMode(wm)}
                   onChange={(e) => {
@@ -1578,8 +1626,16 @@ export function Room() {
                   />
                 </PromptInputFooter>
               </PromptInput>
+              {chatRoom === "my-pals" && suggestAssist(drafts[wm]) && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2 text-xs" role="group" aria-label="Suggested helpful action">
+                  <span className="text-muted-foreground">I can help with that:</span>
+                  {suggestAssist(drafts[wm]) === "just-start" && <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => beginFocusTask(drafts[wm])}><Sparkles className="size-3.5" /> Just Start</Button>}
+                  {suggestAssist(drafts[wm]) === "brain-dump" && <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new CustomEvent("pixelpals:brain-dump", { detail: { text: drafts[wm] } })), 100); }}><ListTodo className="size-3.5" /> Capture in Brain Dump</Button>}
+                  {suggestAssist(drafts[wm]) === "lounge" && <Button type="button" size="sm" variant="outline" disabled={running} onClick={() => selectChatMode("roundtable", wm)}><Gamepad2 className="size-3.5" /> Discuss in Pal Lounge</Button>}
+                </div>
+              )}
               <div className="suggestions">
-                {modeSuggestions[wm].map((text) => (
+                {(chatRoom === "my-pals" ? ["Help me get started", "I have too much to do", "Help me plan today"] : modeSuggestions[wm]).map((text) => (
                   <Button key={text} variant="ghost" size="sm" disabled={running} onClick={() => { setMode(wm); setDraftIn(wm, text); inputEls.current[wm]?.focus(); }}>
                     {text}
                     <ArrowUpRight size={12} />
@@ -1666,7 +1722,7 @@ export function Room() {
           </span>
           <span>
             pixel<span className="text-primary">pals</span>
-            <span className="brand-chat"> / chat</span>
+            <span className="brand-chat"> / focus</span>
           </span>
         </a>
         <Button variant="outline" size="sm" className="just-start-header" aria-label="Just Start" onClick={() => beginFocusTask()} title="Just Start: one small action at a time"><Sparkles className="size-4" /> <span>Just Start</span></Button>
@@ -1677,7 +1733,7 @@ export function Room() {
           onClick={(e) => { const el = e.target as HTMLElement; if (el.closest("button") && !el.closest("[role=combobox],[role=switch],.header-menu-btn")) setMenuOpen(false); }}
         >
           <span className="lab-badge">
-            <span className="status-dot" /> THE MULTI-MODEL PLAYGROUND
+            <span className="status-dot" /> YOUR FOCUS & AI COMPANION
           </span>
           <EngineSettingsDialog />
           {canSpeak && (
@@ -1718,9 +1774,9 @@ export function Room() {
               <DialogHeader>
                 <DialogTitle>A little room for big ideas</DialogTitle>
                 <DialogDescription>
-                  Roundtable lets the pals respond to each other. Broadcast gives independent
-                  answers. Choose at least two pals, set your topic, and start. Your conversation is
-                  saved only in this browser. Choose Saved discussions to keep and reopen multiple conversations. AI replies use your free keys or the in-browser model — no credits.
+                  My Pals is your everyday place to ask questions, plan your day, and get unstuck.
+                  Pal Lounge keeps the original multi-Pal conversations, independent answers and debates.
+                  All six chat histories are preserved in this browser. Nothing is deleted during the update.
                 </DialogDescription>
               </DialogHeader>
             </DialogContent>
@@ -1737,8 +1793,8 @@ export function Room() {
         <span className="mobile-strip-hint">tap for the room</span>
       </button>
       <TaskSync />
-      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} onCompanionStart={setFocusCompanion} />
-      <FocusCompanion session={focusCompanion} onChange={setFocusCompanion} />
+      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} onCompanionStart={(next) => { setFocusBreak(false); setFocusCompanion(next); }} />
+      <FocusCompanion session={focusCompanion} onChange={changeFocusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} />
       {!desktopApp && <UpdateBanner />}
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
@@ -1749,11 +1805,12 @@ export function Room() {
       <div className="workspace-frame">
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
-          {ALL_MODES.map((m) => (
-            <Button key={m} variant="ghost" className="sidebar-item" title={`${modeLabel[m]}: ${modeHelp[m]}`} aria-pressed={openModes[m]} onClick={() => { toggleMode(m); setMode(m); }}>{m === "roundtable" ? <Users /> : m === "broadcast" ? <Radio /> : m === "direct" ? <MessageSquare /> : m === "solve" ? <Wrench /> : m === "debate" ? <Swords /> : <Workflow />}<span>{modeLabel[m]}</span><i className={openModes[m] ? "status-dot" : ""} /></Button>
-          ))}
-          <Button variant="ghost" className="sidebar-item" title="Pixel room" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pixel room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
-          <Button variant="ghost" className="sidebar-item" title="Just Start: help me start a task" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="My Pals: one place to ask, plan, solve and get unstuck" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => toggleChatRoom("my-pals")}><MessageSquare /><span>My Pals</span><i className={isChatRoomOpen(openModes, "my-pals") ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Pal Lounge: Roundtable, independent answers and debates" aria-pressed={isChatRoomOpen(openModes, "pal-lounge")} onClick={() => toggleChatRoom("pal-lounge")}><Gamepad2 /><span>Pal Lounge</span><i className={isChatRoomOpen(openModes, "pal-lounge") ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Just Start: one tiny first step, with optional Pal body doubling" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Focus Together: start body doubling with your Pal" onClick={() => beginFocusTask()}><Users /><span>Focus Together</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Brain Dump: capture tasks and natural-language reminders in Today" onClick={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }}><ListTodo /><span>Brain Dump</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Pal Room: interact with your work buddy and take breaks together" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pal Room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes and memories" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Fun: Dungeon Master campaigns" aria-pressed={funOpen} onClick={() => setFunOpen((value) => !value)}><Gamepad2 /><span>Fun</span></Button>
@@ -1775,9 +1832,12 @@ export function Room() {
           <div className="sidebar-divider" />
           <WorkspaceLayoutMenu onShow={(ids) => {
             const show = (id: string) => ids.includes(id);
-            setOpenModes(perMode((m) => show(`mode-${m}`)));
-            const selectedMode = ALL_MODES.find((m) => show(`mode-${m}`));
-            if (selectedMode) setMode(selectedMode);
+            const selectedMy = MY_PALS_MODES.find((m) => show("mode-" + m)) ?? "smart";
+            const selectedLounge = PAL_LOUNGE_MODES.find((m) => show("mode-" + m)) ?? "roundtable";
+            let restored = perMode((m) => m === selectedMy && (show("chat-my-pals") || MY_PALS_MODES.some((id) => show("mode-" + id))));
+            if (show("chat-pal-lounge") || PAL_LOUNGE_MODES.some((id) => show("mode-" + id))) restored = activateChatMode(restored, selectedLounge);
+            setOpenModes(restored);
+            setMode(isChatRoomOpen(restored, "my-pals") ? selectedMy : selectedLounge);
             setRoomOpen(show("room"));
             setTodayOpen(show("today"));
             setMailOpen(show("mail"));
@@ -1811,7 +1871,7 @@ export function Room() {
         </nav>
         <div className="workspace-stage">
           <main className="window-canvas" aria-label="Floating workspace">
-            <WorkspaceWindow id="room" title="Pixel room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => setRoomOpen(false)} resetVersion={resetVersion}>
+            <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => setRoomOpen(false)} resetVersion={resetVersion}>
               <div className="room-column">          <div className="room-scene">
             <img
               src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
@@ -1839,7 +1899,7 @@ export function Room() {
               </span>
             </div>
             {agents.map((a, i) => assistantOn ? (
-              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={running && speaking === a.id} enabled={enabled.includes(a.id)} />
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} />
             ) : (
               <div
                 key={a.id}
@@ -1850,6 +1910,7 @@ export function Room() {
                   speaking === a.id && "is-speaking",
                   !running && chatter === a.id && "is-chatting",
                   running && speaking && speaking !== a.id && enabled.includes(a.id) && "is-listening",
+                  focusCompanion?.pal === a.id && !focusBreak && "pal-room-active-buddy",
                 )}
               >
                 {speaking === a.id && (
@@ -1858,6 +1919,8 @@ export function Room() {
                   </div>
                 )}
                 {speaking === a.id && !bubbleText && <ThinkingProp id={a.id} mode={characterMode} />}
+                {focusCompanion?.pal === a.id && !focusBreak && speaking !== a.id && <span className="pal-room-task-bubble" aria-label="Pal working alongside you">💻</span>}
+                {focusCompanion?.pal === a.id && focusBreak && speaking !== a.id && <span className="pal-room-task-bubble" aria-label="Pal on break">☕</span>}
                 <PixelCharacter id={a.id} animated={speaking === a.id} />
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror, characterMode)}
@@ -1875,6 +1938,7 @@ export function Room() {
               </span>
             </div>
           </div>
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} />
           <div className="section-heading">
             <button
               type="button"
@@ -1959,7 +2023,8 @@ export function Room() {
           )}
 </div>
             </WorkspaceWindow>
-            {ALL_MODES.map((wm) => <Fragment key={wm}>{renderModeWindow(wm)}</Fragment>)}
+            {renderModeWindow(myPalsMode)}
+            {renderModeWindow(loungeMode)}
             <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
               {toolsSeen && <Suspense fallback={<div className="p-4 text-sm opacity-70" role="status">Loading…</div>}><ShowServicesTools /></Suspense>}
             </WorkspaceWindow>
@@ -2005,7 +2070,7 @@ export function Room() {
         </div>
       </div>
       <nav className="mobile-tabbar" aria-label="Windows">
-        <button type="button" aria-pressed={conversationOpen} onClick={() => mobileTab("chat")}><MessageSquare /><span>Chat</span></button>
+        <button type="button" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => mobileTab("chat")}><MessageSquare /><span>My Pals</span></button>
         <button type="button" aria-pressed={todayOpen} onClick={() => mobileTab("today")}><Sun /><span>Today</span></button>
         <button type="button" aria-pressed={tasksOpen} onClick={() => mobileTab("tasks")}><CheckSquare /><span>Tasks</span></button>
         <button type="button" aria-pressed={notesOpen} onClick={() => mobileTab("notes")}><ListTodo /><span>Notes</span></button>

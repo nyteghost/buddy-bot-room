@@ -1,0 +1,33 @@
+/* Small activity corner attached to the original Pal room; reduced-motion friendly. */
+.pal-room-activities {
+  display: flex; align-items: center; gap: 14px; padding: 12px;
+  border-top: 1px solid var(--border); background: var(--card); color: var(--card-foreground);
+}
+.pal-room-illustration {
+  position: relative; flex: 0 0 100px; width: 100px; height: 106px;
+  display: grid; place-items: center; border-radius: 12px; overflow: hidden;
+  background: var(--muted);
+}
+.pal-room-illustration .pixel-character {
+  position: relative; z-index: 2; width: 72px !important; height: 80px !important;
+  object-fit: contain; image-rendering: pixelated;
+}
+.pal-room-illustration[data-activity="working"] .pixel-character { animation: pal-room-work 2.4s ease-in-out infinite; }
+.pal-room-illustration[data-activity="break"] .pixel-character { transform: translateY(7px); }
+.pal-room-illustration .pal-room-prop {
+  position: absolute; right: 9px; top: 8px; z-index: 3; font-size: 19px;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.2));
+}
+.pal-room-illustration .pal-room-surface {
+  position: absolute; bottom: 7px; left: 11px; right: 11px; height: 11px;
+  border-radius: 4px; background: var(--border);
+}
+@keyframes pal-room-work { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+@media (prefers-reduced-motion: reduce) {
+  .pal-room-illustration[data-activity="working"] .pixel-character { animation: none; }
+}
+@media (max-width: 420px) {
+  .pal-room-illustration { flex-basis: 70px; width: 70px; height: 85px; }
+  .pal-room-illustration .pixel-character { width: 60px !important; height: 68px !important; }
+  .pal-room-activities { gap: 8px; padding: 8px; }
+}
