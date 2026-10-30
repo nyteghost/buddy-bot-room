@@ -59,7 +59,9 @@ export function applyReview(proposed: readonly EventEntry[], suggestedTasks: rea
   const entryLines = applyLines(proposed, draft.entries, draft.addedEntries);
   const taskLines = applyLines(suggestedTasks, draft.tasks, draft.addedTasks);
   // Strict validity protects export from malformed project files and impossible times.
-  const entries = entryLines.flatMap((line) => line.final && validEntry(line.final) ? [{ ...line.final }] : []);
+  // Never discard an imported suggestion just because older parser rules produced an unusual time.
+  // Strict validation applies to user-created or edited entries; original source remains preserved.
+  const entries = entryLines.flatMap((line) => line.final && (line.status === "unchanged" || validEntry(line.final)) ? [{ ...line.final }] : []);
   const tasks = taskLines.flatMap((line) => line.final && /^\d{4}-\d{2}-\d{2}$/.test(line.final.date) &&
     (line.final.section === "HALLS" || line.final.section === "BALLROOM") && line.final.text.trim()
       ? [{ ...line.final }] : []);
