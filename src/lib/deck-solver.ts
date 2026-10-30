@@ -142,7 +142,7 @@ export function planStage(
   //    holders in the strips either side.
   //  - inOffset: inside a holder strip, every other deck bridges between the
   //    two holders next to it.
-  type Pattern = { crossOffset: number | null; inOffset: number | null };
+  type Pattern = { crossOffset: number | null; inOffset: number | null; inStride: number };
 
   function buildOrientation(
     orientation: "horizontal" | "vertical",
@@ -197,7 +197,7 @@ export function planStage(
         // a strip that supports a bridged strip must stay solid
         if (bridgedStrip[s - 1] || bridgedStrip[s + 1]) continue;
         for (let p = 1; p < K - 1; p++) {
-          if ((p - pattern.inOffset) % 2 === 0) isBridge[s][p] = true;
+          if ((p - pattern.inOffset) % pattern.inStride === 0) isBridge[s][p] = true;
         }
       }
     }
@@ -334,11 +334,20 @@ export function planStage(
     };
   }
 
+  // Consider every-fourth deck bridges too: three 4×8 decks can sit on a
+  // 3-deck holder, then a bridge spans to the next 3-deck holder. The old
+  // alternating-only search split these runs into tiny holder groups.
   const patterns: Pattern[] = [];
+  const seenPatterns = new Set<string>();
   for (const crossOffset of [1, 2, null]) {
-    for (const inOffset of [1, 2, null]) {
-      patterns.push({ crossOffset, inOffset });
+    for (const stride of [2, 3, 4]) {
+      for (let offset = 1; offset <= stride; offset++) {
+        const pattern: Pattern = {crossOffset, inOffset: offset, inStride: stride};
+        const key = JSON.stringify(pattern);
+        if (!seenPatterns.has(key)) { patterns.push(pattern); seenPatterns.add(key); }
+      }
     }
+    patterns.push({crossOffset, inOffset: null, inStride: 2});
   }
 
   const attempts: Attempt[] = [];
@@ -352,16 +361,17 @@ export function planStage(
   if (attempts.length === 0) {
     return { ok: false, reason: "Could not build this stage with available holders." };
   }
-  // Prefer: no holder error, then MOST bridges, then fewest single-deck holders,
-  // then fewest holders overall.
+  // Prefer complete, buildable layouts using the fewest holders first.
+  // A 3-holder/2-bridge solution is operationally simpler than 5 holders/4 bridges.
+  // After fewer holders, favor fewer 1-deck holders and then more useful bridges.
   attempts.sort((p, q) => {
     const pe = p.holderError ? 1 : 0;
     const qe = q.holderError ? 1 : 0;
     if (pe !== qe) return pe - qe;
-    if (p.totalBridges !== q.totalBridges) return q.totalBridges - p.totalBridges;
+    if (p.totalHolders !== q.totalHolders) return p.totalHolders - q.totalHolders;
     if (prefs.mostlyThree && p.threes !== q.threes) return q.threes - p.threes;
     if (p.singles !== q.singles) return p.singles - q.singles;
-    return p.totalHolders - q.totalHolders;
+    return q.totalBridges - p.totalBridges;
   });
 
 
