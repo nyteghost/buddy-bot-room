@@ -126,7 +126,8 @@ await step("Today future overview and important Brain Dump alert", async () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
     }
   });
-  await page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i }).click();
+  const todayItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i });
+  if (await todayItem.getAttribute("aria-pressed") !== "true") await todayItem.click();
   const overview = page.getByRole("navigation", { name: "Day overview" });
   await overview.getByRole("button", { name: "Tomorrow" }).click();
   await overview.getByRole("button", { name: "Day after" }).click();

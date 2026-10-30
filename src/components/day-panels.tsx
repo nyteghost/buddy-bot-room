@@ -189,7 +189,7 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks }: { 
       <Block title="Tasks">
         {!open_.length && !todayReminders.length && <Quiet>{dayOffset === 0 ? "Nothing open. Add something in Brain Dump or Tasks." : "No timed tasks or reminders for this day."}</Quiet>}
         {todayReminders.map((r) => <button type="button" key={r.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>⏰ {whenLabel(r.at, tz)} — {r.text}</button>)}
-        {open_.slice(0, 6).map((t) => <button type="button" key={t.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>☐ {t.text}</button>)}
+        {open_.slice(0, 6).map((t) => <button type="button" key={t.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>☐ {t.scheduledAt ? clock(t.scheduledAt, tz) + " — " : ""}{t.text}</button>)}
       </Block>
       <BrainDump />
       {dayOffset === 0 && <Block title="Tonight">
