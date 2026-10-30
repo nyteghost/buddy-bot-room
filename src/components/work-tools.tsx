@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Briefcase, CalendarClock, CalendarDays, CalendarPlus, CalendarSync, Download, ExternalLink, FileUp, GitBranch, Layers, Map as MapIcon, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, 
 import { StandaloneVendors } from "@/components/showpilot-vendors";
 import { FloorMapPanel } from "@/components/floor-map-panel";
 import { scopeShowPilotRows } from "@/lib/showpilot-venue";
+import { ScheduleReview } from "@/components/showpilot-review-panel";
+import { applyReview, emptyReviewDraft, fingerprintRows, parseDraft, parseReviewProject, storageKey, type ReviewDraft, type ReviewProject } from "@/lib/showpilot-review";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -89,6 +91,13 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
   const [entries, setEntries] = useState<EventEntry[]>([]);
   const [status, setStatus] = useState("");
   const [blob, setBlob] = useState<Blob | null>(null);
+  const [freshBlob, setFreshBlob] = useState<Blob | null>(null);
+  const [suggestedEntries, setSuggestedEntries] = useState<EventEntry[]>([]);
+  const [suggestedTasks, setSuggestedTasks] = useState<TaskNote[]>([]);
+  const [draft, setDraft] = useState<ReviewDraft>(emptyReviewDraft);
+  const draftRef = useRef<ReviewDraft>(emptyReviewDraft());
+  const fingerprintRef = useRef("");
+  const compileRef = useRef(0);
   const [merged, setMerged] = useState(false);
   const [tasks, setTasks] = useState<TaskNote[]>([]);
   const [shared, setShared] = useState<string[]>([]);
@@ -99,30 +108,105 @@ function EventsTab({ venueOnly = false }: { venueOnly?: boolean }) {
   const [venueExcluded, setVenueExcluded] = useState(0);
   const [approvedSpaces, setApprovedSpaces] = useState<string[]>([]);
   const [report, setReport] = useState("");
-  async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean, approved: string[] = []) {
-    const { eventsWorkbook } = await import("@/lib/work-files");
+  const saveDraftForCurrent = (next: ReviewDraft) => {
+    draftRef.current = next; setDraft(next);
+    if (fingerprintRef.current) {
+      try { localStorage.setItem(storageKey(fingerprintRef.current), JSON.stringify(next)); }
+      catch { setStatus("Local storage is full or disabled. Save your review project to preserve changes."); }
+    }
+  };
+  function draftFor(rows: EventRow[], override?: ReviewDraft): ReviewDraft {
+    const fingerprint = fingerprintRows(rows);
+    if (override) {
+      fingerprintRef.current = fingerprint; saveDraftForCurrent(override); return override;
+    }
+    if (fingerprintRef.current === fingerprint) return draftRef.current;
+    fingerprintRef.current = fingerprint;
+    try {
+      const text = localStorage.getItem(storageKey(fingerprint));
+      const next = text ? parseDraft(text) : emptyReviewDraft();
+      draftRef.current = next; setDraft(next); return next;
+    } catch {
+      const next = emptyReviewDraft();
+      draftRef.current = next; setDraft(next); return next;
+    }
+  }
+  async function compileReview(proposals: EventEntry[], notes: TaskNote[], nextDraft: ReviewDraft, existing?: File) {
+    const token = ++compileRef.current;
+    const approved = applyReview(proposals, notes, nextDraft);
+    setEntries(approved.entries);
+    setTasks(approved.tasks);
+    setShared(sharedSpaces(approved.entries));
+    setBlob(null); setFreshBlob(null);
+    if (!approved.entries.length) return;
+    try {
+      const { eventsWorkbook } = await import("@/lib/work-files");
+      // Fresh export honors removals. Existing templates retain typed shifts and PTO.
+      const fresh = await eventsWorkbook(approved.entries, undefined, approved.tasks);
+      if (compileRef.current !== token) return;
+      setFreshBlob(fresh);
+      if (existing) {
+        const merged = await eventsWorkbook(approved.entries, existing, approved.tasks);
+        if (compileRef.current !== token) return;
+        setBlob(merged);
+      } else setBlob(fresh);
+    } catch (e) {
+      if (compileRef.current === token) setStatus("Could not build reviewed Excel schedule: " + (e as Error).message);
+    }
+  }
+  async function build(src: { rows: EventRow[]; existing?: File; sources: number }, includePending: boolean, approved: string[] = [], overrideDraft?: ReviewDraft) {
+    const nextDraft = draftFor(src.rows, overrideDraft);
     const uncancelled = src.rows.filter((r) => !isCancelledRow(r));
     const scope = venueOnly ? scopeShowPilotRows(uncancelled, approved) : { accepted: uncancelled, excluded: [] as EventRow[], needsReview: [] as EventRow[] };
     const live = scope.accepted;
     setVenueExcluded(scope.excluded.length);
     setVenueReview([...new Set(scope.needsReview.map((r) => r.space || "(no space)"))].sort());
-    setPending([...new Set(live.filter(isPendingRow).map((r) => `${r.event || r.description} (${r.status})`))].sort());
+    setPending([...new Set(live.filter(isPendingRow).map((r) => (r.event || r.description) + " (" + r.status + ")"))].sort());
     const rows = includePending ? live : live.filter((r) => !isPendingRow(r));
-    const list = summarizeEvents(rows);
+    const proposals = summarizeEvents(rows);
     const dayList = [...new Set(live.map((r) => r.date))].sort();
     const statuses = new Map<string, number>();
     for (const r of src.rows) statuses.set(r.status ?? "(none)", (statuses.get(r.status ?? "(none)") ?? 0) + 1);
     setReport((old) => [old.split("\n--- counts ---")[0], "--- counts ---",
-      `rows read: ${src.rows.length}`, `cancelled: ${src.rows.length - uncancelled.length}`, `other-building rows excluded: ${scope.excluded.length}`, `unverified-space rows: ${scope.needsReview.length}`, `not-yet-definite: ${live.filter(isPendingRow).length} (${includePending ? "included" : "left out"})`,
-      `rows used: ${rows.length}`, `entries built: ${list.length}`, `dates: ${dayList[0] ?? "-"} to ${dayList.at(-1) ?? "-"}`,
-      `statuses: ${[...statuses].map(([k, v]) => `${k}=${v}`).join(", ") || "-"}`,
-      `sample rows: ${JSON.stringify(src.rows.slice(0, 3))}`].join("\n"));
+      "rows read: " + src.rows.length, "cancelled: " + (src.rows.length - uncancelled.length),
+      "other-building rows excluded: " + scope.excluded.length,
+      "unverified-space rows: " + scope.needsReview.length,
+      "not-yet-definite: " + live.filter(isPendingRow).length + (includePending ? " (included)" : " (excluded)"),
+      "rows used: " + rows.length, "entries suggested: " + proposals.length,
+      "dates: " + (dayList[0] ?? "-") + " to " + (dayList.at(-1) ?? "-"),
+      "statuses: " + ([...statuses].map(([k,v]) => k + "=" + v).join(", ") || "-")].join("\n"));
     const notes = [...airwallTasks(rows), ...taskSuggestions(rows)].sort((a, b) => a.date.localeCompare(b.date));
-    setShared(sharedSpaces(list));
-    setEntries(list); setMerged(!!src.existing); setTasks(notes);
-    setBlob(list.length ? await eventsWorkbook(list, src.existing, notes) : null);
-    const dates = new Set(list.map((e) => e.date)).size;
-    setStatus(list.length ? `${src.sources} report${src.sources > 1 ? "s" : ""} · ${list.length} entries across ${dates} days. ${src.existing ? `Filled into ${src.existing.name} — engineer shifts kept.${notes.length ? ` ${notes.length} task suggestions added to empty Tasks cells.` : ""}` : "Built weekly sheets with the engineering roster."}` : "No show, move-in or move-out lines found.");
+    setSuggestedEntries(proposals);
+    setSuggestedTasks(notes);
+    setMerged(!!src.existing);
+    setStatus(src.sources + " reports · " + proposals.length + " suggested entries. Review them before exporting."
+      + (src.existing ? " Typed shifts and PTO in the existing workbook remain protected." : ""));
+    await compileReview(proposals, notes, nextDraft, src.existing);
+  }
+  function reviewChanged(next: ReviewDraft) {
+    saveDraftForCurrent(next);
+    void compileReview(suggestedEntries, suggestedTasks, next, source?.existing);
+  }
+  function saveProject() {
+    if (!source) return;
+    const p: ReviewProject = { kind:"showpilot-review-project", version:1, originalRows:source.rows,
+      draft:draftRef.current, approvedSpaces, includePending:withPending,
+      note:source.existing ? "Original Excel staffing template must be uploaded separately when resuming." : "" };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(p)], {type:"application/json"}));
+    const a = document.createElement("a");
+    a.href=url; a.download="showpilot-review-"+(source.rows[0]?.date ?? "schedule")+".json";a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }
+  async function loadProject(f:File) {
+    setStatus("Opening saved review project…");++compileRef.current;
+    try {
+      if (f.size > 16_000_000) throw new Error("Project exceeds 16 MB.");
+      const p = parseReviewProject(await f.text());
+      const nextSource={rows:p.originalRows,sources:1};
+      setSource(nextSource);setWithPending(p.includePending);setApprovedSpaces(p.approvedSpaces);
+      await build(nextSource,p.includePending,p.approvedSpaces,p.draft);
+      setStatus("Review project loaded. Original report and manual decisions restored. Reattach the original monthly Excel template if you need to preserve its existing shifts/PTO.");
+    }catch(e){setStatus("Could not open ShowPilot project: "+(e as Error).message);}
   }
   async function load(files: File[]) {
     setStatus("Reading…"); setBlob(null); setApprovedSpaces([]); setVenueReview([]); setVenueExcluded(0);
