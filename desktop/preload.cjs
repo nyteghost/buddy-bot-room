@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require("electron");
+contextBridge.exposeInMainWorld("showpilotUpdates",Object.freeze({status:()=>ipcRenderer.invoke("showpilot-update:status"),setChannel:(channel)=>ipcRenderer.invoke("showpilot-update:channel",channel),check:()=>ipcRenderer.invoke("showpilot-update:check"),open:()=>ipcRenderer.invoke("showpilot-update:open")}));
 contextBridge.exposeInMainWorld("showpilotAI", Object.freeze({
   status: () => ipcRenderer.invoke("showpilot-ai:status"),
   saveKey: (provider, key) => ipcRenderer.invoke("showpilot-ai:save",provider,key),
