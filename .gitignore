@@ -3,3 +3,7 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Generated from src/assets/showpilot-icon.svg during build
+desktop/showpilot.ico
+desktop/showpilot.png
