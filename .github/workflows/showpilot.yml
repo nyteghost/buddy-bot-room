@@ -1,10 +1,10 @@
 name: ShowPilot standalone checks
 on:
   push:
-    branches: [feat/showpilot-standalone]
+    branches: [main, beta, feat/showpilot-standalone]
   workflow_dispatch:
 concurrency:
-  group: showpilot-stage-bridge-beta-validation
+  group: showpilot-${{ github.ref_name }}-validation
   cancel-in-progress: true
 jobs:
   check:
@@ -14,7 +14,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --no-save
       - run: bun run check
-      - run: node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/google-calendar.cjs && node --check desktop/ai-vault.cjs
+      - run: node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/google-calendar.cjs && node --check desktop/ai-vault.cjs && node --check desktop/app-updates.cjs
       - run: bun test
       - run: bun run build
       - name: Upload offline browser build
