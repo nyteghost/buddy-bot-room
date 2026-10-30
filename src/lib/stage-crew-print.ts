@@ -41,7 +41,7 @@ function stageDiagram(stage:CrewPrintStage):string {
 /** Stable date-only rendering: never shift the show date across local time zones. */
 export type CrewScheduleDates = { showDate?: string; buildByDate?: string };
 function crewDate(value?: string): string {
-  if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return "Not set";
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Not set";
   const parsed = new Date(value + "T12:00:00Z");
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0,10) !== value) return "Not set";
   return new Intl.DateTimeFormat("en-US", {weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(parsed);
@@ -67,7 +67,7 @@ export function crewPrintDocument(eventName:string, stages:readonly CrewPrintSta
       '<div><span>2-DECK HOLDERS</span><strong>'+tally.holders[2]+'</strong></div>'+
       '<div><span>1-DECK HOLDERS</span><strong>'+tally.holders[1]+'</strong></div></div>'+
       '<div class="drawing"><h3>DECK PLACEMENT · TOP VIEW</h3>'+stageDiagram(s)+'</div>'+
-      '<div class="legend"><b>Diagram key:</b> solid outline = 1-deck holder · dashed = 2-deck holder · double = 3-deck holder. Each light rectangle is one 4 × 8 deck.</div>'+
+      '<div class="legend"><b>Diagram key:</b> solid outline = 1-deck holder · dashed = 2-deck holder · double = 3-deck holder. Outlines show individual decks. Deck size is stated once in the materials summary.</div>'+
       loose+note+
       '<div class="footer">STAGE '+(index+1)+' OF '+stages.length+' · '+escape(s.name||"Stage")+'</div></article>';
   }).join("");
