@@ -25,7 +25,7 @@ describe("named and saved workspace layouts", () => {
     const canvas = { width: 1000, height: 700 };
     const chat = presetWindowRects("chat", canvas);
     expect(chat.room).toEqual({ x: 0, y: 0, w: 500, h: 700 });
-    expect(chat["mode-roundtable"]).toEqual({ x: 500, y: 0, w: 500, h: 700 });
+    expect(chat["chat-my-pals"]).toEqual({ x: 500, y: 0, w: 500, h: 700 });
     expect(Object.keys(presetWindowRects("mail", canvas))).toEqual(["mail"]);
     expect(Object.keys(presetWindowRects("work", canvas))).toEqual(["tools", "documents"]);
     expect(Object.keys(presetWindowRects("server", canvas))).toEqual(["today", "setup"]);
