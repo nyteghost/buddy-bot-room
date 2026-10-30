@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, parsePastedShifts, shiftLabel, airwallTasks, isCancelledRow, isPendingRow, sharedSpaces, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type EventRow, type Shift, type TaskNote } from "@/lib/work-tools";
+import { buildIcs, DEFAULT_SCHEDULE_NAME, editShift, entryLabel, formatMinutes, googleCalendarLink, isIsoDate, minutesToTime, newShiftId, nextMondayIso, parsePastedShifts, shiftLabel, airwallTasks, isCancelledRow, isPendingRow, sharedSpaces, summarizeEvents, taskSuggestions, timeToMinutes, withShiftIds, type EventEntry, type EventRow, type Shift, type TaskNote } from "@/lib/work-tools";
 import { StandaloneVendors } from "@/components/showpilot-vendors";
 import { FloorMapPanel } from "@/components/floor-map-panel";
 import { scopeShowPilotRows } from "@/lib/showpilot-venue";
@@ -365,11 +365,7 @@ function ShiftsTab() {
   }
   const ics = () => import("@/lib/work-files").then((m) => m.downloadBlob(new Blob([buildIcs(shifts, title.trim() || "Mark Work")], { type: "text/calendar" }), "my-shifts.ics"));
   const [pasted, setPasted] = useState("");
-  const [weekStart, setWeekStart] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // this week's Monday
-    return d.toISOString().slice(0, 10);
-  });
+  const [weekStart, setWeekStart] = useState(nextMondayIso);
   function readPasted() {
     const list = parsePastedShifts(pasted, weekStart, name);
     setShifts(withShiftIds(list)); setRemoved([]); setEditing(null);
