@@ -168,7 +168,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
         <textarea readOnly aria-label="Pal draft to review and copy" rows={5} className="w-full resize-y rounded-md border bg-background p-2 text-xs" value={workDraft} onFocus={e => e.currentTarget.select()} />
         <p className="text-xs text-muted-foreground">Copy or edit this manually. Your Pal cannot read, change or send anything from another app.</p>
       </section>}
-      {workNote && <p className="text-xs text-muted-foreground" role="status">{workNote}</p>
+      {workNote && <p className="text-xs text-muted-foreground" role="status">{workNote}</p>}
       <label className="focus-companion-mode text-xs text-muted-foreground">
         Companion style
         <span className="relative inline-flex items-center">
