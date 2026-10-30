@@ -12,6 +12,7 @@ const req = (body: unknown) => new Request("http://localhost/api/just-start", {
 });
 beforeEach(() => {
   vi.stubEnv("BUDDY_ACCOUNTS", "1");
+  vi.stubEnv("BUDDY_DATA_DIR", "/tmp/pixelpals-focus-route-tests");
   user.mockReset();
   ai.mockReset();
   user.mockResolvedValue({ username: "owner", owner: true });
