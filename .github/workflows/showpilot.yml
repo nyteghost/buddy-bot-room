@@ -4,7 +4,7 @@ on:
     branches: [feat/showpilot-standalone]
   workflow_dispatch:
 concurrency:
-  group: showpilot-calendar-beta-validation
+  group: showpilot-stage-bridge-beta-validation
   cancel-in-progress: true
 jobs:
   check:
