@@ -353,7 +353,7 @@ export function Room() {
   useEffect(() => { if (error) logClient("error", `Shown to user: ${error}`); }, [error]);
   const [saveError, setSaveError] = useState("");
   const [settings, setSettings] = useState(false);
-  const [palsOpen, setPalsOpen] = useState(true);
+  const [palsOpen, setPalsOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(true);
   const [openModes, setOpenModes] = useState<Record<Mode, boolean>>(defaultOpenModes);
   const conversationOpen = ALL_MODES.some((m) => openModes[m]);
@@ -1805,24 +1805,23 @@ export function Room() {
       <div className="workspace-frame">
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
-          <Button variant="ghost" className="sidebar-item" title="My Pals: one place to ask, plan, solve and get unstuck" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => toggleChatRoom("my-pals")}><MessageSquare /><span>My Pals</span><i className={isChatRoomOpen(openModes, "my-pals") ? "status-dot" : ""} /></Button>
-          <Button variant="ghost" className="sidebar-item" title="Pal Lounge: Roundtable, independent answers and debates" aria-pressed={isChatRoomOpen(openModes, "pal-lounge")} onClick={() => toggleChatRoom("pal-lounge")}><Gamepad2 /><span>Pal Lounge</span><i className={isChatRoomOpen(openModes, "pal-lounge") ? "status-dot" : ""} /></Button>
-          <Button variant="ghost" className="sidebar-item" title="Just Start: one tiny first step, with optional Pal body doubling" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Focus Together: start body doubling with your Pal" onClick={() => beginFocusTask()}><Users /><span>Focus Together</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Brain Dump: capture tasks and natural-language reminders in Today" onClick={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }}><ListTodo /><span>Brain Dump</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Pal Room: interact with your work buddy and take breaks together" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pal Room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Just Start: one tiny first step, with optional Pal body doubling" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Brain Dump: capture tasks and natural-language reminders in Today" onClick={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }}><ListTodo /><span>Brain Dump</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="My Pals: one place to ask, plan, solve and get unstuck" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => toggleChatRoom("my-pals")}><MessageSquare /><span>My Pals</span><i className={isChatRoomOpen(openModes, "my-pals") ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Pal Room: interact with your work buddy and take breaks together" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pal Room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Pal Lounge: Roundtable, independent answers and debates" aria-pressed={isChatRoomOpen(openModes, "pal-lounge")} onClick={() => toggleChatRoom("pal-lounge")}><Gamepad2 /><span>Pal Lounge</span><i className={isChatRoomOpen(openModes, "pal-lounge") ? "status-dot" : ""} /></Button>
+          <Button variant="ghost" className="sidebar-item" title="Additional tools: Calendar, Mail, Notes, Work tools and more" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More tools</span></Button>
+          {moreOpen && <>
+          <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Documents: read PDF and Excel files" aria-pressed={docsOpen} onClick={() => setDocsOpen((value) => !value)}><FileText /><span>Documents</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Notes and memories" aria-pressed={notesOpen} onClick={() => setNotesOpen((value) => !value)}><ListTodo /><span>Notes</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Fun: Dungeon Master campaigns" aria-pressed={funOpen} onClick={() => setFunOpen((value) => !value)}><Gamepad2 /><span>Fun</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
           {addons.filter((a) => a.enabled && a.window).map((a) => (
             <Button key={a.id} variant="ghost" className="sidebar-item" title={`Add-on: ${a.name}`} aria-pressed={addonOpen === a.id} onClick={() => setAddonOpen((v) => (v === a.id ? null : a.id))}><Puzzle /><span>{a.window?.title ?? a.name}</span></Button>
           ))}
-          <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Documents: read PDF and Excel files" aria-pressed={docsOpen} onClick={() => setDocsOpen((value) => !value)}><FileText /><span>Documents</span></Button>
-          <Button variant="ghost" className="sidebar-item" title="Work tools, recorder, compare models and the debug log" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More</span></Button>
-          {moreOpen && <>
           <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Open betas and playtests" aria-pressed={playtestsOpen} onClick={() => setPlaytestsOpen((value) => !value)}><FlaskConical /><span>Playtests</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>

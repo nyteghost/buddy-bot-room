@@ -171,6 +171,31 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await page.unroute("**/api/just-start");
 });
 
+await step("Living Pal Room task board, quick start, and calm/playful controls", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  const board = page.getByRole("region", { name: "Living Task Board" });
+  await board.getByRole("button", { name: "Add a thought" }).click();
+  const dump = page.getByRole("region", { name: "Brain Dump" });
+  await dump.getByRole("textbox", { name: "Brain dump tasks" }).fill("Organize the garage");
+  await dump.getByRole("button", { name: "Capture thoughts" }).click();
+  await board.getByRole("button", { name: "Start: Organize the garage" }).waitFor();
+  await board.getByRole("button", { name: "Start: Organize the garage" }).click();
+  const dialog = page.getByRole("dialog", { name: "Just Start" });
+  await dialog.getByRole("textbox", { name: "What are you trying to start?" }).waitFor();
+  if (await dialog.getByRole("textbox", { name: "What are you trying to start?" }).inputValue() !== "Organize the garage") {
+    throw Error("Living Task Board did not preload the selected task");
+  }
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await mood.getByRole("button", { name: "Switch Pal Room to Playful" }).click();
+  await mood.getByRole("group", { name: "What the Pals are doing" }).getByText(/Tinkering with a computer/).waitFor();
+  if (await page.evaluate(() => localStorage.getItem("pixel-pals-room-playful-v1")) !== "1") throw Error("Playful preference wasn't saved");
+  await mood.getByRole("button", { name: "Switch Pal Room to Calm" }).click();
+  if (await mood.getByRole("group", { name: "What the Pals are doing" }).count()) throw Error("Calm mode kept the activity list visible");
+  await roomItem.click();
+});
+
 await step("Just Start fallback handles swingset as three distinct numbered steps", async () => {
   await page.route("**/api/just-start", async (route) => {
     const request = route.request().postDataJSON();
@@ -201,7 +226,7 @@ await step("Just Start fallback handles swingset as three distinct numbered step
 });
 
 await step("expand the sidebar More group", async () => {
-  const more = page.locator(".sidebar-item", { hasText: /^\s*More\s*$/i }).first();
+  const more = page.locator(".sidebar-item", { hasText: /^\s*More tools\s*$/i }).first();
   if (await more.count()) await more.click({ timeout: 8000 });
 });
 await step("Today future overview and important Brain Dump alert", async () => {

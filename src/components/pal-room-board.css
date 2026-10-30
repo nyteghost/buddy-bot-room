@@ -1,0 +1,11 @@
+.living-task-board { display: grid; gap: 10px; margin: 8px 10px 12px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); min-width: 0; }
+.living-task-board-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.living-task-board-pin { display: grid; place-items: center; color: var(--primary); flex: none; }
+.living-task-board-items { display: grid; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.living-task-note { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px; border-radius: 9px; border: 1px solid var(--border); background: var(--muted); }
+.living-task-note-first { border-color: var(--primary); }
+.living-task-note-title { font-size: 13px; overflow-wrap: anywhere; line-height: 1.45; }
+.living-task-note-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 4px; font-size: 11px; color: var(--muted-foreground); }
+.living-task-board-empty { padding: 8px; border: 1px dashed var(--border); border-radius: 8px; display: grid; gap: 4px; }
+.living-task-board-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 430px) { .living-task-board { padding: 9px; margin: 7px; } .living-task-note { padding: 8px; } }

@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { Coffee, Sparkles, Play, Users } from "lucide-react";
+import { Coffee, Sparkles, Play, Users, Moon, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PixelCharacter } from "./pixel-character";
 import { TinyWins } from "./tiny-wins";
-import { agentName } from "@/lib/agents";
+import { agentName, type AgentId } from "@/lib/agents";
+import { palActivity } from "@/lib/pal-room-life";
 import { companionActivity, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
 import "./pal-room-activities.css";
 
-export function PalRoomActivities({ session, onStart, onPauseChange, paused }: {
+export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase }: {
   session: FocusSession | null;
   onStart: () => void;
   onPauseChange: (value: boolean) => void;
   paused: boolean;
+  playful: boolean;
+  onPlayfulChange: (value: boolean) => void;
+  phase: number;
 }) {
   const theme = useCharacterMode();
   const [celebrationToken, setCelebrationToken] = useState(0);
@@ -36,6 +40,7 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused }: {
   const name = agentName(id, false, false, theme);
   const working = !!session && !paused;
   const resting = !!session && paused;
+  const ambientPals: AgentId[] = ["byte", "sage", "saiyan"];
   return (
     <section className="pal-room-activities" aria-label="Pal Room activities">
       <div className="pal-room-illustration" data-activity={resting ? "break" : working && celebrating ? "celebrating" : working ? "working" : "idle"} aria-hidden="true">
@@ -58,6 +63,32 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused }: {
           )}
           {!session && <Button type="button" size="sm" variant="ghost" onClick={onStart}><Sparkles className="size-3.5" /> Just Start</Button>}
         </div>
+      </div>
+      <div className="pal-room-mood">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold">Room mood</p>
+            <p className="text-xs text-muted-foreground">{playful ? "Pals take turns with little activities." : "Calm by default: a quieter room with fewer distractions."}</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" aria-pressed={playful}
+            aria-label={playful ? "Switch Pal Room to Calm" : "Switch Pal Room to Playful"}
+            onClick={() => onPlayfulChange(!playful)}>
+            {playful ? <Moon className="size-3.5" /> : <PartyPopper className="size-3.5" />}
+            {playful ? "Calm" : "Playful"}
+          </Button>
+        </div>
+        {playful && (
+          <div className="pal-room-life-list" role="group" aria-label="What the Pals are doing">
+            {ambientPals.map((pal) => {
+              const action = palActivity(pal, phase);
+              return <span key={pal} className="pal-room-life-chip" title={action.text}>
+                <span aria-hidden="true">{action.emoji}</span>
+                <strong>{agentName(pal, false, false, theme)}</strong>
+                <span>{action.text}</span>
+              </span>;
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

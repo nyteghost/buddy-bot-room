@@ -44,3 +44,11 @@
 @media (prefers-reduced-motion: reduce) {
   .pal-room-illustration[data-activity="celebrating"] .pixel-character { animation: none; }
 }
+
+/* Room mood lives inside the existing Pal Room; idle activities are opt-in. */
+.pal-room-activities { flex-wrap: wrap; }
+.pal-room-activities > .min-w-0.flex-1 { min-width: min(210px, 100%); }
+.pal-room-mood { display: grid; gap: 8px; flex: 0 0 100%; padding-top: 9px; border-top: 1px solid var(--border); }
+.pal-room-life-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal-room-life-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); font-size: 11px; }
+.pal-room-life-chip strong { font-weight: 600; }

@@ -9,3 +9,24 @@
   border-radius: 7px; background: var(--card); color: var(--card-foreground);
   border: 1px solid var(--border); box-shadow: 0 3px 10px rgba(0,0,0,.2);
 }
+
+/* Optional room mood: small, thematic activity cue above idle characters. */
+.room-scene .pal-room-idle-bubble {
+  position: absolute;
+  top: -12px;
+  right: -6px;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .22);
+  font-size: 15px;
+  line-height: 1;
+  pointer-events: none;
+}

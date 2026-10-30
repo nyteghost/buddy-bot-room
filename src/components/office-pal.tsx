@@ -9,13 +9,13 @@ import { useCalmInterval } from "@/lib/power";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
 
-export function OfficePal({ id, index, mode, active, enabled }: {
-  id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean;
+export function OfficePal({ id, index, mode, active, enabled, playful = false }: {
+  id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean; playful?: boolean;
 }) {
   const [elapsed, setElapsed] = useState(0);
   const [arrived, setArrived] = useState(false);
   const [start] = useState(() => performance.now());
-  const wandering = enabled && !active && !(typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const wandering = enabled && !active && playful && !(typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   // The walk is redrawn 6 times a second; it pauses while the tab is hidden and slows down in low-power mode.
   useCalmInterval(() => setElapsed(performance.now() - start), 160, wandering);
   useEffect(() => {
@@ -28,12 +28,14 @@ export function OfficePal({ id, index, mode, active, enabled }: {
   const pose = officePose(id, index, elapsed);
   const directional = hasFacingArt(id);
   const working = active && arrived;
-  const walking = enabled && (active ? !arrived : pose.walking);
+  const x = active ? station.home[0] : playful ? pose.x : station.home[0];
+  const y = active ? station.home[1] : playful ? pose.y : station.home[1];
+  const walking = enabled && (active ? !arrived : wandering && pose.walking);
   // Seated whenever the pal is parked at its own desk chair.
-  const seated = active ? arrived : !pose.walking && pose.x === station.home[0] && pose.y === station.home[1];
+  const seated = active ? arrived : !walking && x === station.home[0] && y === station.home[1];
   const position = {
-    "--office-x": `${active ? station.home[0] : pose.x}%`,
-    "--office-y": `${active ? station.home[1] : pose.y}%`,
+    "--office-x": `${x}%`,
+    "--office-y": `${y}%`,
   } as CSSProperties;
   return (
     <div
