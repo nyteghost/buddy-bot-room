@@ -56,6 +56,11 @@ export function ShowServicesTools({ page = false }: { page?: boolean } = {}) {
               <TabsTrigger key={id} value={id} className="gap-1.5"><Icon className="size-4" aria-hidden />{label}</TabsTrigger>
             ))}
           </TabsList>
+          <div role="status" className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+            <p className="font-semibold">Show Services tools are moving to ShowPilot</p>
+            <p className="mt-1 text-muted-foreground">This legacy workspace remains available during migration so you can review or export your existing work. New convention-center features are developed in ShowPilot.</p>
+            <a className="mt-2 inline-flex items-center gap-1 font-medium text-primary underline" href="https://github.com/nyteghost/showpilot" target="_blank" rel="noopener noreferrer">Open ShowPilot project <ExternalLink className="size-3.5" aria-hidden /></a>
+          </div>
           <div className="flex items-start justify-between gap-3 pt-2">
             <p className="text-sm text-muted-foreground">{cur.hint}</p>
             {!page && <a href={`/work?tab=${tab}`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs text-primary underline"><ExternalLink className="size-3.5" /> Open as its own page</a>}
