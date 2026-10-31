@@ -445,6 +445,15 @@ export function Room() {
   const [justStartTask, setJustStartTask] = useState("");
   const [focusCompanion, setFocusCompanion] = useState<FocusSession | null>(null);
   const [focusBreak, setFocusBreak] = useState(false);
+  const [focusResumeVersion, setFocusResumeVersion] = useState(0);
+  const resumeSavedFocus = (saved: FocusSession) => {
+    if (focusCompanion && JSON.stringify(focusCompanion) === JSON.stringify(saved)) { setFocusBreak(false); return; }
+    if (focusCompanion && !window.confirm("Replace your current focus session with the saved checkpoint? Your task list will stay unchanged.")) return;
+    // Remounting cancels pending suggestions for the previous session before resuming.
+    setFocusResumeVersion(value => value + 1);
+    setFocusBreak(false);
+    setFocusCompanion(saved);
+  };
   const changeFocusCompanion = (next: FocusSession | null) => { if (!next) setFocusBreak(false); setFocusCompanion(next); };
   const beginFocusTask = (task = "") => { setJustStartTask(task); setJustStartOpen(true); };
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -1862,8 +1871,8 @@ export function Room() {
         <span className="mobile-strip-hint">tap for the room</span>
       </button>
       <TaskSync />
-      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} onCompanionStart={(next) => { setFocusBreak(false); setFocusCompanion(next); }} />
-      <FocusCompanion session={focusCompanion} onChange={changeFocusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} />
+      <JustStartDialog open={justStartOpen} onOpenChange={setJustStartOpen} initialTask={justStartTask} onCompanionStart={(next) => { setFocusResumeVersion(value => value + 1); setFocusBreak(false); setFocusCompanion(next); }} />
+      <FocusCompanion key={focusResumeVersion} session={focusCompanion} onChange={changeFocusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} />
       {!desktopApp && <UpdateBanner />}
       <UnraidBanner onDiagnose={() => void serverCheck("/diagnose", true)} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={palette} />
@@ -2118,7 +2127,7 @@ export function Room() {
               <SetupPanel open={setupOpen} />
             </WorkspaceWindow>
             <WorkspaceWindow id="today" title="Today" icon={<Sun className="size-4" />} open={todayOpen} onClose={() => setTodayOpen(false)} resetVersion={resetVersion}>
-              <TodayPanel open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} onJustStart={beginFocusTask} />
+              <TodayPanel onResumeFocus={resumeSavedFocus} open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} onJustStart={beginFocusTask} />
             </WorkspaceWindow>
             <WorkspaceWindow id="tasks" title="Tasks & reminders" icon={<CheckSquare className="size-4" />} open={tasksOpen} onClose={() => setTasksOpen(false)} resetVersion={resetVersion}>
               <TasksPanel open={tasksOpen} onJustStart={beginFocusTask} />

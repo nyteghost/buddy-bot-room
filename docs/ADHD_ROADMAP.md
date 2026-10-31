@@ -48,10 +48,16 @@ See [BETA_MOBILE_3.md](BETA_MOBILE_3.md) for release scope and owner checks, and
 
 ## Proposed next priorities (not yet scheduled)
 
-1. **Where was I?** One-tap recovery of the chosen task, draft and next tiny step after an interruption.
+1. **Where was I?** Home now offers one-tap recovery of an explicitly saved Focus Assist task and next tiny step. Broader draft/workspace recovery remains proposed.
 2. **I'm stuck**: make the task smaller, explain it, or create an explicitly requested sample alongside the user.
 3. **Recovery shelf**: discover unfinished drafts and recover recently deleted tasks/notes.
 4. **Memory review**: inspect each Pal's remembered context, correct stale facts, and choose privacy boundaries.
 5. **Richer contextual Pal reactions**: greetings and celebrations tied to explicit activity, without claiming autonomous work. The beta animation pass supplies the pose foundation.
 
 Prefer the first two to additional dashboard cards: they directly help task initiation. These are proposals, separate from delivered beta features.
+
+
+## Security and Home resume follow-up
+
+- Patched the two critical dependency findings with compatible pins for DOMPurify and shell-quote; beta publishing and CI now block on critical audit findings. Remaining lower-severity findings still need triage; see [SECURITY_BETA.md](SECURITY_BETA.md).
+- Home shows an explicitly saved Focus Assist checkpoint with its task, completed-step count and next tiny step. Resume is user-triggered; dismissing the checkpoint does not remove tasks, notes, or drafts. No model call or automatic chat capture is involved.

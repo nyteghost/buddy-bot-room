@@ -31,3 +31,9 @@ On Unraid, use the existing separate beta stack (`pixelpals-beta`, port 8091) an
 5. Start a small Focus Assist task, save your place, prepare a notebook summary, and approve it only after review.
 
 Optional local message-body summaries, full vault export/restore, richer visual time planning, and external app integrations remain on the roadmap. They are not claimed complete by this release.
+
+## Security and Home resume follow-up
+
+Critical dependency findings are patched and a critical-severity audit is now a publishing gate. See [SECURITY_BETA.md](SECURITY_BETA.md) for fixed versions and the remaining lower-severity findings.
+
+After **Save my place** in Focus Assist, Home displays **Where was I?** with the saved task and next tiny step. **Resume my saved step** restores the saved Pal, mode, completed steps and step number without a model call. The app asks before replacing a different active focus session. Dismissing or finishing clears only the checkpoint, preserving tasks and notes. Saving is explicit, browser-local and synchronizes open tabs in that browser; it does not automatically capture chats, mail drafts or workspace state.

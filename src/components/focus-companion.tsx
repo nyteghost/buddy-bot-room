@@ -7,8 +7,9 @@ import { PixelCharacter } from "./pixel-character";
 import { TinyWins } from "./tiny-wins";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cleanStartStep, fallbackStartStep, whatCountsAsDone } from "@/lib/focus-assist";
-import { COMPANION_MODES, FOCUS_CHECKPOINT_KEY, companionActivity, readFocusCheckpoint, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
+import { COMPANION_MODES, companionActivity, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
 import { focusMemoryProposal } from "@/lib/focus-memory";
+import { saveFocusCheckpoint, useFocusCheckpoint } from "@/lib/focus-checkpoint-store";
 import { useCharacterMode } from "@/lib/hellraiser";
 
 type Props = { session: FocusSession | null; onChange: (value: FocusSession | null) => void; paused?: boolean; onPauseChange?: (paused: boolean) => void };
@@ -18,7 +19,7 @@ const modeNames: Record<CompanionMode, string> = {
 
 /** Optional, nonmodal body double: the rest of Pixel Pals stays usable. */
 export function FocusCompanion({ session, onChange, paused = false, onPauseChange }: Props) {
-  const [saved, setSaved] = useState<FocusSession | null>(null);
+  const saved = useFocusCheckpoint();
   const [checkin, setCheckin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -30,10 +31,6 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   const [workNote, setWorkNote] = useState("");
   const pending = useRef<AbortController | null>(null);
   const theme = useCharacterMode();
-  useEffect(() => {
-    try { setSaved(readFocusCheckpoint(localStorage.getItem(FOCUS_CHECKPOINT_KEY))); }
-    catch { setSaved(null); }
-  }, []);
   useEffect(() => () => { pending.current?.abort(); workPending.current?.abort(); }, []);
   useEffect(() => { workPending.current?.abort(); setWorkDraft(""); setWorkSource(""); setWorkNote(""); setWorkBusy(false); }, [session?.task]);
   useEffect(() => {
@@ -47,16 +44,10 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
 
   const save = () => {
     if (!session) return;
-    try {
-      localStorage.setItem(FOCUS_CHECKPOINT_KEY, JSON.stringify(session));
-      setSaved(session);
-      setNote("Your place is saved in this browser. You can resume another day.");
-    } catch { setNote("This browser could not save your place."); }
+    setNote(saveFocusCheckpoint(session) ? "Your place is saved in this browser. Resume from Home or this companion." : "This browser could not save your place.");
   };
   const forget = () => {
-    try { localStorage.removeItem(FOCUS_CHECKPOINT_KEY); }
-    catch { /* Optional browser storage */ }
-    setSaved(null);
+    if (!saveFocusCheckpoint(null)) setNote("This browser could not clear your saved place.");
   };
   const end = () => { pending.current?.abort(); pending.current = null; setBusy(false); setNote(""); forget(); onChange(null); };
   const workTogether = async () => {

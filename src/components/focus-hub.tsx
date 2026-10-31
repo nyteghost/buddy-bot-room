@@ -4,6 +4,8 @@ import { ArrowRight, Brain, Clock3, Coffee, MessageCircle, Moon, Play, RotateCcw
 import { Button } from "@/components/ui/button";
 import { useWorkbench } from "@/lib/workbench";
 import { chooseFocusTask, type Energy } from "@/lib/focus-pick";
+import { ResumeFocusCard } from "./resume-focus-card";
+import type { FocusSession } from "@/lib/focus-companion";
 import { zoneDateKey } from "@/lib/day-overview";
 
 const NOTE_KEY = "pixel-pals-daily-note-v1";
@@ -19,11 +21,12 @@ function safeNote(raw: string | null, today: string): DailyNote {
 }
 
 /** One clear action, without automatic task mutations or opaque model recommendations. */
-export function FocusHub({ onStart, onBrainDump, onOpenTasks, onOpenMail }: {
+export function FocusHub({ onStart, onBrainDump, onOpenTasks, onOpenMail, onResumeFocus }: {
   onStart: (task: string) => void;
   onBrainDump: () => void;
   onOpenTasks: () => void;
   onOpenMail?: () => void;
+  onResumeFocus?: ((session: FocusSession) => void) | undefined;
 }) {
   const { todos } = useWorkbench();
   const [energy, setEnergy] = useState<Energy>("steady");
@@ -61,6 +64,7 @@ export function FocusHub({ onStart, onBrainDump, onOpenTasks, onOpenMail }: {
         </div>
         <Button size="sm" variant="ghost" onClick={onBrainDump}><Brain className="size-3.5" /> Brain Dump</Button>
       </div>
+      {onResumeFocus && <ResumeFocusCard onResume={onResumeFocus} />}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <label className="flex items-center gap-1">Energy
           <select className="rounded-md border bg-background p-1.5" value={energy} aria-label="Your energy today" onChange={(e) => { setEnergy(e.target.value as Energy); setSkipped([]); }}>

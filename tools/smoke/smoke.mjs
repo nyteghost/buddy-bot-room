@@ -173,11 +173,18 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await companion.getByRole("button", { name: "Save my place" }).click();
   await companion.getByRole("button", { name: "Pause companion" }).click();
   const checkpoint = page.getByRole("complementary", { name: "Saved Focus Assist checkpoint" });
-  await checkpoint.getByRole("button", { name: /Resume with/ }).click();
+  await checkpoint.waitFor();
+  const todayEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i });
+  if (await todayEntry.getAttribute("aria-pressed") !== "true") await todayEntry.click();
+  const resume = page.locator('[data-window-id="today"]').getByRole("region", { name: "Where was I?", exact: true });
+  await resume.getByText("Review tomorrow's schedule", { exact: true }).waitFor();
+  await resume.getByRole("button", { name: "Resume my saved step" }).click();
   await companion.getByText("Check the next event.").waitFor();
   await companion.getByText(/Step 3 · Your next tiny step/).waitFor();
   await companion.getByRole("button", { name: "Finish & clear" }).click();
   if (await checkpoint.count()) throw Error("Companion checkpoint was not cleared");
+  if (await resume.count()) throw Error("Home kept a cleared checkpoint");
+  if (await todayEntry.getAttribute("aria-pressed") === "true") await todayEntry.click();
   await page.unroute("**/api/just-start");
 });
 
