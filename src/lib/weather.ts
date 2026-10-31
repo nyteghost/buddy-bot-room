@@ -5,6 +5,7 @@ export type Weather = {
   units: Units;
   now: { temp: number; feels: number; code: number; wind: number };
   days: { date: string; hi: number; lo: number; code: number; rain: number }[];
+  hours?: { time: string; temp: number; code: number; rain: number }[];
 };
 
 const CODES: [number[], string, string][] = [
@@ -22,7 +23,7 @@ export const unitSymbols = (u: Units) => ({ temp: u === "imperial" ? "°F" : "°
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : 0);
 
 export function shapeWeather(json: unknown, place: string, units: Units): Weather | null {
-  const j = json as { current?: Record<string, unknown>; daily?: Record<string, unknown[]> } | null;
+  const j = json as { current?: Record<string, unknown>; daily?: Record<string, unknown[]>; hourly?: Record<string, unknown[]> } | null;
   const c = j?.current;
   const d = j?.daily;
   if (!c || !d || !Array.isArray(d["time"])) return null;
@@ -30,7 +31,12 @@ export function shapeWeather(json: unknown, place: string, units: Units): Weathe
     date: String(date),
     hi: num(d["temperature_2m_max"]?.[i]), lo: num(d["temperature_2m_min"]?.[i]), code: num(d["weather_code"]?.[i]), rain: num(d["precipitation_probability_max"]?.[i]),
   }));
-  return { place: place.slice(0, 60), units, now: { temp: num(c["temperature_2m"]), feels: num(c["apparent_temperature"]), code: num(c["weather_code"]), wind: num(c["wind_speed_10m"]) }, days };
+  const h = j?.hourly;
+  const hours = Array.isArray(h?.["time"]) ? (h["time"] as string[]).slice(0, 96).map((time, i) => ({
+    time: String(time), temp: num(h["temperature_2m"]?.[i]), code: num(h["weather_code"]?.[i]),
+    rain: num(h["precipitation_probability"]?.[i]),
+  })).filter(item => /^\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(item.time)) : [];
+  return { place: place.slice(0, 60), units, hours, now: { temp: num(c["temperature_2m"]), feels: num(c["apparent_temperature"]), code: num(c["weather_code"]), wind: num(c["wind_speed_10m"]) }, days };
 }
 
 /** One line for the brief and chat: "Rain, 54°F (feels 51°F). Today 58°/47°, 70% chance of rain." */
