@@ -4,6 +4,7 @@ import { Bookmark, Check, ChevronDown, Coffee, Play, RotateCcw, X, FileText } fr
 import { Button } from "@/components/ui/button";
 import { agents, agentName } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
+import { StuckHelp } from "./stuck-help";
 import { TinyWins } from "./tiny-wins";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cleanStartStep, fallbackStartStep, whatCountsAsDone } from "@/lib/focus-assist";
@@ -171,6 +172,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
           <ChevronDown className="pointer-events-none absolute right-2 size-3" />
         </span>
       </label>
+      <StuckHelp task={session.task} step={session.step} disabled={busy || paused} onUseStep={step => { pending.current?.abort(); pending.current = null; setBusy(false); onChange({ ...session, step }); setNote("Smaller step selected. No completed steps were added."); }} />
       {note && <p className="text-xs text-muted-foreground" role="status">{note}</p>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">{session.completed.length} step(s) marked done · Check-ins {session.mode === "checkins" ? "every 10 minutes" : "off"}</span>

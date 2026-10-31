@@ -19,8 +19,8 @@ jobs:
             bash -n scripts/install-unraid-beta.sh
             docker compose -f docker-compose.unraid-beta.yml config --quiet
           fi
-      - name: Critical dependency security gate
-        run: bun audit --audit-level critical
+      - name: High and critical dependency security gate
+        run: bun audit --audit-level high
       - name: TypeScript
         run: bunx tsc --noEmit
       - name: Tests

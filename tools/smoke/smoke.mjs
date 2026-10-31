@@ -146,6 +146,30 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await companion.getByText(/Review tomorrow's schedule/).waitFor();
   await companion.getByRole("region", { name: "Tiny wins" }).waitFor();
   await companion.getByText(/Step 2 · Your next tiny step/).waitFor();
+  const helpRequests = [];
+  await page.route("**/api/focus-help", async route => {
+    const body = route.request().postDataJSON(); helpRequests.push(body.choice);
+    const text = body.choice === "smaller" ? "Look at the schedule title." : body.choice === "sample" ? "Sample: Event name — start time — question to check." : "Read only the first event. One detail is enough.";
+    await route.fulfill({ json: { choice: body.choice, text, source: "local-ai" } });
+  });
+  const initialStep = await companion.locator(".focus-companion-step > p").nth(1).innerText();
+  await companion.getByRole("button", { name: "I'm stuck", exact: true }).click();
+  if (helpRequests.length) throw Error("Opening stuck help invoked AI without a choice");
+  const stuck = companion.getByRole("region", { name: "Help when stuck" });
+  await stuck.getByRole("button", { name: "Explain it", exact: true }).click();
+  await stuck.getByText("Read only the first event. One detail is enough.", { exact: true }).waitFor();
+  if (await companion.locator(".focus-companion-step > p").nth(1).innerText() !== initialStep) throw Error("Explanation changed the current step");
+  await stuck.getByRole("button", { name: "Show a sample", exact: true }).click();
+  await stuck.getByText("Sample: Event name — start time — question to check.", { exact: true }).waitFor();
+  await stuck.getByRole("button", { name: "Make it smaller", exact: true }).click();
+  await stuck.getByText("Look at the schedule title.", { exact: true }).waitFor();
+  await stuck.getByRole("button", { name: "Use this smaller step", exact: true }).click();
+  await companion.locator(".focus-companion-step").getByText("Look at the schedule title.", { exact: true }).waitFor();
+  await companion.getByText(/Step 2 · Your next tiny step/).waitFor();
+  await page.unroute("**/api/focus-help");
+  const offlineHelp = await page.request.post(`${URL_}/api/focus-help`, { data: { task: "Write a report", step: "Open the document", choice: "explain" } });
+  if (!offlineHelp.ok() || (await offlineHelp.json()).source !== "offline") throw Error("The real stuck-help endpoint did not provide an offline fallback");
+
   await page.route("**/api/pal-work", async (route) => {
     await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({draft:"Sample plan:\n- Review the first shift",source:"offline-example"})});
   });

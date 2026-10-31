@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, Clock3, RotateCcw, Sparkles, Users } from "lucide-react";
 import { agents, agentName, type AgentId } from "@/lib/agents";
 import { PixelCharacter } from "./pixel-character";
+import { StuckHelp } from "./stuck-help";
 import { TinyWins } from "./tiny-wins";
 import { makeFocusSession, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
@@ -187,11 +188,12 @@ export function JustStartDialog({ open, onOpenChange, initialTask = "", onCompan
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void ask("next")}><Check className="size-4" /> I started</Button>
               <Button variant="outline" disabled={busy} onClick={() => void ask("smaller")}>Smaller step</Button>
-              <Button variant="outline" disabled={busy} onClick={() => void ask("stuck")}>I'm stuck</Button>
+
             </div>
           )}
         </section>
       )}
+      {stage !== "entry" && <StuckHelp key={`${open}:${task}`} task={task} step={step} disabled={busy} onUseStep={next => { pending.current?.abort(); pending.current = null; setBusy(false); setStep(next); setStepSource("quick-start"); setNote("Smaller step selected. Your completed steps were kept."); }} />}
       {stage !== "entry" && completed.length > 0 && <TinyWins completed={completed} celebrationToken={celebrationToken} />}
       {stage !== "entry" && (
         <div className="flex flex-wrap items-center gap-2 border-t pt-2">

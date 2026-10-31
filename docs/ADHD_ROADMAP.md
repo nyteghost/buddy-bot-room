@@ -49,7 +49,7 @@ See [BETA_MOBILE_3.md](BETA_MOBILE_3.md) for release scope and owner checks, and
 ## Proposed next priorities (not yet scheduled)
 
 1. **Where was I?** Home now offers one-tap recovery of an explicitly saved Focus Assist task and next tiny step. Broader draft/workspace recovery remains proposed.
-2. **I'm stuck**: make the task smaller, explain it, or create an explicitly requested sample alongside the user.
+2. **I'm stuck**: implemented in Just Start and Focus Assist, with explicit Smaller / Explain / Sample choices, instant offline help and optional local-only refinement.
 3. **Recovery shelf**: discover unfinished drafts and recover recently deleted tasks/notes.
 4. **Memory review**: inspect each Pal's remembered context, correct stale facts, and choose privacy boundaries.
 5. **Richer contextual Pal reactions**: greetings and celebrations tied to explicit activity, without claiming autonomous work. The beta animation pass supplies the pose foundation.
@@ -61,3 +61,11 @@ Prefer the first two to additional dashboard cards: they directly help task init
 
 - Patched the two critical dependency findings with compatible pins for DOMPurify and shell-quote; beta publishing and CI now block on critical audit findings. Remaining lower-severity findings still need triage; see [SECURITY_BETA.md](SECURITY_BETA.md).
 - Home shows an explicitly saved Focus Assist checkpoint with its task, completed-step count and next tiny step. Resume is user-triggered; dismissing the checkpoint does not remove tasks, notes, or drafts. No model call or automatic chat capture is involved.
+
+
+## Stuck help and security triage
+
+- I'm stuck offers three choices in Just Start and Focus Assist. Opening the choices does not call a model. A smaller step is applied only after the user chooses Use this smaller step; step number and completed progress remain intact. Explanation and sample text are previews only.
+- Local inference has a 15-second budget for this feature and supports cancellation. User task/step data never falls back to a cloud provider.
+- Security updates reduce the full audit from 35 findings to 4 (three moderate, one low), with zero high or critical findings. The publishing gate now blocks high and critical findings. The remaining dependency paths and follow-up work are recorded in SECURITY_BETA.md.
+- Real Unraid mount/restore and iPhone interaction checks still require the owner's devices. Automated mobile/browser checks use isolated data and do not validate the owner's deployment.

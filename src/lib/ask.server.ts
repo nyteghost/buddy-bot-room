@@ -55,7 +55,8 @@ export function askChain(s: EngineSettings, prompt: string, forceLocal = false):
 
 export type AskResult = { ok: true; text: string; via: string } | { ok: false; error: string };
 
-export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean } = {}): Promise<AskResult> {
+export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean; signal?: AbortSignal | undefined } = {}): Promise<AskResult> {
+  if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
   const s = engineFromJson(raw);
@@ -74,6 +75,7 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
   }
   let lastError = "";
   for (const original of chain) {
+    if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
     const p = original.kind === "ollama-server" ? { ...original, model: (await resolveLocalModel(original.model ?? "")) ?? "" } : original;
     const m = modelFor(p);
     if (!m) continue;
@@ -81,11 +83,12 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
       assertInferenceAllowed(p.kind, m.base, ollamaBase());
       const provider = createOpenAICompatible({ name: p.kind, apiKey: m.key || "none", baseURL: m.base });
       // Only connection-type failures are retried (twice, with backoff), so an answer is never produced twice.
-      const out = await withRetry<{ text: string }>(() => generateText({ model: provider(m.model), system, prompt: user, maxOutputTokens: Math.min(1500, opts.maxTokens ?? 700), maxRetries: 0, abortSignal: AbortSignal.timeout(120_000) }), { retries: p.kind === "ollama-server" ? 2 : 0, onRetry: (n, e, ms) => logServer("warn", `ask retry ${n} in ${ms}ms: ${e instanceof Error ? e.message.slice(0, 80) : "error"}`) });
+      const out = await withRetry<{ text: string }>(() => generateText({ model: provider(m.model), system, prompt: user, maxOutputTokens: Math.min(1500, opts.maxTokens ?? 700), maxRetries: 0, abortSignal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000) }), { retries: p.kind === "ollama-server" ? 2 : 0, ...(opts.signal ? { signal: opts.signal } : {}), onRetry: (n, e, ms) => logServer("warn", `ask retry ${n} in ${ms}ms: ${e instanceof Error ? e.message.slice(0, 80) : "error"}`) });
       const text = out.text.trim();
       if (text) return { ok: true, text, via: p.kind === "ollama-server" ? `Local AI (${m.model})` : p.kind };
       lastError = "empty answer";
     } catch (e) {
+      if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
       lastError = e instanceof Error ? e.message.slice(0, 120) : "failed";
       logServer("warn", `ask via ${p.kind} failed: ${lastError}`);
     }
