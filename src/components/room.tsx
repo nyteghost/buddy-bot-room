@@ -1347,7 +1347,7 @@ export function Room() {
   const palette: PaletteAction[] = [
     ...recentChats.map((row): PaletteAction => ({ id: `chat-open-${row.id}`, group: "Saved chats", label: `${modeLabel[row.mode as Mode] ?? row.mode}: ${row.title.slice(0, 60)}`, keywords: "open saved chat history", run: () => { showMode(row.mode); setMode(row.mode); window.setTimeout(() => window.dispatchEvent(new CustomEvent("pixelpals:open-chat", { detail: row })), 50); } })),
     { id: "win-room", group: "Windows", label: "Toggle Pixel room", run: () => setRoomOpen((v) => !v) },
-    { id: "win-tools", group: "Windows", label: "Toggle Work tools", run: () => setToolsOpen((v) => !v) },
+    { id: "win-tools", group: "Windows", label: "Legacy work tools (migration/export)", run: () => setToolsOpen((v) => !v) },
     { id: "win-rec", group: "Windows", label: "Toggle Recorder", run: () => setRecorderOpen((v) => !v) },
     { id: "win-notes", group: "Windows", label: "Open Notes, memories, documents & pal instructions", keywords: "memories todos files", run: () => setNotesOpen(true) },
     { id: "win-search", group: "Windows", label: "Search everything (chats, notes, tasks)", keywords: "find look up history", run: () => setSearchOpen(true) },
@@ -1808,7 +1808,7 @@ export function Room() {
               </DialogHeader>
             </DialogContent>
           </Dialog>
-          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => window.location.assign("/work")}><Wrench className="size-4" /> Work tools</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => window.location.assign("/work")}><Wrench className="size-4" /> Legacy work tools</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
@@ -1839,7 +1839,7 @@ export function Room() {
           <Button variant="ghost" className="sidebar-item" title="Pal Room: interact with your work buddy and take breaks together" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pal Room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Tasks and reminders" aria-pressed={tasksOpen} onClick={() => setTasksOpen((value) => !value)}><CheckSquare /><span>Tasks</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Pal Lounge: Roundtable, independent answers and debates" aria-pressed={isChatRoomOpen(openModes, "pal-lounge")} onClick={() => toggleChatRoom("pal-lounge")}><Gamepad2 /><span>Pal Lounge</span><i className={isChatRoomOpen(openModes, "pal-lounge") ? "status-dot" : ""} /></Button>
-          <Button variant="ghost" className="sidebar-item" title="Additional tools: Calendar, Mail, Notes, Work tools and more" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More tools</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Additional tools: Calendar, Mail, Notes and more" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}><ChevronDown className={moreOpen ? "" : "-rotate-90"} /><span>More tools</span></Button>
           {moreOpen && <>
           <Button variant="ghost" className="sidebar-item" title="Calendar: your next 7 days" aria-pressed={calendarOpen} onClick={() => setCalendarOpen((value) => !value)}><CalendarDays /><span>Calendar</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Mail: unread subjects" aria-pressed={mailOpen} onClick={() => setMailOpen((value) => !value)}><Mail /><span>Mail</span></Button>
@@ -1849,7 +1849,7 @@ export function Room() {
           {addons.filter((a) => a.enabled && a.window).map((a) => (
             <Button key={a.id} variant="ghost" className="sidebar-item" title={`Add-on: ${a.name}`} aria-pressed={addonOpen === a.id} onClick={() => setAddonOpen((v) => (v === a.id ? null : a.id))}><Puzzle /><span>{a.window?.title ?? a.name}</span></Button>
           ))}
-          <Button variant="ghost" className="sidebar-item" title="Work tools" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Work tools</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Legacy Show Services tools — migration and export" aria-pressed={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><Wrench /><span>Legacy work tools</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Open betas and playtests" aria-pressed={playtestsOpen} onClick={() => setPlaytestsOpen((value) => !value)}><FlaskConical /><span>Playtests</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Recorder" aria-pressed={recorderOpen} onClick={() => setRecorderOpen((value) => !value)}><Mic /><span>Recorder</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Blind model comparison" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale /><span>Compare models</span></Button>
@@ -2054,7 +2054,7 @@ export function Room() {
             </WorkspaceWindow>
             {renderModeWindow(myPalsMode)}
             {renderModeWindow(loungeMode)}
-            <WorkspaceWindow id="tools" title="Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
+            <WorkspaceWindow id="tools" title="Legacy Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>
               {toolsSeen && <Suspense fallback={<div className="p-4 text-sm opacity-70" role="status">Loading…</div>}><ShowServicesTools /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="playtests" title="Betas & playtests" icon={<FlaskConical className="size-4" />} open={playtestsOpen} onClose={() => setPlaytestsOpen(false)} resetVersion={resetVersion}>
