@@ -402,6 +402,7 @@ export function Room() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [funOpen, setFunOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
   function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
@@ -2123,13 +2124,18 @@ export function Room() {
           </main>
         </div>
       </div>
+      {mobileMoreOpen && <div className="mobile-more-menu" role="group" aria-label="More mobile tools">
+        <button type="button" onClick={() => { mobileTab("notes"); setMobileMoreOpen(false); }}><ListTodo /> Notes</button>
+        <button type="button" onClick={() => { mobileTab("room"); setMobileMoreOpen(false); }}><Users /> Pal Room</button>
+        <button type="button" onClick={() => { mobileTab("calendar"); setMobileMoreOpen(false); }}><CalendarDays /> Calendar</button>
+        <button type="button" onClick={() => { mobileTab("mail"); setMobileMoreOpen(false); }}><Mail /> Mail</button>
+        <button type="button" onClick={() => { setMobileMoreOpen(false); mobileTab("chat"); setOpenModes(o => ({ ...o, [mode]: false })); setSetupOpen(true); }}><Settings2 /> Settings</button>
+      </div>}
       <nav className="mobile-tabbar" aria-label="Windows">
-        <button type="button" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => mobileTab("chat")}><MessageSquare /><span>My Pals</span></button>
-        <button type="button" aria-pressed={todayOpen} onClick={() => mobileTab("today")}><Sun /><span>Today</span></button>
-        <button type="button" aria-pressed={tasksOpen} onClick={() => mobileTab("tasks")}><CheckSquare /><span>Tasks</span></button>
-        <button type="button" aria-pressed={notesOpen} onClick={() => mobileTab("notes")}><ListTodo /><span>Notes</span></button>
-        <button type="button" aria-pressed={roomOpen} onClick={() => mobileTab("room")}><Users /><span>Room</span></button>
-        <button type="button" aria-pressed={setupOpen} onClick={() => { mobileTab("chat"); setOpenModes((o) => ({ ...o, [mode]: false })); setSetupOpen(true); }}><Settings2 /><span>Settings</span></button>
+        <button type="button" aria-pressed={todayOpen} onClick={() => { mobileTab("today"); setMobileMoreOpen(false); }}><Sun /><span>Home</span></button>
+        <button type="button" aria-pressed={tasksOpen} onClick={() => { mobileTab("tasks"); setMobileMoreOpen(false); }}><CheckSquare /><span>Tasks</span></button>
+        <button type="button" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => { mobileTab("chat"); setMobileMoreOpen(false); }}><MessageSquare /><span>Pals</span></button>
+        <button type="button" aria-pressed={mobileMoreOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen} aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
       </nav>
       <footer className="app-footer">
         <span>SMALL PIXELS. BIG PERSPECTIVES.</span>
