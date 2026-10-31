@@ -42,6 +42,41 @@ export function MemorySection() {
   const [question, setQuestion] = useState("");
   const [palId, setPalId] = useState<string>(agents[0]?.id ?? "nova");
   const [why, setWhy] = useState<string[] | null>(null);
+  const [vaultRevision, setVaultRevision] = useState<string | null>(null);
+  const [vaultMessage, setVaultMessage] = useState("");
+  const [vaultPending, setVaultPending] = useState(false);
+  const [vaultPreview, setVaultPreview] = useState<{ memories: Entry[]; pal?: Record<string, Entry[]>; project?: Record<string, Entry[]> } | null>(null);
+  async function loadVault() {
+    setVaultPending(true); setVaultMessage("");
+    try {
+      const response = await fetch("/api/obsidian-memory");
+      if (!response.ok) throw Error("Server vault unavailable. Check your login and persistent data folder.");
+      const data = await response.json() as { revision: string; exists: boolean; memories: { memories: Entry[]; pal?: Record<string, Entry[]>; project?: Record<string, Entry[]> } };
+      setVaultRevision(data.revision); setVaultPreview(data.memories);
+      setVaultMessage(data.exists ? "Obsidian note loaded for review. Import only if you want to replace browser memories." : "No vault note yet. Save your current memories to create it.");
+    } catch (error) { setVaultMessage(error instanceof Error ? error.message : "Could not read the vault."); }
+    finally { setVaultPending(false); }
+  }
+  async function saveVault() {
+    if (vaultRevision === null) { setVaultMessage("Load the vault first to prevent overwriting other changes."); return; }
+    setVaultPending(true); setVaultMessage("");
+    try {
+      const w = getWorkbench();
+      const response = await fetch("/api/obsidian-memory", { method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({revision:vaultRevision,memories:{memories:w.memories,pal:w.pal??{},project:w.project??{}}}) });
+      const data = await response.json() as { revision?: string; error?: string };
+      if (!response.ok || !data.revision) throw Error(data.error ?? "Vault save failed");
+      setVaultRevision(data.revision);
+      setVaultPreview({ memories:w.memories,pal:w.pal,project:w.project });
+      setVaultMessage("Saved to Obsidian Markdown on your Unraid data volume.");
+    } catch (error) { setVaultMessage(error instanceof Error ? error.message : "Could not save the vault."); }
+    finally { setVaultPending(false); }
+  }
+  function importVault() {
+    if (!vaultPreview) return;
+    if (!window.confirm("Replace only your browser's Pal memories with the reviewed Obsidian memories? Notes and tasks will stay untouched.")) return;
+    updateWorkbench((w) => ({ ...w, memories:vaultPreview.memories, pal:vaultPreview.pal??{}, project:vaultPreview.project??{} }));
+    setVaultMessage("Vault memories imported into this browser. Your tasks and notes were preserved.");
+  }
   const projects = Object.keys(bench.project ?? {});
   const shown = project ? bench.project?.[project] ?? [] : [];
 
@@ -55,6 +90,18 @@ export function MemorySection() {
 
   return (
     <>
+      <section className="grid gap-2 rounded-lg border p-3" aria-label="Obsidian memory vault">
+        <h3>Obsidian Memory Vault <span>Markdown on your Unraid server · owner-only</span></h3>
+        <p className="docs-note">Your memories remain in this browser until you choose to export or import. Load the vault, review the counts, then save or import. Changes made in Obsidian need an import before the Pals can use them.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={vaultPending} onClick={() => void loadVault()}>1. Load vault</Button>
+          <Button type="button" size="sm" disabled={vaultPending || vaultRevision === null} onClick={() => void saveVault()}>2. Save to Obsidian</Button>
+          <Button type="button" size="sm" variant="outline" disabled={vaultPending || !vaultPreview} onClick={importVault}>Import reviewed memories</Button>
+        </div>
+        {vaultPreview && <p className="docs-note">Vault preview: {vaultPreview.memories.length} shared, {Object.values(vaultPreview.pal??{}).reduce((n,r)=>n+r.length,0)} Pal-specific, {Object.values(vaultPreview.project??{}).reduce((n,r)=>n+r.length,0)} project memories.</p>}
+        {vaultMessage && <p role="status" className="docs-note">{vaultMessage}</p>}
+        <p className="docs-note">Vault location inside the container: BUDDY_DATA_DIR/obsidian/Pixel Pals Memory.md. Open the mapped directory as an Obsidian vault.</p>
+      </section>
       <section>
         <h3>Pals remember <span>shared with every pal · {bench.memories.length}</span></h3>
         <ul>
