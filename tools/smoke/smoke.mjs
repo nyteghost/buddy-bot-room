@@ -462,11 +462,11 @@ await step("mobile chat uses clean full-screen layout and collapsible settings",
   await chat.waitFor({ state: "visible" });
   if (await chat.locator('.window-titlebar').isVisible()) throw Error("desktop window title still visible on mobile");
   const more = chat.locator(".mobile-chat-options");
-  await more.locator("summary").waitFor({ state: "visible" });
+  await more.locator(":scope > summary").waitFor({ state: "visible" });
   if (await more.getAttribute("open") !== null) throw Error("Advanced options unexpectedly open");
-  await more.locator("summary").click();
+  await more.locator(":scope > summary").click();
   if (await more.getAttribute("open") === null) throw Error("Advanced chat options did not expand");
-  await more.locator("summary").click();
+  await more.locator(":scope > summary").click();
   const bounds = await chat.boundingBox();
   if (!bounds || bounds.width < 375 || bounds.x > 5) throw Error("Chat is not full width on mobile");
   const shell = await page.locator(".modular-workspace").evaluate(e => ({ body: e.scrollWidth, view: e.clientWidth }));
