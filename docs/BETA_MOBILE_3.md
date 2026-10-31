@@ -12,6 +12,10 @@ Development and testing stay on `beta`. `main` and the production `:latest` imag
 - Fresh installations create the configured data directory before running migrations. TypeScript is now a required CI and publishing check; the committed route registry includes the existing memory/focus endpoints.
 - Beta Docker publishing receives the tested Git SHA and verifies the immutable `beta-<sha>` tag's digest after publishing. It does not publish `:latest`.
 
+## Pal animation follow-up
+
+The existing character artwork now supports layered head/body/leg poses, alternating walk cycles, individual pacing, looking around, greetings, stretches, working poses and short celebrations. Room movement eases at waypoints and pauses in hidden windows. Enable **Playful** in Pal Room for ambient poses; Calm remains the default. Reduced-motion preferences disable the decorative animations, including when changed while the app is running. Low-power mode pauses decorative loops and walking. The artwork, voices, theme identities and station duties remain unchanged; these visual poses perform no real machine or app actions.
+
 ## Release checks
 
 Run the full Vitest suite, `tsc --noEmit`, a self-hosted production build, and `tools/smoke/smoke.mjs` against throwaway data. Browser checks include mobile widths 320, 390 and 700px. Both GitHub CI and Publish beta image must succeed for the same commit before pulling.

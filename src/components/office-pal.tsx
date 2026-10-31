@@ -1,23 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
-import { officePose, officeStations, type Heading } from "@/lib/office-motion";
+import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
-import { useCalmInterval } from "@/lib/power";
+import { ambientMotion, advanceMotionClock } from "@/lib/pal-motion";
+import { useReducedMotion } from "@/lib/reduced-motion";
+import { useCalmInterval, lowPower } from "@/lib/power";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
 
-export function OfficePal({ id, index, mode, active, enabled, playful = false }: {
-  id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean; playful?: boolean;
+export function OfficePal({ id, index, mode, active, enabled, playful = false, visible = true }: {
+  id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean; playful?: boolean; visible?: boolean;
 }) {
   const [elapsed, setElapsed] = useState(0);
   const [arrived, setArrived] = useState(false);
-  const [start] = useState(() => performance.now());
-  const wandering = enabled && !active && playful && !(typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  // The walk is redrawn 6 times a second; it pauses while the tab is hidden and slows down in low-power mode.
-  useCalmInterval(() => setElapsed(performance.now() - start), 160, wandering);
+  const lastTick = useRef(0);
+  const wasActive = useRef(active);
+  const reduced = useReducedMotion();
+  const low = lowPower.use();
+  const wandering = visible && enabled && !active && playful && !reduced && !low;
+  // The walk is redrawn 10 times a second; it pauses in hidden windows, hidden tabs, low-power mode, or reduced motion.
+  useEffect(() => { lastTick.current = performance.now(); }, [wandering]);
+  useCalmInterval(() => {
+    const now = performance.now();
+    const delta = now - lastTick.current;
+    lastTick.current = now;
+    setElapsed(value => advanceMotionClock(value, delta));
+  }, 100, wandering);
+  useEffect(() => {
+    if (wasActive.current && !active) setElapsed(-index * 4100);
+    wasActive.current = active;
+  }, [active, index]);
   useEffect(() => {
     setArrived(false);
     if (!active) return;
@@ -27,12 +42,14 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false }:
   const station = officeStations[id];
   const pose = officePose(id, index, elapsed);
   const directional = hasFacingArt(id);
-  const working = active && arrived;
+  const atDesk = Math.hypot(pose.x - station.home[0], pose.y - station.home[1]) < .2;
+  const working = active && (arrived || reduced || atDesk);
   const x = active ? station.home[0] : playful ? pose.x : station.home[0];
   const y = active ? station.home[1] : playful ? pose.y : station.home[1];
-  const walking = enabled && (active ? !arrived : wandering && pose.walking);
+  const walking = enabled && (active ? !working : wandering && pose.walking);
+  const heading = active && walking ? headingOf(station.home[0] - pose.x, station.home[1] - pose.y) : pose.heading;
   // Seated whenever the pal is parked at its own desk chair.
-  const seated = active ? arrived : !walking && x === station.home[0] && y === station.home[1];
+  const seated = active ? working : !walking && x === station.home[0] && y === station.home[1];
   const position = {
     "--office-x": `${x}%`,
     "--office-y": `${y}%`,
@@ -40,12 +57,12 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false }:
   return (
     <div
       style={position}
-      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !active && !directional && `office-dir-${pose.heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !active && !directional && pose.facingLeft && "office-facing-left", !enabled && "pal-away")}
+      className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !directional && `office-dir-${heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !directional && (walking ? heading.includes("w") : !active && pose.facingLeft) && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
       aria-label={`${station.label}: ${working ? station.activity : walking ? "walking to a station" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, pose.heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{station.label}</span>
     </div>
   );
@@ -65,7 +82,7 @@ function ChairBack() {
 /** Which way a pal with directional art looks: the way it walks, toward the monitors when seated in the back row, otherwise at you. */
 function facingOf(directional: boolean, active: boolean, walking: boolean, seated: boolean, side: "away" | "toward", heading: Heading): Heading | undefined {
   if (!directional) return undefined;
-  if (active) return walking ? "n" : side === "away" ? "n" : "s";
+  if (active) return walking ? heading : side === "away" ? "n" : "s";
   if (walking) return heading;
   return seated && side === "away" ? "n" : "s";
 }

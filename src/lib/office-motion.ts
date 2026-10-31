@@ -1,3 +1,4 @@
+import { easeWalk } from "./pal-motion";
 import type { AgentId } from "./agents";
 
 type Point = readonly [number, number];
@@ -46,7 +47,7 @@ export function officePose(id: AgentId, index: number, elapsed: number) {
     const from = points[i] ?? home;
     const to = points[i + 1] ?? home;
     if (phase < duration) {
-      const ratio = phase / duration;
+      const ratio = easeWalk(phase / duration);
       return {
         x: from[0] + (to[0] - from[0]) * ratio,
         y: from[1] + (to[1] - from[1]) * ratio,

@@ -1,0 +1,43 @@
+/* Transform-only layered art: no image swaps, timers per frame, or flashing. */
+.pal-rig { image-rendering: pixelated; overflow: visible; }
+.pal-rig .rig-pose, .pal-rig .rig-head, .pal-rig .rig-body, .pal-rig .rig-left-leg, .pal-rig .rig-right-leg { transform-box: view-box; }
+.pal-rig .rig-pose { transform-origin: 64px 124px; }
+.pal-rig .rig-head { transform-origin: 64px 57px; }
+.pal-rig .rig-body { transform-origin: 64px 98px; }
+.pal-rig .rig-left-leg { transform-origin: 55px 98px; }
+.pal-rig .rig-right-leg { transform-origin: 73px 98px; }
+.pal-rig[data-pal-motion="idle"] .rig-body { animation: rig-breathe var(--pal-breathe) ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="look"] .rig-head { animation: rig-look 6s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="wave"] .rig-pose { animation: rig-greet 5s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="wave"] .rig-head { animation: rig-nod 5s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="stretch"] .rig-pose { animation: rig-stretch 7s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="talk"] .rig-head { animation: rig-nod 1.8s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="talk"] .rig-body { animation: rig-breathe 2.2s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="work"] .rig-head { animation: rig-consider 3s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="work"] .rig-body { animation: rig-work 1.8s ease-in-out var(--pal-phase) infinite; }
+.pal-rig[data-pal-motion="rest"] .rig-pose { transform: translateY(2px); }
+.pal-rig[data-pal-motion="celebrate"] .rig-pose { animation: rig-celebrate 850ms ease-out 2; }
+.pal-rig[data-pal-motion="walk"] .rig-pose { animation: rig-stride var(--pal-gait) linear infinite; }
+.pal-rig[data-pal-motion="walk"] .rig-left-leg { animation: rig-step var(--pal-gait) ease-in-out infinite; }
+.pal-rig[data-pal-motion="walk"] .rig-right-leg { animation: rig-step var(--pal-gait) ease-in-out infinite; animation-delay: calc(var(--pal-gait) * -.5); }
+@keyframes rig-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.015); } }
+@keyframes rig-look { 0%,25%,85%,100% { transform: rotate(0); } 40%,60% { transform: rotate(3deg) translateX(1px); } }
+@keyframes rig-greet { 0%,20%,65%,100% { transform: rotate(0); } 35%,50% { transform: rotate(-3deg) translateY(-1px); } }
+@keyframes rig-nod { 0%,20%,80%,100% { transform: rotate(0); } 40%,60% { transform: rotate(-3deg) translateY(1px); } }
+@keyframes rig-stretch { 0%,20%,90%,100% { transform: rotate(0) scaleY(1); } 45% { transform: rotate(-3deg) scaleY(1.025); } 65% { transform: rotate(3deg) scaleY(1.025); } }
+@keyframes rig-consider { 0%,100% { transform: rotate(0); } 35%,65% { transform: rotate(2deg) translateY(1px); } }
+@keyframes rig-work { 0%,100% { transform: translateX(0); } 45%,55% { transform: translateX(1px); } }
+@keyframes rig-stride { 0%,50%,100% { transform: translateY(0); } 25%,75% { transform: translateY(-2px); } }
+@keyframes rig-step { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-3px) rotate(3deg); } }
+@keyframes rig-celebrate { 0%,100% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-9px) rotate(-4deg); } 70% { transform: translateY(-3px) rotate(3deg); } }
+/* Existing scene transforms still handle placement, facing and seating. */
+.office-character > .pal-rig, .scene-pal > .pal-rig,
+.pal-room-illustration .pal-rig { animation: none !important; }
+.room-scene .pal-rig { filter: drop-shadow(0 2px 0 rgb(0 0 0 / .35)); }
+.scene-pal > .pal-rig { transition: filter .2s; }
+.scene-pal.is-speaking > .pal-rig { filter: drop-shadow(0 0 3px var(--agent-color)) drop-shadow(0 2px 0 rgb(0 0 0 / .35)); }
+html[data-hidden="1"] .pal-rig *, html[data-lowpower="1"] .pal-rig *,
+.workspace-window[hidden] .pal-rig * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  .pal-rig *, .office-pal { animation: none !important; transition: none !important; }
+}

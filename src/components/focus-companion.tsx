@@ -137,7 +137,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   return (
     <aside className="focus-companion" aria-label="Focus Assist work companion">
       <div className="flex items-start gap-2">
-        <div className={`focus-companion-pal${hasFacingArt(session.pal) ? " focus-companion-pal-directional" : ""}`} aria-hidden="true"><PixelCharacter id={session.pal} mode={theme} animated /></div>
+        <div className={`focus-companion-pal${hasFacingArt(session.pal) ? " focus-companion-pal-directional" : ""}`} aria-hidden="true"><PixelCharacter id={session.pal} mode={theme} motion={paused ? "rest" : "work"} /></div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">{name} is here with you</p>
           <p className="text-xs text-muted-foreground">{pal?.role} · Illustrated body double</p>

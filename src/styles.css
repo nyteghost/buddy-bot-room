@@ -2505,3 +2505,12 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
     scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important;
   }
 }
+
+/* Smooth the shared floor routes; layered artwork owns its pose animations. */
+.linux .office-pal { transition: left .12s linear, top .12s linear, opacity .2s; }
+.linux .office-pal.office-assigned { transition: left 1s ease-in-out, top 1s ease-in-out; }
+.office-character > .pal-rig.pal-directional { transform: none; }
+.office-seated-away .office-character > .pal-rig.pal-directional { transform: translateY(-8%); clip-path: inset(0 0 30% 0); }
+@media (prefers-reduced-motion: reduce) {
+  .linux .office-pal, .linux .office-pal.office-assigned { transition: none; }
+}

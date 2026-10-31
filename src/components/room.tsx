@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { ambientMotion } from "@/lib/pal-motion";
+import { useCalmInterval } from "@/lib/power";
 import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
 import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow, Sparkles } from "lucide-react";
@@ -365,11 +367,7 @@ export function Room() {
   useEffect(() => {
     try { setPalRoomPlayful(localStorage.getItem(PAL_ROOM_MOOD_KEY) === "1"); } catch { /* Private browsing: calm default */ }
   }, []);
-  useEffect(() => {
-    if (!roomOpen || !palRoomPlayful || document.visibilityState === "hidden") return;
-    const tick = window.setInterval(() => setPalRoomPhase((n) => (n + 1) % 300), 25_000);
-    return () => window.clearInterval(tick);
-  }, [roomOpen, palRoomPlayful]);
+  useCalmInterval(() => setPalRoomPhase(n => (n + 1) % 300), 8000, roomOpen && palRoomPlayful);
   const changePalRoomMood = (next: boolean) => {
     setPalRoomPlayful(next);
     try { localStorage.setItem(PAL_ROOM_MOOD_KEY, next ? "1" : "0"); } catch { /* optional setting */ }
@@ -1969,7 +1967,7 @@ export function Room() {
               </span>
             </div>
             {agents.map((a, i) => assistantOn ? (
-              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} />
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} />
             ) : (
               <div
                 key={a.id}
@@ -1991,7 +1989,7 @@ export function Room() {
                 {speaking === a.id && !bubbleText && <ThinkingProp id={a.id} mode={characterMode} />}
                 {focusCompanion?.pal === a.id && !focusBreak && speaking !== a.id && <span className="pal-room-task-bubble" aria-label="Pal working alongside you">💻</span>}
                 {focusCompanion?.pal === a.id && focusBreak && speaking !== a.id && <span className="pal-room-task-bubble" aria-label="Pal on break">☕</span>}
-                <PixelCharacter id={a.id} animated={speaking === a.id} />
+                <PixelCharacter id={a.id} animated={speaking === a.id} motion={palRoomPlayful && enabled.includes(a.id) ? ambientMotion(a.id, palRoomPhase) : undefined} />
                 {palRoomPlayful && !running && !focusCompanion && enabled.includes(a.id) && <span className="pal-room-idle-bubble" title={palActivity(a.id, palRoomPhase).text} aria-label={agentName(a.id, hell, horror, characterMode) + ": " + palActivity(a.id, palRoomPhase).text}>{palActivity(a.id, palRoomPhase).emoji}</span>}
                 <span className={`agent-${a.id}`}>
                   {agentName(a.id, hell, horror, characterMode)}

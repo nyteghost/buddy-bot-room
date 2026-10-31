@@ -1,3 +1,5 @@
+import { PalArtRig } from "./pal-art-rig";
+import type { PalMotion } from "@/lib/pal-motion";
 import { cn } from "@/lib/utils";
 import type { AgentId } from "@/lib/agents";
 import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
@@ -13,6 +15,7 @@ export function PixelCharacter({
   back = false,
   facing,
   mode: explicitMode,
+  motion,
 }: {
   id: AgentId;
   className?: string;
@@ -23,11 +26,14 @@ export function PixelCharacter({
   /** Which way the pal faces. Only pals with directional art (Saiyan) use it; the default is facing the viewer. */
   facing?: Facing | undefined;
   mode?: CharacterMode;
+  motion?: PalMotion | undefined;
 }) {
   const currentMode = useCharacterMode();
   const mode = explicitMode ?? currentMode;
   const directional = hasFacingArt(id) ? facingArt(id, facing ?? "s") : undefined;
   const art = directional ?? (back ? undefined : palArt(id, mode));
+  const pose = walking ? "walk" : animated ? "talk" : motion;
+  if (art && pose) return <PalArtRig id={id} art={art} motion={pose} className={cn("pixel-character native-sprite pal-art", directional && "pal-directional", `agent-${id}`, className)} />;
   if (art) {
     return (
       <img

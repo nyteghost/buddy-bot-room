@@ -45,7 +45,7 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
     <section className="pal-room-activities" aria-label="Pal Room activities">
       <div className="pal-room-illustration" data-activity={resting ? "break" : working && celebrating ? "celebrating" : working ? "working" : "idle"} aria-hidden="true">
         <div className="pal-room-prop">{resting ? "☕" : celebrating ? "✨" : working ? "💻" : "✨"}</div>
-        <PixelCharacter id={id} mode={theme} walking={working} animated={!resting} />
+        <PixelCharacter id={id} mode={theme} motion={resting ? "rest" : celebrating ? "celebrate" : working ? "work" : playful ? "look" : undefined} />
         <div className="pal-room-surface" />
       </div>
       <div className="min-w-0 flex-1">
