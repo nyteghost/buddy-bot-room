@@ -12,8 +12,8 @@ The legacy Work Tools panel now labels itself as migrating and links to the stan
 - Confirm ShowPilot supports the correct **Cobb Galleria Centre (CGC) only** scope, not CEPAC.
 - Keep Repo Watch in Pixel Pals if useful independently of event operations; it is not intrinsically a ShowPilot function.
 
-## Stage 3 — hide legacy entry points (planned)
-After parity and backup verification, replace prominent Work Tools navigation with a simple 'Open ShowPilot' link and a recoverable legacy-data/export option. Do not silently remove commands, files, or user saves. Keep unrelated personal tools.
+## Stage 3 — de-emphasize legacy entry points (in progress)
+Beta now labels the desktop/mobile/sidebar/command palette Work Tools entry points as **Legacy work tools**, and the /work bookmark remains functional with migration messaging. After parity and backup verification, replace prominent Work Tools navigation with a simple 'Open ShowPilot' link and a recoverable legacy-data/export option. Do not silently remove commands, files, or user saves. Keep unrelated personal tools.
 
 ## Stage 4 — remove unused code (planned)
 Once migrated and confirmed, remove only dead CGC work-specific UI, parsing and scheduling dependencies, tests and help references. Use separate commits to make rollback straightforward. The old /work route should redirect or explain the move rather than break saved bookmarks. Retain personal calendar, tasks, notes, AI and any generally useful utilities.
@@ -24,4 +24,4 @@ Once migrated and confirmed, remove only dead CGC work-specific UI, parsing and 
 - Never merge work event records, employee shifts or private work details into Pixel Pals personal memories automatically.
 - Development changes first go to beta; promotion to main requires validation.
 
-**Current status:** Stage 1 only. Remaining stages are not complete and no end-to-end test has been reported.
+**Current status:** Stage 1 and legacy navigation labeling committed on beta. Data parity, migration, hidden entry points, cleanup, build and end-to-end validation are still outstanding.
