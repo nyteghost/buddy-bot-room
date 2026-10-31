@@ -35,7 +35,7 @@ export function shapeWeather(json: unknown, place: string, units: Units): Weathe
   const hours = Array.isArray(h?.["time"]) ? (h["time"] as string[]).slice(0, 96).map((time, i) => ({
     time: String(time), temp: num(h["temperature_2m"]?.[i]), code: num(h["weather_code"]?.[i]),
     rain: num(h["precipitation_probability"]?.[i]),
-  })).filter(item => /^\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(item.time)) : [];
+  })).filter(item => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(item.time)) : [];
   return { place: place.slice(0, 60), units, hours, now: { temp: num(c["temperature_2m"]), feels: num(c["apparent_temperature"]), code: num(c["weather_code"]), wind: num(c["wind_speed_10m"]) }, days };
 }
 
