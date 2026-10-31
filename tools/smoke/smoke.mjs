@@ -9,7 +9,7 @@ const URL_ = process.env.SMOKE_URL || "http://localhost:8090";
 const USER = process.env.SMOKE_USER || "smoke";
 const PASS = process.env.SMOKE_PASS || "Smoke-test-only-1";
 // Windows to open from the sidebar (matched by visible text). Missing ones are reported, not fatal, so renames don't break CI.
-const WINDOWS = ["Today", "Notes", "Calendar", "Work tools", "Playtests"];
+const WINDOWS = ["Today", "Notes", "Calendar", "Legacy work tools", "Playtests"];
 // Console noise that is expected in a bare test environment (no Ollama, no internet-only services, no favicon).
 const IGNORE = [/favicon/i, /Failed to load resource/i, /ERR_CONNECTION/i, /ERR_NAME_NOT_RESOLVED/i, /net::ERR/i, /ollama/i, /WebSocket/i];
 
