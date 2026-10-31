@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SecondBrainPanel } from "./second-brain-panel";
 import { MEMORY_SUGGEST_ENABLED, MEMORY_SUGGEST_KEY, type SuggestedMemory } from "@/lib/memory-suggestions";
 import { Pencil, Pin, PinOff, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,7 @@ export function MemorySection() {
 
   return (
     <>
+      <SecondBrainPanel />
       <section className="grid gap-2 rounded-lg border p-3" aria-label="Suggested memories">
         <h3>Suggested memories <span>review before saving</span></h3>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={suggestionsEnabled}
