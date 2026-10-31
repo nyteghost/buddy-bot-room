@@ -12,11 +12,14 @@ services:
       BUDDY_ACCOUNTS: "1"
       BUDDY_TZ: America/New_York
       BUDDY_BACKUP_DIR: /backups
+      OBSIDIAN_VAULT_DIR: /vault
+      OBSIDIAN_NEW_FOLDER: PixelPals
       OLLAMA_URL: ${BETA_OLLAMA_URL:-}
       NVIDIA_VISIBLE_DEVICES: none
     volumes:
       - /mnt/user/appdata/pixelpals-beta/data:/data
       - /mnt/user/appdata/pixelpals-beta/backups:/backups
+      - /mnt/user/appdata/obsidian/vaults/Homelab:/vault:rw
     extra_hosts:
       - host.docker.internal:host-gateway
     healthcheck:
