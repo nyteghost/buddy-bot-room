@@ -2428,8 +2428,8 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
 
 /* Mobile Today 2.1: a single clear action and concise expandable overview. */
 @media (max-width:700px) {
-  .modular-workspace .window-today > .window-titlebar { display: none; }
-  .modular-workspace .window-today .window-body { min-height: 0; }
+  .modular-workspace [data-window-id="today"] > .window-titlebar { display: none; }
+  .modular-workspace [data-window-id="today"] .window-body { min-height: 0; }
   .modular-workspace .focus-hub { padding: 12px; gap: 8px; }
   .modular-workspace .focus-hub > div:first-child p { display: none; }
   .modular-workspace .focus-hub .text-muted-foreground { line-height: 1.4; }
