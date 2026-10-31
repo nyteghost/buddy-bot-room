@@ -118,6 +118,22 @@ const Block = ({ title, children }: { title: string; children: React.ReactNode }
     {children}
   </section>
 );
+/** All details stay visible on desktop; phones start with a compact summary. */
+function MobileBlock({ title, summary, children }: { title: string; summary: string; children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(() => typeof window === "undefined" || window.innerWidth > 700);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 700px)");
+    const update = () => setExpanded(!mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return <section className="mobile-today-block rounded-lg border px-3 py-2">
+    <button type="button" className="mobile-today-block-toggle" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>
+      <span className="font-semibold">{title}</span><span className="truncate text-xs text-muted-foreground">{summary}</span><span aria-hidden="true">{expanded ? "−" : "+"}</span>
+    </button>
+    {expanded && <div className="grid gap-2 pt-2">{children}</div>}
+  </section>;
+}
 const Quiet = ({ children }: { children: React.ReactNode }) => <p className="text-xs text-muted-foreground">{children}</p>;
 
 /** Everything for today in one place: weather, calendar, unread mail, tasks and a watch pick. Each part quietly says how to set it up if it isn't. */
@@ -171,7 +187,7 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
         {events.length} calendar {events.length === 1 ? "event" : "events"} · {todayReminders.length} scheduled {todayReminders.length === 1 ? "reminder" : "reminders"}
         {forecast ? " · " + forecastDescription(forecast.code).text : ""}
       </p>
-      <Block title={dayOffset === 0 ? "Weather" : "Weather forecast"}>
+      <MobileBlock title={dayOffset === 0 ? "Weather" : "Weather forecast"} summary={forecast ? forecast.hi + "° / " + forecast.lo + "° · " + forecastDescription(forecast.code).text : "Today’s conditions"}>
         {dayOffset === 0 && weather.data?.weather ? <p>{describeCode(weather.data.weather.now.code).icon} {weather.data.weather.place}: {weatherLine(weather.data.weather)}</p>
           : forecast ? <p>{forecastDescription(forecast.code).icon} {weather.data?.weather?.place}: {forecastDescription(forecast.code).text}, {forecast.hi}°/{forecast.lo}°{forecast.rain >= 30 ? " · " + forecast.rain + "% chance of rain" : ""}</p>
           : <Quiet>{weather.error || "Forecast not available for this day yet."}</Quiet>}
@@ -193,24 +209,24 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
             </div>
           </div>
         )}
-      </Block>
-      <Block title="Calendar">
+      </MobileBlock>
+      <MobileBlock title="Calendar" summary={events.length + " events"}>
         {cal.data?.configured === false && <Quiet>No calendar connected. Open Calendar for the one-minute setup.</Quiet>}
         {cal.data?.configured && !events.length && <Quiet>No calendar events for this day.</Quiet>}
         {events.map((e, i) => <button key={`${e.start}-${i}`} type="button" className="flex min-w-0 gap-3 rounded-sm text-left hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={onOpenCalendar} title="Open Calendar"><span className="w-16 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : clock(e.start, tz)}</span><span className="truncate">{e.title}</span></button>)}
         {!cal.data && <Quiet>{cal.error || "Loading…"}</Quiet>}
-      </Block>
-      {dayOffset === 0 && <Block title="Mail">
+      </MobileBlock>
+      {dayOffset === 0 && <MobileBlock title="Mail" summary={mail.data?.configured ? mail.data.items.length + " unread" : "Inbox"}>
         {mail.data?.configured === false && <Quiet>No mailbox connected. Open Mail for setup.</Quiet>}
         {mail.data?.configured && <p>{mail.data.items.length ? mail.data.items.length + " unread" : "No unread mail."}</p>}
         {mail.data?.items.slice(0, 3).map((m, i) => <button key={i} type="button" className="block w-full truncate rounded-sm text-left text-xs text-muted-foreground hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-ring" title="Open Mail inbox" onClick={onOpenMail}>{m.subject} · {m.from}</button>)}
         {!mail.data && <Quiet>{mail.error || "Loading…"}</Quiet>}
-      </Block>}
-      <Block title="Tasks">
+      </MobileBlock>}
+      <MobileBlock title="Tasks" summary={open_.length + " open · " + todayReminders.length + " reminders"}>
         {!open_.length && !todayReminders.length && <Quiet>{dayOffset === 0 ? "Nothing open. Add something in Brain Dump or Tasks." : "No timed tasks or reminders for this day."}</Quiet>}
         {todayReminders.map((r) => <button type="button" key={r.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>⏰ {whenLabel(r.at, tz)} — {r.text}</button>)}
         {open_.slice(0, 6).map((t) => <button type="button" key={t.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>☐ {t.scheduledAt ? clock(t.scheduledAt, tz) + " — " : ""}{t.text}</button>)}
-      </Block>
+      </MobileBlock>
       <BrainDump />
       {dayOffset === 0 && <Block title="Tonight">
         {pick ? <p>{pick.kind === "show" ? "📺" : "🎬"} {pick.title}{pick.year ? " (" + pick.year + ")" : ""}{pick.inPlex ? " · in Plex" : ""}</p> : <Quiet>{trakt.error ? "Connect Trakt to get a pick." : trakt.data ? "Nothing unwatched on your list." : "Loading…"}</Quiet>}
