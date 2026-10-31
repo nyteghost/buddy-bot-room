@@ -455,6 +455,23 @@ await step("planner file is served", async () => {
   const r = await page.request.get(`${URL_}/stage-planner.html`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
 });
+await step("mobile chat uses clean full-screen layout and collapsible settings", async () => {
+  await page.setViewportSize({ width: 390, height: 780 });
+  await page.locator('.mobile-tabbar button', { hasText: "My Pals" }).click();
+  const chat = page.locator('[data-window-id="chat-my-pals"]');
+  await chat.waitFor({ state: "visible" });
+  if (await chat.locator('.window-titlebar').isVisible()) throw Error("desktop window title still visible on mobile");
+  const more = chat.locator(".mobile-chat-options");
+  await more.locator("summary").waitFor({ state: "visible" });
+  if (await more.getAttribute("open") !== null) throw Error("Advanced options unexpectedly open");
+  await more.locator("summary").click();
+  if (await more.getAttribute("open") === null) throw Error("Advanced chat options did not expand");
+  await more.locator("summary").click();
+  const bounds = await chat.boundingBox();
+  if (!bounds || bounds.width < 375 || bounds.x > 5) throw Error("Chat is not full width on mobile");
+  const shell = await page.locator(".modular-workspace").evaluate(e => ({ body: e.scrollWidth, view: e.clientWidth }));
+  if (shell.body > shell.view + 4) throw Error("Mobile shell has horizontal overflow");
+});
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
