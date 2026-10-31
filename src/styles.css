@@ -2359,7 +2359,7 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
     left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important;
     border: 0; border-radius: 0; box-shadow: none; min-width: 0;
   }
-  .modular-workspace .workspace-window > .window-titlebar { display: none; }
+  .modular-workspace .window-conversation > .window-titlebar { display: none; }
   .modular-workspace .workspace-window > .window-body { min-height: 0; border: 0; }
   .modular-workspace .window-conversation .conversation-panel { min-height: 0; display: flex; flex-direction: column; }
   .modular-workspace .window-conversation .conversation-header { padding: 8px 14px; min-height: 44px; }
