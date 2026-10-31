@@ -57,6 +57,7 @@ import { FocusCompanion } from "./focus-companion";
 import { PalRoomActivities } from "./pal-room-activities";
 import { LivingTaskBoard } from "./living-task-board";
 import { QuestCorner } from "./quest-corner";
+import { renderMemoryContext, type BrainNote } from "@/lib/second-brain";
 import { MEMORY_SUGGEST_ENABLED, MEMORY_SUGGEST_KEY, queueSuggestedMemory, suggestMemoryLocally, type SuggestedMemory } from "@/lib/memory-suggestions";
 import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
 import "./pal-room-cues.css";
@@ -684,6 +685,13 @@ export function Room() {
     const docsNow = projectNow?.docs.length && docsAll.some((d) => projectNow.docs.includes(d.name)) ? docsAll.filter((d) => projectNow.docs.includes(d.name)) : docsAll;
     let docText = docsNow.length ? docContext(await smartRetrieve(allChunks(docsNow), topic)) : "";
     // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
+    let obsidianContext = "";
+    try {
+      if (localStorage.getItem("pixelpals-brain-retrieval")==="1" && ["ollama","local","local-server","auto-ollama"].includes(engine.kind) && topic.trim()) {
+        const response=await fetch("/api/second-brain?q="+encodeURIComponent(topic.slice(0,200)),{signal:AbortSignal.timeout(2500)});
+        if(response.ok){const data=await response.json() as {notes?:BrainNote[]};obsidianContext=renderMemoryContext(data.notes??[],1800);}
+      }
+    } catch { /* Second Brain is optional */ }
     let memBoost: ReadonlyMap<string, number> | undefined;
     {
       const wbNow = getWorkbench();
@@ -766,7 +774,7 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: [projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost })].filter(Boolean).join("\n\n"),
+            memoryContext: [projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
