@@ -9,8 +9,8 @@ function WorkPage() {
       <header className="mb-4 flex items-center gap-3 border-b border-border pb-3">
         <img src={mascot} width={36} height={36} alt="" draggable={false} style={{ imageRendering: "pixelated" }} />
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold leading-tight">Show Services tools</h1>
-          <p className="text-xs text-muted-foreground">Events, shifts, stage decks, vendors, floor maps. Files are read in this browser and never leave your device.</p>
+          <h1 className="text-xl font-semibold leading-tight">Legacy Show Services tools</h1>
+          <p className="text-xs text-muted-foreground">Migration and export access for existing work. New convention-center work belongs in ShowPilot.</p>
         </div>
         <a href="/" className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-1.5 text-sm text-foreground hover:bg-accent"><ArrowLeft className="size-4" /> Pixel Pals</a>
       </header>
@@ -21,5 +21,5 @@ function WorkPage() {
 
 export const Route = createFileRoute("/work")({
   component: WorkPage,
-  head: () => ({ meta: [{ title: "Show Services tools" }, { name: "description", content: "Work tools: schedules, stage decks, vendors and floor-map coloring." }] }),
+  head: () => ({ meta: [{ title: "Legacy Show Services tools" }, { name: "description", content: "Legacy work tools are retained for migration while ShowPilot becomes the dedicated work app." }] }),
 });
