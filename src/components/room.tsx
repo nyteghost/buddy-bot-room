@@ -57,6 +57,7 @@ import { FocusCompanion } from "./focus-companion";
 import { PalRoomActivities } from "./pal-room-activities";
 import { LivingTaskBoard } from "./living-task-board";
 import { QuestCorner } from "./quest-corner";
+import { MEMORY_SUGGEST_ENABLED, MEMORY_SUGGEST_KEY, queueSuggestedMemory, suggestMemoryLocally, type SuggestedMemory } from "@/lib/memory-suggestions";
 import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
 import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
@@ -583,6 +584,20 @@ export function Room() {
     replayRef.current?.abort();
     setReplayId(null);
     const topic = ask?.text ?? override ?? topicDraft;
+    // Suggest memories only from explicit preferences, only after the owner opts in.
+    if (!ask && !override && topic.length <= 500 && suggestMemoryLocally(topic)) {
+      try {
+        if (localStorage.getItem(MEMORY_SUGGEST_ENABLED) === "1") {
+          void fetch("/api/memory-suggest", { method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text:topic}) })
+            .then(r=>r.ok?r.json():null).then((data:{suggestion?:string}|null)=>{
+              if(!data?.suggestion)return;
+              const existing=JSON.parse(localStorage.getItem(MEMORY_SUGGEST_KEY)??"[]") as SuggestedMemory[];
+              localStorage.setItem(MEMORY_SUGGEST_KEY,JSON.stringify(queueSuggestedMemory(Array.isArray(existing)?existing:[],data.suggestion)));
+              window.dispatchEvent(new Event("pixelpals:memory-proposed"));
+            }).catch(()=>{});
+        }
+      } catch { /* local storage unavailable */ }
+    }
     const mentioned = ask || override ? null : resolveMention(topic, modeRef.current);
     const direct = ask || mentioned ? true : direct0;
     const partner = ask?.partner ?? mentioned ?? partnerChoice;
