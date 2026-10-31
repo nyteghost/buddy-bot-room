@@ -179,7 +179,7 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
           <div className="mt-3 grid gap-2">
             <p className="text-xs font-semibold text-muted-foreground">Temperatures throughout the day</p>
             <div className="flex gap-2 overflow-x-auto pb-2" role="list" aria-label="Hourly temperature forecast">
-              {weather.data.weather.hours.filter(h => h.time.startsWith(day + "T") && (dayOffset !== 0 || Number(h.time.slice(11, 13)) >= new Date().getHours())).map(h => {
+              {weather.data.weather.hours.filter(h => h.time.startsWith(day + "T")).map(h => {
                 const hour=Number(h.time.slice(11,13));
                 const hourLabel=hour===0?"12 AM":hour<12?hour+" AM":hour===12?"12 PM":(hour-12)+" PM";
                 const condition=forecastDescription(h.code);
