@@ -175,6 +175,24 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
         {dayOffset === 0 && weather.data?.weather ? <p>{describeCode(weather.data.weather.now.code).icon} {weather.data.weather.place}: {weatherLine(weather.data.weather)}</p>
           : forecast ? <p>{forecastDescription(forecast.code).icon} {weather.data?.weather?.place}: {forecastDescription(forecast.code).text}, {forecast.hi}°/{forecast.lo}°{forecast.rain >= 30 ? " · " + forecast.rain + "% chance of rain" : ""}</p>
           : <Quiet>{weather.error || "Forecast not available for this day yet."}</Quiet>}
+        {!!weather.data?.weather?.hours?.length && (
+          <div className="mt-3 grid gap-2">
+            <p className="text-xs font-semibold text-muted-foreground">Temperatures throughout the day</p>
+            <div className="flex gap-2 overflow-x-auto pb-2" role="list" aria-label="Hourly temperature forecast">
+              {weather.data.weather.hours.filter(h => h.time.startsWith(day + "T") && (dayOffset !== 0 || Number(h.time.slice(11, 13)) >= new Date().getHours())).map(h => {
+                const hour=Number(h.time.slice(11,13));
+                const hourLabel=hour===0?"12 AM":hour<12?hour+" AM":hour===12?"12 PM":(hour-12)+" PM";
+                const condition=forecastDescription(h.code);
+                return <div role="listitem" key={h.time} className="flex min-w-16 shrink-0 flex-col items-center gap-1 rounded-lg border bg-card/60 px-2 py-2 text-center">
+                  <span className="text-xs text-muted-foreground">{hourLabel}</span>
+                  <span aria-label={condition.text} title={condition.text} className="text-lg">{condition.icon}</span>
+                  <span className="font-semibold">{h.temp}°</span>
+                  {h.rain>0&&<span className="text-xs text-muted-foreground">{h.rain}% rain</span>}
+                </div>;
+              })}
+            </div>
+          </div>
+        )}
       </Block>
       <Block title="Calendar">
         {cal.data?.configured === false && <Quiet>No calendar connected. Open Calendar for the one-minute setup.</Quiet>}
