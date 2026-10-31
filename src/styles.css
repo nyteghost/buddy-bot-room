@@ -2424,3 +2424,38 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
   .modular-workspace .mobile-tabbar button { font-size: 9px; }
   .modular-workspace .window-conversation .conversation-header { padding-inline: 10px; }
 }
+
+
+/* Mobile Today 2.1: a single clear action and concise expandable overview. */
+@media (max-width:700px) {
+  .modular-workspace .window-today > .window-titlebar { display: none; }
+  .modular-workspace .window-today .window-body { min-height: 0; }
+  .modular-workspace .focus-hub { padding: 12px; gap: 8px; }
+  .modular-workspace .focus-hub > div:first-child p { display: none; }
+  .modular-workspace .focus-hub .text-muted-foreground { line-height: 1.4; }
+  .modular-workspace .focus-hub button { min-height: 40px; }
+  .modular-workspace .mobile-today-block-toggle {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    min-height: 42px; text-align: left; cursor: pointer;
+  }
+  .modular-workspace .mobile-today-block-toggle > span:nth-child(2) { flex: 1; text-align: right; min-width: 0; }
+  .modular-workspace .mobile-today-block-toggle > span:last-child { font-size: 18px; width: 18px; text-align: center; }
+  .modular-workspace .mobile-tabbar { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .modular-workspace .mobile-tabbar button { min-height: 58px; font-size: 11px; }
+  .modular-workspace .mobile-more-menu {
+    display: grid; grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 8px; padding: 12px; position: sticky; bottom: calc(58px + env(safe-area-inset-bottom));
+    z-index: 71; border-top: 1px solid var(--border); background: var(--card);
+  }
+  .modular-workspace .mobile-more-menu button {
+    display: flex; align-items: center; gap: 8px; min-height: 46px;
+    padding: 10px; text-align: left; border: 1px solid var(--border); border-radius: 12px;
+  }
+  .modular-workspace .mobile-more-menu button svg { width: 18px; height: 18px; flex-shrink: 0; }
+}
+@media(min-width:701px) {
+  .mobile-more-menu { display:none; }
+  .mobile-today-block-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; }
+  .mobile-today-block-toggle > span:nth-child(2) { display:none; }
+  .mobile-today-block-toggle > span:last-child { display:none; }
+}
