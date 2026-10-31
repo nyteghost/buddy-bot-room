@@ -124,6 +124,7 @@ function MobileBlock({ title, summary, children }: { title: string; summary: str
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 700px)");
     const update = () => setExpanded(!mq.matches);
+    update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
