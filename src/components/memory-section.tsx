@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { MEMORY_SUGGEST_ENABLED, MEMORY_SUGGEST_KEY, type SuggestedMemory } from "@/lib/memory-suggestions";
 import { Pencil, Pin, PinOff, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,63 @@ export function MemorySection() {
   const [question, setQuestion] = useState("");
   const [palId, setPalId] = useState<string>(agents[0]?.id ?? "nova");
   const [why, setWhy] = useState<string[] | null>(null);
+  const [suggestionsEnabled, setSuggestionsEnabled] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestedMemory[]>([]);
+  const [autoSync, setAutoSync] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("");
+  useEffect(() => {
+    const load = () => {
+      try {
+        setSuggestionsEnabled(localStorage.getItem(MEMORY_SUGGEST_ENABLED)==="1");
+        const raw=JSON.parse(localStorage.getItem(MEMORY_SUGGEST_KEY)??"[]") as SuggestedMemory[];
+        setSuggestions(Array.isArray(raw)?raw.filter(x=>typeof x.text==="string"&&typeof x.at==="number").slice(-15):[]);
+        setAutoSync(localStorage.getItem("pixel-pals-memory-auto-sync-v1")==="1");
+      } catch { /* private browsing */ }
+    };
+    load(); window.addEventListener("pixelpals:memory-proposed",load);
+    return ()=>window.removeEventListener("pixelpals:memory-proposed",load);
+  }, []);
+  const removeSuggestion=(index:number)=>{
+    const next=suggestions.filter((_,i)=>i!==index);
+    setSuggestions(next);
+    try{localStorage.setItem(MEMORY_SUGGEST_KEY,JSON.stringify(next));}catch{}
+  };
+  const syncApproved=async()=>{
+    setSyncStatus("Checking Obsidian for changes…");
+    try{
+      const response=await fetch("/api/obsidian-memory");
+      if(!response.ok)throw Error("Obsidian vault unavailable");
+      const data=await response.json() as {revision:string;memories:{memories:Entry[];pal?:Record<string,Entry[]>;project?:Record<string,Entry[]>}};
+      const current=getWorkbench();
+      // Never remove server memories automatically. Merge browser approvals into vault.
+      const merged=[...(data.memories.memories??[])];
+      for(const entry of current.memories)if(!merged.some(x=>x.id===entry.id||x.text.toLowerCase()===entry.text.toLowerCase()))merged.push(entry);
+      const pal={...(data.memories.pal??{})};
+      for(const [key,rows] of Object.entries(current.pal??{})){
+        const group=[...(pal[key]??[])];
+        for(const item of rows)if(!group.some(x=>x.id===item.id||x.text.toLowerCase()===item.text.toLowerCase()))group.push(item);
+        pal[key]=group;
+      }
+      const project={...(data.memories.project??{})};
+      for(const [key,rows] of Object.entries(current.project??{})){
+        const group=[...(project[key]??[])];
+        for(const item of rows)if(!group.some(x=>x.id===item.id||x.text.toLowerCase()===item.text.toLowerCase()))group.push(item);
+        project[key]=group;
+      }
+      const saved=await fetch("/api/obsidian-memory",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({revision:data.revision,memories:{memories:merged,pal,project}})});
+      if(!saved.ok)throw Error(saved.status===409?"Obsidian changed during sync. Retry after reviewing.":"Could not sync. Check the vault permissions.");
+      const body=await saved.json() as {revision:string};
+      setVaultRevision(body.revision);setVaultPreview({memories:merged,pal,project});
+      setSyncStatus("Approved memories merged into the Obsidian vault. Existing notes were preserved.");
+    }catch(e){setSyncStatus(e instanceof Error?e.message:"Sync failed");}
+  };
+  const approveSuggestion=(index:number)=>{
+    const text=suggestions[index]?.text;if(!text)return;
+    updateWorkbench(w=>({...w,memories:addEntry(w.memories,text)}));
+    removeSuggestion(index);
+    setSyncStatus("Saved to browser memory. Sync to Obsidian when you're ready.");
+    if(autoSync)window.setTimeout(()=>void syncApproved(),50);
+  };
   const [vaultRevision, setVaultRevision] = useState<string | null>(null);
   const [vaultMessage, setVaultMessage] = useState("");
   const [vaultPending, setVaultPending] = useState(false);
@@ -90,6 +148,26 @@ export function MemorySection() {
 
   return (
     <>
+      <section className="grid gap-2 rounded-lg border p-3" aria-label="Suggested memories">
+        <h3>Suggested memories <span>review before saving</span></h3>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={suggestionsEnabled}
+          onChange={e=>{setSuggestionsEnabled(e.target.checked);try{localStorage.setItem(MEMORY_SUGGEST_ENABLED,e.target.checked?"1":"0");}catch{}}}/>
+          Suggest useful preferences from chat (local AI only)
+        </label>
+        <p className="docs-note">Only explicit non-sensitive preferences are considered. Nothing is saved to permanent memory automatically.</p>
+        {suggestions.length===0?<p className="docs-note">No suggestions awaiting review.</p>:
+          <ul>{suggestions.map((item,i)=><li key={item.at+":"+i} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1">{item.text}</span>
+            <Button type="button" size="sm" onClick={()=>approveSuggestion(i)}>Remember</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={()=>removeSuggestion(i)}>Dismiss</Button>
+          </li>)}</ul>}
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={autoSync}
+          onChange={e=>{setAutoSync(e.target.checked);try{localStorage.setItem("pixel-pals-memory-auto-sync-v1",e.target.checked?"1":"0");}catch{}}}/>
+          Sync approved memories to Obsidian automatically
+        </label>
+        <Button type="button" size="sm" variant="outline" onClick={()=>void syncApproved()}>Sync approved memories now</Button>
+        {syncStatus&&<p role="status" className="docs-note">{syncStatus}</p>}
+      </section>
       <section className="grid gap-2 rounded-lg border p-3" aria-label="Obsidian memory vault">
         <h3>Obsidian Memory Vault <span>Markdown on your Unraid server · owner-only</span></h3>
         <p className="docs-note">Your memories remain in this browser until you choose to export or import. Load the vault, review the counts, then save or import. Changes made in Obsidian need an import before the Pals can use them.</p>
