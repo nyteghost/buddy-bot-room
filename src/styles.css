@@ -2344,3 +2344,83 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
 @media (max-width: 700px) {
   .focus-companion { right: 8px; bottom: 8px; max-height: 58vh; padding: 10px; }
 }
+
+
+/* Pixel Pals mobile workspace 2.0 — phone-only; desktop windows remain unchanged. */
+.mobile-chat-options { display: contents; }
+.mobile-chat-options > summary { display: none; }
+@media (max-width: 700px) {
+  .modular-workspace { min-height: 100dvh; overflow-x: hidden; }
+  .modular-workspace .workspace-frame { min-height: 0; }
+  .modular-workspace .workspace-stage { min-width: 0; }
+  .modular-workspace .window-canvas { margin: 0; min-height: 0; }
+  .modular-workspace .workspace-window,
+  .modular-workspace .workspace-window.window-sized {
+    left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important;
+    border: 0; border-radius: 0; box-shadow: none; min-width: 0;
+  }
+  .modular-workspace .workspace-window > .window-titlebar { display: none; }
+  .modular-workspace .workspace-window > .window-body { min-height: 0; border: 0; }
+  .modular-workspace .window-conversation .conversation-panel { min-height: 0; display: flex; flex-direction: column; }
+  .modular-workspace .window-conversation .conversation-header { padding: 8px 14px; min-height: 44px; }
+  .modular-workspace .conversation-header h2 { font-size: 15px; }
+  .modular-workspace .conversation-header button { width: 40px; height: 40px; }
+  .modular-workspace .window-conversation [aria-label="My Pals conversation style"],
+  .modular-workspace .window-conversation [aria-label="Pal Lounge conversation style"] {
+    flex-wrap: nowrap; overflow-x: auto; padding: 5px 10px; gap: 5px; scrollbar-width: none;
+  }
+  .modular-workspace .window-conversation [aria-label$="conversation style"] > span { display: none; }
+  .modular-workspace .window-conversation [aria-label$="conversation style"] button {
+    flex: 0 0 auto; min-height: 40px; border-radius: 12px; font-size: 12px; padding-inline: 12px;
+  }
+  .modular-workspace .window-conversation [aria-label="My Pals quick actions"] {
+    flex-wrap: nowrap; overflow-x: auto; padding: 7px 10px; gap: 7px; scrollbar-width: none;
+  }
+  .modular-workspace .window-conversation [aria-label="My Pals quick actions"] button {
+    flex: 0 0 auto; min-height: 40px; border-radius: 12px;
+  }
+  .modular-workspace .window-conversation .saved-toolbar { padding: 5px 10px; gap: 6px; min-height: 38px; }
+  .modular-workspace .window-conversation .save-status,
+  .modular-workspace .window-conversation .conversation-footer,
+  .modular-workspace .window-conversation .conversation-subhead { display: none; }
+  .modular-workspace .window-conversation .chat-log { flex: 1 1 0; min-height: 0; }
+  .modular-workspace .window-conversation .chat-content { padding: 14px 14px 20px; gap: 15px; }
+  .modular-workspace .window-conversation .empty-content { min-height: 0; }
+  .modular-workspace .window-conversation .chat-empty { padding: 14px 0; }
+  .modular-workspace .window-conversation .empty-pals { margin-bottom: 10px; }
+  .modular-workspace .window-conversation .workspace-composer {
+    display: flex; flex-direction: column; flex: 0 0 auto; gap: 5px;
+    padding: 8px 12px 8px; border-top: 1px solid var(--border);
+  }
+  .modular-workspace .window-conversation .topic-section { width: 100%; min-width: 0; }
+  .modular-workspace .window-conversation .topic-composer textarea {
+    min-height: 46px !important; max-height: 96px !important; font-size: 16px; resize: none;
+  }
+  .modular-workspace .window-conversation .composer-label,
+  .modular-workspace .window-conversation .suggestions,
+  .modular-workspace .window-conversation .launch-controls > .start-button { display: none; }
+  .modular-workspace .window-conversation .topic-composer [data-slot="input-group"] { border-radius: 16px; }
+  .modular-workspace .window-conversation .mobile-chat-options {
+    display: block; width: 100%; font-size: 12px; color: var(--muted-foreground);
+  }
+  .modular-workspace .window-conversation .mobile-chat-options > summary {
+    display: block; padding: 7px 8px; width: max-content; max-width: 100%;
+    min-height: 36px; cursor: pointer; border-radius: 9px; list-style: disclosure-closed;
+  }
+  .modular-workspace .window-conversation .mobile-chat-options[open] > summary { list-style: disclosure-open; }
+  .modular-workspace .window-conversation .mobile-chat-options .launch-controls {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 7px 0;
+  }
+  .modular-workspace .mobile-tabbar {
+    position: sticky; bottom: 0; z-index: 70; grid-template-columns: repeat(6,minmax(0,1fr));
+    padding-bottom: env(safe-area-inset-bottom); background: var(--card);
+  }
+  .modular-workspace .mobile-tabbar button { min-height: 56px; padding: 6px 1px; font-size: 10px; }
+  .modular-workspace .mobile-tabbar button:focus-visible,
+  .modular-workspace .window-conversation button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .modular-workspace .focus-companion { bottom: calc(65px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 380px) {
+  .modular-workspace .mobile-tabbar button { font-size: 9px; }
+  .modular-workspace .window-conversation .conversation-header { padding-inline: 10px; }
+}
