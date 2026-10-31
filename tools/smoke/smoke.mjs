@@ -457,7 +457,7 @@ await step("planner file is served", async () => {
 });
 await step("mobile chat uses clean full-screen layout and collapsible settings", async () => {
   await page.setViewportSize({ width: 390, height: 780 });
-  await page.locator('.mobile-tabbar button', { hasText: "My Pals" }).click();
+  await page.locator('.mobile-tabbar button', { hasText: "Pals" }).click();
   const chat = page.locator('[data-window-id="chat-my-pals"]');
   await chat.waitFor({ state: "visible" });
   if (await chat.locator('.window-titlebar').isVisible()) throw Error("desktop window title still visible on mobile");
@@ -469,6 +469,17 @@ await step("mobile chat uses clean full-screen layout and collapsible settings",
   await more.locator(":scope > summary").click();
   const bounds = await chat.boundingBox();
   if (!bounds || bounds.width < 375 || bounds.x > 5) throw Error("Chat is not full width on mobile");
+  await page.locator('.mobile-tabbar button', { hasText: "Home" }).click();
+  const today = page.locator('[data-window-id="today"]');
+  await today.waitFor({state:"visible"});
+  const weather = today.locator(".mobile-today-block", {hasText:"Weather"}).first();
+  await weather.locator(".mobile-today-block-toggle").waitFor();
+  if (await weather.locator(".mobile-today-block-toggle").getAttribute("aria-expanded") !== "false") throw Error("Weather is not collapsed on mobile");
+  await weather.locator(".mobile-today-block-toggle").click();
+  if (await weather.locator(".mobile-today-block-toggle").getAttribute("aria-expanded") !== "true") throw Error("Weather did not expand");
+  await page.locator('.mobile-tabbar button', { hasText: "More" }).click();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Notes" }).waitFor();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Notes" }).click();
   const shell = await page.locator(".modular-workspace").evaluate(e => ({ body: e.scrollWidth, view: e.clientWidth }));
   if (shell.body > shell.view + 4) throw Error("Mobile shell has horizontal overflow");
 });
