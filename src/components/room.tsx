@@ -1693,6 +1693,7 @@ export function Room() {
                 ))}
               </div>
             </div>
+            <details className="mobile-chat-options"><summary>Conversation options</summary>
             <div className="launch-controls">
               {wm === "direct" && (
                 <div>
@@ -1757,6 +1758,7 @@ export function Room() {
                 {busyHere ? "Stop" : wm === "direct" ? "Send" : wm === "debate" ? "Start debate" : wm === "solve" ? "Solve it" : wm === "smart" ? "Ask the team" : wm === "broadcast" ? "Ask everyone" : "Start discussion"}
               </Button>
             </div>
+            </details>
             {tooFewFor(wm) && <p className="validation-note">Invite at least two pals to start.</p>}
           </section>
         </section>
