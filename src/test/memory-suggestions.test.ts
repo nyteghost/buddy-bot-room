@@ -1,0 +1,3 @@
+import { expect,it } from "vitest";
+import {sanitizeMemorySuggestion,queueSuggestedMemory,suggestMemoryLocally} from "@/lib/memory-suggestions";
+it("suggests preferences but rejects secrets",()=>{expect(suggestMemoryLocally("I prefer concise replies.")).toContain("I prefer");expect(suggestMemoryLocally("What time is it?")).toBeNull();expect(sanitizeMemorySuggestion("My password is hunter2")).toBeNull();expect(queueSuggestedMemory([], "I prefer bullet points.")).toHaveLength(1);});
