@@ -39,6 +39,7 @@ export async function getWeather(): Promise<{ weather: Weather } | { error: stri
       latitude: String(where.lat), longitude: String(where.lon), timezone: "auto", forecast_days: "4",
       current: "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
       daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+      hourly: "temperature_2m,weather_code,precipitation_probability",
       temperature_unit: u === "imperial" ? "fahrenheit" : "celsius", wind_speed_unit: u === "imperial" ? "mph" : "kmh",
     });
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { signal: AbortSignal.timeout(8000) });
