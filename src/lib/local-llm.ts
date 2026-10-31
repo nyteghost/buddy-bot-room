@@ -3,6 +3,8 @@ import { freeModels } from "./engine";
 import { createThinkFilter, maxTokensFor, stripThinking } from "./think-filter";
 
 type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;
+type BrowserGpu = { requestAdapter(): Promise<{ limits: { maxBufferSize: number }; features: { has(name: string): boolean } } | null> };
+const browserGpu = () => (navigator as Navigator & { gpu?: BrowserGpu }).gpu;
 let enginePromise: Promise<Engine> | null = null;
 
 export function hasWebGPU() {
@@ -27,7 +29,7 @@ export function loadedLocalModel() {
 /** Probes the GPU and returns the best-fitting Hugging Face model. */
 export async function detectBestModel() {
   const { modelForProbe } = await import("./gpu-tier");
-  const adapter = hasWebGPU() ? await navigator.gpu.requestAdapter() : null;
+  const adapter = hasWebGPU() ? await browserGpu()?.requestAdapter() : null;
   if (!adapter) throw new Error("No WebGPU graphics card found in this browser.");
   const info = (adapter as unknown as { info?: { description?: string; vendor?: string; architecture?: string } }).info;
   const description =
@@ -94,7 +96,7 @@ export function webglRenderer(): string | null {
 export async function getGpuInfo(): Promise<string | null> {
   if (!hasWebGPU()) return null;
   try {
-    const adapter = await navigator.gpu.requestAdapter();
+    const adapter = await browserGpu()?.requestAdapter();
     const info = (adapter as unknown as { info?: { description?: string; vendor?: string; architecture?: string } })?.info;
     const gl = webglRenderer();
     if (gl) return gl;

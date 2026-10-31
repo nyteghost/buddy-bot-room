@@ -19,6 +19,8 @@ jobs:
             bash -n scripts/install-unraid-beta.sh
             docker compose -f docker-compose.unraid-beta.yml config --quiet
           fi
+      - name: TypeScript
+        run: bunx tsc --noEmit
       - name: Tests
         run: bun run test
       - name: Dependency security check (informational)
@@ -55,8 +57,8 @@ jobs:
           npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
       - name: Start the app
         run: |
-          mkdir -p "$RUNNER_TEMP/data"
-          BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
+          mkdir -p "$RUNNER_TEMP/data" "$RUNNER_TEMP/vault"
+          BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" OBSIDIAN_VAULT_DIR="$RUNNER_TEMP/vault" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
           for i in $(seq 1 40); do curl -fsS http://localhost:8090/__health >/dev/null && exit 0; sleep 1; done
           cat server.log; exit 1
       - name: Smoke test

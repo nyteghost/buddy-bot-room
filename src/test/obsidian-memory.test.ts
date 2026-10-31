@@ -9,6 +9,6 @@ describe("Obsidian memory format", () => {
  });
  it("accepts manual changes made in Obsidian", () => {
   const changed = renderMemoryNote(data).replace("Gentle encouragement", "Quiet encouragement");
-  expect(parseMemoryNote(changed).pal?.saiyan?.[0]?.text).toBe("Quiet encouragement");
+  expect(parseMemoryNote(changed).pal?.["saiyan"]?.[0]?.text).toBe("Quiet encouragement");
  });
 });

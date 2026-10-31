@@ -15,7 +15,7 @@ describe("readScheduleWorkbook (ExcelJS)", () => {
     sheet.getCell("C3").value = "OFF";
     sheet.getCell("A4").value = "101";
     const buffer = await workbook.xlsx.writeBuffer();
-    const file = new NodeFile([buffer], "schedule.xlsx");
+    const file = new NodeFile([new Uint8Array(buffer as unknown as ArrayBuffer)], "schedule.xlsx");
     const result = await readScheduleWorkbook(file as unknown as File, "Madjid");
     expect(result.people).toContain("Madjid");
     expect(result.shifts).toHaveLength(1);

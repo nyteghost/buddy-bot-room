@@ -8,6 +8,7 @@ import { TinyWins } from "./tiny-wins";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cleanStartStep, fallbackStartStep, whatCountsAsDone } from "@/lib/focus-assist";
 import { COMPANION_MODES, FOCUS_CHECKPOINT_KEY, companionActivity, readFocusCheckpoint, type CompanionMode, type FocusSession } from "@/lib/focus-companion";
+import { focusMemoryProposal } from "@/lib/focus-memory";
 import { useCharacterMode } from "@/lib/hellraiser";
 
 type Props = { session: FocusSession | null; onChange: (value: FocusSession | null) => void; paused?: boolean; onPauseChange?: (paused: boolean) => void };
@@ -160,6 +161,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
       <div className="flex flex-wrap gap-2">
         <Button size="sm" disabled={busy || paused} onClick={() => void nextStep()}><Check className="size-4" /> Done with step</Button>
         {onPauseChange && <Button variant="outline" size="sm" onClick={() => onPauseChange(!paused)}>{paused ? <Play className="size-4" /> : <Coffee className="size-4" />}{paused ? " I am back" : " Break together"}</Button>}
+        <Button variant="outline" size="sm" onClick={() => { window.dispatchEvent(new CustomEvent("pixelpals:review-memory", { detail: focusMemoryProposal(session) })); setNote("A summary is ready in Notes → Second Brain. Review it there before saving to Obsidian."); }}>Review in Second Brain</Button>
         <Button variant="outline" size="sm" onClick={save}><Bookmark className="size-4" /> Save my place</Button>
         <Button variant="outline" size="sm" disabled={workBusy || paused} onClick={() => void workTogether()}><FileText className="size-4" /> {workBusy ? "Preparing…" : "Pal: make a sample"}</Button>
       </div>

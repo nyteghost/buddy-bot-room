@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - name: TypeScript
+        run: bunx tsc --noEmit
       - run: bun run test
       - run: bun run build
 
@@ -49,8 +51,8 @@ jobs:
           npx --prefix "$RUNNER_TEMP/pw" playwright install --with-deps chromium
       - name: Start test server
         run: |
-          mkdir -p "$RUNNER_TEMP/data"
-          BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
+          mkdir -p "$RUNNER_TEMP/data" "$RUNNER_TEMP/vault"
+          BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" OBSIDIAN_VAULT_DIR="$RUNNER_TEMP/vault" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
           for i in $(seq 1 40); do curl -fsS http://localhost:8090/__health >/dev/null && exit 0; sleep 1; done
           cat server.log; exit 1
       - name: Browser smoke test
@@ -76,12 +78,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: image
         with:
           context: .
           target: prod
+          build-args: |
+            BUDDY_REF=beta
+            BUDDY_COMMIT=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=beta-${{ github.sha }}
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/buddy-bot-room:beta
             ghcr.io/${{ github.repository_owner }}/buddy-bot-room:beta-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify published immutable beta tag
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/buddy-bot-room:beta-${{ github.sha }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE" > published-image.txt
+          grep -F "$DIGEST" published-image.txt
+          echo "Published and verified $IMAGE ($DIGEST)" >> "$GITHUB_STEP_SUMMARY"

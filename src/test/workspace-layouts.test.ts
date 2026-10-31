@@ -24,7 +24,7 @@ describe("named and saved workspace layouts", () => {
   it("creates Chat, Mail, Work and Server arrangements", () => {
     const canvas = { width: 1000, height: 700 };
     const chat = presetWindowRects("chat", canvas);
-    expect(chat.room).toEqual({ x: 0, y: 0, w: 500, h: 700 });
+    expect(chat["room"]).toEqual({ x: 0, y: 0, w: 500, h: 700 });
     expect(chat["chat-my-pals"]).toEqual({ x: 500, y: 0, w: 500, h: 700 });
     expect(Object.keys(presetWindowRects("mail", canvas))).toEqual(["mail"]);
     expect(Object.keys(presetWindowRects("work", canvas))).toEqual(["tools", "documents"]);
@@ -33,8 +33,8 @@ describe("named and saved workspace layouts", () => {
   it("fits compact screens and restores saved coordinates proportionally", () => {
     const layout = readWorkspaceLayout(JSON.stringify({ canvas: { width: 1000, height: 700 }, windows: { mail: { x: 500, y: 0, w: 500, h: 700 } } }));
     expect(layout).not.toBeNull();
-    expect(scaleWorkspaceLayout(layout!, { width: 600, height: 400 }).mail).toEqual({ x: 300, y: 0, w: 300, h: 400 });
-    expect(presetWindowRects("work", { width: 600, height: 400 }).documents.w).toBe(600);
+    expect(scaleWorkspaceLayout(layout!, { width: 600, height: 400 })["mail"]).toEqual({ x: 300, y: 0, w: 300, h: 400 });
+    expect(presetWindowRects("work", { width: 600, height: 400 })["documents"]!.w).toBe(600);
   });
   it("rejects malformed saved layouts instead of applying them", () => {
     expect(readWorkspaceLayout("bad json")).toBeNull();

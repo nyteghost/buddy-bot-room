@@ -25,8 +25,8 @@ page.on("console", (m) => {
 });
 
 async function step(name, fn) {
-  try { await fn(); notes.push(`ok   ${name}`); }
-  catch (e) { problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); }
+  try { await fn(); notes.push(`ok   ${name}`); console.log(`ok   ${name}`); }
+  catch (e) { problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); console.log(`FAIL ${name}: ${e.message}`); }
 }
 
 await step("home page loads", async () => {
@@ -455,6 +455,45 @@ await step("planner file is served", async () => {
   const r = await page.request.get(`${URL_}/stage-planner.html`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
 });
+await step("Mail 2.0 folders, list and reader with controlled messages", async () => {
+  await page.route("**/api/mail", route => route.fulfill({ json: { configured: true, imap: true, m365: false, items: [], errors: [] } }));
+  await page.route("**/api/mailbox**", async route => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== "GET") throw Error("Smoke must not send or modify real mail");
+    const message = { uid: 101, subject: "Controlled smoke message", from: "Test sender", fromAddr: "test@example.invalid", date: "2026-10-31T12:00:00Z", seen: false, messageId: "smoke-message", text: "A safe test message body.", to: "owner@example.invalid", cc: "", attachments: [], files: [], references: "" };
+    await route.fulfill({ json: url.searchParams.get("op") === "read" ? { message } : { folder: "INBOX", folders: [{ name: "INBOX", label: "Inbox", special: "inbox" }], messages: [message], total: 1, account: "owner@example.invalid", gmail: false } });
+  });
+  const picker = page.getByRole("combobox", { name: "Workspace layout" });
+  await picker.selectOption("chat");
+  await picker.selectOption("mail");
+  const mail = page.locator('[data-window-id="mail"]');
+  await mail.getByRole("button", { name: "Refresh", exact: true }).click();
+  await mail.locator(".mail-message-row > button:first-child").filter({ hasText: "Controlled smoke message" }).click();
+  await mail.getByText("A safe test message body.", { exact: true }).waitFor();
+  if (!await mail.locator(".mail-list").isVisible() || !await mail.locator(".mail-detail").isVisible()) throw Error("Mail list and reader must stay visible together in a wide window");
+  if (!await mail.getByRole("navigation", { name: "Mail folders" }).isVisible()) throw Error("Folder navigation missing in a wide window");
+  await page.screenshot({ path: process.env.SMOKE_MAIL_SHOT || "/tmp/pixel-mail-desktop.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  if (await mail.locator(".mail-list").isVisible()) throw Error("Phone reader should replace the list");
+  await mail.getByRole("button", { name: "Back", exact: true }).click();
+  if (!await mail.locator(".mail-list").isVisible()) throw Error("Back did not restore the phone message list");
+  await page.screenshot({ path: "/tmp/pixel-mail-mobile.png" });
+  await page.unroute("**/api/mailbox**");
+  await page.unroute("**/api/mail");
+});
+await step("Second Brain approved note lifecycle in the throwaway vault", async () => {
+  const now = new Date().toISOString();
+  const note = { id: "smoke-" + Date.now(), category: "Focus Sessions", title: "Smoke checkpoint", body: "Next step: open a blank page", createdAt: now, updatedAt: now, source: "task-progress", tags: [] };
+  const savedResponse = await page.request.post(`${URL_}/api/second-brain`, { data: { op: "save", note } });
+  if (!savedResponse.ok()) throw Error(`Vault save failed: ${savedResponse.status()}`);
+  const saved = (await savedResponse.json()).note;
+  const found = await page.request.get(`${URL_}/api/second-brain?q=checkpoint`);
+  if (!(await found.json()).notes.some(n => n.id === saved.id)) throw Error("Approved note was not found");
+  const stale = await page.request.post(`${URL_}/api/second-brain`, { data: { op: "save", note: saved, revision: "stale" } });
+  if (stale.status() !== 409) throw Error("Stale memory edit was accepted");
+  const trashed = await page.request.post(`${URL_}/api/second-brain`, { data: { op: "trash", id: saved.id, revision: saved.revision } });
+  if (!trashed.ok()) throw Error("Could not soft-trash the test note");
+});
 await step("mobile chat uses clean full-screen layout and collapsible settings", async () => {
   await page.setViewportSize({ width: 390, height: 780 });
   await page.locator('.mobile-tabbar button', { hasText: "Pals" }).click();
@@ -482,6 +521,28 @@ await step("mobile chat uses clean full-screen layout and collapsible settings",
   await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Notes" }).click();
   const shell = await page.locator(".modular-workspace").evaluate(e => ({ body: e.scrollWidth, view: e.clientWidth }));
   if (shell.body > shell.view + 4) throw Error("Mobile shell has horizontal overflow");
+});
+await step("Mobile UI 3.0 tool navigation at narrow and wide phone sizes", async () => {
+  for (const width of [320, 390, 700]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const [label, id] of [["Home", "today"], ["Tasks", "tasks"], ["Pals", "chat-my-pals"], ["Notes", "notes"], ["Calendar", "calendar"], ["Mail", "mail"], ["Documents", "documents"], ["Recorder", "recorder"], ["Fun", "fun"], ["Playtests", "playtests"], ["Settings", "setup"]]) {
+      if (["Home", "Tasks", "Pals"].includes(label)) await page.locator(".mobile-tabbar").getByRole("button", { name: label, exact: true }).click();
+      else {
+        await page.locator("#mobile-more-trigger").click();
+        await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: label, exact: true }).click();
+      }
+      const panel = page.locator(`[data-window-id="${id}"]`);
+      await panel.waitFor({ state: "visible" });
+      const visible = await page.locator(".workspace-window:visible").count();
+      if (visible !== 1) throw Error(`${label}: ${visible} windows visible at ${width}px`);
+      const size = await panel.evaluate(e => ({ scroll: e.scrollWidth, width: e.clientWidth }));
+      if (size.scroll > size.width + 4) throw Error(`${label} overflows at ${width}px`);
+      if (await panel.locator(".window-resize:visible").count()) throw Error(`${label} shows desktop resize handles`);
+    }
+    await page.locator("#mobile-more-trigger").click();
+    await page.keyboard.press("Escape");
+    if (await page.locator("#mobile-more-trigger").getAttribute("aria-expanded") !== "false") throw Error("Escape did not close More");
+  }
 });
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);

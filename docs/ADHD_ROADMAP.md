@@ -21,13 +21,13 @@
 | Daily planning | Morning and shutdown notes stored intentionally in the local browser for that day | Beta implementation |
 | Tiny Quests | Optional local session-only decoration rewards based on explicitly marked steps | Beta implementation |
 | Real AI body doubling | Owner-triggered local-only sample artifact beside the task, with safe offline fallback; never reads or edits outside apps | Partial; approved integrations remain future work |
-| Mail refresh | Explainable subject-only follow-up hints, opt-in review in Brain Dump, no automatic mail changes or sends | Partial; three-pane responsive redesign and body summaries remain future work |
-| Pal personality & memory | Existing themed roles, Pal-specific memories, project notes, and saved checkpoints | Existing; further continuity enhancements planned |
+| Mail refresh | Explainable subject-only follow-up hints, opt-in review in Brain Dump, no automatic mail changes or sends | Responsive folder/list/reader beta implemented; optional local body summaries remain future work |
+| Pal personality & memory | Existing themed roles, Pal-specific memories, project notes, and saved checkpoints | Focus checkpoint → reviewed Second Brain note implemented; further continuity planned |
 | Reliability & accessibility | Existing local AI safeguards, fallback paths, reduced-motion support, tests, release gates | Ongoing |
 
 ## Remaining longer-term work
 1. **Connected work with explicit permission and undo**: fine-grained scopes per app and file, preview each proposed write, confirmation, audit trail, safe undo, and no unprompted actions.
-2. **Mail 2.0 layout**: responsive three-pane navigation and optional local-only message summaries after mailbox permission review.
+2. **Mail 2.0**: responsive navigation is implemented in beta; optional local-only message summaries still require mailbox permission review.
 3. **More useful personal continuity**: named reusable project context with opt-in local saving, easy review/deletion and no private information sent to cloud AI by default.
 4. **Visual time blindness support**: configurable visual time horizon, quieter transitions and notifications only after an explicit choice.
 5. **Accessibility review**: keyboard, screen reader, mobile focus and responsive workspace testing.
@@ -39,3 +39,8 @@
 - Browser smoke tests cover Pick for Me / Today, Brain Dump categorization and day placement, the Pal quest, and owner-initiated sample work.
 - No changes to main without owner testing.
 - Never characterize mock or animated Pal work as actual access to screens, files, email or tools.
+
+
+## Mobile UI 3.0 / continuity beta (October 31)
+
+See [BETA_MOBILE_3.md](BETA_MOBILE_3.md) for release scope and owner checks, and [SECOND_BRAIN.md](SECOND_BRAIN.md) for current notebook behavior. Shared mobile controls, tool navigation, responsive Mail panes, content-revision conflict checks, and a reviewable Focus Assist notebook summary are implemented. Remaining longer-term items above stay open; a successful automated build does not replace real Unraid, iOS or mailbox testing.

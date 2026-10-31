@@ -10,13 +10,13 @@ export type Entry = { id: string; text: string; at: number; /** Always sent to t
 export type Todo = Entry & {
   done: boolean;
   source?: "brain-dump";
-  important?: boolean;
-  reminderAt?: number;
-  reminderId?: string;
+  important?: boolean | undefined;
+  reminderAt?: number | undefined;
+  reminderId?: string | undefined;
   /** Task timing does not require an alert. */
-  scheduledAt?: number;
+  scheduledAt?: number | undefined;
   /** For date-only tasks, without making up a clock time. */
-  dueDate?: string;
+  dueDate?: string | undefined;
 };
 /** `pal` holds memories only one pal sees, keyed by agent id. */
 export type Workbench = { memories: Entry[]; notes: Entry[]; todos: Todo[]; pal?: Record<string, Entry[]> | undefined; /** Memories that only apply while that project is active. */ project?: Record<string, Entry[]> | undefined };

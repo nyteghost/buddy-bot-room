@@ -50,7 +50,7 @@ export function WorkspaceLayoutMenu({ onShow }: { onShow: (visibleIds: string[])
     if (bounds.width < 1 || bounds.height < 1) return;
     const windows: Record<string, WindowRect> = {};
     for (const win of el.querySelectorAll<HTMLElement>(".workspace-window:not([hidden])")) {
-      const id = win.dataset.windowId;
+      const id = win.dataset["windowId"];
       if (!id || !/^[a-z0-9-]{1,40}$/.test(id)) continue;
       const r = win.getBoundingClientRect();
       windows[id] = fitWindowRect({ x: r.left - canvasBounds.left, y: r.top - canvasBounds.top, w: r.width, h: r.height }, bounds);

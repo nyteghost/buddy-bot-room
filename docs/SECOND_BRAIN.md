@@ -1,22 +1,26 @@
-# Second Brain for Pixel Pals (beta foundation)
+# Second Brain for Pixel Pals (beta)
 
-Pixel Pals already has browser memory and an optional mounted Obsidian vault. This feature is an **additional**, opt-in memory foundation, not a replacement for existing memories, and not yet a completed app integration.
+Second Brain is an optional, owner-controlled notebook in the mounted Obsidian vault. Open **Notes → Second Brain → Connect to Obsidian**. `OBSIDIAN_VAULT_DIR` identifies the server mount; requests cannot choose another vault.
 
-## Implemented in this change
-- `src/lib/second-brain.ts`: typed Markdown memory categories, a fixed PixelPals subfolder namespace, safe note-path construction, lightweight offline keyword retrieval, capped context formatting, and explicit memory proposals.
-- `src/lib/second-brain.test.ts`: unit tests for isolation, search, context labeling, and proposals.
-- No cloud service, model, extra dependency, database migration, user-data access, automatic memory collection, or chat behavior change is introduced.
+## Available in beta
 
-## Planned integration (not implemented yet)
-1. Build an owner-authenticated server adapter for the existing mounted /vault location; validate real paths and prevent symlink traversal. Create notes only under `/vault/PixelPals/`; leave any ShowPilot folder alone. Never let an HTTP request supply a vault root.
-2. Add a Settings → Second Brain opt-in panel. Show the resolved vault status, allow a safe create/search/edit/trash workflow, and a preview/approve queue for proposed memories. Turn automatic extraction OFF by default. Treat personal or sensitive information as requiring explicit review.
-3. Bridge confirmed personal preferences, projects, and Focus Assist session progress into the notebook using minimal summaries; never scrape or save complete conversations automatically.
-4. Add a retrieval toggle for chat and Focus Assist. Limit retrieved excerpts, label them untrusted, and apply privacy rules before ever supplying them to a model. No cloud notebook context by default.
-5. Add easy backup/export and restore checks; consider optional Obsidian linking and stale-note/conflict review.
-6. Verify local/Unraid installation, accounts, tests, and end-to-end write/search/restart/restore before promoting to main.
+- Create, search, edit and soft-trash approved Markdown notes under `PixelPals/Preferences`, `Projects`, `Focus Sessions`, `Decisions`, and `Lessons Learned`.
+- Content revisions detect edits made directly in Obsidian even when the note's frontmatter timestamp is unchanged. A conflict keeps your browser draft; copy it, refresh the list, and review the latest note before editing again.
+- Editing a title keeps the existing filename. Notes renamed in Obsidian remain editable if the filename retains its `--<id>.md` suffix. Categories are fixed while editing an existing note.
+- Focus Assist's **Review in Second Brain** prepares a minimal task/checkpoint summary in Notes. Review, remove private details, and choose **Edit and approve**, then **Save approved note**. No automatic notebook write or conversation capture occurs.
+- The optional per-browser **local-only Second Brain chat retrieval** switch defaults off. Relevant short excerpts are labelled untrusted data; cloud engines do not receive notebook excerpts through this feature.
+- **Use as Pal memory** copies the chosen note into browser memory by explicit action. Browser Pal memories and the separate Obsidian Memory Markdown bridge remain available.
 
-## Notes
-The upstream `NicholasSpisak/second-brain` is inspiration, not a dependency or installed runtime component. This code does **not** automatically install that project or claim its features.
-The currently configured Unraid compose mounts a vault at `/vault`; confirm deployment permissions, ownership, backup policy, and whether the intended vault is appropriate before enabling writes.
+## Data boundaries and recovery
 
-**Status: foundation only, not user-ready.** No settings switch or automatic memory learning has been activated.
+ShowPilot and other vault directories are outside the notebook namespace. Symlinked notebook directories are rejected before creating children. New files use exclusive creation; edits use a temporary file and replacement. Soft-deleted notes go to the vault's `.trash` folder, which must be a real directory, not a symlink.
+
+Back up the mounted vault separately from Pixel Pals' `/data` volume. The app's data-volume backup does not automatically include a separately mounted `/vault`. Restore a trashed note with Obsidian or your file manager; retain its `--<id>.md` suffix and category folder. Back up both the beta data and the vault before testing an update.
+
+## Still requiring validation or future work
+
+- Real Unraid filesystem permissions and Obsidian editing/restart/restore tests on the owner's installation.
+- An in-app notebook export/restore workflow and richer proposal history.
+- Explicitly scoped integrations with preview and undo. No autonomous external-app edits are enabled.
+
+`NicholasSpisak/second-brain` is inspiration only, not an installed dependency. Automatic extraction and complete conversation archiving are not enabled by this feature.

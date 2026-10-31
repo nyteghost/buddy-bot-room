@@ -18,6 +18,8 @@ export interface BrainNote {
   updatedAt: string;
   source: MemorySource;
   tags: string[];
+  /** Content revision supplied by the vault adapter, never a client timestamp. */
+  revision?: string;
 }
 export interface MemoryProposal {
   category: SecondBrainCategory;

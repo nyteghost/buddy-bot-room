@@ -23,10 +23,11 @@ export async function handleObsidianMemory(request: Request): Promise<Response> 
   if (raw.length > 150000) return reply({ error: "Too large" }, 413);
   const body = JSON.parse(raw) as { revision?: string; memories?: ReturnType<typeof parseMemoryNote> };
   if (typeof body.revision !== "string" || !/^[a-f0-9]{64}$/.test(body.revision) || !body.memories || !Array.isArray(body.memories.memories) || body.memories.memories.length > 100) return reply({ error: "Invalid memory payload" }, 400);
+  const memories = body.memories;
   return await locked(async () => {
    const before = await read();
    if (body.revision !== await sha(before)) return reply({ error: "Obsidian was edited since your last load. Reload to avoid overwriting it." }, 409);
-   const md = renderMemoryNote(body.memories);
+   const md = renderMemoryNote(memories);
    if (md.length > 150000) return reply({ error: "Memory note too large" }, 413);
    const f = await fs();
    await f.mkdir(folder() + "/obsidian", { recursive: true });

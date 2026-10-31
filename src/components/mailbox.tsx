@@ -59,10 +59,7 @@ export function Mailbox({ open }: { open: boolean }) {
   }, [account]);
   useEffect(() => {
     if (!account || view !== "compose") return;
-    const timer = window.setTimeout(() => {
-      writeMailDraft(sessionStorage, account, draft);
-    }, 350);
-    return () => window.clearTimeout(timer);
+    writeMailDraft(sessionStorage, account, draft);
   }, [account, draft, view]);
   const [busy, setBusy] = useState("");
   const [confirm, setConfirm] = useState<"" | "send" | "delete">("");
@@ -72,10 +69,13 @@ export function Mailbox({ open }: { open: boolean }) {
   // Only the newest list request may update the screen: switching folders quickly cancels the older request, and a late answer is ignored.
   const listReq = useRef<{ id: number; ctl: AbortController | null }>({ id: 0, ctl: null });
   const readReq = useRef<AbortController | null>(null);
-  useEffect(() => () => { listReq.current.ctl?.abort(); readReq.current?.abort(); }, []);
+  const pagingReq = useRef<AbortController | null>(null);
+  useEffect(() => () => { listReq.current.ctl?.abort(); readReq.current?.abort(); pagingReq.current?.abort(); }, []);
   const load = useCallback(async (f = folder, search = q, onlyUnread = unread, fresh = false) => {
     listReq.current.ctl?.abort();
     readReq.current?.abort();
+    pagingReq.current?.abort();
+    setBusy("");
     const ctl = new AbortController();
     const id = ++listReq.current.id;
     listReq.current.ctl = ctl;
@@ -92,9 +92,13 @@ export function Mailbox({ open }: { open: boolean }) {
 
   const loadOlder = async () => {
     if (!data || more) return;
+    const generation = listReq.current.id;
+    const ctl = new AbortController();
+    pagingReq.current?.abort(); pagingReq.current = ctl;
     setMore(true);
     const params = new URLSearchParams({ op: "list", folder: data.folder, offset: String(data.messages.length), ...(q.trim() ? { q: q.trim() } : {}), ...(unread ? { unread: "1" } : {}) });
-    const res = await call<ListData>(`/api/mailbox?${params}`);
+    const res = await call<ListData>(`/api/mailbox?${params}`, undefined, ctl.signal);
+    if (ctl.signal.aborted || generation !== listReq.current.id) return;
     setMore(false);
     if (res.error || res.aborted) { if (res.error) setError(res.error); return; }
     setData((d) => {
@@ -187,8 +191,7 @@ export function Mailbox({ open }: { open: boolean }) {
 
   const inTrash = data?.folders.find((f) => f.name === folder)?.special === "trash" || data?.folders.find((f) => f.name === folder)?.special === "junk";
 
-  if (view === "compose") {
-    return (
+  const composePane = () => (
       <div className="grid gap-2">
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => { setView(msg ? "read" : "list"); setConfirm(""); }}><ArrowLeft className="size-4" /> Back</Button>
@@ -196,10 +199,10 @@ export function Mailbox({ open }: { open: boolean }) {
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { if (account) writeMailDraft(sessionStorage, account, null); setDraft(blankMailDraft()); setDraftRestored(false); setConfirm(""); }}>Discard draft</Button>
         </div>
         <Input aria-label="To" placeholder="To (separate several with commas)" value={draft.to} onChange={(e) => { setDraft({ ...draft, to: e.target.value }); setConfirm(""); }} />
-        <Input aria-label="Cc" placeholder="Cc (optional)" value={draft.cc} onChange={(e) => setDraft({ ...draft, cc: e.target.value })} />
-        <Input aria-label="Subject" placeholder="Subject" value={draft.subject} onChange={(e) => setDraft({ ...draft, subject: e.target.value })} />
+        <Input aria-label="Cc" placeholder="Cc (optional)" value={draft.cc} onChange={(e) => { setDraft({ ...draft, cc: e.target.value }); setConfirm(""); }} />
+        <Input aria-label="Subject" placeholder="Subject" value={draft.subject} onChange={(e) => { setDraft({ ...draft, subject: e.target.value }); setConfirm(""); }} />
         <textarea aria-label="Message" className="min-h-48 w-full rounded-md border bg-background px-2 py-1 text-sm" placeholder="Write your message" value={draft.text} onChange={(e) => { setDraft({ ...draft, text: e.target.value }); setConfirm(""); }} />
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant={confirm === "send" ? "destructive" : "default"} disabled={busy === "send" || !draft.to.trim()} onClick={() => void send()}>
             {busy === "send" ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />} {confirm === "send" ? "Really send it" : "Send"}
@@ -209,9 +212,9 @@ export function Mailbox({ open }: { open: boolean }) {
         <span className="text-xs text-muted-foreground">{account ? `${draftRestored ? "Recovered draft. " : ""}Unsent changes are saved in this browser tab (not sent to the server).` : "Drafts can be saved after your mailbox connects."} Plain text only, no attachments.</span>
       </div>
     );
-  }
 
-  if (view === "read" && msg) {
+  const readPane = () => {
+    if (!msg) return null;
     const targets = (data?.folders ?? []).filter((f) => f.name !== folder);
     return (
       <div className="grid gap-2">
@@ -239,7 +242,7 @@ export function Mailbox({ open }: { open: boolean }) {
             })}
           </div>
         ) : msg.attachments.length > 0 && <span className="text-xs text-muted-foreground">Attachments: {msg.attachments.join(", ")}</span>}
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => startReply(msg)} disabled={!msg.fromAddr}><Reply className="size-3" /> Reply</Button>
           <Button size="sm" variant={confirm === "delete" ? "destructive" : "outline"} disabled={busy === "delete"} onClick={() => void doDelete()}>
@@ -270,12 +273,19 @@ export function Mailbox({ open }: { open: boolean }) {
         )}
       </div>
     );
-  }
+  };
 
+  const folders = data?.folders ?? [{ name: "INBOX", label: "Inbox", special: "inbox" as const }];
+  const changeFolder = (name: string) => { setFolder(name); setNote(""); setView("list"); setMsg(null); setConfirm(""); void load(name); };
   return (
-    <div className="grid gap-2">
+    <div className="mail-workspace" data-mail-view={view}>
+    <nav className="mail-folders" aria-label="Mail folders">
+      <h3>Mail</h3>
+      {folders.map(f => <button type="button" key={f.name} aria-current={folder === f.name ? "page" : undefined} onClick={() => changeFolder(f.name)}>{f.special === "inbox" ? "Inbox" : f.label}</button>)}
+    </nav>
+    <section className="mail-list grid gap-2" aria-label="Message list" aria-busy={loading}>
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Folder" className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" value={folder} onChange={(e) => { setFolder(e.target.value); setNote(""); void load(e.target.value); }}>
+        <select aria-label="Folder" className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" value={folder} onChange={(e) => changeFolder(e.target.value)}>
           {(data?.folders ?? [{ name: "INBOX", label: "INBOX", special: "inbox" as const }]).map((f) => <option key={f.name} value={f.name}>{f.special === "inbox" ? "Inbox" : f.label}</option>)}
         </select>
         <Button size="sm" variant="ghost" className="h-8" onClick={() => void load(folder, q, unread, true)} aria-label="Refresh"><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} /></Button>
@@ -294,14 +304,15 @@ export function Mailbox({ open }: { open: boolean }) {
         </label>
       </div>
       <p className="text-xs text-muted-foreground">Possible follow-ups are based only on subject keywords. Read the message to decide; no automatic AI analysis, replies or task creation.</p>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-      {note && <p className="text-xs text-green-600 dark:text-green-400">✅ {note}</p>}
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {note && <p role="status" className="text-xs text-green-600 dark:text-green-400">✅ {note}</p>}
+      {loading && <p role="status" className="text-xs text-muted-foreground">Loading messages…</p>}
       {data && !(followupsOnly ? data.messages.filter(m => followupHint(m)).length : data.messages.length) && !error && <p className="text-muted-foreground">{followupsOnly ? "No obvious follow-up subjects in these loaded messages." : q || unread ? "Nothing matches." : "This folder is empty."}</p>}
       {data?.messages.filter(m => !followupsOnly || followupHint(m)).map((m) => {
         const link = data.gmail && data.account ? gmailLink(data.account, m.messageId) : null;
         return (
-          <div key={m.uid} className="flex items-stretch gap-1">
-            <button type="button" onClick={() => void openMessage(m)} className="grid min-w-0 flex-1 gap-0.5 rounded-md border px-3 py-2 text-left hover:bg-accent/40" disabled={busy === `open${m.uid}`}>
+          <div key={m.uid} className="mail-message-row flex items-stretch gap-1">
+            <button type="button" onClick={() => void openMessage(m)} aria-current={msg?.uid === m.uid && view === "read" ? "true" : undefined} className="grid min-w-0 flex-1 gap-0.5 rounded-md border px-3 py-2 text-left hover:bg-accent/40" disabled={busy === `open${m.uid}`}>
               <span className={`truncate ${m.seen ? "" : "font-semibold"}`}>{!m.seen && <span className="mr-1 text-primary">●</span>}{m.subject}</span>
               <span className="truncate text-xs text-muted-foreground">{m.from}{when(m.date) ? ` · ${when(m.date)}` : ""}</span>
               {followupHint(m) && <span className="text-xs text-muted-foreground">Possible follow-up</span>}
@@ -318,6 +329,10 @@ export function Mailbox({ open }: { open: boolean }) {
           <span className="text-xs text-muted-foreground">Showing the newest {data.messages.length} of {data.total}.</span>
         </div>
       )}
+    </section>
+    <section className="mail-detail" aria-label={view === "compose" ? "Compose message" : "Message reader"}>
+      {view === "compose" ? composePane() : view === "read" ? readPane() : <p className="text-sm text-muted-foreground">Choose a message to read, or Write to start a draft.</p>}
+    </section>
     </div>
   );
 }

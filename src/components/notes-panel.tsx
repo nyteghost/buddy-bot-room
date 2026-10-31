@@ -123,7 +123,7 @@ function ObsidianNotes() {
   const load = useCallback(async () => {
     setBusy(true);
     const res = await notesCall<{ configured: boolean; reachable?: boolean; notes?: VaultNote[]; newFolder?: string; truncated?: boolean }>("/api/vault?op=list");
-    setState({ configured: res.configured !== false && !(res.error && res.configured === undefined), reachable: res.reachable, notes: res.notes ?? [], newFolder: res.newFolder ?? "", truncated: !!res.truncated, ...(res.error ? { error: res.error } : {}) });
+    setState({ configured: res.configured !== false && !(res.error && res.configured === undefined), ...(res.reachable === undefined ? {} : { reachable: res.reachable }), notes: res.notes ?? [], newFolder: res.newFolder ?? "", truncated: !!res.truncated, ...(res.error ? { error: res.error } : {}) });
     setBusy(false);
   }, []);
   useEffect(() => {

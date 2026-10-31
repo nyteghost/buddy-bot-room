@@ -30,6 +30,7 @@ export function ensureMigrated(): Promise<MigrationReport | null> {
     const root = dir();
     if (!root) return null;
     try {
+      await (await fsp()).mkdir(root, { recursive: true, mode: 0o700 });
       const kv = dataFolderKV(root);
       const rec = parseRecord(await kv.get(SERVER_VERSION_FILE));
       const last = serverMigrations[serverMigrations.length - 1]?.id ?? 0;

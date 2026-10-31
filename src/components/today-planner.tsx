@@ -143,7 +143,7 @@ export function TodayPlanner() {
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Do this now</div>
             <div className="text-lg font-semibold leading-snug">{pick.title}</div>
             {state?.pick?.reason && <div className="text-sm">{state.pick.reason}</div>}
-            {state?.focus?.id !== pick.id && <FocusStart id={pick.id} mins={pick.mins} busy={!!busy} run={run} />}
+            {state?.focus?.id !== pick.id && <FocusStart id={pick.id} {...(pick.mins === undefined ? {} : { mins: pick.mins })} busy={!!busy} run={run} />}
             <div className="flex flex-wrap gap-2">
               <Button className="h-11" disabled={!!busy} onClick={() => void run("done", { op: "done", id: pick.id })}><Check className="size-4" /> Done</Button>
               <Button variant="outline" className="h-11" disabled={!!busy} onClick={() => void run("whatnow", { op: "whatnow", id: pick.id, area })}><SkipForward className="size-4" /> Not this one</Button>

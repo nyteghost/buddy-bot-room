@@ -292,7 +292,7 @@ export function Room() {
   const partnerChoice = partner;
   const [desktopApp, setDesktopApp] = useState(false);
   useEffect(() => setDesktopApp(isTauri()), []);
-  const startRef = useRef<(ask?: { partner: AgentId; text: string }, override?: string) => Promise<void>>(async () => {});
+  const startRef = useRef<(ask?: { partner: AgentId; text: string }, override?: string, inMode?: Mode) => Promise<void>>(async () => {});
   useEffect(() => {
     const onAsk = (e: Event) => {
       const detail = (e as CustomEvent<{ partner: AgentId; text: string }>).detail;
@@ -403,15 +403,33 @@ export function Room() {
   const [funOpen, setFunOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  useEffect(() => {
+    if (!mobileMoreOpen) return;
+    document.querySelector<HTMLButtonElement>("#mobile-more-tools button")?.focus();
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target as Element;
+      if (!target.closest("#mobile-more-tools, #mobile-more-trigger")) setMobileMoreOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [mobileMoreOpen]);
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
-  function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar") {
+  function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar" | "documents" | "fun" | "recorder" | "playtests" | "setup") {
     setOpenModes(perMode(() => false));
     setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
     setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
-    setToolsOpen(false); setFunOpen(false); setSetupOpen(false); setSearchOpen(false); setRecorderOpen(false);
+    setToolsOpen(false); setFunOpen(tab === "fun"); setSetupOpen(tab === "setup"); setSearchOpen(false); setRecorderOpen(tab === "recorder"); setDocsOpen(tab === "documents"); setPlaytestsOpen(tab === "playtests"); setAddonOpen(null);
     if (tab === "chat") { showMode(myPalsMode); setMode(myPalsMode); }
   }
+  useEffect(() => {
+    const reviewMemory = () => {
+      if (window.matchMedia("(max-width: 700px)").matches) mobileTab("notes");
+      else setNotesOpen(true);
+    };
+    window.addEventListener("pixelpals:review-memory", reviewMemory);
+    return () => window.removeEventListener("pixelpals:review-memory", reviewMemory);
+  }, []);
   const [mailOpen, setMailOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
@@ -2124,18 +2142,22 @@ export function Room() {
           </main>
         </div>
       </div>
-      {mobileMoreOpen && <div className="mobile-more-menu" role="group" aria-label="More mobile tools">
+      {mobileMoreOpen && <div id="mobile-more-tools" className="mobile-more-menu" role="group" aria-label="More mobile tools" onKeyDown={e => { if (e.key === "Escape") { setMobileMoreOpen(false); document.getElementById("mobile-more-trigger")?.focus(); } }}>
         <button type="button" onClick={() => { mobileTab("notes"); setMobileMoreOpen(false); }}><ListTodo /> Notes</button>
         <button type="button" onClick={() => { mobileTab("room"); setMobileMoreOpen(false); }}><Users /> Pal Room</button>
         <button type="button" onClick={() => { mobileTab("calendar"); setMobileMoreOpen(false); }}><CalendarDays /> Calendar</button>
         <button type="button" onClick={() => { mobileTab("mail"); setMobileMoreOpen(false); }}><Mail /> Mail</button>
-        <button type="button" onClick={() => { setMobileMoreOpen(false); mobileTab("chat"); setOpenModes(o => ({ ...o, [mode]: false })); setSetupOpen(true); }}><Settings2 /> Settings</button>
+        <button type="button" onClick={() => { mobileTab("documents"); setMobileMoreOpen(false); }}><FileText /> Documents</button>
+        <button type="button" onClick={() => { mobileTab("recorder"); setMobileMoreOpen(false); }}><Mic /> Recorder</button>
+        <button type="button" onClick={() => { mobileTab("fun"); setMobileMoreOpen(false); }}><Gamepad2 /> Fun</button>
+        <button type="button" onClick={() => { mobileTab("playtests"); setMobileMoreOpen(false); }}><FlaskConical /> Playtests</button>
+        <button type="button" onClick={() => { setMobileMoreOpen(false); mobileTab("setup"); }}><Settings2 /> Settings</button>
       </div>}
       <nav className="mobile-tabbar" aria-label="Windows">
         <button type="button" aria-pressed={todayOpen} onClick={() => { mobileTab("today"); setMobileMoreOpen(false); }}><Sun /><span>Home</span></button>
         <button type="button" aria-pressed={tasksOpen} onClick={() => { mobileTab("tasks"); setMobileMoreOpen(false); }}><CheckSquare /><span>Tasks</span></button>
         <button type="button" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => { mobileTab("chat"); setMobileMoreOpen(false); }}><MessageSquare /><span>Pals</span></button>
-        <button type="button" aria-pressed={mobileMoreOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen} aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
+        <button type="button" aria-pressed={mobileMoreOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen || docsOpen || recorderOpen || funOpen || playtestsOpen} id="mobile-more-trigger" aria-controls="mobile-more-tools" aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
       </nav>
       <footer className="app-footer">
         <span>SMALL PIXELS. BIG PERSPECTIVES.</span>

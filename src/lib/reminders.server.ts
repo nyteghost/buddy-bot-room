@@ -148,7 +148,7 @@ export async function handleReminders(request: Request): Promise<Response> {
     if (!Number.isSafeInteger(at) || at < Date.now() + 10_000 || at > Date.now() + 366 * 86_400_000)
       return Response.json({ error: "Choose a future time within the next year." }, { status: 400 });
     const id = crypto.randomUUID().slice(0, 8);
-    const added = await updateReminders(async (current) => {
+    const added = await updateReminders<{ ok: true } | { ok: false; error: string }>(async (current) => {
       const result = addReminder(current, at, title, id, undefined, { important: body.important === true });
       return result.ok
         ? { list: result.list, result: { ok: true as const } }

@@ -40,7 +40,10 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   const key = `pixel-pals-window-${id}-v1`;
   const sizeKey = `pixel-pals-window-${id}-size-v1`;
   useEffect(() => {
-    if (open) setFront(++windowStack);
+    if (open) {
+      setFront(++windowStack);
+      if (window.matchMedia("(max-width: 700px)").matches) ref.current?.focus({ preventScroll: true });
+    }
   }, [open]);
   useEffect(() => {
     try {
@@ -209,7 +212,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
     "--window-h": size ? `${size.h}px` : undefined,
     zIndex: front,
   } as CSSProperties;
-  return <section ref={ref} aria-label={title} hidden={!open} style={style}
+  return <section ref={ref} tabIndex={-1} aria-label={title} hidden={!open} style={style}
     data-window-id={id}
     className={cn("workspace-window", `window-${id}`, className, size && "window-sized", expanded && "window-expanded")}
     onPointerDownCapture={() => setFront(++windowStack)}>

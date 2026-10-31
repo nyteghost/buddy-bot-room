@@ -125,7 +125,7 @@ export function MemorySection() {
       const data = await response.json() as { revision?: string; error?: string };
       if (!response.ok || !data.revision) throw Error(data.error ?? "Vault save failed");
       setVaultRevision(data.revision);
-      setVaultPreview({ memories:w.memories,pal:w.pal,project:w.project });
+      setVaultPreview({ memories:w.memories,pal:w.pal??{},project:w.project??{} });
       setVaultMessage("Saved to Obsidian Markdown on your Unraid data volume.");
     } catch (error) { setVaultMessage(error instanceof Error ? error.message : "Could not save the vault."); }
     finally { setVaultPending(false); }
