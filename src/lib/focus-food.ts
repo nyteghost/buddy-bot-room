@@ -1,8 +1,9 @@
+import { readFoodChat, type FoodChatTurn } from "./food-chat";
 import { readPowderAddition, type PowderAddition } from "./protein-powder";
 import { readFoodMacros, type FoodMacros } from "./food-macros";
 export const FOOD_KEY = "pixel-pals-focus-food-v1";
 export type FoodRecipe = { powderAddition?: PowderAddition; title: string; ingredients: string[]; steps: string[]; servings: string; source: string; nutrition: string };
-export type FoodSession = { macroCheck?: FoodMacros; version: 1; recipe: FoodRecipe; index: number; checked: number[]; stage: "prep" | "cook" | "done"; portions: string; timer: { label: string; end: number } | null };
+export type FoodSession = { chatHistory?: FoodChatTurn[]; macroCheck?: FoodMacros; version: 1; recipe: FoodRecipe; index: number; checked: number[]; stage: "prep" | "cook" | "done"; portions: string; timer: { label: string; end: number } | null };
 const line = (v: unknown, max: number): v is string => typeof v === "string" && !!v.trim() && v.length <= max;
 export function validRecipe(value: unknown): FoodRecipe | null {
   if (!value || typeof value !== "object") return null;
@@ -40,7 +41,8 @@ export function readFoodSession(raw: string | null): FoodSession | null {
     if (!recipe || s.version !== 1 || !["prep", "cook", "done"].includes(s.stage) || !Number.isInteger(s.index) || s.index < 0 || s.index >= recipe.steps.length || !Array.isArray(s.checked) || s.checked.length > recipe.ingredients.length || !s.checked.every(x => Number.isInteger(x) && x >= 0 && x < recipe.ingredients.length) || typeof s.portions !== "string" || s.portions.length > 80) return null;
     if (s.timer !== null && (!s.timer || !line(s.timer.label, 80) || !Number.isFinite(s.timer.end) || s.timer.end < 0)) return null;
     const macroCheck = readFoodMacros(s.macroCheck);
-    return { ...(macroCheck ? { macroCheck } : {}), version: 1, recipe, index: s.index, checked: [...new Set(s.checked)], stage: s.stage, portions: s.portions, timer: s.timer };
+    const chatHistory = readFoodChat(s.chatHistory, recipe.steps.length);
+    return { ...(chatHistory.length ? { chatHistory } : {}), ...(macroCheck ? { macroCheck } : {}), version: 1, recipe, index: s.index, checked: [...new Set(s.checked)], stage: s.stage, portions: s.portions, timer: s.timer };
   } catch { return null; }
 }
 export function foodCoach(step: string): string {

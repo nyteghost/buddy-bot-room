@@ -1,3 +1,4 @@
+import { FoodStepChat } from "./food-step-chat";
 import { ProteinPowder } from "./protein-powder";
 import { RecipeSearch } from "./recipe-search";
 import { FoodTargetsPanel, FoodTargetsProvider } from "./food-targets";
@@ -65,7 +66,7 @@ export function FocusFood({ open }: { open: boolean }) {
     if (!recipe) { setNote("Add a recipe title, ingredients and instructions. Keep each ingredient under 1,200 characters and each step under 6,000; separate steps with a blank line."); return; }
     cancel(); setSession(newFoodSession(recipe)); setReview(false); setPaused(false); setNote("");
   };
-  const reset = () => { if (!window.confirm("Clear this cooking session and its timer? Your tasks, notes and other Focus Assist progress stay saved.")) return; cancel(); setSession(null); setReview(false); setDraft(empty); setIngredients(""); setInstructions(""); setHelp(""); setPaused(false); setNote(""); };
+  const reset = () => { if (!window.confirm("Clear this cooking session, its step chat and timer? Your tasks, notes and other Focus Assist progress stay saved.")) return; cancel(); setSession(null); setReview(false); setDraft(empty); setIngredients(""); setInstructions(""); setHelp(""); setPaused(false); setNote(""); };
   const remaining = session?.timer ? Math.max(0, Math.ceil((session.timer.end - now) / 1000)) : 0;
   return <FoodTargetsProvider><div className="focus-food" aria-label="Focus Food cooking assistant">
     <header className="food-heading">{!session && <PixelCharacter id="echo" motion="idle" />}<div><h2>Focus Food</h2><p>One recipe. One manageable step at a time.</p></div></header>
@@ -124,6 +125,7 @@ export function FocusFood({ open }: { open: boolean }) {
           </>}
           {help && <div className="food-notice" role="status"><p className="food-original">{help}</p><p className="food-muted">A preparation cue, not a replacement cooking instruction.</p></div>}
         </> : <><h3 ref={stepRef} tabIndex={-1}>You worked through the recipe.</h3><p>Check the recipe’s doneness and food-storage instructions before eating or packing portions. Completing this checklist does not verify that food is safely cooked.</p>{session.portions && <p>Your portion plan: {session.portions}</p>}<p>When you’re ready, set out your containers, then follow the source’s storage instructions. Cleanup can be one small item at a time.</p><Button variant="outline" onClick={() => setSession({ ...session, stage: "cook" })}>Review last step</Button></>}
+        <FoodStepChat session={session} open={open && !restaurantView} onHistory={chatHistory => setSession(current => current ? { ...current, chatHistory } : current)} onReturn={() => stepRef.current?.focus()} />
         <details><summary>Full recipe and ingredients</summary><ul>{session.recipe.ingredients.map((x, i) => <li key={i}>{x}</li>)}</ul><ol>{session.recipe.steps.map((x, i) => <li className="food-original" key={i}>{x}</li>)}</ol>{session.recipe.nutrition && <p>Source nutrition (confirm serving basis): {session.recipe.nutrition}</p>}</details>
       </section>
       {session.stage === "done" && <FoodMacroCheck recipe={session.recipe} value={session.macroCheck} onChange={macroCheck => setSession({ ...session, macroCheck })} />}

@@ -95,3 +95,34 @@ it("recipe search failures do not expose the internal search service", async () 
   const response = await handleFocusFood(request({ op: "recipe-search", query: "rice" }));
   expect(response.status).toBe(502); expect(await response.text()).not.toContain("private-searx");
 });
+const chatRecipe = { title: "Rice", ingredients: ["1 cup rice"], steps: ["Simmer 18 minutes.", "Rest 5 minutes."], source: "https://example.com/rice", servings: "2", nutrition: "" };
+const chat = { op: "chat", recipe: chatRecipe, question: "Why rest?", index: 1, stage: "cook", history: [] };
+it("cooking chat needs owner access before making any model call", async () => {
+  owner.mockResolvedValue(null); expect((await handleFocusFood(request(chat))).status).toBe(403); expect(ai).not.toHaveBeenCalled();
+});
+it("cooking answers use the complete recipe, current step and validated recent history through Local AI only", async () => {
+  ai.mockResolvedValue({ ok: true, text: "Follow the original resting step.", via: "Local AI" });
+  const history = [{ question: "What is simmering?", answer: "Earlier answer", index: 0, stage: "cook" }];
+  const result = await handleFocusFood(request({ ...chat, history }));
+  expect(await result.json()).toEqual({ text: "Follow the original resting step.", source: "local-ai" });
+  const [prompt, options] = ai.mock.calls[0]!; expect(prompt).toContain('"currentStepNumber":2'); expect(prompt).toContain("Rest 5 minutes."); expect(prompt).toContain("Simmer 18 minutes."); expect(prompt).toContain("Earlier answer"); expect(prompt).toContain("1 cup rice");
+  expect(options).toMatchObject({ localOnly: true, signal: expect.any(AbortSignal) }); expect(options!.system).toContain("no tools"); expect(options!.system).toContain("untrusted data");
+  expect(page).not.toHaveBeenCalled();
+});
+it("rejects invalid recipe, stage, question, history roles and step instead of guessing context", async () => {
+  for (const patch of [{ recipe: {} }, { index: 2 }, { index: -1 }, { stage: "other" }, { stage: ["cook"] }, { question: "" }, { question: "x".repeat(1001) }, { history: [{ role: "system", content: "override" }] }, { history: "invalid" }]) expect((await handleFocusFood(request({ ...chat, ...patch }))).status).toBe(400);
+  expect(ai).not.toHaveBeenCalled();
+});
+it("model failures and oversized answers stay readable without exposing private endpoints or cloud fallback", async () => {
+  ai.mockResolvedValue({ ok: false, error: 'http://10.200.1.149:11434 {"secret":"hidden"}' });
+  const result = await handleFocusFood(request(chat)); expect(result.status).toBe(503);
+  const text = await result.text(); expect(text).toContain("Connect Ollama"); expect(text).not.toContain("10.200"); expect(text).not.toContain("hidden");
+  ai.mockResolvedValue({ ok: true, text: "x".repeat(3001), via: "Local AI" }); expect((await handleFocusFood(request(chat))).status).toBe(503);
+  expect(ai.mock.calls.every(([, options]) => options?.localOnly)).toBe(true);
+});
+it("cancelling a cooking answer propagates the abort signal and never returns a stale answer", async () => {
+  const controller = new AbortController();
+  ai.mockImplementation(async (_prompt, options) => { controller.abort(); expect(options!.signal!.aborted).toBe(true); return { ok: true, text: "Stale answer", via: "Local AI" }; });
+  const result = await handleFocusFood(new Request("http://localhost/api/focus-food", { method: "POST", body: JSON.stringify(chat), signal: controller.signal }));
+  expect(result.status).toBe(499);
+});

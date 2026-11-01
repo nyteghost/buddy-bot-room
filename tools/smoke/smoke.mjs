@@ -601,7 +601,33 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   if (!(await food.locator(".food-step").innerText()).includes("18 minutes")) throw Error("Original cooking time changed");
   await food.getByLabel("Timer name", { exact: true }).fill("Rice");
   await food.getByRole("button", { name: "Start timer", exact: true }).click();
+  const beforeChat = await page.evaluate(() => JSON.parse(localStorage.getItem("pixel-pals-focus-food-v1")));
+  const cookingQuestions = [];
+  const chatFixture = async route => {
+    const data = route.request().postDataJSON();
+    if (data.op !== "chat") return route.continue();
+    cookingQuestions.push(data);
+    return route.fulfill({ json: { text: `Recipe-aware answer for step ${data.index + 1}.`, source: "local-ai" } });
+  };
+  await page.route("**/api/focus-food", chatFixture);
+  await food.getByRole("button", { name: "Ask about this step", exact: true }).click();
+  const stepChat = food.getByRole("region", { name: "Recipe step chat", exact: true });
+  await stepChat.getByRole("textbox", { name: "Question about this recipe", exact: true }).fill("What does simmer mean here?");
+  await stepChat.getByRole("button", { name: "Ask cooking assistant", exact: true }).click();
+  await stepChat.getByText("Recipe-aware answer for step 1.", { exact: false }).waitFor();
+  await stepChat.getByRole("button", { name: "Back to recipe", exact: true }).click();
+  const afterChat = await page.evaluate(() => JSON.parse(localStorage.getItem("pixel-pals-focus-food-v1")));
+  if (afterChat.index !== beforeChat.index || afterChat.timer.end !== beforeChat.timer.end || JSON.stringify(afterChat.recipe) !== JSON.stringify(beforeChat.recipe)) throw Error("Cooking chat changed recipe, step or timer");
   await food.getByRole("button", { name: "Done with this step", exact: true }).click();
+  await food.getByRole("button", { name: "Ask about this step", exact: true }).click();
+  await stepChat.getByRole("textbox", { name: "Question about this recipe", exact: true }).fill("What is this step for?");
+  await stepChat.getByRole("button", { name: "Ask cooking assistant", exact: true }).click();
+  await stepChat.getByText("Recipe-aware answer for step 2.", { exact: false }).waitFor();
+  if (cookingQuestions[1].index !== 1 || cookingQuestions[1].history[0].index !== 0 || cookingQuestions[1].recipe.steps[0] !== beforeChat.recipe.steps[0]) throw Error("Cooking chat lost recipe, step or recent questions");
+  for (const width of [320, 390, 700]) { await page.setViewportSize({ width, height: 844 }); if (await stepChat.evaluate(el => el.scrollWidth > el.clientWidth + 1)) throw Error(`Step chat overflows at ${width}px`); }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stepChat.getByRole("button", { name: "Back to recipe", exact: true }).click();
+  await page.unroute("**/api/focus-food", chatFixture);
   await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
   await page.locator('.mobile-tabbar button', { hasText: "Home" }).click();
   await page.locator("#mobile-more-trigger").click();
@@ -613,6 +639,10 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
   await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
   await food.getByRole("timer", { name: "Rice", exact: true }).waitFor();
+  await food.getByRole("button", { name: "Ask about this step", exact: true }).click();
+  await stepChat.getByText("Recipe-aware answer for step 1.", { exact: false }).waitFor();
+  await stepChat.getByText("Recipe-aware answer for step 2.", { exact: false }).waitFor();
+  await stepChat.getByRole("button", { name: "Back to recipe", exact: true }).click();
   if (await kitchen.getAttribute("data-kitchen-action") !== "wait") throw Error("Kitchen lost its step after reload");
   const blocked = await page.request.post(`${URL_}/api/focus-food`, { data: { op: "import", url: "https://127.0.0.1/" } });
   if (blocked.status() !== 422) throw Error("Recipe importer accepted a private address");
@@ -765,6 +795,8 @@ await step("Remote Ollama backend inference, missing models, policy and authenti
     const denied = await anonymous.request.get(`${URL_}${path}`);
     if (![401, 403].includes(denied.status())) throw Error(`${path} exposed internal metadata without authentication`);
   }
+  const deniedFoodChat = await anonymous.request.post(`${URL_}/api/focus-food`, { data: { op: "chat" } });
+  if (![401, 403].includes(deniedFoodChat.status())) throw Error("Cooking chat allowed an unauthenticated request");
   await anonymous.close();
   const body = { agentId: "nova", model: "openai/gpt-6-astra", mode: "direct", round: 1, messages: [{ id: "smoke-local-u", role: "user", parts: [{ type: "text", text: "Hello" }] }], engine: { kind: "ollama-server", apiKey: "", model: "qwen3.5:9b", maxTokens: 200 } };
   const missing = await page.request.post(`${URL_}/api/chat`, { data: { ...body, engine: { ...body.engine, model: "llama3.2:3b" } } });
@@ -799,6 +831,8 @@ await step("Remote Ollama backend inference, missing models, policy and authenti
     if (!actual.ok() || actual.headers()["x-pixelpals-model"] !== "qwen3.5:9b") throw Error(`${label} did not use the installed backend model`);
     await chat.getByRole("button", { name: "Send", exact: true }).waitFor();
   }
+  const cookingAnswer = await page.request.post(`${URL_}/api/focus-food`, { data: { op: "chat", question: "Explain this step briefly.", recipe: { title: "Smoke recipe", ingredients: ["Rice"], steps: ["Follow the original source."], servings: "1", nutrition: "", source: "" }, index: 0, stage: "cook", history: [] } });
+  if (!cookingAnswer.ok() || (await cookingAnswer.json()).text !== "Local fixture reply.") throw Error("Cooking chat did not use backend Local AI under Local-Only mode");
   page.off("request", watchDirect);
   if (directRequests.length) throw Error("A proxied mode contacted an Ollama endpoint from the browser");
   await page.request.post(`${URL_}/api/settings`, { data: { values: { LOCAL_ONLY_AI: "off" } } });

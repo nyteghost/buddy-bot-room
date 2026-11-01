@@ -85,3 +85,5 @@ Implemented: separate Restaurant macros view, online menu search using configure
 Implemented: Focus Food recipe discovery → select result → original recipe import → review → Pal cook-along, reusing existing search and recipe-import safeguards. See [Focus Food guide](FOCUS_FOOD.md).
 
 Implemented: reviewed protein-powder additions from the user’s label, weighed-dose previews, optional protein-shortfall calculation, nutrition provenance and reversible ingredient changes. See [Focus Food guide](FOCUS_FOOD.md).
+
+Implemented: recipe-aware Local AI step chat with current-step context, recent conversation, one-tap return, saved recipe-local history, cancellation and unchanged cooking progress/timers. See [Focus Food guide](FOCUS_FOOD.md).

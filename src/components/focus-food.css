@@ -45,3 +45,6 @@
 .focus-food form { display: grid; min-width: 0; gap: 12px; }
 
 .focus-food select { min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--foreground); font-size: 16px; }
+
+.food-step-chat { min-width: 0; }
+.food-chat-history { display: grid; gap: 10px; min-width: 0; max-height: 420px; overflow: auto; overscroll-behavior: contain; }
