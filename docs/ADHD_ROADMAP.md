@@ -34,6 +34,10 @@
 6. **Pal Room storytelling**: additional themed scene changes; keep decorations and quests opt-in and non-punitive.
 7. **Technical review**: model failure recovery, offline loading and caching, permission boundaries and external integrations.
 
+## Focus Food (November beta)
+
+Single-recipe cooking is implemented: public recipe-link import, paste/manual fallback, optional local-only verbatim organization, mandatory review, ingredient checklist, one original instruction at a time, offline stuck help, optional preparation coaching, browser-local recovery and one named timer. Source cooking values stay unchanged; meal-prep portion notes do not scale quantities. See [FOCUS_FOOD.md](FOCUS_FOOD.md) for boundaries and device checks. Multiple-recipe weekly planning, combined groceries, recipe scaling and Obsidian recipe export remain future work.
+
 ## Acceptance checks
 - Unit tests and production build pass.
 - Browser smoke tests cover Pick for Me / Today, Brain Dump categorization and day placement, the Pal quest, and owner-initiated sample work.

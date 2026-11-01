@@ -121,7 +121,8 @@ const Block = ({ title, children }: { title: string; children: React.ReactNode }
 );
 /** All details stay visible on desktop; phones start with a compact summary. */
 function MobileBlock({ title, summary, children }: { title: string; summary: string; children: React.ReactNode }) {
-  const [expanded, setExpanded] = useState(() => typeof window === "undefined" || window.innerWidth > 700);
+  // Match SSR on the first render; the media-query effect then collapses phones.
+  const [expanded, setExpanded] = useState(true);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 700px)");
     const update = () => setExpanded(!mq.matches);

@@ -60,6 +60,8 @@ jobs:
       - name: Start the app
         run: |
           mkdir -p "$RUNNER_TEMP/data" "$RUNNER_TEMP/vault"
+          # Smoke tests do not poll third-party playtest sources.
+          echo '{"sources":[],"items":[],"status":{},"lastRun":""}' > "$RUNNER_TEMP/data/playtests.json"
           BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" OBSIDIAN_VAULT_DIR="$RUNNER_TEMP/vault" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &
           for i in $(seq 1 40); do curl -fsS http://localhost:8090/__health >/dev/null && exit 0; sleep 1; done
           cat server.log; exit 1

@@ -3,7 +3,7 @@ import { ambientMotion } from "@/lib/pal-motion";
 import { useCalmInterval } from "@/lib/power";
 import { startPolling } from "@/lib/poll";
 import { DefaultChatTransport, readUIMessageStream } from "ai";
-import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow, Sparkles } from "lucide-react";
+import { Puzzle, ArrowUpRight, Check, ChevronDown, CircleHelp, Copy, Download, ListTodo, Scale, MessageSquare, Mic, LayoutGrid, History, PanelLeftClose, PanelLeftOpen, Gamepad2, FlaskConical, Wrench, Minus, Play, Plus, Radio, Swords, RotateCcw, Search, Settings2, Square, Users, X, Bug, Volume2, VolumeX, Ellipsis, Maximize2, Minimize2, Mail, CalendarDays, CheckSquare, Sun, FileText, Workflow, Sparkles, CookingPot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -88,6 +88,7 @@ const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
 // Secondary windows load their code the first time they are opened, so the first screen has less to download and run.
 const ShowServicesTools = lazy(() => import("./work-tools").then((m) => ({ default: m.ShowServicesTools })));
+const FocusFood = lazy(() => import("./focus-food").then(m => ({ default: m.FocusFood })));
 const PlaytestsPanel = lazy(() => import("./playtests-panel").then((m) => ({ default: m.PlaytestsPanel })));
 import { WorkspaceWindow } from "./workspace-window";
 import { MicRecorder } from "./mic-recorder";
@@ -394,6 +395,8 @@ export function Room() {
   };
   const setConversationOpen = (value: boolean) => { if (value) showMode(mode); };
   const resetModes = () => { setOpenModes(defaultOpenModes); setMode("smart"); };
+  const [foodOpen, setFoodOpen] = useState(false);
+  const foodSeen = useEverTrue(foodOpen);
   const [toolsOpen, setToolsOpen] = useState(false);
   const toolsSeen = useEverTrue(toolsOpen);
   const playtestsSeen = useEverTrue(playtestsOpen);
@@ -413,8 +416,9 @@ export function Room() {
   }, [mobileMoreOpen]);
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
-  function mobileTab(tab: "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar" | "documents" | "fun" | "recorder" | "playtests" | "setup") {
+  function mobileTab(tab: "food" | "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar" | "documents" | "fun" | "recorder" | "playtests" | "setup") {
     setOpenModes(perMode(() => false));
+    setFoodOpen(tab === "food");
     setRoomOpen(tab === "room"); setTodayOpen(tab === "today"); setTasksOpen(tab === "tasks"); setNotesOpen(tab === "notes");
     setMailOpen(tab === "mail"); setCalendarOpen(tab === "calendar");
     setToolsOpen(false); setFunOpen(tab === "fun"); setSetupOpen(tab === "setup"); setSearchOpen(false); setRecorderOpen(tab === "recorder"); setDocsOpen(tab === "documents"); setPlaytestsOpen(tab === "playtests"); setAddonOpen(null);
@@ -1409,7 +1413,7 @@ export function Room() {
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
     { id: "win-docs", group: "Windows", label: "Open Documents (PDF and Excel viewer)", keywords: "pdf excel xlsx csv viewer file spreadsheet", run: () => setDocsOpen(true) },
     { id: "win-fun", group: "Windows", label: "Open Fun (Dungeon Master campaign)", keywords: "dnd rpg adventure dice dungeon master games", run: () => setFunOpen(true) },
-    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
+    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
     { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
     { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: () => regenerate(mode) },
@@ -1862,7 +1866,7 @@ export function Room() {
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => window.location.assign("/work")}><Wrench className="size-4" /> Legacy work tools</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
-          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
         </div>
       </header>
       <button type="button" className="mobile-strip" onClick={() => setRoomOpen((v) => !v)}>
@@ -1885,6 +1889,7 @@ export function Room() {
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Just Start: one tiny first step, with optional Pal body doubling" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Focus Food: cook one recipe at a time" aria-pressed={foodOpen} onClick={() => setFoodOpen(v => !v)}><CookingPot /><span>Focus Food</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Brain Dump: capture tasks and natural-language reminders in Today" onClick={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }}><ListTodo /><span>Brain Dump</span></Button>
           <Button variant="ghost" className="sidebar-item" title="My Pals: one place to ask, plan, solve and get unstuck" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => toggleChatRoom("my-pals")}><MessageSquare /><span>My Pals</span><i className={isChatRoomOpen(openModes, "my-pals") ? "status-dot" : ""} /></Button>
           <Button variant="ghost" className="sidebar-item" title="Pal Room: interact with your work buddy and take breaks together" aria-pressed={roomOpen} onClick={() => setRoomOpen((value) => !value)}><Users /><span>Pal Room</span><i className={roomOpen ? "status-dot" : ""} /></Button>
@@ -1917,6 +1922,7 @@ export function Room() {
             setMode(isChatRoomOpen(restored, "my-pals") ? selectedMy : selectedLounge);
             setRoomOpen(show("room"));
             setTodayOpen(show("today"));
+            setFoodOpen(show("focus-food"));
             setMailOpen(show("mail"));
             setDocsOpen(show("documents"));
             setToolsOpen(show("tools"));
@@ -1932,7 +1938,7 @@ export function Room() {
             setMoreOpen(show("tools") || show("setup"));
             setSidebarCompact(false);
           }} />
-          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />
@@ -2129,6 +2135,9 @@ export function Room() {
             <WorkspaceWindow id="today" title="Today" icon={<Sun className="size-4" />} open={todayOpen} onClose={() => setTodayOpen(false)} resetVersion={resetVersion}>
               <TodayPanel onResumeFocus={resumeSavedFocus} open={todayOpen} onOpenMail={() => setMailOpen(true)} onOpenCalendar={() => setCalendarOpen(true)} onOpenTasks={() => setTasksOpen(true)} onJustStart={beginFocusTask} />
             </WorkspaceWindow>
+            <WorkspaceWindow id="focus-food" title="Focus Food" icon={<CookingPot className="size-4" />} open={foodOpen} onClose={() => setFoodOpen(false)} resetVersion={resetVersion}>
+              {foodSeen && <Suspense fallback={<p className="p-4" role="status">Loading Focus Food…</p>}><FocusFood open={foodOpen} /></Suspense>}
+            </WorkspaceWindow>
             <WorkspaceWindow id="tasks" title="Tasks & reminders" icon={<CheckSquare className="size-4" />} open={tasksOpen} onClose={() => setTasksOpen(false)} resetVersion={resetVersion}>
               <TasksPanel open={tasksOpen} onJustStart={beginFocusTask} />
             </WorkspaceWindow>
@@ -2145,11 +2154,12 @@ export function Room() {
               <DocumentsPanel />
             </WorkspaceWindow>
             <DocumentModalHost />
-            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !docsOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
+            {!roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !docsOpen && !foodOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
           </main>
         </div>
       </div>
       {mobileMoreOpen && <div id="mobile-more-tools" className="mobile-more-menu" role="group" aria-label="More mobile tools" onKeyDown={e => { if (e.key === "Escape") { setMobileMoreOpen(false); document.getElementById("mobile-more-trigger")?.focus(); } }}>
+        <button type="button" onClick={() => { mobileTab("food"); setMobileMoreOpen(false); }}><CookingPot /> Focus Food</button>
         <button type="button" onClick={() => { mobileTab("notes"); setMobileMoreOpen(false); }}><ListTodo /> Notes</button>
         <button type="button" onClick={() => { mobileTab("room"); setMobileMoreOpen(false); }}><Users /> Pal Room</button>
         <button type="button" onClick={() => { mobileTab("calendar"); setMobileMoreOpen(false); }}><CalendarDays /> Calendar</button>
@@ -2164,7 +2174,7 @@ export function Room() {
         <button type="button" aria-pressed={todayOpen} onClick={() => { mobileTab("today"); setMobileMoreOpen(false); }}><Sun /><span>Home</span></button>
         <button type="button" aria-pressed={tasksOpen} onClick={() => { mobileTab("tasks"); setMobileMoreOpen(false); }}><CheckSquare /><span>Tasks</span></button>
         <button type="button" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => { mobileTab("chat"); setMobileMoreOpen(false); }}><MessageSquare /><span>Pals</span></button>
-        <button type="button" aria-pressed={mobileMoreOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen || docsOpen || recorderOpen || funOpen || playtestsOpen} id="mobile-more-trigger" aria-controls="mobile-more-tools" aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
+        <button type="button" aria-pressed={mobileMoreOpen || foodOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen || docsOpen || recorderOpen || funOpen || playtestsOpen} id="mobile-more-trigger" aria-controls="mobile-more-tools" aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
       </nav>
       <footer className="app-footer">
         <span>SMALL PIXELS. BIG PERSPECTIVES.</span>

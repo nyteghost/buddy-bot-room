@@ -17,7 +17,9 @@ const problems = [];
 const notes = [];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
-page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
+// Browser checks use the local test server and controlled fixtures only.
+await page.route("**/*", route => { const url = new globalThis.URL(route.request().url()); return [new globalThis.URL(URL_).origin].includes(url.origin) || ["data:", "blob:"].includes(url.protocol) ? route.continue() : route.abort(); });
+page.on("pageerror", (e) => { problems.push(`page error: ${e.message}`); console.log(`Browser page error: ${e.stack || e.message}`); });
 page.on("console", (m) => {
   if (m.type() !== "error") return;
   const t = m.text();
@@ -548,6 +550,37 @@ await step("Second Brain approved note lifecycle in the throwaway vault", async 
   const trashed = await page.request.post(`${URL_}/api/second-brain`, { data: { op: "trash", id: saved.id, revision: saved.revision } });
   if (!trashed.ok()) throw Error("Could not soft-trash the test note");
 });
+await step("Focus Food reviewed recipe, offline cooking and saved progress", async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#mobile-more-trigger").click();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
+  const food = page.locator('[data-window-id="focus-food"]');
+  await food.getByLabel("Paste recipe text").fill("Rice bowls\nIngredients\n1 cup rice\n2 cups water\nInstructions\nBring water to a boil. Cover and simmer 18 minutes.\nRest for 5 minutes.");
+  await food.getByRole("button", { name: "Use pasted text", exact: true }).click();
+  await food.getByRole("heading", { name: "Review before cooking" }).waitFor();
+  await food.getByRole("button", { name: "Save recipe and get ready" }).click();
+  await food.getByRole("checkbox", { name: "1 cup rice", exact: true }).check();
+  await food.getByRole("button", { name: "I’m ready — show the first step" }).click();
+  await food.getByRole("button", { name: "I’m stuck — help me begin" }).click();
+  await food.getByRole("heading", { name: "Step 1 of 2", exact: true }).waitFor();
+  if (!(await food.locator(".food-step").innerText()).includes("18 minutes")) throw Error("Original cooking time changed");
+  await food.getByLabel("Timer name", { exact: true }).fill("Rice");
+  await food.getByRole("button", { name: "Start timer", exact: true }).click();
+  await food.getByRole("button", { name: "Done with this step", exact: true }).click();
+  await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
+  await page.locator('.mobile-tabbar button', { hasText: "Home" }).click();
+  await page.locator("#mobile-more-trigger").click();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
+  await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
+  await page.reload();
+  await page.locator("#mobile-more-trigger").click();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
+  await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
+  await food.getByRole("timer", { name: "Rice", exact: true }).waitFor();
+  const blocked = await page.request.post(`${URL_}/api/focus-food`, { data: { op: "import", url: "https://127.0.0.1/" } });
+  if (blocked.status() !== 422) throw Error("Recipe importer accepted a private address");
+  await page.screenshot({ path: process.env.SMOKE_FOOD_SHOT || "/tmp/pixel-food-mobile.png" });
+});
 await step("mobile chat uses clean full-screen layout and collapsible settings", async () => {
   await page.setViewportSize({ width: 390, height: 780 });
   await page.locator('.mobile-tabbar button', { hasText: "Pals" }).click();
@@ -579,7 +612,7 @@ await step("mobile chat uses clean full-screen layout and collapsible settings",
 await step("Mobile UI 3.0 tool navigation at narrow and wide phone sizes", async () => {
   for (const width of [320, 390, 700]) {
     await page.setViewportSize({ width, height: 844 });
-    for (const [label, id] of [["Home", "today"], ["Tasks", "tasks"], ["Pals", "chat-my-pals"], ["Notes", "notes"], ["Calendar", "calendar"], ["Mail", "mail"], ["Documents", "documents"], ["Recorder", "recorder"], ["Fun", "fun"], ["Playtests", "playtests"], ["Settings", "setup"]]) {
+    for (const [label, id] of [["Focus Food", "focus-food"], ["Home", "today"], ["Tasks", "tasks"], ["Pals", "chat-my-pals"], ["Notes", "notes"], ["Calendar", "calendar"], ["Mail", "mail"], ["Documents", "documents"], ["Recorder", "recorder"], ["Fun", "fun"], ["Playtests", "playtests"], ["Settings", "setup"]]) {
       if (["Home", "Tasks", "Pals"].includes(label)) await page.locator(".mobile-tabbar").getByRole("button", { name: label, exact: true }).click();
       else {
         await page.locator("#mobile-more-trigger").click();

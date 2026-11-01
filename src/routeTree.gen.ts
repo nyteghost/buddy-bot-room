@@ -22,6 +22,7 @@ import { Route as ApiCaptureRouteImport } from './routes/api.capture'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiDebuglogRouteImport } from './routes/api.debuglog'
 import { Route as ApiEmbedRouteImport } from './routes/api.embed'
+import { Route as ApiFocusFoodRouteImport } from './routes/api.focus-food'
 import { Route as ApiFocusHelpRouteImport } from './routes/api.focus-help'
 import { Route as ApiGoogleRouteImport } from './routes/api.google'
 import { Route as ApiIcsRouteImport } from './routes/api.ics'
@@ -129,6 +130,11 @@ const ApiDebuglogRoute = ApiDebuglogRouteImport.update({
 const ApiEmbedRoute = ApiEmbedRouteImport.update({
   id: '/api/embed',
   path: '/api/embed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFocusFoodRoute = ApiFocusFoodRouteImport.update({
+  id: '/api/focus-food',
+  path: '/api/focus-food',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFocusHelpRoute = ApiFocusHelpRouteImport.update({
@@ -361,6 +367,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/embed': typeof ApiEmbedRoute
+  '/api/focus-food': typeof ApiFocusFoodRoute
   '/api/focus-help': typeof ApiFocusHelpRoute
   '/api/google': typeof ApiGoogleRouteWithChildren
   '/api/ics': typeof ApiIcsRoute
@@ -419,6 +426,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/embed': typeof ApiEmbedRoute
+  '/api/focus-food': typeof ApiFocusFoodRoute
   '/api/focus-help': typeof ApiFocusHelpRoute
   '/api/google': typeof ApiGoogleRouteWithChildren
   '/api/ics': typeof ApiIcsRoute
@@ -478,6 +486,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/embed': typeof ApiEmbedRoute
+  '/api/focus-food': typeof ApiFocusFoodRoute
   '/api/focus-help': typeof ApiFocusHelpRoute
   '/api/google': typeof ApiGoogleRouteWithChildren
   '/api/ics': typeof ApiIcsRoute
@@ -538,6 +547,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/debuglog'
     | '/api/embed'
+    | '/api/focus-food'
     | '/api/focus-help'
     | '/api/google'
     | '/api/ics'
@@ -596,6 +606,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/debuglog'
     | '/api/embed'
+    | '/api/focus-food'
     | '/api/focus-help'
     | '/api/google'
     | '/api/ics'
@@ -654,6 +665,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/debuglog'
     | '/api/embed'
+    | '/api/focus-food'
     | '/api/focus-help'
     | '/api/google'
     | '/api/ics'
@@ -713,6 +725,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiDebuglogRoute: typeof ApiDebuglogRoute
   ApiEmbedRoute: typeof ApiEmbedRoute
+  ApiFocusFoodRoute: typeof ApiFocusFoodRoute
   ApiFocusHelpRoute: typeof ApiFocusHelpRoute
   ApiGoogleRoute: typeof ApiGoogleRouteWithChildren
   ApiIcsRoute: typeof ApiIcsRoute
@@ -847,6 +860,13 @@ declare module '@tanstack/react-router' {
       path: '/api/embed'
       fullPath: '/api/embed'
       preLoaderRoute: typeof ApiEmbedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/focus-food': {
+      id: '/api/focus-food'
+      path: '/api/focus-food'
+      fullPath: '/api/focus-food'
+      preLoaderRoute: typeof ApiFocusFoodRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/focus-help': {
@@ -1181,6 +1201,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiDebuglogRoute: ApiDebuglogRoute,
   ApiEmbedRoute: ApiEmbedRoute,
+  ApiFocusFoodRoute: ApiFocusFoodRoute,
   ApiFocusHelpRoute: ApiFocusHelpRoute,
   ApiGoogleRoute: ApiGoogleRouteWithChildren,
   ApiIcsRoute: ApiIcsRoute,
