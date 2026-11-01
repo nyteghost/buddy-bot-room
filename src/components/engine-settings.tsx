@@ -1,3 +1,4 @@
+import { OllamaConnect } from "./ollama-connect";
 import { useEffect, useState } from "react";
 import { Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,8 @@ export function EngineSettingsDialog() {
         </details>
         {(engine.kind === "ollama" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3 text-sm">
+            <OllamaConnect />
+            <p className="text-xs text-muted-foreground">Advanced browser-direct settings below save as you type. For Unraid and phones, use Save and connect above.</p>
             <label className="grid gap-1">
               <span className="font-medium">Server URL</span>
               <Input

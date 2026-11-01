@@ -1,3 +1,4 @@
+import { OllamaConnect } from "./ollama-connect";
 import { useCallback, useEffect, useState } from "react";
 import { Download, Trash2, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ export function LocalAiPanel() {
     fetch("/api/ollama").then((r) => r.json()).then((j) => setStatus(j as Status)).catch(() => setStatus({ configured: true, reachable: false, error: "Couldn't reach the Pixel Pals server." }));
   }, []);
   useEffect(load, [load]);
+  useEffect(() => { window.addEventListener("pixelpals:ollama-connected", load); return () => window.removeEventListener("pixelpals:ollama-connected", load); }, [load]);
 
   async function pull(model: string, task?: TaskKey) {
     setBusy((b) => ({ ...b, [model]: "Starting…" }));
@@ -101,13 +103,7 @@ export function LocalAiPanel() {
     load();
   }
 
-  if (!status) return <p className="text-sm text-muted-foreground">Checking the Local AI server…</p>;
-  if (!status.configured)
-    return (
-      <p className="rounded-md border p-3 text-sm text-muted-foreground">
-        Local AI isn't set up on this server. Use the Portainer stack (<code>docker-compose.portainer.yml</code>), which includes Ollama, or set <code>OLLAMA_URL</code> to an Ollama address.
-      </p>
-    );
+  if (!status || !status.configured) return <div className="grid gap-3 text-sm"><OllamaConnect />{!status && <p className="text-sm text-muted-foreground">Checking the Local AI server…</p>}</div>;
   const hw = status.hardware;
   const installed = status.models ?? [];
   const names = new Set(installed.map((m) => m.name));
@@ -122,6 +118,7 @@ export function LocalAiPanel() {
 
   return (
     <div className="grid gap-3 text-sm">
+      <OllamaConnect />
       <p className={`rounded-md border p-2 text-xs ${status.localOnly ? "border-emerald-500/40 bg-emerald-500/10" : "border-amber-500/40 bg-amber-500/10"}`}>
         {status.localOnly
           ? "Local-Only AI is ON: every answer, scheduled job and retry uses only your own Ollama. Cloud keys are never called, even if saved. Change it in Settings → Local AI."

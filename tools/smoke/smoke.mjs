@@ -641,6 +641,24 @@ await step("Mobile UI 3.0 tool navigation at narrow and wide phone sizes", async
     if (await page.locator("#mobile-more-trigger").getAttribute("aria-expanded") !== "false") throw Error("Escape did not close More");
   }
 });
+await step("Connect Ollama tests from the server, saves address and selects its installed model", async () => {
+  await page.locator("#mobile-more-trigger").click();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Settings", exact: true }).click();
+  const connector = page.locator('[data-window-id="setup"]').getByRole("region", { name: "Connect Ollama", exact: true });
+  const address = `http://127.0.0.1:${process.env.SMOKE_OLLAMA_PORT || "11435"}`;
+  await connector.getByLabel("Ollama server address", { exact: true }).fill(address);
+  if (!await connector.getByRole("button", { name: "Save and connect", exact: true }).isDisabled()) throw Error("Untested endpoint could be saved");
+  await connector.getByRole("button", { name: "Test connection", exact: true }).click();
+  await connector.getByRole("combobox", { name: "Installed local model", exact: true }).waitFor();
+  const before = await page.request.get(`${URL_}/api/settings`);
+  if ((await before.json()).settings.find(x => x.key === "OLLAMA_URL")?.source === "app") throw Error("Testing saved the address prematurely");
+  await connector.getByRole("button", { name: "Save and connect", exact: true }).click();
+  await connector.getByText(/Saved and connected/).waitFor();
+  const saved = await page.request.get(`${URL_}/api/settings`);
+  if ((await saved.json()).settings.find(x => x.key === "OLLAMA_URL")?.value !== address) throw Error("Ollama address did not persist on the server");
+  const engine = await page.evaluate(() => JSON.parse(localStorage.getItem("pixel-pals-engine-v1") || "{}"));
+  if (engine.kind !== "local-server" || engine.localChat !== "smoke-local:7b") throw Error("Selected model was not applied to the local server engine");
+});
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);

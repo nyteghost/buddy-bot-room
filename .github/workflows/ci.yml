@@ -60,6 +60,7 @@ jobs:
       - name: Start the app
         run: |
           mkdir -p "$RUNNER_TEMP/data" "$RUNNER_TEMP/vault"
+          node tools/smoke/ollama.mjs > ollama-smoke.log 2>&1 &
           # Smoke tests do not poll third-party playtest sources.
           echo '{"sources":[],"items":[],"status":{},"lastRun":""}' > "$RUNNER_TEMP/data/playtests.json"
           BUDDY_PASSWORD="Smoke-CI-Setup-Only" BUDDY_SELF_HOSTED=1 BUDDY_DATA_DIR="$RUNNER_TEMP/data" OBSIDIAN_VAULT_DIR="$RUNNER_TEMP/vault" PORT=8090 HOST=0.0.0.0 NODE_ENV=production nohup bun .output/server/index.mjs > server.log 2>&1 &

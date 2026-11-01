@@ -1,3 +1,4 @@
+import { OllamaConnect } from "./ollama-connect";
 import { AddonSettings } from "@/components/addons";
 import { parseServiceKeyFile } from "@/lib/gcal";
 import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
@@ -163,6 +164,7 @@ export function SetupPanel({ open }: { open: boolean }) {
   };
   return (
     <div className="grid gap-3 p-3 text-sm">
+      <OllamaConnect onConnected={() => { void load(); void loadFields(); }} />
       {error && <p className="text-destructive">{error}</p>}
       {items && <p className="font-medium">{setupSummary(items)}</p>}
       <div className="flex flex-wrap items-center gap-2">

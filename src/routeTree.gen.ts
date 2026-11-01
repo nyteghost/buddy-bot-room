@@ -36,6 +36,7 @@ import { Route as ApiMemorySuggestRouteImport } from './routes/api.memory-sugges
 import { Route as ApiNotesSyncRouteImport } from './routes/api.notes-sync'
 import { Route as ApiObsidianMemoryRouteImport } from './routes/api.obsidian-memory'
 import { Route as ApiOllamaRouteImport } from './routes/api.ollama'
+import { Route as ApiOllamaConnectRouteImport } from './routes/api.ollama-connect'
 import { Route as ApiPalWorkRouteImport } from './routes/api.pal-work'
 import { Route as ApiPlaytestsRouteImport } from './routes/api.playtests'
 import { Route as ApiPlexRouteImport } from './routes/api.plex'
@@ -200,6 +201,11 @@ const ApiObsidianMemoryRoute = ApiObsidianMemoryRouteImport.update({
 const ApiOllamaRoute = ApiOllamaRouteImport.update({
   id: '/api/ollama',
   path: '/api/ollama',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOllamaConnectRoute = ApiOllamaConnectRouteImport.update({
+  id: '/api/ollama-connect',
+  path: '/api/ollama-connect',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPalWorkRoute = ApiPalWorkRouteImport.update({
@@ -381,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
   '/api/ollama': typeof ApiOllamaRoute
+  '/api/ollama-connect': typeof ApiOllamaConnectRoute
   '/api/pal-work': typeof ApiPalWorkRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/plex': typeof ApiPlexRoute
@@ -440,6 +447,7 @@ export interface FileRoutesByTo {
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
   '/api/ollama': typeof ApiOllamaRoute
+  '/api/ollama-connect': typeof ApiOllamaConnectRoute
   '/api/pal-work': typeof ApiPalWorkRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/plex': typeof ApiPlexRoute
@@ -500,6 +508,7 @@ export interface FileRoutesById {
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
   '/api/ollama': typeof ApiOllamaRoute
+  '/api/ollama-connect': typeof ApiOllamaConnectRoute
   '/api/pal-work': typeof ApiPalWorkRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/plex': typeof ApiPlexRoute
@@ -561,6 +570,7 @@ export interface FileRouteTypes {
     | '/api/notes-sync'
     | '/api/obsidian-memory'
     | '/api/ollama'
+    | '/api/ollama-connect'
     | '/api/pal-work'
     | '/api/playtests'
     | '/api/plex'
@@ -620,6 +630,7 @@ export interface FileRouteTypes {
     | '/api/notes-sync'
     | '/api/obsidian-memory'
     | '/api/ollama'
+    | '/api/ollama-connect'
     | '/api/pal-work'
     | '/api/playtests'
     | '/api/plex'
@@ -679,6 +690,7 @@ export interface FileRouteTypes {
     | '/api/notes-sync'
     | '/api/obsidian-memory'
     | '/api/ollama'
+    | '/api/ollama-connect'
     | '/api/pal-work'
     | '/api/playtests'
     | '/api/plex'
@@ -739,6 +751,7 @@ export interface RootRouteChildren {
   ApiNotesSyncRoute: typeof ApiNotesSyncRoute
   ApiObsidianMemoryRoute: typeof ApiObsidianMemoryRoute
   ApiOllamaRoute: typeof ApiOllamaRoute
+  ApiOllamaConnectRoute: typeof ApiOllamaConnectRoute
   ApiPalWorkRoute: typeof ApiPalWorkRoute
   ApiPlaytestsRoute: typeof ApiPlaytestsRoute
   ApiPlexRoute: typeof ApiPlexRoute
@@ -958,6 +971,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ollama'
       fullPath: '/api/ollama'
       preLoaderRoute: typeof ApiOllamaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ollama-connect': {
+      id: '/api/ollama-connect'
+      path: '/api/ollama-connect'
+      fullPath: '/api/ollama-connect'
+      preLoaderRoute: typeof ApiOllamaConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/pal-work': {
@@ -1215,6 +1235,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNotesSyncRoute: ApiNotesSyncRoute,
   ApiObsidianMemoryRoute: ApiObsidianMemoryRoute,
   ApiOllamaRoute: ApiOllamaRoute,
+  ApiOllamaConnectRoute: ApiOllamaConnectRoute,
   ApiPalWorkRoute: ApiPalWorkRoute,
   ApiPlaytestsRoute: ApiPlaytestsRoute,
   ApiPlexRoute: ApiPlexRoute,

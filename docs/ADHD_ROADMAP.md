@@ -38,6 +38,8 @@
 
 Single-recipe cooking is implemented: public recipe-link import, paste/manual fallback, optional local-only verbatim organization, mandatory review, ingredient checklist, one original instruction at a time, offline stuck help, optional preparation coaching, browser-local recovery and one named timer. Source cooking values stay unchanged; meal-prep portion notes do not scale quantities. See [FOCUS_FOOD.md](FOCUS_FOOD.md) for boundaries and device checks. Multiple-recipe weekly planning, combined groceries, recipe scaling and Obsidian recipe export remain future work.
 
+Local AI setup now has a visible **Connect Ollama** form in Settings and the relevant AI engine menus: test from the server, choose an installed model, then Save and connect. Failed tests preserve the previous connection. See [OLLAMA_CONNECT.md](OLLAMA_CONNECT.md).
+
 ## Acceptance checks
 - Unit tests and production build pass.
 - Browser smoke tests cover Pick for Me / Today, Brain Dump categorization and day placement, the Pal quest, and owner-initiated sample work.
