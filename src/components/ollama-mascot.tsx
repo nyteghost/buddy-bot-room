@@ -142,7 +142,7 @@ export function OllamaMascot({ active = false }: { active?: boolean }) {
         <span>
           {online ? `${displayModel} · ${server ? health.remote ? "Remote Ollama via Pixel Pals" : "Ollama via Pixel Pals" : "Browser-direct Ollama"}` : server ? health.note ?? "Checking from Pixel Pals…" : "Browser-direct connection unavailable. Use Connect Ollama in Settings."}
         </span>
-        <span>{problem ?? (active ? "Local AI is answering…" : "No browser access to the remote PC is needed in server mode.")}</span>
+        <span>{problem ?? (active ? "Conversation in progress" : "No browser access to the remote PC is needed in server mode.")}</span>
       </div>
       {defaultProblem && replacement && (
         <button type="button" className="ollama-switch" onClick={() => setEngine({ localChat: replacement, ollamaModel: replacement, localAuto: false })}>
