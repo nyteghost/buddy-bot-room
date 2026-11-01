@@ -77,3 +77,7 @@ Prefer the first two to additional dashboard cards: they directly help task init
 - Local inference has a 15-second budget for this feature and supports cancellation. User task/step data never falls back to a cloud provider.
 - Security updates reduce the full audit from 35 findings to 4 (three moderate, one low), with zero high or critical findings. The publishing gate now blocks high and critical findings. The remaining dependency paths and follow-up work are recorded in SECURITY_BETA.md.
 - Real Unraid mount/restore and iPhone interaction checks still require the owner's devices. Automated mobile/browser checks use isolated data and do not validate the owner's deployment.
+
+## Restaurant meal comparisons and shared targets
+
+Implemented: separate Restaurant macros view, online menu search using configured SearXNG, official restaurant starting links, bounded public-HTTPS menu import, paste/manual nutrition review, Yes/No comparisons and browser-local saved orders. Shared meal targets appear at the top of Focus Food, with an optional daily-plan split helper. Cooking state stays separate. See [restaurant guide](FOCUS_FOOD_RESTAURANTS.md) for supported formats, privacy, tests and limitations.

@@ -8,7 +8,7 @@ Open **Review nutrition, portion and meal targets**. Explicit source values such
 
 Confirm whether those facts describe one source serving or the whole recipe. For whole-recipe values, enter the number of equal portions you made. Enter how many source servings or recipe portions are in your meal. Check the confirmation box only after reviewing the source, actual products and any ingredient changes. Editing facts, their basis or portion size clears that confirmation.
 
-Set your **meal calorie budget** and **meal protein minimum** from your own plan. Optional carb and fat limits are used only when explicitly entered; there are no automatic low-carb/low-fat rules, daily calorie prescriptions or muscle-gain promises. Targets are blank initially. **Remember meal targets** explicitly stores only the targets for future recipes in this browser. **Forget remembered meal targets** removes that preference without clearing this meal's entered facts or cooking progress.
+Set your **meal calorie budget** and **meal protein minimum** in **Your meal targets** at the top of Focus Food. These are shared by recipe and restaurant comparisons. Optional carb and fat limits are used only when explicitly entered; there are no automatic low-carb/low-fat rules, daily calorie prescriptions or muscle-gain promises. Targets are blank initially. **Remember meal targets** explicitly stores only the targets for future recipes in this browser. **Forget remembered meal targets** removes that preference without clearing this meal's entered facts or cooking progress.
 
 ## Exactly what Yes and No mean
 

@@ -595,15 +595,16 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   const macros = food.getByRole("region", { name: "Finished recipe nutrition and macro check", exact: true });
   await macros.getByText("Not enough information to judge", { exact: true }).waitFor();
   await macros.getByText("Review nutrition, portion and meal targets", { exact: true }).click();
-  for (const [label, value] of [["Source calories (kcal)", "500"], ["Source protein (g)", "40"], ["Source carbs (g)", "50"], ["Source fat (g)", "15"], ["Meal calorie budget (kcal)", "400"], ["Meal protein minimum (g)", "35"], ["Meal carb limit (g, optional)", "40"]]) await macros.getByLabel(label, { exact: true }).fill(value);
+  await food.getByText("Edit meal targets / use a daily plan", { exact: true }).click();
+  for (const [label, value] of [["Source calories (kcal)", "500"], ["Source protein (g)", "40"], ["Source carbs (g)", "50"], ["Source fat (g)", "15"], ["Meal calorie budget (kcal)", "400"], ["Meal protein minimum (g)", "35"], ["Meal carb limit (g, optional)", "40"]]) await (label.startsWith("Meal ") ? food.getByRole("region", { name: "Shared meal targets", exact: true }) : macros).getByLabel(label, { exact: true }).fill(value);
   await macros.getByLabel("Nutrition serving basis", { exact: true }).selectOption("serving");
   await macros.getByRole("checkbox").check();
   await macros.getByText("No — doesn’t fit your meal targets", { exact: true }).waitFor();
   await macros.getByText(/compare replacing part of the rice with cauliflower rice/).waitFor();
-  await macros.getByLabel("Meal calorie budget (kcal)", { exact: true }).fill("600");
-  await macros.getByLabel("Meal carb limit (g, optional)", { exact: true }).fill("");
+  await food.getByLabel("Meal calorie budget (kcal)", { exact: true }).fill("600");
+  await food.getByLabel("Meal carb limit (g, optional)", { exact: true }).fill("");
   await macros.getByText("Yes — fits your meal targets", { exact: true }).waitFor();
-  await macros.getByRole("button", { name: "Remember meal targets", exact: true }).click();
+  await food.getByRole("button", { name: "Remember meal targets", exact: true }).click();
   await page.reload();
   await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
   await page.locator("#mobile-more-trigger").click();
@@ -612,6 +613,53 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   const savedFood = await page.evaluate(() => JSON.parse(localStorage.getItem("pixel-pals-focus-food-v1") || "{}"));
   if (savedFood.recipe.ingredients[0] !== "1 cup rice" || savedFood.recipe.steps[0] !== "Bring water to a boil. Cover and simmer 18 minutes.") throw Error("Macro suggestions changed the original recipe");
   await macros.screenshot({ path: "/tmp/pixel-food-macrocheck.png" });
+});
+await step("Restaurant menu search, review, saved macros and cooking separation", async () => {
+  const food = page.locator('[data-window-id="focus-food"]');
+  const original = await page.evaluate(() => localStorage.getItem("pixel-pals-focus-food-v1"));
+  await food.getByRole("button", { name: "Restaurant macros", exact: true }).click();
+  const restaurant = food.getByRole("region", { name: "Restaurant macro finder", exact: true });
+  const fixture = async route => {
+    const data = route.request().postDataJSON();
+    if (data.op === "restaurant-search") return route.fulfill({ json: { hits: [{ title: "Test Grill official nutrition", url: "https://restaurant.example/menu", snippet: "Menu nutrition" }] } });
+    if (data.op === "restaurant-import") return route.fulfill({ json: { items: [{ name: "Fixture chicken bowl", serving: "1 bowl", source: "https://restaurant.example/menu", nutrition: "calories: 500 kcal · protein: 40 g · carbs: 50 g · fat: 15 g" }] } });
+    return route.continue();
+  };
+  await page.route("**/api/focus-food", fixture);
+  await restaurant.getByLabel("Restaurant or meal search", { exact: true }).fill("Test Grill");
+  await restaurant.getByRole("button", { name: "Search menus online", exact: true }).click();
+  await restaurant.getByRole("button", { name: "Use this menu link", exact: true }).click();
+  await restaurant.getByRole("button", { name: "Load menu nutrition", exact: true }).click();
+  await restaurant.getByRole("button", { name: "Review Fixture chicken bowl", exact: true }).click();
+  const macros = restaurant.getByRole("region", { name: "Restaurant nutrition and macro check", exact: true });
+  await macros.getByText("Not enough information to judge", { exact: true }).waitFor();
+  await restaurant.getByLabel("Restaurant name", { exact: true }).fill("Test Grill");
+  await macros.getByText("Review nutrition, portion and meal targets", { exact: true }).click();
+  await macros.getByLabel("Nutrition serving basis", { exact: true }).selectOption("serving");
+  await macros.getByRole("checkbox").check();
+  await macros.getByText("Yes — fits your meal targets", { exact: true }).waitFor();
+  await restaurant.getByRole("button", { name: "Save reviewed order", exact: true }).click();
+  await restaurant.getByText("Yes — fits current meal targets", { exact: true }).waitFor();
+  await food.getByText("Edit meal targets / use a daily plan", { exact: true }).click();
+  await food.getByLabel("Meal calorie budget (kcal)", { exact: true }).fill("400");
+  await restaurant.getByText("No — doesn’t fit current meal targets", { exact: true }).waitFor();
+  await restaurant.getByRole("button", { name: "Compare Fixture chicken bowl", exact: true }).click();
+  await macros.getByText("No — doesn’t fit your meal targets", { exact: true }).waitFor();
+  await restaurant.getByLabel("Menu item / complete order", { exact: true }).fill("Changed custom order");
+  await macros.getByText("Not enough information to judge", { exact: true }).waitFor();
+  for (const width of [320, 390, 700]) {
+    await page.setViewportSize({ width, height: 844 });
+    const overflow = await restaurant.evaluate(el => el.scrollWidth > el.clientWidth + 1);
+    if (overflow) throw Error(`Restaurant panel overflows at ${width}px`);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await restaurant.getByRole("button", { name: "1. Find a meal", exact: true }).click();
+  await restaurant.screenshot({ path: "/tmp/pixel-restaurant-finder.png" });
+  await page.unroute("**/api/focus-food", fixture);
+  const blocked = await page.request.post(`${URL_}/api/focus-food`, { data: { op: "restaurant-import", url: "https://127.0.0.1/" } });
+  if (blocked.status() !== 422) throw Error("Private restaurant URLs were not refused");
+  await food.getByRole("button", { name: "Cook a recipe", exact: true }).click();
+  if (await page.evaluate(() => localStorage.getItem("pixel-pals-focus-food-v1")) !== original) throw Error("Restaurant workflow modified cooking data");
 });
 await step("mobile chat uses clean full-screen layout and collapsible settings", async () => {
   await page.setViewportSize({ width: 390, height: 780 });

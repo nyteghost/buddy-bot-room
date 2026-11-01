@@ -1,3 +1,4 @@
+import { useFoodTargets } from "@/lib/food-targets-store";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import {
@@ -13,19 +14,22 @@ export function FoodMacroCheck({
   recipe,
   value,
   onChange,
+  context = "recipe",
 }: {
+  context?: "recipe" | "restaurant";
   recipe: FoodRecipe;
   value?: MacroData | undefined;
   onChange: (value: MacroData) => void;
 }) {
-  const data = value ?? initialFoodMacros(recipe.nutrition),
+  const shared = useFoodTargets();
+  const data = { ...(value ?? initialFoodMacros(recipe.nutrition)), ...(shared?.targets ?? {}) },
     result = checkFoodMacros(data);
   const loaded = useRef(false);
   const [note, setNote] = useState("");
   useEffect(() => {
     if (loaded.current) return;
     loaded.current = true;
-    if (value) return;
+    if (value || shared) return;
     try {
       const targets = readMacroTargets(
         JSON.parse(localStorage.getItem(FOOD_MACRO_TARGETS_KEY) ?? "null"),
@@ -34,7 +38,7 @@ export function FoodMacroCheck({
     } catch {
       /* Optional remembered targets. */
     }
-  }, [value, recipe.nutrition, onChange]);
+  }, [value, recipe.nutrition, onChange, shared]);
   const edit = (patch: Partial<MacroData>, facts = false) =>
     onChange({ ...data, ...patch, ...(facts ? { confirmed: false } : {}) });
   const input = (
@@ -67,7 +71,11 @@ export function FoodMacroCheck({
   return (
     <section
       className="food-card food-macro-check"
-      aria-label="Finished recipe nutrition and macro check"
+      aria-label={
+        context === "restaurant"
+          ? "Restaurant nutrition and macro check"
+          : "Finished recipe nutrition and macro check"
+      }
     >
       <h3>Nutrition facts &amp; Macro Check</h3>
       <p>
@@ -77,17 +85,20 @@ export function FoodMacroCheck({
       </p>
       {recipe.nutrition ? (
         <p className="food-muted food-original">
-          Recipe-provided facts (serving basis unverified): {recipe.nutrition}
+          {context === "restaurant" ? "Menu-provided" : "Recipe-provided"} facts (serving basis
+          unverified): {recipe.nutrition}
         </p>
       ) : (
         <p className="food-muted">
-          No source nutrition was found. Enter facts from the recipe or product labels; AI will not
+          No source nutrition was found. Enter published facts from your source; AI will not
           estimate them from the ingredient list.
         </p>
       )}
       {recipe.source && (
         <a href={recipe.source} target="_blank" rel="noopener noreferrer">
-          Check the original recipe nutrition
+          {context === "restaurant"
+            ? "Check the original menu nutrition"
+            : "Check the original recipe nutrition"}
         </a>
       )}
       <details>
@@ -108,7 +119,7 @@ export function FoodMacroCheck({
             >
               <option value="unknown">Choose the basis after checking the source</option>
               <option value="serving">One source serving</option>
-              <option value="recipe">The whole recipe</option>
+              {context === "recipe" && <option value="recipe">The whole recipe</option>}
             </select>
           </label>
           {data.basis === "recipe" &&
@@ -128,55 +139,69 @@ export function FoodMacroCheck({
             />
             <span>
               I checked these facts and the serving basis against my source, including any
-              ingredient changes.
+              {context === "restaurant"
+                ? " customizations, sides, sauces and drinks."
+                : " ingredient changes."}
             </span>
           </label>
-          <h3>Your targets for this meal</h3>
-          <p className="food-muted">
-            Choose these from your own daily plan. Pixel Pals does not prescribe a daily calorie
-            deficit or protein requirement, and does not assume 2,000 calories fits everyone.
-          </p>
-          <div className="food-macro-grid">
-            {input("calorieLimit", "Meal calorie budget (kcal)")}
-            {input("proteinTarget", "Meal protein minimum (g)")}
-            {input("carbLimit", "Meal carb limit (g, optional)")}
-            {input("fatLimit", "Meal fat limit (g, optional)")}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              const targets = readMacroTargets(data);
-              if (!targets) {
-                setNote("Enter valid meal targets first.");
-                return;
-              }
-              try {
-                localStorage.setItem(FOOD_MACRO_TARGETS_KEY, JSON.stringify(targets));
-                setNote(
-                  "Meal targets remembered in this browser. Recipe nutrition stays separate.",
-                );
-              } catch {
-                setNote("Targets could not be saved in this browser.");
-              }
-            }}
-          >
-            Remember meal targets
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              try {
-                localStorage.removeItem(FOOD_MACRO_TARGETS_KEY);
-                setNote("Remembered targets removed. This meal’s entered values stay unchanged.");
-              } catch {
-                setNote("Remembered targets could not be removed in this browser.");
-              }
-            }}
-          >
-            Forget remembered meal targets
-          </Button>
+          {!shared && (
+            <>
+              <h3>Your targets for this meal</h3>
+              <p className="food-muted">
+                Choose these from your own daily plan. Pixel Pals does not prescribe a daily calorie
+                deficit or protein requirement, and does not assume 2,000 calories fits everyone.
+              </p>
+              <div className="food-macro-grid">
+                {input("calorieLimit", "Meal calorie budget (kcal)")}
+                {input("proteinTarget", "Meal protein minimum (g)")}
+                {input("carbLimit", "Meal carb limit (g, optional)")}
+                {input("fatLimit", "Meal fat limit (g, optional)")}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const targets = readMacroTargets(data);
+                  if (!targets) {
+                    setNote("Enter valid meal targets first.");
+                    return;
+                  }
+                  try {
+                    localStorage.setItem(FOOD_MACRO_TARGETS_KEY, JSON.stringify(targets));
+                    setNote(
+                      "Meal targets remembered in this browser. Recipe nutrition stays separate.",
+                    );
+                  } catch {
+                    setNote("Targets could not be saved in this browser.");
+                  }
+                }}
+              >
+                Remember meal targets
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  try {
+                    localStorage.removeItem(FOOD_MACRO_TARGETS_KEY);
+                    setNote(
+                      "Remembered targets removed. This meal’s entered values stay unchanged.",
+                    );
+                  } catch {
+                    setNote("Remembered targets could not be removed in this browser.");
+                  }
+                }}
+              >
+                Forget remembered meal targets
+              </Button>
+            </>
+          )}
+          {shared && (
+            <p className="food-muted">
+              Using Your meal targets at the top of Focus Food. Edit them there to compare both
+              recipes and restaurants.
+            </p>
+          )}
           {note && (
             <p role="status" className="food-muted">
               {note}
@@ -226,7 +251,25 @@ export function FoodMacroCheck({
           bad; carbs and fat have no automatic pass/fail limits unless you set them.
         </p>
       </div>
-      {result.verdict === "no" && (
+      {result.verdict === "no" && context === "restaurant" && (
+        <div className="food-notice" aria-label="Restaurant alternatives to compare">
+          <h3>Other orders to compare</h3>
+          <p>
+            Compare another published menu item or a different serving size. If offered, check the
+            restaurant’s calculator for changes such as grilled instead of fried, sauces on the side
+            or a different side dish.
+          </p>
+          <p>
+            Customizations are not automatically lower calorie or higher protein. Include sides,
+            sauces and drinks; enter the updated published totals and confirm again. Check allergens
+            with the restaurant.
+          </p>
+          <Button type="button" variant="outline" onClick={() => edit({ confirmed: false })}>
+            I changed my order — recheck nutrition
+          </Button>
+        </div>
+      )}
+      {result.verdict === "no" && context === "recipe" && (
         <div className="grid gap-2" aria-label="Ingredient alternatives to review">
           <h3>Ingredient alternatives to consider</h3>
           {macroAlternatives(recipe.ingredients, result).map((x) => (

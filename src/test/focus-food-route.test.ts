@@ -3,6 +3,8 @@ import { currentUser } from "@/lib/accounts.server";
 import { askPals } from "@/lib/ask.server";
 import { recipePage } from "@/lib/recipe-import.server";
 import { handleFocusFood } from "@/lib/focus-food.server";
+import { handleSearch } from "@/lib/search.server";
+vi.mock("@/lib/search.server", () => ({ handleSearch: vi.fn() }));
 vi.mock("@/lib/accounts.server", () => ({ currentUser: vi.fn() }));
 vi.mock("@/lib/ask.server", () => ({ askPals: vi.fn() }));
 vi.mock("@/lib/recipe-import.server", async importOriginal => ({ ...await importOriginal<object>(), recipePage: vi.fn() }));
@@ -44,4 +46,33 @@ it("rejects oversized bodies and aborts before network access", async () => {
   const controller = new AbortController(); controller.abort();
   expect((await handleFocusFood(new Request("http://localhost/api/focus-food", { method: "POST", body: JSON.stringify({ op: "import", url: "https://example.com" }), signal: controller.signal }))).status).toBe(499);
   expect(page).not.toHaveBeenCalled();
+});
+it("restaurant lookups require an owner before any website or search access", async () => {
+  vi.mocked(handleSearch).mockReset(); owner.mockResolvedValue(null);
+  for (const input of [{ op: "restaurant-search", query: "Moes" }, { op: "restaurant-import", url: "https://example.com/menu" }]) expect((await handleFocusFood(request(input))).status).toBe(403);
+  expect(handleSearch).not.toHaveBeenCalled(); expect(page).not.toHaveBeenCalled(); expect(ai).not.toHaveBeenCalled();
+});
+it("restaurant search passes only a bounded query and never interprets snippets as macros", async () => {
+  vi.mocked(handleSearch).mockReset();
+  vi.mocked(handleSearch).mockResolvedValue(Response.json({ hits: [{ title: "Official menu", url: "https://example.com/menu", snippet: "500 calories" }, { title: "Private", url: "http://10.200.1.30/" }, { title: "Unsafe", url: "javascript:alert(1)" }] }));
+  const result = await (await handleFocusFood(request({ op: "restaurant-search", query: "Moes bowl", calorieLimit: "600", proteinTarget: "40" }))).json();
+  expect(result.hits).toHaveLength(1); expect(result.items).toBeUndefined();
+  const forwarded = vi.mocked(handleSearch).mock.calls[0]![0];
+  expect(forwarded.url).toContain("Moes+bowl"); expect(forwarded.url).not.toContain("600"); expect(forwarded.url).not.toContain("proteinTarget");
+  expect((await handleFocusFood(request({ op: "restaurant-search", query: "x".repeat(161) }))).status).toBe(400);
+  expect(ai).not.toHaveBeenCalled();
+});
+it("restaurant imports preserve missing values and use the SSRF-protected page loader, without AI", async () => {
+  page.mockResolvedValue({ html: '<script type="application/ld+json">{"@type":"MenuItem","name":"Bowl","nutrition":{"calories":"500 kcal","proteinContent":"40 g"}}</script>', source: "https://example.com/menu" });
+  const result = await (await handleFocusFood(request({ op: "restaurant-import", url: "https://example.com/menu" }))).json();
+  expect(result.items[0]).toMatchObject({ name: "Bowl", nutrition: "calories: 500 kcal · proteinContent: 40 g", source: "https://example.com/menu" });
+  expect(page).toHaveBeenCalledWith("https://example.com/menu", expect.any(AbortSignal)); expect(ai).not.toHaveBeenCalled();
+});
+it("menu/search failures explain manual fallback without leaking private endpoints", async () => {
+  page.mockRejectedValue(new Error("10.200.1.30 private socket"));
+  const result = await handleFocusFood(request({ op: "restaurant-import", url: "https://example.com/menu" }));
+  expect(result.status).toBe(422); expect(await result.text()).not.toContain("10.200");
+  vi.mocked(handleSearch).mockResolvedValue(Response.json({ error: "http://private-searx:8081" }, { status: 502 }));
+  const search = await handleFocusFood(request({ op: "restaurant-search", query: "Moes" }));
+  expect(search.status).toBe(502); expect(await search.text()).not.toContain("private-searx");
 });

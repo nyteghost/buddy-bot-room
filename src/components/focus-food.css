@@ -32,3 +32,11 @@
 [data-macro-verdict="yes"] { border-left: 4px solid var(--primary); }
 [data-macro-verdict="no"] { border-left: 4px solid var(--muted-foreground); }
 @media (max-width: 360px) { .food-macro-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.food-cooking-view:not([hidden]), .food-restaurant { display: grid; min-width: 0; gap: 16px; }
+.food-restaurant-directory { display: grid; gap: 8px; }
+.food-menu-results { display: grid; gap: 10px; max-height: 400px; overflow: auto; }
+.food-restaurant .food-card .food-card { padding: 12px; }
+
+.food-restaurant-stage:not([hidden]) { display: grid; min-width: 0; gap: 16px; }
+.food-targets details > .food-macro-grid, .food-targets details > .food-actions { margin: 12px 0; }

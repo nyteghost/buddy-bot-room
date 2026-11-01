@@ -3,6 +3,9 @@ import { currentUser } from "./accounts.server";
 import { askPals } from "./ask.server";
 import { foodCoach, validRecipe } from "./focus-food";
 import { extractRecipe, recipePage } from "./recipe-import.server";
+import { extractMenuFoods } from "./restaurant-import.server";
+import { handleSearch } from "./search.server";
+import { recipeUrl } from "./focus-food";
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 export async function handleFocusFood(request: Request): Promise<Response> {
   if (request.method !== "POST") return reply({ error: "Method not allowed" }, 405);
@@ -14,6 +17,18 @@ export async function handleFocusFood(request: Request): Promise<Response> {
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(15000)]);
   try {
     signal.throwIfAborted();
+    if (input["op"] === "restaurant-search" && typeof input["query"] === "string" && input["query"].trim() && input["query"].length <= 160) {
+      const query = `${input["query"].trim()} official restaurant menu nutrition protein calories`;
+      const response = await handleSearch(new Request(`http://localhost/api/search?${new URLSearchParams({ q: query })}`, { signal }));
+      signal.throwIfAborted();
+      if (!response.ok) return reply({ error: "Restaurant web search is unavailable. Use an official restaurant link below, open a web search, or enter published nutrition manually." }, 502);
+      const data = await response.json() as { hits?: { title: string; url: string; snippet: string }[] };
+      return reply({ hits: (data.hits ?? []).filter(h => recipeUrl(h.url)).slice(0, 6) });
+    }
+    if (input["op"] === "restaurant-import" && typeof input["url"] === "string") {
+      const page = await recipePage(input["url"], signal), items = extractMenuFoods(page.html, page.source);
+      return items.length ? reply({ items, source: page.source }) : reply({ error: "No readable menu nutrition found. This page may use a PDF, an interactive calculator or calories only. Open the restaurant source and paste one item’s labelled nutrition, or enter it manually." }, 422);
+    }
     if (input["op"] === "import" && typeof input["url"] === "string") {
       const page = await recipePage(input["url"], signal), recipe = extractRecipe(page.html, page.source);
       return recipe ? reply({ recipe }) : reply({ error: "No complete structured recipe found. Paste its ingredients and instructions below, or enter them manually." }, 422);
@@ -37,10 +52,11 @@ export async function handleFocusFood(request: Request): Promise<Response> {
       if (result.ok && result.text.trim().length <= 600 && !/[\d°]|\b(cook|bake|boil|fry|microwave|degrees|minutes|hours|seconds|safe|done|substitut|refrigerat|freez|raw|eat|taste)\b/i.test(result.text)) return reply({ text: result.text.trim(), source: "local-ai" });
       return reply({ text: fallback, source: "offline" });
     }
-    return reply({ error: "Choose import, organize or help" }, 400);
+    return reply({ error: "Choose import, organize, help, restaurant-search or restaurant-import" }, 400);
   } catch {
     if (request.signal.aborted) return reply({ error: "Cancelled" }, 499);
     if (input["op"] === "help" && typeof input["step"] === "string") return reply({ text: foodCoach(input["step"]), source: "offline" });
+    if (input["op"] === "restaurant-import" || input["op"] === "restaurant-search") return reply({ error: "Restaurant lookup could not finish. Use a public HTTPS nutrition page, or paste and enter the published facts manually." }, 422);
     return reply({ error: "Recipe import could not finish. The site may block access; paste its text or enter the recipe manually." }, 422);
   }
 }

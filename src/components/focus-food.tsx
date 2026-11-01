@@ -1,3 +1,5 @@
+import { FoodTargetsPanel, FoodTargetsProvider } from "./food-targets";
+import { RestaurantFood } from "./restaurant-food";
 import { FoodMacroCheck } from "./food-macros";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
@@ -7,6 +9,7 @@ import { FOOD_KEY, foodCoach, newFoodSession, pastedRecipe, readFoodSession, val
 import "./focus-food.css";
 const empty: FoodRecipe = { title: "", ingredients: [], steps: [], servings: "", nutrition: "", source: "" };
 export function FocusFood({ open }: { open: boolean }) {
+  const [restaurantView, setRestaurantView] = useState(false);
   const [session, setSession] = useState<FoodSession | null>(null);
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState<FoodRecipe>(empty);
@@ -62,8 +65,16 @@ export function FocusFood({ open }: { open: boolean }) {
   };
   const reset = () => { if (!window.confirm("Clear this cooking session and its timer? Your tasks, notes and other Focus Assist progress stay saved.")) return; cancel(); setSession(null); setReview(false); setDraft(empty); setIngredients(""); setInstructions(""); setHelp(""); setPaused(false); setNote(""); };
   const remaining = session?.timer ? Math.max(0, Math.ceil((session.timer.end - now) / 1000)) : 0;
-  return <div className="focus-food" aria-label="Focus Food cooking assistant">
+  return <FoodTargetsProvider><div className="focus-food" aria-label="Focus Food cooking assistant">
     <header className="food-heading">{!session && <PixelCharacter id="echo" motion="idle" />}<div><h2>Focus Food</h2><p>One recipe. One manageable step at a time.</p></div></header>
+    <FoodTargetsPanel />
+    <div className="food-actions" role="group" aria-label="Focus Food sections">
+      <Button aria-pressed={!restaurantView} variant={restaurantView ? "outline" : "default"} onClick={() => setRestaurantView(false)}>Cook a recipe</Button>
+      <Button aria-pressed={restaurantView} variant={restaurantView ? "default" : "outline"} onClick={() => { cancel(); setRestaurantView(true); }}>Restaurant macros</Button>
+    </div>
+    {restaurantView && session?.timer && <p className="food-notice">Your cooking timer is still running. Return to Cook a recipe to check it; use a kitchen or phone alarm for critical timing.</p>}
+    {ready && <div hidden={!restaurantView}><RestaurantFood open={open && restaurantView} /></div>}
+    <div hidden={restaurantView} className="food-cooking-view">
     <p className="food-muted">Recipes and cooking progress stay in this browser. Importing contacts the recipe website; Local AI is optional and never falls back to cloud AI.</p>
     {note && <p role="status" className="food-notice">{note}</p>}
     {!ready ? <p role="status">Loading your saved place…</p> : !session ? <>
@@ -119,5 +130,6 @@ export function FocusFood({ open }: { open: boolean }) {
       <p className="food-muted">Progress saves in this browser as you go. Closing Focus Food keeps your place. It does not sync to another device or your Obsidian vault.</p><Button variant="ghost" onClick={reset}>Clear recipe and start another</Button>
     </>}
     {busy && <div role="status" className="food-actions"><span>Working… Offline and manual options remain available.</span><Button variant="ghost" onClick={cancel}>Cancel request</Button></div>}
-  </div>;
+    </div>
+  </div></FoodTargetsProvider>;
 }
