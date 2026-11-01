@@ -85,7 +85,7 @@ export function FoodMacroCheck({
       </p>
       {recipe.nutrition ? (
         <p className="food-muted food-original">
-          {context === "restaurant" ? "Menu-provided" : "Recipe-provided"} facts (serving basis
+          {context === "restaurant" ? "Menu-provided" : recipe.powderAddition ? "Calculated recipe plus powder" : "Recipe-provided"} facts (serving basis
           unverified): {recipe.nutrition}
         </p>
       ) : (

@@ -83,3 +83,5 @@ Prefer the first two to additional dashboard cards: they directly help task init
 Implemented: separate Restaurant macros view, online menu search using configured SearXNG, official restaurant starting links, bounded public-HTTPS menu import, paste/manual nutrition review, Yes/No comparisons and browser-local saved orders. Shared meal targets appear at the top of Focus Food, with an optional daily-plan split helper. Cooking state stays separate. See [restaurant guide](FOCUS_FOOD_RESTAURANTS.md) for supported formats, privacy, tests and limitations.
 
 Implemented: Focus Food recipe discovery → select result → original recipe import → review → Pal cook-along, reusing existing search and recipe-import safeguards. See [Focus Food guide](FOCUS_FOOD.md).
+
+Implemented: reviewed protein-powder additions from the user’s label, weighed-dose previews, optional protein-shortfall calculation, nutrition provenance and reversible ingredient changes. See [Focus Food guide](FOCUS_FOOD.md).

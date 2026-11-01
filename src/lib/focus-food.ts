@@ -1,6 +1,7 @@
+import { readPowderAddition, type PowderAddition } from "./protein-powder";
 import { readFoodMacros, type FoodMacros } from "./food-macros";
 export const FOOD_KEY = "pixel-pals-focus-food-v1";
-export type FoodRecipe = { title: string; ingredients: string[]; steps: string[]; servings: string; source: string; nutrition: string };
+export type FoodRecipe = { powderAddition?: PowderAddition; title: string; ingredients: string[]; steps: string[]; servings: string; source: string; nutrition: string };
 export type FoodSession = { macroCheck?: FoodMacros; version: 1; recipe: FoodRecipe; index: number; checked: number[]; stage: "prep" | "cook" | "done"; portions: string; timer: { label: string; end: number } | null };
 const line = (v: unknown, max: number): v is string => typeof v === "string" && !!v.trim() && v.length <= max;
 export function validRecipe(value: unknown): FoodRecipe | null {
@@ -10,7 +11,8 @@ export function validRecipe(value: unknown): FoodRecipe | null {
     !Array.isArray(r.steps) || !r.steps.length || r.steps.length > 100 || !r.steps.every(x => line(x, 6000)) ||
     typeof r.servings !== "string" || r.servings.length > 240 || typeof r.nutrition !== "string" || r.nutrition.length > 2000 || typeof r.source !== "string" || r.source.length > 2000) return null;
   if (r.source && !recipeUrl(r.source)) return null;
-  return { title: r.title, ingredients: [...r.ingredients], steps: [...r.steps], servings: r.servings, nutrition: r.nutrition, source: r.source };
+  const powderAddition = readPowderAddition(r.powderAddition);
+  return { ...(powderAddition ? { powderAddition } : {}), title: r.title, ingredients: [...r.ingredients], steps: [...r.steps], servings: r.servings, nutrition: r.powderAddition && !powderAddition ? "" : r.nutrition, source: r.source };
 }
 export function recipeUrl(raw: string): URL | null {
   try {

@@ -1,3 +1,4 @@
+import { ProteinPowder } from "./protein-powder";
 import { RecipeSearch } from "./recipe-search";
 import { FoodTargetsPanel, FoodTargetsProvider } from "./food-targets";
 import { RestaurantFood } from "./restaurant-food";
@@ -93,10 +94,11 @@ export function FocusFood({ open }: { open: boolean }) {
         {draft.source && <a href={draft.source} target="_blank" rel="noopener noreferrer">Open original recipe</a>}
         {pasted && <details><summary>Compare with pasted original</summary><p className="food-original">{pasted}</p></details>}
         <label>Recipe title<input value={draft.title} maxLength={240} onChange={e => setDraft({ ...draft, title: e.target.value })} /></label>
-        <label>Recipe yield / servings<input value={draft.servings} maxLength={240} onChange={e => setDraft({ ...draft, servings: e.target.value })} placeholder="As written in the recipe" /></label>
-        <label>Ingredients — one per line<textarea rows={7} maxLength={24000} value={ingredients} onChange={e => setIngredients(e.target.value)} /></label>
-        <label>Full instructions — blank line between steps<textarea rows={10} maxLength={100000} value={instructions} onChange={e => setInstructions(e.target.value)} /></label>
-        {draft.nutrition && <p className="food-muted">Source nutrition (basis unverified; confirm per serving vs whole recipe): {draft.nutrition}</p>}
+        <label>Recipe yield / servings<input value={draft.servings} maxLength={240} onChange={e => setDraft({ ...draft, servings: e.target.value, ...(draft.powderAddition ? { nutrition: "" } : {}) })} placeholder="As written in the recipe" /></label>
+        <label>Ingredients — one per line<textarea rows={7} maxLength={24000} value={ingredients} onChange={e => { setIngredients(e.target.value); if (draft.powderAddition) setDraft({ ...draft, nutrition: "" }); }} /></label>
+        <label>Full instructions — blank line between steps<textarea rows={10} maxLength={100000} value={instructions} onChange={e => { setInstructions(e.target.value); if (draft.powderAddition) setDraft({ ...draft, nutrition: "" }); }} /></label>
+        <ProteinPowder recipe={{ ...draft, ingredients: ingredients.split(/\r?\n/).map(x => x.trim()).filter(Boolean), steps: instructions.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean) }} onChange={changed => { setDraft(changed); setIngredients(changed.ingredients.join("\n")); setInstructions(changed.steps.join("\n\n")); }} />
+        {draft.nutrition && <p className="food-muted">{draft.powderAddition ? "Calculated nutrition with powder (per finished portion; review again)" : "Source nutrition (basis unverified; confirm per serving vs whole recipe)"}: {draft.nutrition}</p>}
         <div className="food-actions"><Button onClick={begin}>Save recipe and get ready</Button><Button variant="ghost" onClick={() => { cancel(); setReview(false); }}>Back to import</Button></div>
       </section>}
     </> : <>

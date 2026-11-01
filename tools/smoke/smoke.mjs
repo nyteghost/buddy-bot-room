@@ -567,6 +567,23 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   await food.getByRole("button", { name: "Use this recipe", exact: true }).click();
   await food.getByRole("heading", { name: "Review before cooking" }).waitFor();
   await page.unroute("**/api/focus-food", recipeFixture);
+  const powder = food.getByRole("region", { name: "Protein powder calculator", exact: true });
+  await powder.getByRole("button", { name: "Add protein powder", exact: true }).click();
+  for (const [label, value] of [["Protein powder name / flavour", "Smoke label"], ["Powder weight per label serving (g)", "30"], ["Protein per label serving (g)", "24"], ["Calories per label serving (kcal)", "120"], ["Carbs per label serving (g)", "3"], ["Fat per label serving (g)", "1.5"], ["Portions in the finished recipe", "4"], ["Extra protein wanted per portion (g)", "10"]]) await powder.getByLabel(label, { exact: true }).fill(value);
+  await powder.getByText("Weigh 50.0 g of Smoke label for the whole recipe", { exact: true }).waitFor();
+  if (!await powder.getByRole("button", { name: "Apply measured powder addition", exact: true }).isDisabled()) throw Error("Powder applied without suitability review");
+  await powder.getByText("Include the recipe’s existing nutrition / use my protein shortfall", { exact: true }).click();
+  for (const width of [320, 390, 700]) {
+    await page.setViewportSize({ width, height: 844 });
+    if (await powder.evaluate(el => el.scrollWidth > el.clientWidth + 1)) throw Error(`Powder calculator overflows at ${width}px`);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await powder.getByRole("checkbox", { name: /I checked this product’s allergens/ }).check();
+  await powder.getByRole("button", { name: "Apply measured powder addition", exact: true }).click();
+  const modifiedIngredients = await food.getByRole("textbox", { name: "Ingredients — one per line", exact: true }).inputValue();
+  if (!modifiedIngredients.includes("50.0 g Smoke label")) throw Error("Calculated powder amount missing from recipe");
+  await food.getByRole("button", { name: "Remove powder addition", exact: true }).click();
+  if (await food.getByRole("textbox", { name: "Ingredients — one per line", exact: true }).inputValue() !== "1 cup rice\n2 cups water") throw Error("Removing powder did not restore original ingredients");
   await food.getByRole("button", { name: "Save recipe and get ready" }).click();
   const kitchen = food.getByRole("complementary", { name: "Cook-along Pal" });
   if (await kitchen.getAttribute("data-kitchen-action") !== "gather") throw Error("Pal did not join ingredient prep");
