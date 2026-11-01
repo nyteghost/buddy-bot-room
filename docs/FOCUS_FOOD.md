@@ -13,6 +13,10 @@ Open **Focus Food** in the desktop sidebar or **More → Focus Food** on a phone
 
 ## Timers and completion
 
+### Cook-along Pal
+
+After saving a recipe, a kitchen buddy joins ingredient preparation and follows the current instruction with pretend gathering, chopping, stirring, heating, waiting or plating props. It celebrates only when you mark the recipe checklist complete. It cannot see your food or determine doneness; animations never advance steps, change instructions or start/stop a timer. No model calls, camera or microphone access are involved. The companion stays near the top while scrolling on mobile and uses a compact scene on short screens. **Calm Pal** pauses decorative animation for the mounted cooking window. Reduced-motion, low-power, hidden-tab and hidden-window preferences also stop decorative movement. Pausing the cooking screen gives the Pal a resting pose while the timer continues. Returning or reloading derives the scene from saved recipe progress.
+
 One named timer can run at a time. Enter its duration yourself from the source recipe. It remains active across steps, pauses and reloads. Pausing the screen **does not pause cooking or the timer**. Browsers may delay updates while sleeping/backgrounded; use a kitchen or phone alarm for critical timing. This release does not send background notifications or play an alarm sound. Marking all steps complete does not establish safe cooking/doneness. The final screen asks you to check the source before eating or portioning.
 
 Source nutrition is displayed only if provided, with its serving basis explicitly unverified. No calorie/protein estimates, quantity scaling, dietary guarantees or food-safety values are generated.

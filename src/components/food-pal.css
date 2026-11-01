@@ -1,0 +1,24 @@
+.food-pal { position: sticky; top: 0; z-index: 3; display: grid; gap: 3px; min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; background: var(--card); box-shadow: 0 3px 8px rgb(0 0 0 / .12); }
+.food-pal-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .85rem; }
+.food-pal .food-pal-bar button { min-height: 44px; border-radius: 6px; padding: 6px 8px; color: var(--primary); border: 1px solid var(--border); font-size: .8rem; }
+.food-pal-scene { height: 108px; width: min(100%, 330px); position: relative; justify-self: center; }
+.food-pal-avatar { position: absolute; left: 19%; bottom: 15px; height: 82px; width: 82px; }
+.food-pal-avatar > .pixel-character { width: 100%; height: 100%; object-fit: contain; }
+.food-pal-hat { position: absolute; top: 0; left: 32%; width: 34%; height: 9px; background: #f1f0e7; border: 2px solid #918e91; border-radius: 2px; }
+.food-pal-hat::before { content: ""; position: absolute; bottom: 5px; left: -4px; width: calc(100% + 8px); height: 12px; border-radius: 7px 7px 3px 3px; background: #f1f0e7; border: 2px solid #918e91; }
+.food-pal-kitchen { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.food-pal-caption { font-size: .85rem; line-height: 1.3; }
+.food-pal-progress, .food-pal small { font-size: .73rem; color: var(--muted-foreground); line-height: 1.3; }
+.food-pal-kitchen > g { display: none; }
+[data-kitchen-action="gather"] .kitchen-ingredients, [data-kitchen-action="chop"] .kitchen-chopping, [data-kitchen-action="mix"] .kitchen-mixing, [data-kitchen-action="heat"] .kitchen-heating, [data-kitchen-action="plate"] .kitchen-plating, [data-kitchen-action="celebrate"] .kitchen-plating, [data-kitchen-action="wait"] .kitchen-waiting, [data-kitchen-action="rest"] .kitchen-waiting { display: block; }
+.kitchen-knife { transform-origin: 184px 75px; animation: food-chop 1.8s ease-in-out infinite; }
+.kitchen-spoon { transform-origin: 207px 70px; animation: food-mix 2.6s ease-in-out infinite; }
+.kitchen-steam { animation: food-steam 3s ease-in-out infinite; }
+.kitchen-sparkle { animation: food-steam 2.4s ease-in-out 2; }
+@keyframes food-chop { 0%,100% { transform: translateY(-5px) rotate(-5deg); } 45%,60% { transform: translateY(5px) rotate(5deg); } }
+@keyframes food-mix { 0%,100% { transform: translateX(-6px) rotate(-10deg); } 50% { transform: translateX(6px) rotate(10deg); } }
+@keyframes food-steam { 0%,100% { transform: translateY(1px); opacity: .4; } 50% { transform: translateY(-4px); opacity: 1; } }
+.food-pal[data-kitchen-still="true"] *, html[data-hidden="1"] .food-pal *, html[data-lowpower="1"] .food-pal *, .workspace-window[hidden] .food-pal * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .food-pal *, .food-pal *::before { animation: none !important; transition: none !important; } }
+@media (max-height: 650px) { .food-pal-scene { height: 70px; } .food-pal-avatar { height: 56px; width: 56px; bottom: 7px; } }
+@media (min-width: 701px) { .food-pal { position: relative; } }

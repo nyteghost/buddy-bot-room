@@ -14,12 +14,14 @@ async function start() {
 it("requires review, preserves recipe and advances only on explicit completion", async () => {
   await start();
   expect(screen.getByRole("checkbox", { name: "1 cup rice" })).toBeInTheDocument();
+  expect(screen.getByRole("complementary", { name: "Cook-along Pal" })).toHaveAttribute("data-kitchen-action", "gather");
   fireEvent.click(screen.getByRole("button", { name: /I’m ready/ }));
   fireEvent.click(screen.getByRole("button", { name: /I’m stuck/ }));
   expect(readFoodSession(localStorage.getItem(FOOD_KEY))?.index).toBe(0);
   expect(fetch).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Done with this step" }));
   expect(screen.getByRole("heading", { name: "Step 2 of 2" })).toBeInTheDocument();
+  expect(screen.getByRole("complementary", { name: "Cook-along Pal" })).toHaveAttribute("data-kitchen-action", "wait");
   await waitFor(() => expect(readFoodSession(localStorage.getItem(FOOD_KEY))?.index).toBe(1));
   cleanup(); render(<FocusFood open />);
   expect(screen.getByRole("heading", { name: "Step 2 of 2" })).toBeInTheDocument();
@@ -31,4 +33,20 @@ it("pause keeps a running timer, and hiding the window retains the current sessi
   fireEvent.click(screen.getByRole("button", { name: "Pause / save my place" }));
   expect(screen.getByText(/does not pause cooking/)).toBeInTheDocument();
   expect(readFoodSession(localStorage.getItem(FOOD_KEY))?.timer?.end).toBe(end);
+});
+
+it("calming or pausing the Pal does not advance a recipe or stop its timer", async () => {
+  await start(); fireEvent.click(screen.getByRole("button", { name: /I’m ready/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Start timer" }));
+  const before = readFoodSession(localStorage.getItem(FOOD_KEY));
+  const pal = screen.getByRole("complementary", { name: "Cook-along Pal" });
+  expect(pal).toHaveAttribute("data-kitchen-action", "heat");
+  fireEvent.click(screen.getByRole("button", { name: "Calm Pal" }));
+  expect(pal).toHaveAttribute("data-kitchen-still", "true");
+  expect(readFoodSession(localStorage.getItem(FOOD_KEY))).toEqual(before);
+  fireEvent.click(screen.getByRole("button", { name: "Animate Pal" }));
+  fireEvent.click(screen.getByRole("button", { name: "Pause / save my place" }));
+  expect(pal).toHaveAttribute("data-kitchen-action", "rest");
+  expect(readFoodSession(localStorage.getItem(FOOD_KEY))).toEqual(before);
+  expect(fetch).not.toHaveBeenCalled();
 });

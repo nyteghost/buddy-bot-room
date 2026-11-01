@@ -559,8 +559,17 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   await food.getByRole("button", { name: "Use pasted text", exact: true }).click();
   await food.getByRole("heading", { name: "Review before cooking" }).waitFor();
   await food.getByRole("button", { name: "Save recipe and get ready" }).click();
+  const kitchen = food.getByRole("complementary", { name: "Cook-along Pal" });
+  if (await kitchen.getAttribute("data-kitchen-action") !== "gather") throw Error("Pal did not join ingredient prep");
   await food.getByRole("checkbox", { name: "1 cup rice", exact: true }).check();
   await food.getByRole("button", { name: "I’m ready — show the first step" }).click();
+  if (await kitchen.getAttribute("data-kitchen-action") !== "heat") throw Error("Pal did not follow the cooking step");
+  await food.getByRole("button", { name: "Calm Pal", exact: true }).click();
+  if (await kitchen.getAttribute("data-kitchen-still") !== "true") throw Error("Calm Pal did not pause decorative motion");
+  await food.getByRole("button", { name: "Animate Pal", exact: true }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  if (await kitchen.locator(".kitchen-steam").evaluate(e => getComputedStyle(e).animationName) !== "none") throw Error("Kitchen ignores reduced motion");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await food.getByRole("button", { name: "I’m stuck — help me begin" }).click();
   await food.getByRole("heading", { name: "Step 1 of 2", exact: true }).waitFor();
   if (!(await food.locator(".food-step").innerText()).includes("18 minutes")) throw Error("Original cooking time changed");
@@ -577,6 +586,7 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
   await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
   await food.getByRole("timer", { name: "Rice", exact: true }).waitFor();
+  if (await kitchen.getAttribute("data-kitchen-action") !== "wait") throw Error("Kitchen lost its step after reload");
   const blocked = await page.request.post(`${URL_}/api/focus-food`, { data: { op: "import", url: "https://127.0.0.1/" } });
   if (blocked.status() !== 422) throw Error("Recipe importer accepted a private address");
   await page.screenshot({ path: process.env.SMOKE_FOOD_SHOT || "/tmp/pixel-food-mobile.png" });

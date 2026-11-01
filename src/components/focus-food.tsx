@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { PixelCharacter } from "./pixel-character";
+import { FoodPal } from "./food-pal";
 import { FOOD_KEY, foodCoach, newFoodSession, pastedRecipe, readFoodSession, validRecipe, type FoodRecipe, type FoodSession } from "@/lib/focus-food";
 import "./focus-food.css";
 const empty: FoodRecipe = { title: "", ingredients: [], steps: [], servings: "", nutrition: "", source: "" };
@@ -61,7 +62,7 @@ export function FocusFood({ open }: { open: boolean }) {
   const reset = () => { if (!window.confirm("Clear this cooking session and its timer? Your tasks, notes and other Focus Assist progress stay saved.")) return; cancel(); setSession(null); setReview(false); setDraft(empty); setIngredients(""); setInstructions(""); setHelp(""); setPaused(false); setNote(""); };
   const remaining = session?.timer ? Math.max(0, Math.ceil((session.timer.end - now) / 1000)) : 0;
   return <div className="focus-food" aria-label="Focus Food cooking assistant">
-    <header className="food-heading"><PixelCharacter id="echo" motion="idle" /><div><h2>Focus Food</h2><p>One recipe. One manageable step at a time.</p></div></header>
+    <header className="food-heading">{!session && <PixelCharacter id="echo" motion="idle" />}<div><h2>Focus Food</h2><p>One recipe. One manageable step at a time.</p></div></header>
     <p className="food-muted">Recipes and cooking progress stay in this browser. Importing contacts the recipe website; Local AI is optional and never falls back to cloud AI.</p>
     {note && <p role="status" className="food-notice">{note}</p>}
     {!ready ? <p role="status">Loading your saved place…</p> : !session ? <>
@@ -86,6 +87,7 @@ export function FocusFood({ open }: { open: boolean }) {
         <div className="food-actions"><Button onClick={begin}>Save recipe and get ready</Button><Button variant="ghost" onClick={() => { cancel(); setReview(false); }}>Back to import</Button></div>
       </section>}
     </> : <>
+      <FoodPal session={session} paused={paused} open={open} />
       <section className="food-card" aria-label="Cooking session">
         <h3>{session.recipe.title}</h3>{session.recipe.source && <a href={session.recipe.source} target="_blank" rel="noopener noreferrer">Original recipe</a>}
         {session.recipe.servings && <p>Recipe yield: {session.recipe.servings}</p>}
