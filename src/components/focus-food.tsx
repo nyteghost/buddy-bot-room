@@ -1,3 +1,4 @@
+import { RecipeSearch } from "./recipe-search";
 import { FoodTargetsPanel, FoodTargetsProvider } from "./food-targets";
 import { RestaurantFood } from "./restaurant-food";
 import { FoodMacroCheck } from "./food-macros";
@@ -78,7 +79,7 @@ export function FocusFood({ open }: { open: boolean }) {
     <p className="food-muted">Recipes and cooking progress stay in this browser. Importing contacts the recipe website; Local AI is optional and never falls back to cloud AI.</p>
     {note && <p role="status" className="food-notice">{note}</p>}
     {!ready ? <p role="status">Loading your saved place…</p> : !session ? <>
-      {!review && <section className="food-card" aria-label="Import a recipe">
+      {!review && <><RecipeSearch open={open && !restaurantView} disabled={busy} onSelect={source => { setUrl(source); void call({ op: "import", url: source }); }} /><section className="food-card" aria-label="Import a recipe">
         <label>Recipe link<input type="url" value={url} maxLength={2000} onChange={e => { cancel(); setUrl(e.target.value); }} placeholder="https://…" /></label>
         <Button disabled={busy || !url.trim()} onClick={() => void call({ op: "import", url: url.trim() })}>Import recipe link</Button>
         <p className="food-muted">Some sites block importing. Paste the recipe or enter it manually instead.</p>
@@ -86,7 +87,7 @@ export function FocusFood({ open }: { open: boolean }) {
         <div className="food-actions"><Button variant="outline" disabled={busy || !pasted.trim()} onClick={() => { const r = pastedRecipe(pasted); if (r) edit(r); else setNote("Use Ingredients and Instructions headings, or choose Enter manually. Put each instruction on its own line."); }}>Use pasted text</Button>
           <Button variant="outline" disabled={busy || !pasted.trim()} onClick={() => void call({ op: "organize", text: pasted })}>Organize with Local AI</Button>
           <Button variant="ghost" disabled={busy} onClick={() => edit(empty)}>Enter manually</Button></div>
-      </section>}
+      </section></>}
       {review && <section className="food-card" aria-label="Review recipe">
         <h3>Review before cooking</h3><p>Check for missing steps, allergies, cooking temperatures and doneness checks. AI organization can omit text; compare with the complete source.</p>
         {draft.source && <a href={draft.source} target="_blank" rel="noopener noreferrer">Open original recipe</a>}

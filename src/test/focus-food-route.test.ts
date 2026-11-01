@@ -76,3 +76,22 @@ it("menu/search failures explain manual fallback without leaking private endpoin
   const search = await handleFocusFood(request({ op: "restaurant-search", query: "Moes" }));
   expect(search.status).toBe(502); expect(await search.text()).not.toContain("private-searx");
 });
+it("recipe search requires owner authentication before calling search or AI", async () => {
+  vi.mocked(handleSearch).mockReset(); owner.mockResolvedValue(null);
+  expect((await handleFocusFood(request({ op: "recipe-search", query: "chicken" }))).status).toBe(403);
+  expect(handleSearch).not.toHaveBeenCalled(); expect(page).not.toHaveBeenCalled(); expect(ai).not.toHaveBeenCalled();
+});
+it("recipe search forwards only bounded query words and filters unsafe links", async () => {
+  vi.mocked(handleSearch).mockReset(); vi.mocked(handleSearch).mockResolvedValue(Response.json({ hits: [{ title: "Recipe", url: "https://recipes.example/rice", snippet: "data" }, { title: "Private", url: "http://127.0.0.1/" }] }));
+  const response = await handleFocusFood(request({ op: "recipe-search", query: "rice bowls", proteinTarget: "99", calorieLimit: "777" }));
+  expect(await response.json()).toMatchObject({ hits: [{ title: "Recipe", url: "https://recipes.example/rice" }] });
+  const url = vi.mocked(handleSearch).mock.calls[0]![0].url;
+  expect(url).toContain("rice+bowls+recipe+ingredients+instructions"); expect(url).not.toContain("777"); expect(url).not.toContain("99");
+  expect((await handleFocusFood(request({ op: "recipe-search", query: "x".repeat(161) }))).status).toBe(400);
+  expect(page).not.toHaveBeenCalled(); expect(ai).not.toHaveBeenCalled();
+});
+it("recipe search failures do not expose the internal search service", async () => {
+  vi.mocked(handleSearch).mockResolvedValue(Response.json({ error: "http://private-searx:8081" }, { status: 502 }));
+  const response = await handleFocusFood(request({ op: "recipe-search", query: "rice" }));
+  expect(response.status).toBe(502); expect(await response.text()).not.toContain("private-searx");
+});

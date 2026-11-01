@@ -43,3 +43,11 @@ Implementation references: [Schema.org Recipe](https://schema.org/Recipe), [OWAS
 ## Restaurant meal comparisons and shared targets
 
 Implemented: separate Restaurant macros view, online menu search using configured SearXNG, official restaurant starting links, bounded public-HTTPS menu import, paste/manual nutrition review, Yes/No comparisons and browser-local saved orders. Shared meal targets appear at the top of Focus Food, with an optional daily-plan split helper. Cooking state stays separate. See [restaurant guide](FOCUS_FOOD_RESTAURANTS.md) for supported formats, privacy, tests and limitations.
+
+## Find and import a recipe
+
+In **Cook a recipe**, **Find a recipe** searches for meals by your own words (for example, high-protein chicken meal prep). Select **Use this recipe** to import its original ingredients, complete instructions, yield and any available source nutrition into **Review before cooking**. Check the source, then **Save recipe and get ready** starts ingredient prep and the existing Pal cook-along. No cooking progress starts from a search snippet. A current session remains protected: finish or explicitly clear it before choosing another recipe.
+
+In-app search uses the existing configured SearXNG integration through the owner-authenticated backend. Only the query is sent, not macro targets or cooking data. **Open recipe web search** works as an external fallback; paste the resulting recipe link back into the import form. Some sites block importing or omit structured recipe data, so paste/manual entry remains available. Search descriptions are unverified and are never used as macro facts or cooking instructions. Selecting a result uses the existing public-HTTPS/DNS-pinned importer; it makes no AI call. Requests cancel when hidden or replaced, and late replies are ignored.
+
+Regression checks cover owner access, bounded search input, private-link filtering, search-service errors, query privacy, cancellation, import-to-review, and prep only after explicit acceptance. Mobile browser smoke searches and selects a controlled recipe fixture before following the ordinary cooking flow; this does not verify every live recipe website or a real SearXNG deployment.

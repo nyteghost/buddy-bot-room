@@ -17,11 +17,12 @@ export async function handleFocusFood(request: Request): Promise<Response> {
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(15000)]);
   try {
     signal.throwIfAborted();
-    if (input["op"] === "restaurant-search" && typeof input["query"] === "string" && input["query"].trim() && input["query"].length <= 160) {
-      const query = `${input["query"].trim()} official restaurant menu nutrition protein calories`;
+    if (["restaurant-search", "recipe-search"].includes(String(input["op"])) && typeof input["query"] === "string" && input["query"].trim() && input["query"].length <= 160) {
+      const recipeSearch = input["op"] === "recipe-search";
+      const query = `${input["query"].trim()} ${recipeSearch ? "recipe ingredients instructions" : "official restaurant menu nutrition protein calories"}`;
       const response = await handleSearch(new Request(`http://localhost/api/search?${new URLSearchParams({ q: query })}`, { signal }));
       signal.throwIfAborted();
-      if (!response.ok) return reply({ error: "Restaurant web search is unavailable. Use an official restaurant link below, open a web search, or enter published nutrition manually." }, 502);
+      if (!response.ok) return reply({ error: recipeSearch ? "Recipe search is unavailable. Open a web search, paste a recipe link, or enter a recipe manually." : "Restaurant web search is unavailable. Use an official restaurant link below, open a web search, or enter published nutrition manually." }, 502);
       const data = await response.json() as { hits?: { title: string; url: string; snippet: string }[] };
       return reply({ hits: (data.hits ?? []).filter(h => recipeUrl(h.url)).slice(0, 6) });
     }
@@ -52,9 +53,10 @@ export async function handleFocusFood(request: Request): Promise<Response> {
       if (result.ok && result.text.trim().length <= 600 && !/[\d°]|\b(cook|bake|boil|fry|microwave|degrees|minutes|hours|seconds|safe|done|substitut|refrigerat|freez|raw|eat|taste)\b/i.test(result.text)) return reply({ text: result.text.trim(), source: "local-ai" });
       return reply({ text: fallback, source: "offline" });
     }
-    return reply({ error: "Choose import, organize, help, restaurant-search or restaurant-import" }, 400);
+    return reply({ error: "Choose import, organize, help, recipe-search, restaurant-search or restaurant-import" }, 400);
   } catch {
     if (request.signal.aborted) return reply({ error: "Cancelled" }, 499);
+    if (input["op"] === "recipe-search") return reply({ error: "Recipe search could not finish. Open a web search, paste a recipe link, or enter it manually." }, 422);
     if (input["op"] === "help" && typeof input["step"] === "string") return reply({ text: foodCoach(input["step"]), source: "offline" });
     if (input["op"] === "restaurant-import" || input["op"] === "restaurant-search") return reply({ error: "Restaurant lookup could not finish. Use a public HTTPS nutrition page, or paste and enter the published facts manually." }, 422);
     return reply({ error: "Recipe import could not finish. The site may block access; paste its text or enter the recipe manually." }, 422);

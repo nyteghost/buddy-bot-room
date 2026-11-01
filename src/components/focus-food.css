@@ -40,3 +40,6 @@
 
 .food-restaurant-stage:not([hidden]) { display: grid; min-width: 0; gap: 16px; }
 .food-targets details > .food-macro-grid, .food-targets details > .food-actions { margin: 12px 0; }
+
+.focus-food .food-recipe-results { display: grid; gap: 12px; list-style: none; padding: 0; }
+.focus-food form { display: grid; min-width: 0; gap: 12px; }

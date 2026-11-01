@@ -555,9 +555,18 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   await page.locator("#mobile-more-trigger").click();
   await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
   const food = page.locator('[data-window-id="focus-food"]');
-  await food.getByLabel("Paste recipe text").fill("Rice bowls\nIngredients\n1 cup rice\n2 cups water\nInstructions\nBring water to a boil. Cover and simmer 18 minutes.\nRest for 5 minutes.");
-  await food.getByRole("button", { name: "Use pasted text", exact: true }).click();
+  const recipeFixture = async route => {
+    const data = route.request().postDataJSON();
+    if (data.op === "recipe-search") return route.fulfill({ json: { hits: [{ title: "Rice bowls", url: "https://recipes.example/rice", snippet: "Recipe source description" }] } });
+    if (data.op === "import" && data.url === "https://recipes.example/rice") return route.fulfill({ json: { recipe: { title: "Rice bowls", ingredients: ["1 cup rice", "2 cups water"], steps: ["Bring water to a boil. Cover and simmer 18 minutes.", "Rest for 5 minutes."], source: "https://recipes.example/rice", servings: "2 bowls", nutrition: "" } } });
+    return route.continue();
+  };
+  await page.route("**/api/focus-food", recipeFixture);
+  await food.getByLabel("Recipe search", { exact: true }).fill("rice bowls");
+  await food.getByRole("button", { name: "Search recipes", exact: true }).click();
+  await food.getByRole("button", { name: "Use this recipe", exact: true }).click();
   await food.getByRole("heading", { name: "Review before cooking" }).waitFor();
+  await page.unroute("**/api/focus-food", recipeFixture);
   await food.getByRole("button", { name: "Save recipe and get ready" }).click();
   const kitchen = food.getByRole("complementary", { name: "Cook-along Pal" });
   if (await kitchen.getAttribute("data-kitchen-action") !== "gather") throw Error("Pal did not join ingredient prep");
