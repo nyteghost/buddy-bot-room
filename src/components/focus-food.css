@@ -21,3 +21,14 @@
 .focus-food a { text-decoration: underline; }
 .focus-food :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 @media (max-width: 700px) { .focus-food { padding: 12px; } .food-card { padding: 12px; } }
+
+.food-macro-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.food-macro-check select { min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--foreground); font-size: 16px; }
+.food-nutrition-facts { border: 2px solid var(--foreground); border-radius: 4px; padding: 12px; }
+.food-nutrition-facts > strong { display: block; padding-bottom: 6px; border-bottom: 5px solid var(--foreground); }
+.food-nutrition-facts dl > div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 6px 0; }
+.food-nutrition-facts dl > div:first-child { font-size: 1.1rem; font-weight: 650; }
+.food-nutrition-facts small { display: block; margin-top: 8px; font-size: .75rem; }
+[data-macro-verdict="yes"] { border-left: 4px solid var(--primary); }
+[data-macro-verdict="no"] { border-left: 4px solid var(--muted-foreground); }
+@media (max-width: 360px) { .food-macro-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -1,3 +1,4 @@
+import { FoodMacroCheck } from "./food-macros";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { PixelCharacter } from "./pixel-character";
@@ -111,6 +112,7 @@ export function FocusFood({ open }: { open: boolean }) {
         </> : <><h3 ref={stepRef} tabIndex={-1}>You worked through the recipe.</h3><p>Check the recipe’s doneness and food-storage instructions before eating or packing portions. Completing this checklist does not verify that food is safely cooked.</p>{session.portions && <p>Your portion plan: {session.portions}</p>}<p>When you’re ready, set out your containers, then follow the source’s storage instructions. Cleanup can be one small item at a time.</p><Button variant="outline" onClick={() => setSession({ ...session, stage: "cook" })}>Review last step</Button></>}
         <details><summary>Full recipe and ingredients</summary><ul>{session.recipe.ingredients.map((x, i) => <li key={i}>{x}</li>)}</ul><ol>{session.recipe.steps.map((x, i) => <li className="food-original" key={i}>{x}</li>)}</ol>{session.recipe.nutrition && <p>Source nutrition (confirm serving basis): {session.recipe.nutrition}</p>}</details>
       </section>
+      {session.stage === "done" && <FoodMacroCheck recipe={session.recipe} value={session.macroCheck} onChange={macroCheck => setSession({ ...session, macroCheck })} />}
       <section className="food-card" aria-label="Cooking timer"><h3>Named timer</h3><p className="food-muted">Check the source for duration. Browser timers can be delayed when your phone sleeps; use a kitchen or phone alarm for critical timing. No alarm sound or background notification is sent.</p>
         {session.timer ? <><p role="timer" aria-label={session.timer.label}>{session.timer.label}: {remaining > 0 ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "Time is up — check your recipe"}</p><Button variant="outline" onClick={() => setSession({ ...session, timer: null })}>Clear timer</Button></> : <><label>Timer name<input value={timerLabel} maxLength={80} onChange={e => setTimerLabel(e.target.value)} /></label><label>Minutes<input type="number" min="0.1" max="1440" step="0.1" value={minutes} onChange={e => setMinutes(e.target.value)} /></label><Button variant="outline" disabled={!timerLabel.trim() || !Number.isFinite(+minutes) || +minutes < 0.1 || +minutes > 1440} onClick={() => { setNow(Date.now()); setSession({ ...session, timer: { label: timerLabel.trim(), end: Date.now() + +minutes * 60000 } }); }}>Start timer</Button></>}
       </section>

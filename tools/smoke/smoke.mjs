@@ -591,6 +591,27 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   const blocked = await page.request.post(`${URL_}/api/focus-food`, { data: { op: "import", url: "https://127.0.0.1/" } });
   if (blocked.status() !== 422) throw Error("Recipe importer accepted a private address");
   await page.screenshot({ path: process.env.SMOKE_FOOD_SHOT || "/tmp/pixel-food-mobile.png" });
+  await food.getByRole("button", { name: "Done with this step", exact: true }).click();
+  const macros = food.getByRole("region", { name: "Finished recipe nutrition and macro check", exact: true });
+  await macros.getByText("Not enough information to judge", { exact: true }).waitFor();
+  await macros.getByText("Review nutrition, portion and meal targets", { exact: true }).click();
+  for (const [label, value] of [["Source calories (kcal)", "500"], ["Source protein (g)", "40"], ["Source carbs (g)", "50"], ["Source fat (g)", "15"], ["Meal calorie budget (kcal)", "400"], ["Meal protein minimum (g)", "35"], ["Meal carb limit (g, optional)", "40"]]) await macros.getByLabel(label, { exact: true }).fill(value);
+  await macros.getByLabel("Nutrition serving basis", { exact: true }).selectOption("serving");
+  await macros.getByRole("checkbox").check();
+  await macros.getByText("No — doesn’t fit your meal targets", { exact: true }).waitFor();
+  await macros.getByText(/compare replacing part of the rice with cauliflower rice/).waitFor();
+  await macros.getByLabel("Meal calorie budget (kcal)", { exact: true }).fill("600");
+  await macros.getByLabel("Meal carb limit (g, optional)", { exact: true }).fill("");
+  await macros.getByText("Yes — fits your meal targets", { exact: true }).waitFor();
+  await macros.getByRole("button", { name: "Remember meal targets", exact: true }).click();
+  await page.reload();
+  await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
+  await page.locator("#mobile-more-trigger").click();
+  await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
+  await macros.getByText("Yes — fits your meal targets", { exact: true }).waitFor();
+  const savedFood = await page.evaluate(() => JSON.parse(localStorage.getItem("pixel-pals-focus-food-v1") || "{}"));
+  if (savedFood.recipe.ingredients[0] !== "1 cup rice" || savedFood.recipe.steps[0] !== "Bring water to a boil. Cover and simmer 18 minutes.") throw Error("Macro suggestions changed the original recipe");
+  await macros.screenshot({ path: "/tmp/pixel-food-macrocheck.png" });
 });
 await step("mobile chat uses clean full-screen layout and collapsible settings", async () => {
   await page.setViewportSize({ width: 390, height: 780 });

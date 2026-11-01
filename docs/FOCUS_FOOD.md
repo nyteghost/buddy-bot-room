@@ -13,6 +13,8 @@ Open **Focus Food** in the desktop sidebar or **More → Focus Food** on a phone
 
 ## Timers and completion
 
+The finished-recipe screen now includes **Nutrition facts & Macro Check**: confirm source facts and your portion, enter meal targets, then see **Yes** or **No** against those targets. Missing information prevents a forced verdict. A No offers ingredient alternatives to review without changing the recipe or inventing revised nutrition. See [FOCUS_FOOD_MACROS.md](FOCUS_FOOD_MACROS.md) for criteria, storage, sources and limitations.
+
 ### Cook-along Pal
 
 After saving a recipe, a kitchen buddy joins ingredient preparation and follows the current instruction with pretend gathering, chopping, stirring, heating, waiting or plating props. It celebrates only when you mark the recipe checklist complete. It cannot see your food or determine doneness; animations never advance steps, change instructions or start/stop a timer. No model calls, camera or microphone access are involved. The companion stays near the top while scrolling on mobile and uses a compact scene on short screens. **Calm Pal** pauses decorative animation for the mounted cooking window. Reduced-motion, low-power, hidden-tab and hidden-window preferences also stop decorative movement. Pausing the cooking screen gives the Pal a resting pose while the timer continues. Returning or reloading derives the scene from saved recipe progress.
