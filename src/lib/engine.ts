@@ -7,7 +7,7 @@ export type ReplyLength = "short" | "medium" | "long";
 export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 800, long: 1500 };
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 /** Claude is a PAID provider, so it is never part of the free rotation unless the user opts in. */
-export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server" | "custom"; apiKey: string; model?: string; maxTokens?: number; baseUrl?: string };
+export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server" | "custom"; apiKey: string; model?: string; maxTokens?: number; noFallback?: boolean; baseUrl?: string };
 export type ClaudeMode = "off" | "share" | "only" | "fallback";
 export const CLAUDE_MODELS = [
   { id: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)", price: "$0.10 in / $0.50 out per 1M tokens" },
@@ -46,6 +46,7 @@ export type EngineSettings = {
   anthropicKey: string;
   claudeMode: ClaudeMode;
   claudeModel: string;
+  ollamaTransport?: "auto" | "server" | "browser";
   ollamaUrl: string;
   ollamaModel: string;
   /** How long local-model replies may run: short (default), medium or long. */
@@ -59,7 +60,7 @@ const fallback: EngineSettings = {
   geminiKey: "",
   openrouterKey: "",
   nvidiaKey: "",
-  localChat: "qwen2.5:7b",
+  localChat: "auto",
   localCode: "",
   localReasoning: "",
   localFast: "",
@@ -77,6 +78,7 @@ const fallback: EngineSettings = {
   anthropicKey: "",
   claudeMode: "off",
   claudeModel: DEFAULT_CLAUDE_MODEL,
+  ollamaTransport: "auto",
   ollamaUrl: "http://localhost:11434/v1",
   ollamaModel: "qwen2.5:7b",
   replyLength: "short",
@@ -206,7 +208,7 @@ export function chainAfter(s: EngineSettings, failed: TurnProvider, blockPaid = 
 
 /** The model on the Ollama inside the stack, chosen per task when routing is on. */
 export function localServerProvider(s: EngineSettings, hint: RouteHint = {}): TurnProvider {
-  return { kind: "ollama-server", apiKey: "", model: pickModel(s, hint), maxTokens: replyTokens[s.replyLength] };
+  return { kind: "ollama-server", apiKey: "", model: pickModel(s, hint), noFallback: !!s.localPals?.[hint.agentId ?? ""], maxTokens: replyTokens[s.replyLength] };
 }
 
 export function providerForTurn(s: EngineSettings, turnIndex: number, hint: RouteHint = {}, blockPaid = false): TurnProvider | undefined {

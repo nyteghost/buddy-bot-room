@@ -31,6 +31,7 @@ export function hostHardware(server: Hardware, gpu: HostGpu, ramGbSetting?: unkn
   const ram = Number(ramGbSetting);
   return {
     ...server,
+    ...(gpu.remote ? { cpu: "Remote CPU unknown", cores: 0, ramGb: 0 } : {}),
     ...(gpu.remote && Number.isFinite(ram) && ram > 0 ? { ramGb: ram } : {}),
     gpus: gpu.gb > 0 ? [{ name: "Ollama host GPU", vramGb: gpu.gb }] : [],
     gpuSource: gpu.gb > 0 ? "override" : "none",

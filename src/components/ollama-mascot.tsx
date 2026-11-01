@@ -1,3 +1,5 @@
+import { useOllamaHealth } from "@/lib/ollama-health-store";
+import { serverOllamaTransport, modelProblem, preferredInstalled } from "@/lib/ollama-health";
 import { useEffect, useState } from "react";
 import { startPolling } from "@/lib/poll";
 import { setEngine, useEngine } from "@/lib/engine";
@@ -40,12 +42,14 @@ const llama = [
   "................................",
 ];
 
-type Status = { online: boolean; models: string[]; ping?: number };
+type Status = { checking?: boolean; online: boolean; models: string[]; ping?: number };
 
 /** Probes the configured local Ollama server; the mascot only appears while it answers. */
-function useOllamaStatus(url: string): Status {
-  const [status, setStatus] = useState<Status>({ online: false, models: [] });
+function useOllamaStatus(url: string, enabled: boolean): Status {
+  const [status, setStatus] = useState<Status>({ checking: true, online: false, models: [] });
   useEffect(() => {
+    if (!enabled) return;
+    setStatus({ checking: true, online: false, models: [] });
     let stop = false;
     const base = url.replace(/\/v1\/?$/, "").replace(/\/$/, "");
     async function probe(): Promise<boolean> {
@@ -73,7 +77,7 @@ function useOllamaStatus(url: string): Status {
       stop = true;
       off();
     };
-  }, [url]);
+  }, [url, enabled]);
   return status;
 }
 
@@ -99,7 +103,7 @@ function OllamaLauncher() {
   return (
     <div className="ollama-mascot" role="status">
       <div className="ollama-info">
-        <b>Ollama offline</b>
+        <b>Local AI — Offline</b>
         <span>{note ?? (desktop ? "Start the local server from here." : `Run: ${LAUNCH_CMD}`)}</span>
       </div>
       <button type="button" className="ollama-switch" onClick={desktop ? start : copy}>
@@ -111,10 +115,21 @@ function OllamaLauncher() {
 
 export function OllamaMascot({ active = false }: { active?: boolean }) {
   const engine = useEngine();
-  const status = useOllamaStatus(engine.ollamaUrl);
-  if (!status.online) return engine.kind === "ollama" || engine.kind === "auto-ollama" ? <OllamaLauncher /> : null;
-  const using = engine.kind === "ollama" || engine.kind === "auto-ollama";
-  const hasModel = status.models.some((m) => m === engine.ollamaModel || m.startsWith(`${engine.ollamaModel}:`));
+  const health = useOllamaHealth();
+  const server = serverOllamaTransport(engine.ollamaTransport, health) || engine.kind === "local-server";
+  const using = ["ollama", "auto-ollama", "local-server"].includes(engine.kind) || health.localOnly;
+  const direct = useOllamaStatus(engine.ollamaUrl, using && !server);
+  if (!using) return null;
+  if (!server && !direct.online && !direct.checking) return <OllamaLauncher />;
+  const model = server ? engine.localChat : engine.ollamaModel;
+  const names = server ? health.models.map(m => m.name) : direct.models;
+  const online = server ? health.reachable : direct.online;
+  const defaultProblem = online ? modelProblem(model, names) : null;
+  const palProblem = online ? Object.entries(engine.localPals ?? {}).find(([, assigned]) => assigned && modelProblem(assigned, names)) : undefined;
+  const problem = defaultProblem ?? (palProblem ? `Pal ${palProblem[0]}: ${modelProblem(palProblem[1], names)}` : null);
+  const title = problem ? "Model unavailable" : (server && health.state === "checking") || (!server && direct.checking) ? "Checking" : online ? "Connected" : server && health.state === "configuration" ? "Configuration required" : "Offline";
+  const replacement = preferredInstalled(names);
+  const displayModel = model === "auto" || model.startsWith("auto:") ? replacement || "Automatic installed model" : model;
   return (
     <div className={cn("ollama-mascot", active && "ollama-busy")} role="status">
       <svg viewBox="0 0 32 32" className="ollama-sprite" shapeRendering="crispEdges" aria-label="Cyber Llama, your local Ollama server">
@@ -123,15 +138,15 @@ export function OllamaMascot({ active = false }: { active?: boolean }) {
         )}
       </svg>
       <div className="ollama-info">
-        <b>Ollama online</b>
+        <b>Local AI — {title}</b>
         <span>
-          {hasModel ? engine.ollamaModel : `Model "${engine.ollamaModel}" not pulled`} · {status.ping}ms
+          {online ? `${displayModel} · ${server ? health.remote ? "Remote Ollama via Pixel Pals" : "Ollama via Pixel Pals" : "Browser-direct Ollama"}` : server ? health.note ?? "Checking from Pixel Pals…" : "Browser-direct connection unavailable. Use Connect Ollama in Settings."}
         </span>
-        <span>{active ? "Your GPU is thinking…" : using ? "Powering your pals locally" : "Ready for local chat"}</span>
+        <span>{problem ?? (active ? "Local AI is answering…" : "No browser access to the remote PC is needed in server mode.")}</span>
       </div>
-      {!using && (
-        <button type="button" className="ollama-switch" onClick={() => setEngine({ kind: "ollama" })}>
-          Use Ollama
+      {defaultProblem && replacement && (
+        <button type="button" className="ollama-switch" onClick={() => setEngine({ localChat: replacement, ollamaModel: replacement, localAuto: false })}>
+          Use {replacement} as default
         </button>
       )}
     </div>

@@ -30,14 +30,17 @@ export function ollamaHost(server: Hardware, observedGb?: number) {
 
 /** GET: status, installed models and the machine's hardware. POST {action:"pull"|"delete", model}: download or remove a model. */
 export async function handleOllamaApi(request: Request): Promise<Response> {
+  if ((request.method === "GET" || accountsEnabled(process.env)) && !(await (await import("./accounts.server")).currentUser(request))?.owner) return json({ error: "Owner access required for Local AI status and management." }, 403);
   const localOnly = isLocalOnly(process.env["LOCAL_ONLY_AI"]);
   if (!ollamaBase()) return json({ configured: false, localOnly });
   if (request.method === "GET") {
     const serverHardware = await readHardware();
+    const initialGpu = ollamaHost(serverHardware).gpu;
+    const provenance = { applicationHardware: serverHardware, host: { remote: initialGpu.remote, vramGb: initialGpu.gb, source: initialGpu.source } };
     let hardware = ollamaHost(serverHardware).hardware;
     try {
       const [tags, ps] = await Promise.all([ollama("/api/tags"), ollama("/api/ps").catch(() => null)]);
-      if (!tags.ok) return json({ configured: true, localOnly, reachable: false, hardware, error: `Ollama answered ${tags.status}.` });
+      if (!tags.ok) return json({ configured: true, localOnly, reachable: false, hardware, ...provenance, error: `Ollama answered ${tags.status}.` });
       const models = ((await tags.json()) as { models?: Tag[] }).models ?? [];
       const loaded = ps?.ok ? (((await ps.json()) as { models?: { name: string; size_vram?: number; size?: number }[] }).models ?? []) : [];
       const observedGb = Math.max(0, ...loaded.map((m) => (m.size_vram ?? 0) / 1024 ** 3));
@@ -47,6 +50,7 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
         configured: true,
         reachable: true,
         hardware,
+        applicationHardware: serverHardware,
         host: { vramGb: host.gpu.gb, source: host.gpu.source, remote: host.gpu.remote },
         keepAlive: keepAliveSetting(),
         models: models.map((m) => ({ name: m.name, gb: Math.round(((m.size ?? 0) / 1024 ** 3) * 10) / 10 })),
@@ -55,7 +59,7 @@ export async function handleOllamaApi(request: Request): Promise<Response> {
         loaded: loaded.map((m) => ({ name: m.name, onGpu: (m.size_vram ?? 0) > 0 })),
       });
     } catch {
-      return json({ configured: true, localOnly, reachable: false, hardware, error: "Couldn't reach Ollama. Is the ollama container running?" });
+      return json({ configured: true, localOnly, reachable: false, hardware, ...provenance, error: "Couldn't reach Ollama. Is the ollama container running?" });
     }
   }
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
@@ -148,9 +152,11 @@ export async function resolveLocalModel(model: string): Promise<string | null> {
   try {
     const [tags, server] = await Promise.all([ollama("/api/tags"), readHardware()]);
     if (!tags.ok) return null;
-    const hardware = ollamaHost(server).hardware;
+    const host = ollamaHost(server);
+    const hardware = host.hardware;
+    const knownCapacity = !host.gpu.remote || host.gpu.source === "setting" || host.gpu.source === "server-gpu";
     const list = (((await tags.json()) as { models?: Tag[] }).models ?? []).map((m) => ({ name: m.name, gb: (m.size ?? 0) / 1024 ** 3 }));
-    return bestInstalled(task, list, hardware, await avoidedModels());
+    return bestInstalled(task, list, knownCapacity && (hardware.ramGb > 0 || hardware.gpus.length) ? hardware : null, await avoidedModels());
   } catch {
     return null;
   }

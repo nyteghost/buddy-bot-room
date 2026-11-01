@@ -15,6 +15,8 @@ type Status = {
   reachable?: boolean;
   error?: string;
   hardware?: Hardware;
+  applicationHardware?: Hardware;
+  host?: { remote: boolean; vramGb: number; source: string };
   models?: { name: string; gb: number }[];
   loaded?: { name: string; onGpu: boolean }[];
   feed?: { fetchedAt: string; models: FeedModel[]; error?: string } | null;
@@ -128,8 +130,9 @@ export function LocalAiPanel() {
         <Cpu className="mt-0.5 size-4 shrink-0" />
         <div className="grid gap-1">
           <span className="font-medium">{status.reachable ? "Local AI is running" : "Local AI isn't answering"}</span>
-          {hw && <span className="text-muted-foreground">{describeHardware(hw)}</span>}
-          {hw && !hw.gpus.length && <span className="text-xs text-muted-foreground">No GPU is visible to Pixel Pals, so suggestions assume CPU. With an NVIDIA GPU, set <code>OLLAMA_RUNTIME=nvidia</code> on the stack, or <code>LOCAL_VRAM_GB</code> to your card's memory.</span>}
+          {status.applicationHardware && <span className="text-muted-foreground">Pixel Pals application host: {describeHardware(status.applicationHardware)}</span>}
+          {status.host?.remote ? <span className="text-muted-foreground">Remote Ollama processing host: CPU not detected · {hw?.ramGb ? `${hw.ramGb} GB RAM (manually configured)` : "RAM unknown"} · {status.host.source === "setting" ? `${status.host.vramGb} GB VRAM (manually configured, GPU model not detected)` : status.host.source === "observed" ? `${status.host.vramGb} GB GPU memory used by loaded models (lower bound, not total VRAM)` : "GPU and total VRAM unknown"}</span> : hw && <span className="text-muted-foreground">Ollama processing host: {describeHardware(hw)}</span>}
+          {hw && !hw.gpus.length && !status.host?.remote && <span className="text-xs text-muted-foreground">No GPU is visible to Pixel Pals, so suggestions assume CPU. With an NVIDIA GPU, set <code>OLLAMA_RUNTIME=nvidia</code> on the stack, or <code>LOCAL_VRAM_GB</code> to your card's memory.</span>}
           {status.error && <span className="text-destructive">{status.error}</span>}
           {status.loaded?.map((m) => <span key={m.name} className="text-xs text-muted-foreground">{m.name} is loaded {m.onGpu ? "on the GPU" : "on the CPU (slower)"}.</span>)}
         </div>
@@ -138,7 +141,7 @@ export function LocalAiPanel() {
       {status.reachable && (
         <>
           <div className="grid gap-2">
-            <span className="font-medium">Suggested for this machine</span>
+            <span className="font-medium">Optional downloads — not installed unless marked In use or installed</span>
             {rec.map((r) => (
               <div key={r.task} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
                 <div className="min-w-0">

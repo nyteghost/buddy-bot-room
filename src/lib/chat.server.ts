@@ -1,3 +1,7 @@
+import { readOllamaHealth } from "./ollama-health.server";
+import { installedName, modelProblem, preferredInstalled } from "./ollama-health";
+import { accountsEnabled } from "./accounts";
+import { currentUser } from "./accounts.server";
 import { convertToModelMessages, streamText, validateUIMessages, type ModelMessage } from "ai";
 import { explainAiError } from "./ai-error";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -196,13 +200,22 @@ export async function handleChat(request: Request) {
     }
     {
       const localServer = engine.kind === "ollama-server";
+      if (localServer && accountsEnabled(process.env) && !(await currentUser(request))?.owner) return Response.json({ error: "Owner sign-in required for server Local AI." }, { status: 403 });
       if (localServer && !ollamaBase())
         return Response.json({ error: "Local AI isn't set up on this server. Add Ollama to the stack (see the README) or choose another engine." }, { status: 400 });
       let localModel = localServer ? String(engine.model ?? "") : "";
       if (localServer && parseAutoMarker(localModel)) {
         const resolved = await resolveLocalModel(localModel);
-        if (!resolved) return Response.json({ error: "Automatic model choice found no downloaded model that fits this machine. Download one in the Local AI panel." }, { status: 400 });
+        if (!resolved) return Response.json({ error: "No usable installed local model was found. Test the Ollama connection and choose an installed model in Local AI settings." }, { status: 400 });
         localModel = resolved;
+      }
+      if (localServer) {
+        const health = await readOllamaHealth(request.signal);
+        if (!health.reachable) return Response.json({ error: health.note, code: "ollama-down" }, { status: 503 });
+        const names = health.models.map(m => m.name);
+        const exact = installedName(localModel, names);
+        if (!exact) return Response.json({ error: modelProblem(localModel, names), code: "ollama-model", replacement: preferredInstalled(names) }, { status: 409 });
+        localModel = exact;
       }
       if (localServer && !isModelName(localModel))
         return Response.json({ error: "Pick a Local AI model in engine settings." }, { status: 400 });

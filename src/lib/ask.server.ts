@@ -1,3 +1,5 @@
+import { readOllamaHealth } from "./ollama-health.server";
+import { installedName, modelProblem } from "./ollama-health";
 import { generateText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { engineFromJson, freeModels, localServerProvider, turnProviders, type EngineSettings, type TurnProvider } from "./engine";
@@ -77,6 +79,13 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
   for (const original of chain) {
     if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
     const p = original.kind === "ollama-server" ? { ...original, model: (await resolveLocalModel(original.model ?? "")) ?? "" } : original;
+    if (p.kind === "ollama-server") {
+      const health = await readOllamaHealth(opts.signal);
+      if (!health.reachable) return { ok: false, error: health.note ?? "Ollama is not reachable from Pixel Pals." };
+      const exact = installedName(p.model ?? "", health.models.map(m => m.name));
+      if (!exact) return { ok: false, error: modelProblem(p.model ?? "", health.models.map(m => m.name)) ?? "Choose an installed local model." };
+      p.model = exact;
+    }
     const m = modelFor(p);
     if (!m) continue;
     try {

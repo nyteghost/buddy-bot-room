@@ -8,6 +8,7 @@ export type DispatchDeps<P> = {
   provider: P | undefined;
   /** The message carries mail, calendar or task details. */
   realData: boolean;
+  localOnly?: boolean;
   blockPaid: boolean;
   hasWebGpu: boolean;
   aborted: () => boolean;
@@ -32,6 +33,10 @@ const msg = (e: unknown, fallback: string) => (e instanceof Error ? e.message : 
 export async function dispatchTurn<P>(d: DispatchDeps<P>): Promise<void> {
   const { engine, provider } = d;
   const final = () => d.aborted() || d.hasAnswer();
+  if (d.localOnly) {
+    try { await d.localChain(); } catch (err) { throw new Error(msg(err, "Local AI failed. Local-Only AI blocks cloud fallback; check Local AI in Settings.")); }
+    return;
+  }
   // Your own mail, calendar and tasks are only ever read by your own Ollama: free API tokens aren't spent on them and the details never go to a cloud AI.
   const keepLocal = d.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server";
   if (keepLocal) {
@@ -40,6 +45,7 @@ export async function dispatchTurn<P>(d: DispatchDeps<P>): Promise<void> {
       else await d.localChain();
     } catch (err) {
       if (d.aborted() || d.hasAnswer()) throw err;
+      if (/Requested Ollama model|installed local model/.test(msg(err, ""))) throw err;
       throw new Error("Your own AI (Ollama) isn't reachable, so I didn't send your mail, calendar or task details to a cloud AI. Check Local AI in Settings, or ask without @mail, @calendar or @tasks.");
     }
   } else if (engine.kind === "auto-ollama") {

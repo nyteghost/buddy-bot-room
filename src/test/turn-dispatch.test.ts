@@ -96,3 +96,16 @@ describe("engine routes", () => {
     expect(s.calls).toEqual(["chain:groq"]);
   });
 });
+
+describe("Local-Only routing policy", () => {
+  for (const kind of ["auto-ollama", "ollama", "local-server", "auto", "cloud", "local"]) {
+    it(`never attempts cloud or browser inference in ${kind} when Local-Only is on`, async () => {
+      const s = setup({ engine: { kind, ollamaUrl: "unused" }, localOnly: true });
+      expect(await run(s)).toBe("ok"); expect(s.calls).toEqual(["localChain"]);
+    });
+  }
+  it("preserves the precise missing-model error without offering cloud fallback", async () => {
+    const s = setup({ localOnly: true }, { localChain: new Error('Requested Ollama model "missing:7b" is not installed.') });
+    expect(await run(s)).toContain("not installed"); expect(s.calls).toEqual(["localChain"]);
+  });
+});

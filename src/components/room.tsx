@@ -1,3 +1,6 @@
+import { useOllamaHealth, refreshOllamaHealth } from "@/lib/ollama-health-store";
+import { serverOllamaTransport } from "@/lib/ollama-health";
+import { explainAiError } from "@/lib/ai-error";
 import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ambientMotion } from "@/lib/pal-motion";
 import { useCalmInterval } from "@/lib/power";
@@ -210,11 +213,13 @@ export function Room() {
     setCloud(value);
   }
   const engine = useEngine();
+  const ollamaHealth = useOllamaHealth();
+  const backendOllama = serverOllamaTransport(engine.ollamaTransport, ollamaHealth);
   useEffect(() => { installGlobalLogging(); }, []);
   // Preload only while active. When someone returns after Ollama's idle timeout,
   // re-warm the model without forcing it to stay resident all day.
   useEffect(() => {
-    if (engine.kind !== "ollama" && engine.kind !== "auto-ollama") return;
+    if ((engine.kind !== "ollama" && engine.kind !== "auto-ollama") || backendOllama) return;
     const warm = () => {
       if (document.visibilityState === "hidden") return;
       void warmOllama(engine.ollamaUrl, engine.ollamaModel).then((ok) => {
@@ -225,7 +230,7 @@ export function Room() {
     window.addEventListener("focus", warm);
     document.addEventListener("visibilitychange", warm);
     return () => { window.removeEventListener("focus", warm); document.removeEventListener("visibilitychange", warm); };
-  }, [engine.kind, engine.ollamaUrl, engine.ollamaModel]);
+  }, [engine.kind, engine.ollamaUrl, engine.ollamaModel, backendOllama]);
   const hell = characterMode === "hellraiser";
   const horror = characterMode === "horror";
   useEffect(() => {
@@ -867,7 +872,7 @@ export function Room() {
           const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
-            const chain = orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
+            const chain = first.kind === "ollama-server" ? [first] : orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
             const failures: string[] = [];
             let lastError: unknown;
             for (const p of chain) {
@@ -881,7 +886,7 @@ export function Room() {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
                 failures.push(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
-                lastError = new Error(failures.join(" · "));
+                lastError = new Error(explainAiError(err));
                 benchProvider(benchRef.current, p, err);
                 logClient("warn", `${p.kind} failed, skipping it for a few minutes and trying the next AI`, err);
               }
@@ -892,7 +897,7 @@ export function Room() {
           const cloudFallback = async (why: unknown) => {
             if (controller.signal.aborted || (answer && messageText(answer).trim())) throw why;
             // Mail, calendar and task details never go to a cloud AI, so with those in the question there is nothing to fall back to.
-            if (requestBody.realData) throw why;
+            if (requestBody.realData || ollamaHealth.localOnly || /Local-Only|Requested Ollama model|installed local model/i.test(explainAiError(why))) throw why;
             const rest = orderByHealth(cloudFallbackChain(engine, blockPaid), benchRef.current);
             if (!rest.length) throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} No other AI is set up to take over: add a free key in AI engine settings (or switch the engine to Auto) and chats will fall back to it.`);
             answer = undefined;
@@ -905,14 +910,20 @@ export function Room() {
                 if (controller.signal.aborted || (answer && messageText(answer).trim())) throw err;
                 answer = undefined;
                 failures.push(`${providerNames[p.kind]}: ${err instanceof Error ? err.message : String(err)}`);
-                lastError = new Error(failures.join(" · "));
+                lastError = new Error(explainAiError(err));
                 benchProvider(benchRef.current, p, err);
               }
             }
             throw new Error(`${why instanceof Error ? why.message : "Your local AI didn't answer."} The cloud AIs didn't answer either (${lastError instanceof Error ? lastError.message : String(lastError)}).`);
           };
-          const runOllama = async () =>
-            consume(
+          const runOllama = async () => {
+            const health = ollamaHealth.state === "checking" ? await refreshOllamaHealth() : ollamaHealth;
+            if (serverOllamaTransport(engine.ollamaTransport, health)) {
+              const local = localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : mode, text: lastUser ? messageText(lastUser) : "" });
+              // All backend modes share the configured task defaults and explicit Pal overrides.
+              await runChain(local); return;
+            }
+            await consume(
               await ollamaTurn(
                 await fetchPrompt(),
                 { url: engine.ollamaUrl, model: engine.ollamaModel, maxTokens: replyTokens[engine.replyLength] },
@@ -921,11 +932,13 @@ export function Room() {
               ),
               `Ollama · ${engine.ollamaModel}`,
             );
+          };
           const ollamaKey = { kind: "ollama-server" as const, baseUrl: engine.ollamaUrl };
           await dispatchTurn({
             engine,
             provider,
             realData: !!requestBody.realData,
+            localOnly: ollamaHealth.localOnly,
             blockPaid,
             hasWebGpu: hasWebGPU(),
             aborted: () => controller.signal.aborted,
@@ -962,7 +975,7 @@ export function Room() {
       if (mode === "solve" && !direct && !controller.signal.aborted) celebrate();
     } catch (err) {
       if (!controller.signal.aborted) {
-        const raw = err instanceof Error ? err.message : "The discussion could not continue.";
+        const raw = explainAiError(err);
         logClient("error", "discussion failed", err);
         setError(friendlyError(raw, { engine: engine.kind, ollamaUrl: engine.ollamaUrl, ollamaModel: engine.ollamaModel }));
       }
@@ -1796,7 +1809,7 @@ export function Room() {
     );
   }
   return (
-    <div className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
+    <div aria-busy={!ready} className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
         <a href="/" className="brand">
           <span className="brand-icon">

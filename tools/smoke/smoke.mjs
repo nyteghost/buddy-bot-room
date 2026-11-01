@@ -582,6 +582,7 @@ await step("Focus Food reviewed recipe, offline cooking and saved progress", asy
   await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
   await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
   await page.reload();
+  await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
   await page.locator("#mobile-more-trigger").click();
   await page.getByRole("group", { name: "More mobile tools" }).getByRole("button", { name: "Focus Food", exact: true }).click();
   await food.getByRole("heading", { name: "Step 2 of 2", exact: true }).waitFor();
@@ -657,7 +658,55 @@ await step("Connect Ollama tests from the server, saves address and selects its 
   const saved = await page.request.get(`${URL_}/api/settings`);
   if ((await saved.json()).settings.find(x => x.key === "OLLAMA_URL")?.value !== address) throw Error("Ollama address did not persist on the server");
   const engine = await page.evaluate(() => JSON.parse(localStorage.getItem("pixel-pals-engine-v1") || "{}"));
-  if (engine.kind !== "local-server" || engine.localChat !== "smoke-local:7b") throw Error("Selected model was not applied to the local server engine");
+  if (engine.kind !== "local-server" || engine.localChat !== "qwen3.5:9b") throw Error("Selected model was not applied to the local server engine");
+});
+await step("Remote Ollama backend inference, missing models, policy and authentication", async () => {
+  const health = await page.request.get(`${URL_}/api/ollama-health`);
+  const status = await health.json();
+  if (!status.reachable || !status.models.some(m => m.name === "qwen3.5:9b")) throw Error("Backend health did not see installed Ollama");
+  if (JSON.stringify(status).includes("127.0.0.1")) throw Error("Health response exposed a private endpoint");
+  const anonymous = await browser.newContext();
+  for (const path of ["/api/ollama-health", "/api/ollama"]) {
+    const denied = await anonymous.request.get(`${URL_}${path}`);
+    if (![401, 403].includes(denied.status())) throw Error(`${path} exposed internal metadata without authentication`);
+  }
+  await anonymous.close();
+  const body = { agentId: "nova", model: "openai/gpt-6-astra", mode: "direct", round: 1, messages: [{ id: "smoke-local-u", role: "user", parts: [{ type: "text", text: "Hello" }] }], engine: { kind: "ollama-server", apiKey: "", model: "qwen3.5:9b", maxTokens: 200 } };
+  const missing = await page.request.post(`${URL_}/api/chat`, { data: { ...body, engine: { ...body.engine, model: "llama3.2:3b" } } });
+  if (missing.status() !== 409 || (await missing.json()).code !== "ollama-model") throw Error("Missing model was sent to inference instead of rejected with a repair explanation");
+  const answer = await page.request.post(`${URL_}/api/chat`, { data: body });
+  if (!answer.ok() || answer.headers()["x-pixelpals-model"] !== "qwen3.5:9b" || !(await answer.text()).includes("Local fixture reply.")) throw Error("Server-proxied model did not stream the fixture reply");
+  await page.request.post(`${URL_}/api/settings`, { data: { values: { LOCAL_ONLY_AI: "on" } } });
+  const blocked = await page.request.post(`${URL_}/api/chat`, { data: { ...body, engine: { kind: "groq", apiKey: "smoke-not-a-real-key" } } });
+  if (blocked.status() !== 403 || (await blocked.json()).code !== "local-only") throw Error("Local-Only allowed a cloud provider");
+  const directRequests = [];
+  const watchDirect = request => { if (["11434", "11435"].includes(new globalThis.URL(request.url()).port)) directRequests.push(request.url()); };
+  page.on("request", watchDirect);
+  for (const [label, localOnly] of [["Local AI (this server)", false], ["Ollama on my computer", false], ["Auto (keys + Ollama)", false], ["Auto (keys + Ollama)", true]]) {
+    await page.request.post(`${URL_}/api/settings`, { data: { values: { LOCAL_ONLY_AI: localOnly ? "on" : "off" } } });
+    const policy = page.waitForResponse(r => r.url().endsWith("/api/ollama-health"));
+    await page.evaluate(() => window.dispatchEvent(new Event("pixelpals:ollama-connected")));
+    await policy;
+    await page.setViewportSize({ width: 1500, height: 900 });
+    await page.getByRole("button", { name: "AI engine", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "AI engine", exact: true });
+    await dialog.getByRole("radio", { name: new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click();
+    if (label !== "Local AI (this server)") await dialog.getByLabel("Ollama connection path", { exact: true }).selectOption("auto");
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await page.locator(".ollama-mascot").getByText("Local AI — Connected", { exact: true }).waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator(".mobile-tabbar").getByRole("button", { name: "Pals", exact: true }).click();
+    const chat = page.locator('[data-window-id="chat-my-pals"]');
+    await chat.getByLabel("My Pals message", { exact: true }).fill("@nova Say hello.");
+    const response = page.waitForResponse(r => r.url().endsWith("/api/chat") && r.request().postDataJSON()?.engine?.kind === "ollama-server", { timeout: 30000 });
+    await chat.getByRole("button", { name: "Send", exact: true }).click();
+    const actual = await response;
+    if (!actual.ok() || actual.headers()["x-pixelpals-model"] !== "qwen3.5:9b") throw Error(`${label} did not use the installed backend model`);
+    await chat.getByRole("button", { name: "Send", exact: true }).waitFor();
+  }
+  page.off("request", watchDirect);
+  if (directRequests.length) throw Error("A proxied mode contacted an Ollama endpoint from the browser");
+  await page.request.post(`${URL_}/api/settings`, { data: { values: { LOCAL_ONLY_AI: "off" } } });
 });
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);

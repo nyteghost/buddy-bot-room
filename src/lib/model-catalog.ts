@@ -102,6 +102,7 @@ export type Installed = { name: string; gb: number };
 export function taskOfInstalled(m: Installed): TaskKey {
   const known = CATALOG.find((c) => c.id === m.name || `${c.id}` === m.name.replace(/:latest$/, ""));
   if (known) return known.task;
+  if (/^qwen3\.5:/i.test(m.name)) return "chat";
   if (/coder|code/i.test(m.name)) return "code";
   if (/r1|qwen3|qwq|reason|think/i.test(m.name)) return "reasoning";
   return m.gb > 0 && m.gb <= 2.6 ? "fast" : "chat";
@@ -130,6 +131,8 @@ export function bestInstalled(task: TaskKey, installed: Installed[], hw: Hardwar
     const any = usable.filter((m) => fits(m) !== "no").sort((a, b) => a.gb - b.gb)[0];
     return any ? any.name : null;
   }
+  const preferredGeneral = task === "chat" ? usable.find(m => m.name === "qwen3.5:9b" && fits(m) !== "no") : undefined;
+  if (preferredGeneral) return preferredGeneral.name;
   const own = pickLargest(inClass(task));
   if (own) return own.name;
   if (task !== "chat") return bestInstalled("chat", installed, hw, avoid);

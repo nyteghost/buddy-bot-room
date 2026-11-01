@@ -4,6 +4,7 @@ export type ErrorContext = { engine: string; ollamaUrl?: string; ollamaModel?: s
 export function friendlyError(raw: string, ctx: ErrorContext): string {
   const text = raw.trim();
   const low = text.toLowerCase();
+  if (/Local-Only AI|Requested Ollama model|installed local model|Owner sign-in|Owner access/.test(text)) return text;
   const local = ctx.engine === "ollama" || ctx.engine === "auto-ollama";
   if (/failed to fetch|networkerror|load failed|network request failed|econnrefused/.test(low))
     return local

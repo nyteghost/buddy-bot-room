@@ -1,3 +1,5 @@
+import { OllamaModelSettings } from "./ollama-model-settings";
+import { preferredInstalled } from "@/lib/ollama-health";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -35,10 +37,10 @@ export function OllamaConnect({ onConnected }: { onConnected?: () => void }) {
       if (controller.signal.aborted || pending.current !== controller) return;
       if (!response.ok || !data.ok) { setTested(""); setModels([]); setNote(data.error ?? "Connection failed. Try again; your previous address stays saved."); return; }
       const list = (data.models ?? []).filter(x => typeof x === "string");
-      setUrl(base); setModels(list); setModel(list.includes(model) ? model : list.includes(engine.localChat) ? engine.localChat : list[0] ?? ""); setTested(base);
+      setUrl(base); setModels(list); setModel(list.includes(model) ? model : list.includes(engine.localChat) ? engine.localChat : preferredInstalled(list)); setTested(base);
       if (op === "connect" && data.saved && data.model === model) {
-        setEngine({ kind: "local-server", localChat: model, localAuto: false });
-        setNote("Saved and connected. Pixel Pals now uses your PC’s Ollama through its server. No redeploy needed. Advanced per-Pal model overrides stay unchanged.");
+        setEngine({ kind: "local-server", ollamaTransport: "server", ollamaModel: model, localChat: model, localAuto: false });
+        setNote("Saved and connected. Pixel Pals now reaches the remote Ollama host through its backend (Unraid when hosted there). No redeploy needed. Advanced per-Pal model overrides stay unchanged.");
         window.dispatchEvent(new Event("pixelpals:ollama-connected")); onConnected?.();
       } else setNote(data.note ?? "Connection works. Choose a model, then Save and connect.");
     } catch { if (!controller.signal.aborted) setNote("Could not contact Pixel Pals. Nothing was changed; try again."); }
@@ -54,6 +56,7 @@ export function OllamaConnect({ onConnected }: { onConnected?: () => void }) {
       {!model && <p className="text-xs text-muted-foreground">Test the address to list installed models and enable Save and connect. Testing does not save or switch engines.</p>}
     </>}
     {(busy || note) && <p role="status" className="whitespace-pre-wrap break-words text-xs">{busy ? "Checking the connection from Pixel Pals…" : note}</p>}
+    <OllamaModelSettings />
     <details><summary className="cursor-pointer py-2">PC not reachable? CachyOS / Fish setup</summary><p className="my-2 text-xs">For Ollama installed as a system service, run these commands on the PC, then test again. This restarts Ollama and allows LAN connections. Keep port 11434 on your trusted network; no router port-forward is needed.</p><pre className="max-w-full overflow-x-auto rounded border p-2 text-xs"><code>{OLLAMA_PC_SETUP}</code></pre><Button type="button" variant="outline" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(OLLAMA_PC_SETUP); setNote("PC setup commands copied. Run them on the PC, then Test connection."); } catch { setNote("Clipboard unavailable. Select the commands above and copy them manually."); } }}>Copy PC setup commands</Button></details>
   </section>;
 }

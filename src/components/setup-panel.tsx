@@ -48,6 +48,7 @@ export function SetupPanel({ open }: { open: boolean }) {
       const problems = Object.values(json.errors ?? {});
       setSaveNote((n) => ({ ...n, [id]: json.error ?? (problems.length ? `⚠ ${problems.join(" ")}` : "✅ Saved. No redeploy needed.") }));
       if (!problems.length) setDrafts((d) => { const next = { ...d }; for (const k of keys) delete next[k]; return next; });
+      if (id === "ollama") window.dispatchEvent(new Event("pixelpals:ollama-connected"));
       await load();
     } catch { setSaveNote((n) => ({ ...n, [id]: "⚠ Couldn't reach the server." })); }
     setSaving("");

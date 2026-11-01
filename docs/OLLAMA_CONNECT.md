@@ -19,3 +19,7 @@ Legacy browser-direct fields remain for advanced use and continue saving as type
 Tests cover owner authorization, URL validation, duplicate/cloud model filtering, cancellation, stale replies, no save on Test or failed model checks, and persistence failures. Browser smoke uses `tools/smoke/ollama.mjs`, a localhost-only read-only fixture, to check the real server test/save path and browser engine selection. Start that fixture before manually running `tools/smoke/smoke.mjs`; CI starts it in the app startup step. Real PC/Unraid firewall and service connectivity still require the owner's deployment.
 
 Ollama's official network/service configuration: https://docs.ollama.com/faq#how-do-i-configure-ollama-server
+
+## Remote routing/status follow-up
+
+The sidebar and proxied modes now share authenticated backend health. Local AI, Ollama and Auto use the shared task/default model when the backend path is active; legacy direct URL/model fields are retained for explicit browser-direct operation. Missing task/Pal models have individual repair controls, and Local-Only mode bypasses cloud rotation. See [REMOTE_OLLAMA_BETA.md](REMOTE_OLLAMA_BETA.md) for root causes, hardware provenance, validation and existing Compose Manager update instructions.

@@ -1,3 +1,5 @@
+import { useOllamaHealth } from "@/lib/ollama-health-store";
+import { serverOllamaTransport } from "@/lib/ollama-health";
 import { OllamaConnect } from "./ollama-connect";
 import { useEffect, useState } from "react";
 import { Cpu } from "lucide-react";
@@ -34,14 +36,17 @@ const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "cloud", label: "Free keys", note: "Shares turns between the free keys you add." },
   { kind: "auto", label: "Auto (fastest)", note: "Free keys first; the in-browser model steps in if a key runs out." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once." },
-  { kind: "local-server", label: "Local AI (this server)", note: "The Ollama in your Pixel Pals stack. Nothing to type." },
-  { kind: "ollama", label: "Ollama on my computer", note: "Your own Ollama or llama.cpp, at full GPU speed." },
+  { kind: "local-server", label: "Local AI (this server)", note: "Your configured Ollama, reached through Pixel Pals (including a remote PC)." },
+  { kind: "ollama", label: "Ollama on my computer", note: "Uses the backend when configured; browser-direct remains an advanced option." },
   { kind: "auto-ollama", label: "Auto (keys + Ollama)", note: "Free keys first; your Ollama takes over if they fail." },
 ];
 
 export function EngineSettingsDialog() {
   const engine = useEngine();
-  const installedModels = useOllamaModels(engine.ollamaUrl, engine.kind === "ollama" || engine.kind === "auto-ollama");
+  const health = useOllamaHealth();
+  const directModels = useOllamaModels(engine.ollamaUrl, (engine.kind === "ollama" || engine.kind === "auto-ollama") && !serverOllamaTransport(engine.ollamaTransport, health));
+  const serverOllama = serverOllamaTransport(engine.ollamaTransport, health);
+  const installedModels = serverOllama ? health.models.map(m => m.name) : directModels;
   const [progress, setProgress] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const presets = usePresets();
@@ -57,6 +62,7 @@ export function EngineSettingsDialog() {
           ? `Auto (${count} + Ollama)`
           : engine.kind === "ollama"
           ? `Ollama (${engine.ollamaModel})`
+          : engine.kind === "local-server" ? "Local AI (server connection)"
           : `Free keys (${count})`;
   async function prepareLocal() {
     setLoading(true);
@@ -83,6 +89,7 @@ export function EngineSettingsDialog() {
             Choose where the pals' replies come from. Everything here is free unless you turn on a paid provider.
           </DialogDescription>
         </DialogHeader>
+        {health.localOnly && <p role="status" className="rounded border p-2 text-sm">Local-Only AI is on. Every mode, including Auto, uses your configured backend Ollama. Cloud keys remain saved but are blocked; no cloud fallback will run.</p>}
         <div className="grid gap-1.5" role="radiogroup" aria-label="Where replies come from">
           {options.map((o) => (
             <button
@@ -126,23 +133,24 @@ export function EngineSettingsDialog() {
         {(engine.kind === "ollama" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3 text-sm">
             <OllamaConnect />
+            <label className="grid gap-1">Ollama connection path<select aria-label="Ollama connection path" className="rounded-md border bg-background p-2" value={engine.ollamaTransport ?? "auto"} onChange={e => setEngine({ ollamaTransport: e.target.value as "auto" | "server" | "browser" })}><option value="auto">Automatic — prefer Pixel Pals backend</option><option value="server">Through Pixel Pals backend (desktop and mobile)</option><option value="browser">Browser-direct (advanced, requires browser access)</option></select></label>
             <p className="text-xs text-muted-foreground">Advanced browser-direct settings below save as you type. For Unraid and phones, use Save and connect above.</p>
-            <label className="grid gap-1">
-              <span className="font-medium">Server URL</span>
+            {!serverOllama && <label className="grid gap-1">
+              <span className="font-medium">Browser-direct server URL</span>
               <Input
                 aria-label="Local server URL"
                 className="secret"
                 value={engine.ollamaUrl}
                 onChange={(e) => setEngine({ ollamaUrl: e.target.value })}
               />
-            </label>
+            </label>}
             <label className="grid gap-1">
               <span className="font-medium">Model name</span>
               <Input
                 aria-label="Local server model"
                 list="ollama-installed-models"
-                value={engine.ollamaModel}
-                onChange={(e) => setEngine({ ollamaModel: e.target.value })}
+                value={serverOllama ? engine.localChat : engine.ollamaModel}
+                onChange={(e) => setEngine(serverOllama ? { localChat: e.target.value, localAuto: false } : { ollamaModel: e.target.value })}
               />
               <datalist id="ollama-installed-models">
                 {installedModels.map((name) => (
@@ -169,14 +177,14 @@ export function EngineSettingsDialog() {
               </select>
               <span className="text-xs text-muted-foreground">Thinking models like qwen3 and deepseek-r1 always get at least 1500.</span>
             </label>
-            <p className="text-muted-foreground">
+            {!serverOllama && <p className="text-muted-foreground">
               In a terminal run <code>ollama pull {engine.ollamaModel}</code>, then start it with{" "}
               <code>OLLAMA_ORIGINS="*" ollama serve</code> so the browser is allowed to talk to it.
-            </p>
+            </p>}
           </div>
         )}
         {engine.kind === "local-server" && <LocalAiPanel />}
-        {(engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
+        {!health.localOnly && (engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3">
             <FreeKeysWizard />
             <p className="text-sm font-medium">Free keys <small className="font-normal text-muted-foreground">(a ✓ means a key is saved in this browser)</small></p>

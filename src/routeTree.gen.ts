@@ -37,6 +37,7 @@ import { Route as ApiNotesSyncRouteImport } from './routes/api.notes-sync'
 import { Route as ApiObsidianMemoryRouteImport } from './routes/api.obsidian-memory'
 import { Route as ApiOllamaRouteImport } from './routes/api.ollama'
 import { Route as ApiOllamaConnectRouteImport } from './routes/api.ollama-connect'
+import { Route as ApiOllamaHealthRouteImport } from './routes/api.ollama-health'
 import { Route as ApiPalWorkRouteImport } from './routes/api.pal-work'
 import { Route as ApiPlaytestsRouteImport } from './routes/api.playtests'
 import { Route as ApiPlexRouteImport } from './routes/api.plex'
@@ -206,6 +207,11 @@ const ApiOllamaRoute = ApiOllamaRouteImport.update({
 const ApiOllamaConnectRoute = ApiOllamaConnectRouteImport.update({
   id: '/api/ollama-connect',
   path: '/api/ollama-connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOllamaHealthRoute = ApiOllamaHealthRouteImport.update({
+  id: '/api/ollama-health',
+  path: '/api/ollama-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPalWorkRoute = ApiPalWorkRouteImport.update({
@@ -388,6 +394,7 @@ export interface FileRoutesByFullPath {
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
   '/api/ollama': typeof ApiOllamaRoute
   '/api/ollama-connect': typeof ApiOllamaConnectRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/pal-work': typeof ApiPalWorkRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/plex': typeof ApiPlexRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
   '/api/ollama': typeof ApiOllamaRoute
   '/api/ollama-connect': typeof ApiOllamaConnectRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/pal-work': typeof ApiPalWorkRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/plex': typeof ApiPlexRoute
@@ -509,6 +517,7 @@ export interface FileRoutesById {
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
   '/api/ollama': typeof ApiOllamaRoute
   '/api/ollama-connect': typeof ApiOllamaConnectRoute
+  '/api/ollama-health': typeof ApiOllamaHealthRoute
   '/api/pal-work': typeof ApiPalWorkRoute
   '/api/playtests': typeof ApiPlaytestsRoute
   '/api/plex': typeof ApiPlexRoute
@@ -571,6 +580,7 @@ export interface FileRouteTypes {
     | '/api/obsidian-memory'
     | '/api/ollama'
     | '/api/ollama-connect'
+    | '/api/ollama-health'
     | '/api/pal-work'
     | '/api/playtests'
     | '/api/plex'
@@ -631,6 +641,7 @@ export interface FileRouteTypes {
     | '/api/obsidian-memory'
     | '/api/ollama'
     | '/api/ollama-connect'
+    | '/api/ollama-health'
     | '/api/pal-work'
     | '/api/playtests'
     | '/api/plex'
@@ -691,6 +702,7 @@ export interface FileRouteTypes {
     | '/api/obsidian-memory'
     | '/api/ollama'
     | '/api/ollama-connect'
+    | '/api/ollama-health'
     | '/api/pal-work'
     | '/api/playtests'
     | '/api/plex'
@@ -752,6 +764,7 @@ export interface RootRouteChildren {
   ApiObsidianMemoryRoute: typeof ApiObsidianMemoryRoute
   ApiOllamaRoute: typeof ApiOllamaRoute
   ApiOllamaConnectRoute: typeof ApiOllamaConnectRoute
+  ApiOllamaHealthRoute: typeof ApiOllamaHealthRoute
   ApiPalWorkRoute: typeof ApiPalWorkRoute
   ApiPlaytestsRoute: typeof ApiPlaytestsRoute
   ApiPlexRoute: typeof ApiPlexRoute
@@ -978,6 +991,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ollama-connect'
       fullPath: '/api/ollama-connect'
       preLoaderRoute: typeof ApiOllamaConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ollama-health': {
+      id: '/api/ollama-health'
+      path: '/api/ollama-health'
+      fullPath: '/api/ollama-health'
+      preLoaderRoute: typeof ApiOllamaHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/pal-work': {
@@ -1236,6 +1256,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiObsidianMemoryRoute: ApiObsidianMemoryRoute,
   ApiOllamaRoute: ApiOllamaRoute,
   ApiOllamaConnectRoute: ApiOllamaConnectRoute,
+  ApiOllamaHealthRoute: ApiOllamaHealthRoute,
   ApiPalWorkRoute: ApiPalWorkRoute,
   ApiPlaytestsRoute: ApiPlaytestsRoute,
   ApiPlexRoute: ApiPlexRoute,

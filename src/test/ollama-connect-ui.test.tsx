@@ -19,7 +19,7 @@ it("shows Test and Save, tests without saving, then switches only after confirme
   fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
   await screen.findByRole("combobox", { name: "Installed local model" }); expect(setEngine).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Save and connect" }));
-  await waitFor(() => expect(setEngine).toHaveBeenCalledWith({ kind: "local-server", localChat: "qwen2.5:7b", localAuto: false }));
+  await waitFor(() => expect(setEngine).toHaveBeenCalledWith({ kind: "local-server", ollamaTransport: "server", ollamaModel: "qwen2.5:7b", localChat: "qwen2.5:7b", localAuto: false }));
 });
 it("invalidates tested models and ignores an old reply when the address changes", async () => {
   let resolve: (response: Response) => void = () => {};
