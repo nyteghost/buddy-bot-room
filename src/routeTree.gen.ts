@@ -27,6 +27,7 @@ import { Route as ApiFocusFoodRouteImport } from './routes/api.focus-food'
 import { Route as ApiFocusHelpRouteImport } from './routes/api.focus-help'
 import { Route as ApiGoogleRouteImport } from './routes/api.google'
 import { Route as ApiIcsRouteImport } from './routes/api.ics'
+import { Route as ApiInboxRouteImport } from './routes/api.inbox'
 import { Route as ApiJellyfinRouteImport } from './routes/api.jellyfin'
 import { Route as ApiJustStartRouteImport } from './routes/api.just-start'
 import { Route as ApiKeytestRouteImport } from './routes/api.keytest'
@@ -158,6 +159,11 @@ const ApiGoogleRoute = ApiGoogleRouteImport.update({
 const ApiIcsRoute = ApiIcsRouteImport.update({
   id: '/api/ics',
   path: '/api/ics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInboxRoute = ApiInboxRouteImport.update({
+  id: '/api/inbox',
+  path: '/api/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiJellyfinRoute = ApiJellyfinRouteImport.update({
@@ -390,6 +396,7 @@ export interface FileRoutesByFullPath {
   '/api/focus-help': typeof ApiFocusHelpRoute
   '/api/google': typeof ApiGoogleRouteWithChildren
   '/api/ics': typeof ApiIcsRoute
+  '/api/inbox': typeof ApiInboxRoute
   '/api/jellyfin': typeof ApiJellyfinRoute
   '/api/just-start': typeof ApiJustStartRoute
   '/api/keytest': typeof ApiKeytestRoute
@@ -452,6 +459,7 @@ export interface FileRoutesByTo {
   '/api/focus-help': typeof ApiFocusHelpRoute
   '/api/google': typeof ApiGoogleRouteWithChildren
   '/api/ics': typeof ApiIcsRoute
+  '/api/inbox': typeof ApiInboxRoute
   '/api/jellyfin': typeof ApiJellyfinRoute
   '/api/just-start': typeof ApiJustStartRoute
   '/api/keytest': typeof ApiKeytestRoute
@@ -515,6 +523,7 @@ export interface FileRoutesById {
   '/api/focus-help': typeof ApiFocusHelpRoute
   '/api/google': typeof ApiGoogleRouteWithChildren
   '/api/ics': typeof ApiIcsRoute
+  '/api/inbox': typeof ApiInboxRoute
   '/api/jellyfin': typeof ApiJellyfinRoute
   '/api/just-start': typeof ApiJustStartRoute
   '/api/keytest': typeof ApiKeytestRoute
@@ -579,6 +588,7 @@ export interface FileRouteTypes {
     | '/api/focus-help'
     | '/api/google'
     | '/api/ics'
+    | '/api/inbox'
     | '/api/jellyfin'
     | '/api/just-start'
     | '/api/keytest'
@@ -641,6 +651,7 @@ export interface FileRouteTypes {
     | '/api/focus-help'
     | '/api/google'
     | '/api/ics'
+    | '/api/inbox'
     | '/api/jellyfin'
     | '/api/just-start'
     | '/api/keytest'
@@ -703,6 +714,7 @@ export interface FileRouteTypes {
     | '/api/focus-help'
     | '/api/google'
     | '/api/ics'
+    | '/api/inbox'
     | '/api/jellyfin'
     | '/api/just-start'
     | '/api/keytest'
@@ -766,6 +778,7 @@ export interface RootRouteChildren {
   ApiFocusHelpRoute: typeof ApiFocusHelpRoute
   ApiGoogleRoute: typeof ApiGoogleRouteWithChildren
   ApiIcsRoute: typeof ApiIcsRoute
+  ApiInboxRoute: typeof ApiInboxRoute
   ApiJellyfinRoute: typeof ApiJellyfinRoute
   ApiJustStartRoute: typeof ApiJustStartRoute
   ApiKeytestRoute: typeof ApiKeytestRoute
@@ -934,6 +947,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ics'
       fullPath: '/api/ics'
       preLoaderRoute: typeof ApiIcsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/inbox': {
+      id: '/api/inbox'
+      path: '/api/inbox'
+      fullPath: '/api/inbox'
+      preLoaderRoute: typeof ApiInboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/jellyfin': {
@@ -1266,6 +1286,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFocusHelpRoute: ApiFocusHelpRoute,
   ApiGoogleRoute: ApiGoogleRouteWithChildren,
   ApiIcsRoute: ApiIcsRoute,
+  ApiInboxRoute: ApiInboxRoute,
   ApiJellyfinRoute: ApiJellyfinRoute,
   ApiJustStartRoute: ApiJustStartRoute,
   ApiKeytestRoute: ApiKeytestRoute,

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { currentUser, tokenUser } from "./accounts.server";
 import { askPals } from "./ask.server";
 import { agents } from "./agents";
@@ -17,7 +18,7 @@ const locked = <T,>(fn: () => Promise<T>): Promise<T> => { const run = chain.the
 
 async function read(): Promise<TodayState> {
   if (!dir()) return EMPTY;
-  try { return parseState(JSON.parse(await (await fs()).readFile(file(), "utf8"))); } catch { return EMPTY; }
+  try { return parseState(JSON.parse(await (await fs()).readFile(file(), "utf8"))); } catch(e) { if((e as NodeJS.ErrnoException).code==="ENOENT")return EMPTY;throw e; }
 }
 async function write(s: TodayState): Promise<void> {
   const f = await fs();
@@ -190,4 +191,12 @@ export async function tickToday(now = Date.now()): Promise<void> {
   if (!due.length) return;
   await update((st) => markNudged(st, due.map((n) => n.key)));
   for (const n of due) await pushNotice(n.title, n.body);
+}
+
+/** Read-only snapshot for the home brief and review; never generates routines or model calls. */
+export const todaySnapshot=()=>locked(async()=>structuredClone(await read()));
+export async function approveCaptureTask(capture:string,suggestion:string,title:string,notes:string,minutes:number|null){
+ const id='cap-'+createHash('sha256').update(capture+':'+suggestion).digest('hex').slice(0,20);
+ const state=await update(s=>{if(s.tasks.some(t=>t.id===id))return s;if(s.tasks.length>=500)throw Error('Today task limit reached; review existing tasks first.');const duplicate=s.tasks.find(t=>t.status==='open'&&t.title.toLowerCase()===title.toLowerCase());if(duplicate)return s;return addTask(s,title,'capture',id,Date.now(),{notes:notes.slice(0,600),...(minutes?{mins:minutes}:{})});});
+ const task=state.tasks.find(t=>t.id===id)??state.tasks.find(t=>t.status==='open'&&t.title.toLowerCase()===title.toLowerCase());if(!task)throw Error('Task was not saved');return task;
 }

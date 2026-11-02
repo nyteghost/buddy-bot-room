@@ -142,3 +142,33 @@ it("filesystem failure preserves the previous database and does not reset it to 
   await expect(keeperSnapshot()).rejects.toThrow();
   expect(await fs.readFile(dir + "/memory-keeper.json", "utf8")).toBe("corrupt");
 });
+
+it("adds same-scope Obsidian backlinks without linking private or other-project notes", async () => {
+  const a = await save();
+  await keeperTransaction((s) => {
+    createMemory(s, {
+      title: "Ollama daemon",
+      text: "Ollama daemon uses systemd",
+      scope: "global",
+      verified: true,
+    });
+    createMemory(s, {
+      title: "Private Ollama daemon",
+      text: "Ollama daemon private detail",
+      scope: "private",
+      verified: true,
+    });
+    createMemory(s, {
+      title: "Project Ollama daemon",
+      text: "Ollama daemon project detail",
+      scope: "project",
+      project: "other",
+      verified: true,
+    });
+  });
+  await syncKeeper();
+  const md = await fs.readFile(vault + "/Pixel Pals/Memory/Global/" + a.id + ".md", "utf8");
+  expect(md).toContain("Related notes:");
+  expect(md).not.toContain("Private Ollama");
+  expect(md).not.toContain("Project Ollama");
+});

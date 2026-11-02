@@ -12,3 +12,9 @@
 - **General answer appears all at once:** this release buffers the server answer so receipt, persistence and authorization can be validated together. Existing Pals retains streaming.
 
 See [[GENERAL_CHAT]], [[MEMORY_KEEPER]], [[ASSISTANT_UNRAID]] and [[ASSISTANT_ARCHITECTURE]]. These are plain Markdown and can be copied into an Obsidian documentation folder.
+
+## Current-information answers and Capture Inbox
+
+If General Chat says it cannot verify current information, expand its web status. Set Web search mode to On for a question Auto did not recognize. Configure and Test SearXNG in Settings → Integrations, including JSON results support on the search server. A working Ollama connection does not itself supply live search. See [current information](CURRENT_INFORMATION.md).
+
+If a voice memo stays queued, verify local Whisper settings and that Memory Keeper/capture processing are enabled. The app remains usable with text/manual review while the PC is off. HTTP origins normally cannot record a live microphone: upload a memo or use HTTPS. Keep overly long recordings and split them into shorter clips; the worker refuses to silently truncate their transcripts. See [Capture Inbox](CAPTURE_INBOX.md).

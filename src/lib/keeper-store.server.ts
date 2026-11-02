@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   newKeeper,
   normalize,
+  words,
   safeId,
   sensitive,
   type KeeperState,
@@ -74,6 +75,8 @@ export function validMemory(v: unknown): v is Memory {
   const m = v as Memory;
   return (
     safeId(m.id) &&
+    (m.category === undefined || ["fact", "idea"].includes(m.category)) &&
+    (m.origin === undefined || (safeId(m.origin.capture) && safeId(m.origin.suggestion))) &&
     typeof m.title === "string" &&
     m.title.length > 0 &&
     m.title.length <= 120 &&
@@ -203,10 +206,12 @@ export async function safeDirectory(base: string, parts: string[]): Promise<stri
   }
   return path;
 }
-function markdown(m: Memory): string {
+function markdown(m: Memory, related: Memory[] = []): string {
   return (
     "---\ntype: pixel-pals-memory-keeper\nid: " +
     m.id +
+    "\ncategory: " +
+    (m.category ?? "fact") +
     "\nscope: " +
     m.scope +
     "\nproject: " +
@@ -221,7 +226,24 @@ function markdown(m: Memory): string {
     m.title.replace(/[\r\n]/g, " ") +
     "\n\n" +
     m.text +
-    "\n"
+    "\n\n<!-- pixel-pals-links -->\n" +
+    (m.origin
+      ? "Source: Capture Inbox record `" + m.origin.capture + "`.\n"
+      : m.sources
+          .map(
+            (src) =>
+              "Source conversation `" + src.conversation + "`, message `" + src.message + "`.",
+          )
+          .join("\n")) +
+    (related.length
+      ? "\nRelated notes:\n" +
+        related
+          .map(
+            (other) => "- [[" + other.id + "|" + other.title.replace(/[[\]|<>\r\n]/g, " ") + "]]",
+          )
+          .join("\n")
+      : "") +
+    "\n<!-- /pixel-pals-links -->\n"
   );
 }
 export async function syncKeeper(importEdits = false): Promise<{ note: string; count: number }> {
@@ -241,6 +263,31 @@ export async function syncKeeper(importEdits = false): Promise<{ note: string; c
       "Archive",
     ])
       await safeDirectory(base, [folder]);
+    const links = new Map<string, Memory[]>();
+    const linkKey = (m: Memory, word: string) =>
+      [m.scope, m.project, m.conversation, word].join("|");
+    for (const memory of s.records) {
+      if (memory.status !== "active" || memory.scope === "private") continue;
+      for (const word of new Set(words(memory.title + " " + memory.text).slice(0, 50))) {
+        const key = linkKey(memory, word);
+        const bucket = links.get(key) ?? [];
+        bucket.push(memory);
+        links.set(key, bucket);
+      }
+    }
+    const relatedFor = (memory: Memory) => {
+      const related: Memory[] = [];
+      const seen = new Set([memory.id]);
+      for (const word of new Set(words(memory.title + " " + memory.text).slice(0, 50))) {
+        for (const other of links.get(linkKey(memory, word)) ?? []) {
+          if (seen.has(other.id)) continue;
+          related.push(other);
+          seen.add(other.id);
+          if (related.length === 3) return related;
+        }
+      }
+      return related;
+    };
     for (const m of s.records) {
       const folder =
         m.status === "archived"
@@ -282,6 +329,7 @@ export async function syncKeeper(importEdits = false): Promise<{ note: string; c
           const body = current
             .replace(/^---\n[\s\S]*?\n---\n/, "")
             .replace(/^# [^\n]*\n\s*/, "")
+            .replace(/<!-- pixel-pals-links -->[\s\S]*?<!-- \/pixel-pals-links -->/g, "")
             .trim();
           if (body && !sensitive(body) && !s.forgotten.includes(fingerprint(body))) {
             m.versions.unshift({
@@ -304,7 +352,7 @@ export async function syncKeeper(importEdits = false): Promise<{ note: string; c
         }
         continue;
       }
-      const next = markdown(m);
+      const next = markdown(m, relatedFor(m));
       if (current !== next) {
         if (current === null) await fs.writeFile(path, next, { flag: "wx", mode: 0o600 });
         else {

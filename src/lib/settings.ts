@@ -21,6 +21,10 @@ export type SettingField = {
 };
 
 export const SETTING_FIELDS: SettingField[] = [
+  {key:"SEARXNG_URL",label:"Web search address",group:"searxng",kind:"url",placeholder:"http://searxng:8080",help:"Server-side SearXNG endpoint. Enable JSON results in SearXNG. Search queries leave Pixel Pals through this service."},
+  {key:"WHISPER_URL",label:"Local Whisper address",group:"whisper",kind:"url",placeholder:"http://whisper:8000",help:"Local OpenAI-compatible transcription server. Voice recordings are sent here only for transcription."},
+  {key:"WHISPER_MODEL",label:"Whisper model",group:"whisper",kind:"text",placeholder:"Systran/faster-whisper-small"},
+{key:"CAPTURE_AUTO_PROCESS",label:"Process Capture Inbox locally",group:"ollama",kind:"select",options:["on","off"],help:"Uses the shared Memory Keeper queue and configured local Whisper/Ollama services. Off preserves captures for manual review. No cloud fallback."},
   {key:"MEMORY_VAULT_GID",label:"Obsidian group for managed memory notes (optional)",group:"obsidian",kind:"number",placeholder:"100",help:"Match the GID used by your Obsidian container. When set, only managed Pixel Pals/Memory folders/files get group access (2770/0660); other vault notes and private application data are untouched. Empty keeps owner-only files."},
 
   {key:"CHAT_MASK_IDENTIFIERS",label:"Also mask standalone email addresses in AI chat",group:"ollama",kind:"select",options:["off","on"],help:"Recognizable credentials and labelled login details are always scrubbed. On also masks standalone email addresses before server-side inference. Provider/settings credential fields stay functional."},

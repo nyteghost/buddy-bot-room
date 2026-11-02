@@ -93,6 +93,7 @@ const LinuxTerminal = lazy(() => import("./linux-terminal"));
 import { AccountButton } from "./account-button";
 // Secondary windows load their code the first time they are opened, so the first screen has less to download and run.
 const ShowServicesTools = lazy(() => import("./work-tools").then((m) => ({ default: m.ShowServicesTools })));
+const CaptureInbox = lazy(() => import("./capture-inbox").then(m=>({default:m.CaptureInbox})));
 const GeneralChat = lazy(() => import("./general-chat").then(m => ({ default: m.GeneralChat })));
 const FocusFood = lazy(() => import("./focus-food").then(m => ({ default: m.FocusFood })));
 const PlaytestsPanel = lazy(() => import("./playtests-panel").then((m) => ({ default: m.PlaytestsPanel })));
@@ -403,7 +404,22 @@ export function Room() {
   };
   const setConversationOpen = (value: boolean) => { if (value) showMode(mode); };
   const resetModes = () => { setOpenModes(defaultOpenModes); setMode("smart"); };
+  useEffect(() => {
+    const configure=(event:Event)=>{const id=(event as CustomEvent<{id?:string}>).detail?.id;if(!id || !['searxng','seerr','whisper'].includes(id))return;setSetupTarget(previous=>({id,request:(previous?.request??0)+1}));if(window.matchMedia('(max-width: 700px)').matches)mobileTab('setup');else setSetupOpen(true);};
+    window.addEventListener('pixelpals:configure-integration',configure);
+    return ()=>window.removeEventListener('pixelpals:configure-integration',configure);
+    // Fixed integration destinations; state setters stay mounted with the workspace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [setupTarget, setSetupTarget] = useState<{ id: string; request: number } | null>(null);
+  const [captureFocus,setCaptureFocus]=useState(0);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const captureSeen=useEverTrue(captureOpen);
+  const [captureId,setCaptureId]=useState<string|undefined>(undefined);
+  useEffect(()=>{const show=(event:Event)=>{const id=(event as CustomEvent<{id?:string}>).detail?.id;setCaptureId(id);setCaptureFocus(v=>v+1);if(window.matchMedia("(max-width: 700px)").matches)mobileTab("capture");else setCaptureOpen(true);};window.addEventListener("pixelpals:inbox",show);return()=>window.removeEventListener("pixelpals:inbox",show);
+  // Fixed destination; opening does not replace mounted editor state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const [generalOpen, setGeneralOpen] = useState(false);
   const generalSeen = useEverTrue(generalOpen);
   const [foodOpen, setFoodOpen] = useState(false);
@@ -427,8 +443,9 @@ export function Room() {
   }, [mobileMoreOpen]);
   const [chatter, setChatter] = useState<AgentId | null>(null);
   /** Phones: one window at a time. Closes the rest and opens the one tapped in the bottom tab bar. */
-  function mobileTab(tab: "general" | "food" | "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar" | "documents" | "fun" | "recorder" | "playtests" | "setup") {
+  function mobileTab(tab: "capture" | "general" | "food" | "chat" | "today" | "tasks" | "notes" | "room" | "mail" | "calendar" | "documents" | "fun" | "recorder" | "playtests" | "setup") {
     setOpenModes(perMode(() => false));
+    setCaptureOpen(tab === "capture");
     setGeneralOpen(tab === "general");
     if (tab !== "general" && appEntry(location.search) === "chat") history.replaceState(null, "", "/?workspace=1");
     setFoodOpen(tab === "food");
@@ -1461,7 +1478,7 @@ export function Room() {
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
     { id: "win-docs", group: "Windows", label: "Open Documents (PDF and Excel viewer)", keywords: "pdf excel xlsx csv viewer file spreadsheet", run: () => setDocsOpen(true) },
     { id: "win-fun", group: "Windows", label: "Open Fun (Dungeon Master campaign)", keywords: "dnd rpg adventure dice dungeon master games", run: () => setFunOpen(true) },
-    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setGeneralOpen(false); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
+    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setCaptureOpen(false); setGeneralOpen(false); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
     { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
     { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: () => regenerate(mode) },
@@ -1935,6 +1952,7 @@ export function Room() {
       <div className="workspace-frame">
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
+          <Button variant="ghost" className="sidebar-item" aria-pressed={captureOpen} onClick={()=>captureOpen?setCaptureOpen(false):window.dispatchEvent(new Event("pixelpals:inbox"))}><Mic /><span>Capture Inbox</span></Button>
           <Button variant="ghost" className="sidebar-item" aria-pressed={generalOpen} onClick={() => generalOpen ? closeGeneral() : openGeneral()}><MessageSquare /><span>General Chat · Ask Anything</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Just Start: one tiny first step, with optional Pal body doubling" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
@@ -1969,6 +1987,7 @@ export function Room() {
             if (show("chat-pal-lounge") || PAL_LOUNGE_MODES.some((id) => show("mode-" + id))) restored = activateChatMode(restored, selectedLounge);
             setOpenModes(restored);
             setMode(isChatRoomOpen(restored, "my-pals") ? selectedMy : selectedLounge);
+            setCaptureOpen(show("capture-inbox"));
             setGeneralOpen(show("general-chat"));
             setRoomOpen(show("room"));
             setTodayOpen(show("today"));
@@ -2004,6 +2023,9 @@ export function Room() {
         </nav>
         <div className="workspace-stage">
           <main className="window-canvas" aria-label="Floating workspace">
+            <WorkspaceWindow focusVersion={captureFocus} id="capture-inbox" title="Capture Inbox" icon={<Mic className="size-4" />} open={captureOpen} onClose={()=>{setCaptureOpen(false);if(window.matchMedia("(max-width: 700px)").matches)mobileTab("today");}} resetVersion={resetVersion}>
+              {captureSeen&&<Suspense fallback={<p className="p-4">Opening Capture Inbox…</p>}><CaptureInbox open={captureOpen} initialId={captureId} onStart={beginFocusTask}/></Suspense>}
+            </WorkspaceWindow>
             <WorkspaceWindow id="general-chat" title="General Chat" icon={<MessageSquare className="size-4" />} open={generalOpen} onClose={closeGeneral} resetVersion={resetVersion}>
               {generalSeen && <Suspense fallback={<p className="p-4" role="status">Loading General Chat…</p>}><GeneralChat open={generalOpen} /></Suspense>}
             </WorkspaceWindow>
@@ -2207,11 +2229,12 @@ export function Room() {
               <DocumentsPanel />
             </WorkspaceWindow>
             <DocumentModalHost />
-            {!generalOpen && !roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !docsOpen && !foodOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
+            {!captureOpen && !generalOpen && !roomOpen && !conversationOpen && !toolsOpen && !playtestsOpen && !recorderOpen && !notesOpen && !funOpen && !calendarOpen && !mailOpen && !docsOpen && !foodOpen && !todayOpen && !tasksOpen && !setupOpen && !searchOpen && <div className="workspace-rest"><img src={mascot} width={128} height={128} alt="Pixel Pals mascot" draggable={false} className="pixel-character native-sprite brand-mascot-big" /><h1>Pixel Pals</h1></div>}
           </main>
         </div>
       </div>
       {mobileMoreOpen && <div id="mobile-more-tools" className="mobile-more-menu" role="group" aria-label="More mobile tools" onKeyDown={e => { if (e.key === "Escape") { setMobileMoreOpen(false); document.getElementById("mobile-more-trigger")?.focus(); } }}>
+        <button type="button" onClick={()=>{setMobileMoreOpen(false);window.dispatchEvent(new Event("pixelpals:inbox"));}}><Mic /> Capture Inbox</button>
         <button type="button" onClick={() => { setMobileMoreOpen(false); window.dispatchEvent(new Event("pixelpals:general-chat")); }}><MessageSquare /> General Chat · Ask Anything</button>
         <button type="button" onClick={() => { mobileTab("food"); setMobileMoreOpen(false); }}><CookingPot /> Focus Food</button>
         <button type="button" onClick={() => { mobileTab("notes"); setMobileMoreOpen(false); }}><ListTodo /> Notes</button>
@@ -2228,7 +2251,7 @@ export function Room() {
         <button type="button" aria-pressed={todayOpen} onClick={() => { mobileTab("today"); setMobileMoreOpen(false); }}><Sun /><span>Home</span></button>
         <button type="button" aria-pressed={tasksOpen} onClick={() => { mobileTab("tasks"); setMobileMoreOpen(false); }}><CheckSquare /><span>Tasks</span></button>
         <button type="button" aria-pressed={isChatRoomOpen(openModes, "my-pals")} onClick={() => { mobileTab("chat"); setMobileMoreOpen(false); }}><MessageSquare /><span>Pals</span></button>
-        <button type="button" aria-pressed={mobileMoreOpen || generalOpen || foodOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen || docsOpen || recorderOpen || funOpen || playtestsOpen} id="mobile-more-trigger" aria-controls="mobile-more-tools" aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
+        <button type="button" aria-pressed={mobileMoreOpen || captureOpen || generalOpen || foodOpen || notesOpen || roomOpen || setupOpen || mailOpen || calendarOpen || docsOpen || recorderOpen || funOpen || playtestsOpen} id="mobile-more-trigger" aria-controls="mobile-more-tools" aria-expanded={mobileMoreOpen} onClick={() => setMobileMoreOpen(v => !v)}><Settings2 /><span>More</span></button>
       </nav>
       <footer className="app-footer">
         <span>SMALL PIXELS. BIG PERSPECTIVES.</span>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./focus-hub.css";
 import { ArrowRight, Brain, Clock3, Coffee, MessageCircle, Moon, Play, RotateCcw, Sparkles, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useWorkbench } from "@/lib/workbench";
+import { useWorkbench, type Todo } from "@/lib/workbench";
 import { chooseFocusTask, type Energy } from "@/lib/focus-pick";
 import { ResumeFocusCard } from "./resume-focus-card";
 import type { FocusSession } from "@/lib/focus-companion";
@@ -21,7 +21,8 @@ function safeNote(raw: string | null, today: string): DailyNote {
 }
 
 /** One clear action, without automatic task mutations or opaque model recommendations. */
-export function FocusHub({ onStart, onBrainDump, onOpenTasks, onOpenMail, onResumeFocus }: {
+export function FocusHub({ onStart, onBrainDump, onOpenTasks, onOpenMail, onResumeFocus, serverTodos = [] }: {
+  serverTodos?: Todo[];
   onStart: (task: string) => void;
   onBrainDump: () => void;
   onOpenTasks: () => void;
@@ -49,7 +50,7 @@ export function FocusHub({ onStart, onBrainDump, onOpenTasks, onOpenMail, onResu
   useEffect(() => {
     if (note.day !== day) setNote({ day, morning: "", shutdown: "" });
   }, [day, note.day]);
-  const pick = useMemo(() => chooseFocusTask(todos, { now, zone, minutes, energy, skipIds: skipped }), [todos, now, zone, minutes, energy, skipped]);
+  const pick = useMemo(() => chooseFocusTask([...serverTodos,...todos], { now, zone, minutes, energy, skipIds: skipped }), [todos, serverTodos, now, zone, minutes, energy, skipped]);
   const save = () => {
     try { localStorage.setItem(NOTE_KEY, JSON.stringify({ ...note, day })); setSavedMessage("Saved in this browser for today."); }
     catch { setSavedMessage("This browser couldn't store your note."); }

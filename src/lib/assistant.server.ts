@@ -1,3 +1,5 @@
+import { readCaptures } from "./capture.server";
+import { webMode, needsWeb, clockContext, type WebReceipt } from "./assistant-web";
 import { scrubChatData, scrubChatText } from "./chat-scrub";
 import { randomUUID } from "node:crypto";
 import { currentUser } from "./accounts.server";
@@ -55,6 +57,49 @@ const running = new Set<string>();
 const mine = (rows: Row[], owner: string) =>
   rows.filter((r) => r.assistant && r.owner === owner && !r.shared) as Conversation[];
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+async function lookupWeb(question: string, data: Record<string, unknown>, req: Request) {
+  let search: unknown = null;
+  const requestedWeb = webMode(data["web"], data["research"]);
+  const web: WebReceipt = {
+    state: requestedWeb === "off" ? "off" : "not-needed",
+    at: new Date().toISOString(),
+    cached: false,
+    hits: [],
+  };
+  if (needsWeb(question, requestedWeb)) {
+    const r = await handleSearch(
+      new Request(
+        "http://localhost/api/search?" + new URLSearchParams({ q: question.slice(0, 300) }),
+        { headers: req.headers, signal: req.signal },
+      ),
+    ).catch(() => null);
+    const result = r?.ok ? await r.json().catch(() => null) : null;
+    if (result && Array.isArray(result.hits)) {
+      web.hits = result.hits
+        .filter(
+          (h: { title?: unknown; url?: unknown; snippet?: unknown }) =>
+            typeof h.url === "string" && /^https?:\/\//i.test(h.url),
+        )
+        .slice(0, 6)
+        .map((h: { title?: unknown; url: string; snippet?: unknown }) => ({
+          title: String(h.title ?? "Source").slice(0, 140),
+          url: h.url.slice(0, 500),
+          snippet: String(h.snippet ?? "").slice(0, 280),
+        }));
+      web.cached = result.cached === true;
+      web.state = web.hits.length ? "connected" : "no-results";
+      search = { query: question, checkedAt: web.at, cached: web.cached, hits: web.hits };
+    } else {
+      web.state = "unavailable";
+      search = {
+        unavailable: true,
+        note: "Web search is unavailable. Do not claim current verification. Ask the user to configure Web search in Settings → Integrations.",
+      };
+    }
+  }
+
+  return { search, web };
+}
 async function invalidateSummaries() {
   await chatTransaction(async (rows) => {
     for (const r of rows)
@@ -130,6 +175,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
           (m) => !q || normalize(m.title + " " + m.text).includes(q),
         );
         const health = await readOllamaHealth().catch(() => null);
+        const captureRows = await readCaptures().catch(() => []);
         return reply({
           records: records.slice(0, 200),
           conversations: all.map((c) => ({ id: c.id, title: c.title })),
@@ -138,6 +184,12 @@ export async function handleAssistant(req: Request): Promise<Response> {
           pending: state.records.filter((m) => m.status === "pending").length,
           projects: state.projects,
           jobs: state.jobs,
+          captureJobs: {
+            pending: captureRows.filter(
+              (r) => r.inbox?.status === "pending" && r.inbox.job.state !== "done",
+            ).length,
+            failed: captureRows.filter((r) => r.inbox?.job.state === "failed").length,
+          },
           lastSuccess: state.lastSuccess,
           activity: state.activity,
           sync: state.sync,
@@ -646,7 +698,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
         });
       }
       const choice = patch["choice"] as
-        { provider?: unknown; model?: unknown; research?: unknown } | undefined;
+        { provider?: unknown; model?: unknown; research?: unknown; web?: unknown } | undefined;
       if (
         choice &&
         typeof choice.provider === "string" &&
@@ -658,6 +710,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
           provider: choice.provider,
           model: choice.model,
           research: choice.research,
+          web: webMode(choice.web, choice.research),
         };
       if (typeof patch["title"] === "string") c.title = text(patch["title"], 100) || c.title;
       if (typeof patch["draft"] === "string" && patch["draft"].length <= 10000)
@@ -761,6 +814,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
         provider: text(data["provider"], 40) || "auto",
         model: text(data["model"], 120),
         research: data["research"] === true,
+        web: webMode(data["web"], data["research"]),
       };
       c.assistant.draft = question;
       c.assistant.revision++;
@@ -769,7 +823,12 @@ export async function handleAssistant(req: Request): Promise<Response> {
         value: undefined,
       }));
       const fresh = await keeperSnapshot();
-      const semantic = await semanticScores(question, c, fresh.records);
+      const [semantic, health, webResult] = await Promise.all([
+        semanticScores(question, c, fresh.records),
+        readOllamaHealth(req.signal),
+        lookupWeb(question, data, req),
+      ]);
+      const web = webResult.web;
       const memories = retrieve(
         question,
         c,
@@ -779,24 +838,8 @@ export async function handleAssistant(req: Request): Promise<Response> {
       );
       const budget = numberSetting("ASSISTANT_CONTEXT_CHARS", 16000, 4000, 48000);
       const messages = contextMessages(c, fresh, budget);
-      let search: unknown = null,
-        tool: unknown = null;
-      if (
-        data["research"] === true &&
-        /\b(latest|today|current|research|search|look up|this week|news)\b/i.test(question)
-      ) {
-        const r = await handleSearch(
-          new Request(
-            "http://localhost/api/search?" + new URLSearchParams({ q: question.slice(0, 200) }),
-          ),
-        );
-        search = r.ok
-          ? await r.json()
-          : {
-              unavailable: true,
-              note: "Configured web search unavailable. Do not claim current verification.",
-            };
-      }
+      const search = webResult.search;
+      let tool: unknown = null;
       if (/\b(my tasks|my to.?dos|plan my day)\b/i.test(question)) {
         const r = await handleToday(
           new Request("http://localhost/api/today", { headers: req.headers }),
@@ -806,7 +849,6 @@ export async function handleAssistant(req: Request): Promise<Response> {
       const settings = engineFromJson(JSON.stringify(data["engine"] ?? {}));
       const mode = typeof data["provider"] === "string" ? data["provider"] : "auto";
       const override = text(data["model"], 120);
-      const health = await readOllamaHealth(req.signal);
       if (mode === "ollama-server" && !health.reachable)
         return reply(
           {
@@ -896,11 +938,13 @@ export async function handleAssistant(req: Request): Promise<Response> {
               id: m.id,
               text: m.text,
               verified: m.verified,
+              category: m.category ?? "fact",
               scope: m.scope,
             })),
             checkpoint: summary,
             continuedContext: restored,
             search,
+            currentTime: clockContext(data["timeZone"] ?? process.env["BUDDY_TZ"]),
             readOnlyTasks: tool,
             omittedMessages: c.messages.length - messages.length,
             notice:
@@ -956,6 +1000,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
           via: provider.kind,
           memoryIds: supplied.map((m) => m.id),
           memoryEpoch: fresh.epoch,
+          web,
         },
       });
       c.assistant.provider = { kind: provider.kind, model: actualModel };
@@ -985,6 +1030,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
           search: search !== null,
           tool: tool !== null,
         },
+        web,
         contextChars: JSON.stringify(messages).length,
         scrubbed: rawQuestion !== question,
       });

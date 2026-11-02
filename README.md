@@ -896,3 +896,7 @@ Work tools -> Repos keeps an eye on GitHub repos you pick (type `owner/name` or 
 ## Betas and playtests
 
 The Playtests window (sidebar, under More) watches sources for newly opened betas, alphas and playtests: Reddit's r/BetaTests and r/playtesting feeds, Playtester.io, and a Steam search, and you can add your own feeds (any RSS/Atom address; for a subreddit add `/new/.rss`) or web pages. It checks every few hours and when you press Check now. A source's first check only records what is already open; later listings get a NEW badge and a phone alert through Telegram or ntfy (whichever you set up). Pages that load their listings with JavaScript can't be read and show "No listings found". The list is kept in `BUDDY_DATA_DIR/playtests.json`.
+
+### Current information and Capture Inbox
+
+See [Current information](docs/CURRENT_INFORMATION.md) for General Chat Web Auto/On/Off and SearXNG setup, and [Capture Inbox](docs/CAPTURE_INBOX.md) for reviewed text/voice capture, Today briefing, task starts and local processing. Existing Unraid installations use [the beta update instructions](docs/ASSISTANT_UNRAID.md).

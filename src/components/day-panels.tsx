@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Flag, ListChecks, Plus, Trash2, CalendarDays } from "lucide-react";
 import { BrainDump } from "./brain-dump";
 import type { FocusSession } from "@/lib/focus-companion";
-import { FocusHub } from "./focus-hub";
+import { TodayOverview } from "./today-overview";
 import { eventsOnDay, offsetDateKey, zoneDateKey } from "@/lib/day-overview";
 import { describeCode as forecastDescription } from "@/lib/weather";
 import { Button } from "@/components/ui/button";
@@ -177,7 +177,7 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
         <div className="font-medium">{dayOffset === 0 ? dayLabel(Date.now(), tz) : dayOffset === 1 ? "Tomorrow" : "Day after tomorrow"} · {new Intl.DateTimeFormat(undefined, { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" }).format(new Date(day + "T12:00:00Z"))}</div>
         <Button size="sm" variant="outline" title="Open the full /today planner: your plan, times, week and focus timer" onClick={() => window.location.assign("/today")}><ListChecks className="size-4" /> /today</Button>
       </div>
-      {dayOffset === 0 && <FocusHub onResumeFocus={onResumeFocus} onStart={(task) => onJustStart?.(task)} onBrainDump={() => window.dispatchEvent(new Event("pixelpals:brain-dump"))} onOpenTasks={() => onOpenTasks?.()} onOpenMail={() => onOpenMail?.()} />}
+      {dayOffset === 0 && <TodayOverview open={open} onResumeFocus={onResumeFocus} onStart={(task) => onJustStart?.(task)} onBrainDump={() => window.dispatchEvent(new Event("pixelpals:brain-dump"))} onOpenTasks={() => onOpenTasks?.()} onOpenMail={() => onOpenMail?.()} />}
       <nav className="grid grid-cols-3 gap-1.5" aria-label="Day overview">
         {([0, 1, 2] as const).map((offset) => (
           <Button key={offset} size="sm" variant={dayOffset === offset ? "default" : "outline"} aria-pressed={dayOffset === offset} onClick={() => setDayOffset(offset)} className="min-w-0 px-1.5 text-xs">

@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta 1.0.820 — Current information and reviewed captures
+
+- Add visible General Chat Web Auto/On/Off, current date/time-zone context, actual search source receipts and truthful search failures. Run independent health, memory and search lookups concurrently.
+- Register saveable SearXNG and local Whisper integration settings.
+- Add owner-only persistent text/voice Capture Inbox with local queued suggestions, explicit review, idempotent Today task approval and private-default Memory Keeper records.
+- Add deterministic Today briefing, gentle weekly review and same-scope Obsidian related-note links.
+- Extend automated and desktop/mobile browser coverage. See docs/CURRENT_INFORMATION.md and docs/CAPTURE_INBOX.md for configuration and limits.
+
 ## Beta 1.0.819 — Workspace chat and integration settings
 
 - Make Settings → Integrations explicit; open Seerr configuration directly from its request dialog. Save existing address/key fields securely without a restart, and verify the API key with a read-only authenticated test.

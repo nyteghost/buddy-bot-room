@@ -112,3 +112,16 @@ it("refuses settings changes without owner authorization", async () => {
   expect(r.status).toBe(403);
   await expect(stat(dir + "/app-secrets.json")).rejects.toThrow();
 });
+it("saves search and transcription addresses through owner integration settings", async () => {
+  const response = await handleSettings(new Request("http://localhost/api/settings", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ values: { SEARXNG_URL: "http://search.local:8080", WHISPER_URL: "http://voice.local:8000", WHISPER_MODEL: "small" } }),
+  }));
+  const data = await response.json();
+  expect(data.errors).toEqual({});
+  expect(data.saved).toEqual(expect.arrayContaining(["SEARXNG_URL", "WHISPER_URL", "WHISPER_MODEL"]));
+  expect(process.env["SEARXNG_URL"]).toBe("http://search.local:8080");
+  expect(process.env["WHISPER_URL"]).toBe("http://voice.local:8000");
+  const disk = JSON.parse(await readFile(dir + "/app-settings.json", "utf8"));
+  expect(disk.WHISPER_MODEL).toBe("small");
+});

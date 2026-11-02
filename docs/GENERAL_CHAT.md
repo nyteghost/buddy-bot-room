@@ -23,3 +23,7 @@ Each chat defaults to **Review**: checkpoints can be processed locally, but prop
 Recognizable chat credentials are scrubbed before inference and new chat persistence, across General Chat, Pals and Food Focus step questions. This includes common tokens, labelled passwords/logins, cookies, private keys and credential-bearing URLs. Enable **Also mask email addresses** in conversation controls or the AI settings for standalone email masking. Intentional API keys entered in provider/settings credential fields remain functional. Unlabelled passwords, uncommon or encoded credentials and images are not reliably detected. Do not paste secrets intentionally.
 
 Memory Center → **Scrub existing chat history** cleans live chat and memory records/versions. Browser cleanup covers known local chat stores, not provider settings. It cannot erase backups, exported files, images, copies already sent to a provider, or manually changed vault notes. Rotate any exposed credential.
+
+## Web search
+
+Use the visible Web search mode beside Ask Anything: Auto for common current-information questions, On to explicitly search, or Off. Source receipts show the actual returned links, cache status and unavailable/empty results. Configure SearXNG in Settings → Integrations. See [current information](CURRENT_INFORMATION.md) for privacy, setup and performance details.

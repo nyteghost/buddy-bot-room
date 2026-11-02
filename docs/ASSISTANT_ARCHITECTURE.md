@@ -19,3 +19,7 @@ Automated tests cover isolation, relevance, private/project boundaries, revision
 ## Retrieval measurement
 
 Synthetic local Bun run: 1,000 scoped records, 100 keyword retrievals in 202 ms total (about 2 ms/query); serialized state 356,993 bytes, whole benchmark process RSS about 44 MB. This measures pure retrieval in this development environment, not Unraid throughput or Ollama/GPU inference. Full production browser and restart checks are recorded in the beta release report.
+
+## Current beta additions
+
+General Chat runs semantic lookup, health and configured search concurrently. Web source receipts are persisted with replies. Capture Inbox extends capture.json and uses the central Memory Keeper worker, canonical today.json and the existing scoped memory store. See [Capture Inbox](CAPTURE_INBOX.md) and [current information](CURRENT_INFORMATION.md).

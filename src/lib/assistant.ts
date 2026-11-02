@@ -2,7 +2,12 @@ import { scrubChatText } from "./chat-scrub";
 import type { RoomMessage } from "./agents";
 export type Scope = "global" | "project" | "conversation" | "private";
 export type AssistantMeta = {
-  choice?: { provider: string; model: string; research: boolean };
+  choice?: {
+    provider: string;
+    model: string;
+    research: boolean;
+    web?: import("./assistant-web").WebMode;
+  };
   project: string;
   pinned: boolean;
   status: "active" | "archived" | "deleted";
@@ -31,6 +36,8 @@ export type Conversation = {
   assistant: AssistantMeta;
 };
 export type Memory = {
+  category?: "fact" | "idea";
+  origin?: { capture: string; suggestion: string };
   id: string;
   title: string;
   text: string;

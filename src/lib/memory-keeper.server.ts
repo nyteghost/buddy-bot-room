@@ -1,3 +1,4 @@
+import { processCaptureJob } from "./capture-inbox-worker.server";
 import { readChatRows, chatTransaction } from "./store.server";
 import {
   activity,
@@ -26,6 +27,7 @@ const host = globalThis as typeof globalThis & {
     active: number;
     lastForeground: number;
     lastError: string;
+    captureTurn?: boolean;
   };
 };
 const runtime = () => (host.__pixelKeeper ??= { active: 0, lastForeground: 0, lastError: "" });
@@ -151,7 +153,17 @@ export async function processKeeperQueue(): Promise<void> {
   r.controller = controller;
   r.working = (async () => {
     let job: KeeperJob | undefined;
+    const captureJob = async () => {
+      try {
+        return await processCaptureJob(controller.signal);
+      } catch {
+        r.lastError = "Capture Inbox storage needs review; conversation jobs remain available.";
+        return false;
+      }
+    };
     try {
+      r.captureTurn = !r.captureTurn;
+      if (r.captureTurn && (await captureJob())) return;
       const chats = await readChatRows();
       await keeperTransaction((s) => {
         for (const row of chats) {
@@ -178,7 +190,10 @@ export async function processKeeperQueue(): Promise<void> {
       });
       const snapshot = await keeperSnapshot();
       job = snapshot.jobs.find((j) => j.state !== "failed" && j.next <= Date.now());
-      if (!job) return;
+      if (!job) {
+        await captureJob();
+        return;
+      }
       await keeperTransaction((s) => {
         const j = s.jobs.find((x) => x.conversation === job!.conversation);
         if (j) j.state = "running";

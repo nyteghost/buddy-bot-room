@@ -40,3 +40,7 @@ A corrupt memory database is preserved and fails closed; it is never silently re
 ## Limits
 
 Up to 300 General Chat conversations, 2,000 memory records and 100 projects. A conversation stops accepting new turns at 5,000 messages or roughly 1.9 MB instead of silently deleting data; export and continue in a fresh chat. The queue is bounded at 100 and resumes unprocessed eligible conversations after restart. Batches and context use conservative character budgets rather than exact model tokenizer counts. Version retention is configurable from 1–20. This beta does not auto-delete or auto-merge chats, or apply inactive-chat organization without your review. Existing Pals/Food Focus chats retain their original flows; saved server conversations can be explicitly copied into General Chat. Memory Keeper does not automatically collect every legacy tool conversation.
+
+## Current beta additions
+
+Reviewed Capture Inbox ideas/memories use this same store, with source capture/suggestion references and private scope by default. Approved non-private Obsidian notes can include up to three keyword-related notes inside the same authorization scope. See [Capture Inbox](CAPTURE_INBOX.md).

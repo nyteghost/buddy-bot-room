@@ -87,3 +87,7 @@ Implemented: Focus Food recipe discovery → select result → original recipe i
 Implemented: reviewed protein-powder additions from the user’s label, weighed-dose previews, optional protein-shortfall calculation, nutrition provenance and reversible ingredient changes. See [Focus Food guide](FOCUS_FOOD.md).
 
 Implemented: recipe-aware Local AI step chat with current-step context, recent conversation, one-tap return, saved recipe-local history, cancellation and unchanged cooking progress/timers. See [Focus Food guide](FOCUS_FOOD.md).
+
+## Current beta additions
+
+Beta 1.0.820 implements reviewed Capture Inbox, local queued voice transcription/suggestions, explicit task/idea/memory approval, Help me start, deterministic Today briefing and a gentle weekly review. See [Capture Inbox](CAPTURE_INBOX.md) for boundaries and remaining live-device verification.

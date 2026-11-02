@@ -8,6 +8,7 @@ type MemoryView = {
   projects: { id: string; name: string }[];
   conversations: { id: string; title: string }[];
   jobs: KeeperJob[];
+  captureJobs?: { pending: number; failed: number };
   activity: { at: string; text: string }[];
   online: boolean;
   enabled: boolean;
@@ -52,6 +53,7 @@ export function MemoryCenter() {
     try {
       const d = await assistantApi(data);
       setNote(d.note || "Saved.");
+      window.dispatchEvent(new Event("pixelpals:memory-changed"));
       await refresh();
       return true;
     } catch (e) {
@@ -108,7 +110,8 @@ export function MemoryCenter() {
             <p>
               {state.active} active · {state.pending} pending · {state.total} total
               <br />
-              {state.jobs.length} queued jobs · {(state.bytes / 1024).toFixed(1)} KB
+              {state.jobs.length} chat jobs · {state.captureJobs?.pending ?? 0} capture jobs ·{" "}
+              {(state.bytes / 1024).toFixed(1)} KB
             </p>
             <p>
               Last processed: {state.lastSuccess || "Not yet"}
@@ -376,6 +379,19 @@ export function MemoryCenter() {
                   confidence {m.confidence} · revision {m.revision}
                 </p>
                 <p className="assistant-text">{m.text}</p>
+                {m.origin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent("pixelpals:inbox", { detail: { id: m.origin!.capture } }),
+                      )
+                    }
+                  >
+                    View source capture
+                  </Button>
+                )}
                 {m.conflicts.length > 0 && (
                   <p>Possible contradiction: review {m.conflicts.length} related record(s).</p>
                 )}

@@ -28,7 +28,7 @@ page.on("console", (m) => {
 
 async function step(name, fn) {
   try { await fn(); notes.push(`ok   ${name}`); console.log(`ok   ${name}`); }
-  catch (e) { problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); console.log(`FAIL ${name}: ${e.message}`); }
+  catch (e) { await page.screenshot({path:"/tmp/pixel-smoke-failure.png"}).catch(()=>undefined); problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); console.log(`FAIL ${name}: ${e.message}`); }
 }
 
 await step("home page loads", async () => {
@@ -963,6 +963,50 @@ await step("General Chat, independent drafts, automatic scrub and Memory Center 
   await page.locator('#mobile-more-tools').getByRole('button',{name:'General Chat · Ask Anything',exact:true}).click();
   await input.waitFor();
   if(await input.inputValue() !== 'Keep this draft in the first chat') throw Error('Mobile navigation discarded the chat draft');
+});
+await step("Web Auto uses configured search and displays sources while Off stays local", async()=>{
+  await page.setViewportSize({width:1500,height:900});
+  await page.request.post(URL_+'/api/settings',{data:{values:{SEARXNG_URL:`http://127.0.0.1:${process.env.SMOKE_OLLAMA_PORT || "11435"}`}}});
+  const chat=page.locator('.general-assistant');
+  await chat.getByRole('combobox',{name:'Web search mode',exact:true}).selectOption('auto');
+  await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('When are the midterms?');
+  const result=page.waitForResponse(r=>r.url().endsWith('/api/assistant')&&r.request().postDataJSON()?.op==='ask');
+  await chat.getByRole('button',{name:'Send question',exact:true}).click();
+  const web=(await (await result).json()).web;if(web.state!=='connected')throw Error('Auto did not use configured search: '+JSON.stringify(web));
+  const sources=chat.locator('details').filter({has:page.locator('summary',{hasText:/^Web sources/})}).last();await sources.locator('summary').click();
+  await sources.getByRole('link',{name:'Current information fixture',exact:true}).waitFor();
+  await chat.getByRole('combobox',{name:'Web search mode',exact:true}).selectOption('off');
+  await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('Latest news');
+  const noWeb=page.waitForResponse(r=>r.url().endsWith('/api/assistant')&&r.request().postDataJSON()?.op==='ask');await chat.getByRole('button',{name:'Send question',exact:true}).click();if((await (await noWeb).json()).web.state!=='off')throw Error('Explicit Off was ignored');
+});
+await step("Capture Inbox stores, reviews and starts a task; Today brief reflects the durable task",async()=>{
+  await page.request.post(URL_+'/api/settings',{data:{values:{CAPTURE_AUTO_PROCESS:'off'}}});
+  await page.evaluate(()=>window.dispatchEvent(new Event('pixelpals:inbox')));
+  const inbox=page.locator('[data-window-id="capture-inbox"]');await inbox.waitFor({state:'visible'});
+  await inbox.getByRole('textbox',{name:'Capture a thought',exact:true}).fill('I need to prepare lunches password=fixture-secret');
+  await inbox.getByRole('button',{name:'Save thought',exact:true}).click();await inbox.getByRole('button',{name:'Review suggestion',exact:true}).first().waitFor();
+  const raw=await (await page.request.get(URL_+'/api/inbox')).json();if(JSON.stringify(raw).includes('fixture-secret'))throw Error('Capture saved raw credentials');
+  const before=await (await page.request.post(URL_+'/api/today',{data:{op:'get'}})).json();const count=before.state.tasks.length;
+  await inbox.getByRole('button',{name:'Review suggestion',exact:true}).first().click();const editor=inbox.getByRole('form',{name:'Review capture suggestion',exact:true});
+  await editor.getByLabel('Save as',{exact:true}).selectOption('task');await editor.getByLabel('Reviewed text',{exact:true}).fill('Prepare lunches from capture');await editor.getByLabel('Small first step',{exact:true}).fill('Get one container');
+  await editor.getByRole('button',{name:'Save and help me start',exact:true}).click();await page.getByRole('dialog',{name:'Just Start',exact:true}).waitFor();await page.getByRole('dialog',{name:'Just Start',exact:true}).getByRole('button',{name:'Close',exact:true}).click();
+  const after=await (await page.request.post(URL_+'/api/today',{data:{op:'get'}})).json();if(after.state.tasks.length!==count+1||!after.state.tasks.some(t=>t.title==='Prepare lunches from capture'))throw Error('Review did not save exactly one planner task');
+  const brief=await (await page.request.get(URL_+'/api/inbox?view=brief&tz=America%2FNew_York')).json();if(!brief.priorities.some(t=>t.title==='Prepare lunches from capture'))throw Error('Today brief missed approved task');
+  await page.setViewportSize({width:390,height:844});await page.locator('.mobile-tabbar').getByRole('button',{name:'Home',exact:true}).click();
+  const overview=page.getByRole('region',{name:'Personalized Today briefing',exact:true});await overview.getByText('Prepare lunches from capture',{exact:true}).waitFor();
+  await overview.getByText('Gentle weekly review',{exact:true}).click();await overview.getByText(/tasks completed in the last seven days/).waitFor();
+  await page.screenshot({path:process.env.SMOKE_BRIEF_SHOT || '/tmp/pixel-capture-brief.png'});
+  await overview.getByRole('button',{name:/Capture a thought/}).click();await inbox.waitFor({state:'visible'});
+  for(const width of [320,390,700]){await page.setViewportSize({width,height:844});const dimensions=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:innerWidth}));if(dimensions.body>dimensions.view+1)throw Error('Capture inbox overflows at '+width);}
+});
+await step("Voice memos survive capture and are transcribed through the local queue",async()=>{
+  const inbox=page.locator('[data-window-id="capture-inbox"]');
+  await page.request.post(URL_+'/api/settings',{data:{values:{WHISPER_URL:`http://127.0.0.1:${process.env.SMOKE_OLLAMA_PORT || "11435"}`,CAPTURE_AUTO_PROCESS:'on'}}});
+  await inbox.getByText('Voice memo',{exact:true}).click();
+  await inbox.getByLabel('Upload voice memo',{exact:true}).setInputFiles({name:'memo.wav',mimeType:'audio/wav',buffer:Buffer.from([82,73,70,70,0,0,0,0])});
+  await inbox.getByRole('button',{name:'Save voice memo',exact:true}).click();
+  await inbox.getByText('I need to prepare lunches.',{exact:true}).waitFor({timeout:90000});
+  const data=await (await page.request.get(URL_+'/api/inbox')).json();const voice=data.items.find(i=>i.inbox.source==='audio');if(!voice||voice.inbox.audio||!voice.inbox.suggestions.length)throw Error('Voice processing did not retain a reviewable transcript and remove processed audio');
 });
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);

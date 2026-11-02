@@ -28,3 +28,7 @@ The sidebar and proxied modes now share authenticated backend health. Local AI, 
 ## General Chat beta integration
 
 See [General Chat](GENERAL_CHAT.md), [Memory Keeper](MEMORY_KEEPER.md) and [Unraid deployment](ASSISTANT_UNRAID.md) for the new centralized service, container mounts, privacy scopes, backup/restore and remote Ollama settings. The existing Second Brain notes and external repository inspiration remain separate from the managed memory mirror; no external autonomous agent is installed.
+
+## Current information and background capture
+
+Ollama answers from model knowledge unless Pixel Pals supplies data. General Chat can supply configured SearXNG results using Web Auto/On/Off; see [current information](CURRENT_INFORMATION.md). Capture Inbox uses the central local Memory Keeper model after optional local Whisper transcription; see [Capture Inbox](CAPTURE_INBOX.md). Neither feature requires changing an already working Ollama network connection.

@@ -1,3 +1,4 @@
+import { webMode as readWebMode, type WebMode } from "@/lib/assistant-web";
 import { scrubChatText } from "@/lib/chat-scrub";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
@@ -30,7 +31,7 @@ export function GeneralChat({
     [note, setNote] = useState(""),
     [provider, setProvider] = useState("auto"),
     [model, setModel] = useState(""),
-    [research, setResearch] = useState(false),
+    [web, setWeb] = useState<WebMode>("auto"),
     [maskIdentifiers, setMaskIdentifiers] = useState(false),
     [pending, setPending] = useState<string[]>([]),
     [show, setShow] = useState(80),
@@ -63,14 +64,22 @@ export function GeneralChat({
           op: "update",
           id: previous.id,
           revision: previous.assistant.revision,
-          patch: { draft: draftRef.current, choice: { provider, model, research } },
+          patch: {
+            draft: draftRef.current,
+            choice: { provider, model, research: web !== "off", web },
+          },
         });
       }
       const d = await assistantApi(undefined, "?id=" + encodeURIComponent(id));
       setCurrent(d.conversation);
       setProvider(d.conversation.assistant.choice?.provider ?? "auto");
       setModel(d.conversation.assistant.choice?.model ?? "");
-      setResearch(d.conversation.assistant.choice?.research ?? false);
+      setWeb(
+        readWebMode(
+          d.conversation.assistant.choice?.web,
+          d.conversation.assistant.choice?.research,
+        ),
+      );
       let saved = "";
       try {
         saved = localStorage.getItem("pixel-pals-assistant-draft-" + id) ?? "";
@@ -98,13 +107,16 @@ export function GeneralChat({
           op: "update",
           id: previous.id,
           revision: previous.assistant.revision,
-          patch: { draft: draftRef.current, choice: { provider, model, research } },
+          patch: {
+            draft: draftRef.current,
+            choice: { provider, model, research: web !== "off", web },
+          },
         });
       const d = await assistantApi({ op: "create", ...extra });
       setCurrent(d.conversation);
       setProvider("auto");
       setModel("");
-      setResearch(false);
+      setWeb("auto");
       setDraft("");
       setView("chat");
       setDrawer(false);
@@ -199,7 +211,8 @@ export function GeneralChat({
           engine,
           provider,
           model,
-          research,
+          web,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           maskIdentifiers,
         }),
         signal: controller.signal,
@@ -567,14 +580,6 @@ export function GeneralChat({
                   <label className="assistant-check">
                     <input
                       type="checkbox"
-                      checked={research}
-                      onChange={(e) => setResearch(e.target.checked)}
-                    />
-                    Use configured web search when this question needs it
-                  </label>
-                  <label className="assistant-check">
-                    <input
-                      type="checkbox"
                       checked={maskIdentifiers}
                       onChange={(e) => {
                         setMaskIdentifiers(e.target.checked);
@@ -640,6 +645,41 @@ export function GeneralChat({
                     {m.role === "assistant" && (
                       <div className="assistant-message-meta">
                         {m.metadata?.via} · {m.metadata?.model}
+                        {m.metadata?.web && (
+                          <details>
+                            <summary>
+                              {m.metadata.web.state === "connected"
+                                ? `Web sources${m.metadata.web.cached ? " (cached)" : ""}`
+                                : m.metadata.web.state === "unavailable"
+                                  ? "Web unavailable — not verified"
+                                  : m.metadata.web.state === "no-results"
+                                    ? "No web results — not verified"
+                                    : "Web not used"}
+                            </summary>
+                            <p>Checked {m.metadata.web.at}</p>
+                            {m.metadata.web.hits.map((h) => (
+                              <p key={h.url}>
+                                <a href={h.url} target="_blank" rel="noopener noreferrer">
+                                  {h.title}
+                                </a>
+                              </p>
+                            ))}
+                            {m.metadata.web.state === "unavailable" && (
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  window.dispatchEvent(
+                                    new CustomEvent("pixelpals:configure-integration", {
+                                      detail: { id: "searxng" },
+                                    }),
+                                  )
+                                }
+                              >
+                                Configure web search
+                              </Button>
+                            )}
+                          </details>
+                        )}
                         {!!m.metadata?.memoryIds?.length && (
                           <Button
                             variant="ghost"
@@ -693,6 +733,22 @@ export function GeneralChat({
                   }}
                 >
                   <label htmlFor="ask-anything">Ask Anything</label>
+                  <label>
+                    Web search
+                    <select
+                      aria-label="Web search mode"
+                      value={web}
+                      onChange={(e) => setWeb(e.target.value as WebMode)}
+                    >
+                      <option value="auto">Auto — current questions</option>
+                      <option value="on">On — search this question</option>
+                      <option value="off">Off — no web search</option>
+                    </select>
+                  </label>
+                  <p className="assistant-muted">
+                    Queries go to your configured search service. Saved memories are not included in
+                    search queries.
+                  </p>
                   <textarea
                     id="ask-anything"
                     rows={3}

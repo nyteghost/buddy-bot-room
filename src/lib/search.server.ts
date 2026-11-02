@@ -37,6 +37,6 @@ export async function handleSearch(request: Request) {
     return Response.json({ query: q, hits });
   } catch (error) {
     logServer("error", `Can't reach SearXNG at ${base}`, error);
-    return Response.json({ error: `Can't reach SearXNG at ${base}. Set SEARXNG_URL in .env.` }, { status: 502 });
+    return Response.json({ error: "Web search is unavailable. Open Settings → Integrations and configure Web search (SearXNG), then Save and Test." }, { status: 502 });
   }
 }

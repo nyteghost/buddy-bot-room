@@ -7,7 +7,7 @@ const base = (): string => (process.env["WHISPER_URL"] ?? "").trim().replace(/\/
 const model = (): string => (process.env["WHISPER_MODEL"] ?? "Systran/faster-whisper-small").trim().slice(0, 120);
 const MAX_BYTES = 8_000_000;
 
-export async function handleStt(request: Request): Promise<Response> {
+export async function handleStt(request: Request, options: {rejectLong?:boolean} = {}): Promise<Response> {
   const url = base();
   if (request.method === "GET") {
     if (!url) return Response.json({ enabled: false });
@@ -30,10 +30,12 @@ export async function handleStt(request: Request): Promise<Response> {
   form.append("model", model());
   form.append("response_format", "json");
   try {
-    const res = await fetch(`${url}/v1/audio/transcriptions`, { method: "POST", body: form, signal: AbortSignal.timeout(90_000) });
+    const res = await fetch(`${url}/v1/audio/transcriptions`, { method: "POST", body: form, signal: AbortSignal.any([request.signal, AbortSignal.timeout(90_000)]) });
     if (!res.ok) return Response.json({ error: `The speech server answered ${res.status}. The first use can fail while it downloads the model; try again in a minute.` }, { status: 502 });
     const json = (await res.json()) as { text?: unknown };
-    return Response.json({ text: typeof json.text === "string" ? json.text.trim().slice(0, 4000) : "" });
+    const text=typeof json.text==='string'?json.text.trim():'';
+    if(options.rejectLong && text.length>4000)return Response.json({error:'Transcript too long. Split the recording into shorter clips.',code:'transcript-too-long'},{status:413});
+    return Response.json({ text:text.slice(0,4000) });
   } catch {
     return Response.json({ error: "Couldn't reach the speech server." }, { status: 502 });
   }

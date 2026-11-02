@@ -35,3 +35,7 @@ If the PC is off, conversations/memory still remain on Unraid. Keyword retrieval
 ## Rollback
 
 Pin the previous verified beta image tag/digest and Compose Up with the same volumes. New assistant rows are isolated from legacy routes; older beta code has not been tested to preserve these new rows during writes. Back up before rollback and do not use an older version to edit chats.json. Keep the newer data snapshot for forward recovery.
+
+## Current beta additions
+
+After updating, configure Web search (SearXNG) and local Dictation (Whisper) in Settings → Integrations if wanted. No additional services or network changes are applied automatically. Text capture works without either service. Live microphone recording requires HTTPS; HTTP supports memo upload. See [current information](CURRENT_INFORMATION.md) and [Capture Inbox](CAPTURE_INBOX.md).

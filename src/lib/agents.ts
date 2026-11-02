@@ -221,7 +221,7 @@ export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate" | 
 export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate", "smart"];
 export type RoomMessage = UIMessage<{
   memoryIds?: string[];
-  memoryEpoch?: number;
+  memoryEpoch?: number; web?: import("./assistant-web").WebReceipt;
   agentId?: AgentId;
   round?: number;
   verdict?: boolean;

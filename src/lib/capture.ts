@@ -2,16 +2,16 @@ import { addEntry, addTodo, type Workbench } from "./workbench";
 
 /** Quick capture: text sent from your phone (Telegram, share sheet) that lands in your notes, tasks or memories. */
 export type CaptureKind = "note" | "todo" | "memory";
-export type Capture = { id: string; kind: CaptureKind; text: string; at: number };
+export type Capture = { id: string; kind: CaptureKind; text: string; at: number; inbox?: import("./capture-inbox").InboxMeta };
 export const MAX_CAPTURES = 100;
 
 export type Parsed = { kind: CaptureKind | "remind"; text: string };
 
 const PREFIXES: [RegExp, Parsed["kind"]][] = [
-  [/^\/?(?:note|n)\s*[:\-]?\s+/i, "note"],
-  [/^\/?(?:todo|task|to-do|t)\s*[:\-]?\s+/i, "todo"],
-  [/^\/?(?:remember|memory|mem)\s*[:\-]?\s+/i, "memory"],
-  [/^\/?remind(?:\s+me)?(?:\s*[:\-]|\s+)\s*/i, "remind"],
+  [/^\/?(?:note|n)\s*[:-]?\s+/i, "note"],
+  [/^\/?(?:todo|task|to-do|t)\s*[:-]?\s+/i, "todo"],
+  [/^\/?(?:remember|memory|mem)\s*[:-]?\s+/i, "memory"],
+  [/^\/?remind(?:\s+me)?(?:\s*[:-]|\s+)\s*/i, "remind"],
 ];
 
 /** "todo: buy milk" → todo; "remind me in 1h stretch" → remind (the server schedules it); anything else is a normal question. */
@@ -33,7 +33,7 @@ export function parseCaptures(raw: unknown): Capture[] {
     const o = r as Partial<Capture> | null;
     const kind = o?.kind;
     return o && typeof o.id === "string" && (kind === "note" || kind === "todo" || kind === "memory") && typeof o.text === "string" && o.text && typeof o.at === "number"
-      ? [{ id: o.id.slice(0, 24), kind, text: o.text.slice(0, 400), at: o.at }] : [];
+      ? [{ id: o.id.slice(0, o.inbox ? 80 : 24), kind, text: o.text.slice(0, o.inbox ? 4000 : 400), at: o.at, ...(o.inbox ? {inbox:o.inbox} : {}) }] : [];
   }).slice(-MAX_CAPTURES);
 }
 

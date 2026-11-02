@@ -1,3 +1,4 @@
+import { handleSearch } from "@/lib/search.server";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,6 +9,7 @@ import { handleChat } from "@/lib/chat.server";
 import { readOllamaHealth } from "@/lib/ollama-health.server";
 import { keeperSnapshot, keeperTransaction } from "@/lib/keeper-store.server";
 import { readChatRows } from "@/lib/store.server";
+vi.mock("@/lib/search.server", () => ({ handleSearch: vi.fn() }));
 vi.mock("@/lib/accounts.server", () => ({ currentUser: vi.fn() }));
 vi.mock("@/lib/chat.server", () => ({ handleChat: vi.fn() }));
 vi.mock("@/lib/ollama-health.server", () => ({ readOllamaHealth: vi.fn() }));
@@ -37,6 +39,9 @@ beforeEach(async () => {
       localOnly: false,
       models: [{ name: "qwen3.5:9b", gb: 5 }],
     } as Awaited<ReturnType<typeof readOllamaHealth>>);
+  vi.mocked(handleSearch)
+    .mockReset()
+    .mockResolvedValue(Response.json({ hits: [] }));
   vi.mocked(handleChat)
     .mockReset()
     .mockImplementation(
@@ -473,4 +478,47 @@ it("keeps concurrent independent chats isolated and ignores client-supplied priv
   expect(JSON.stringify(rows.find((r) => r.id === b.id))).not.toContain("Alpha independent topic");
   for (const [, context] of vi.mocked(handleChat).mock.calls)
     expect(context).not.toContain("CLIENT PRIVILEGED OVERRIDE");
+});
+
+it("uses current web results in Auto, records real source links and starts health checks while search is pending", async () => {
+  const c = await create();
+  let release: ((r: Response) => void) | undefined;
+  vi.mocked(handleSearch).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  const asked = ask(c, "When are the midterms?", { web: "auto", timeZone: "America/New_York" });
+  await vi.waitFor(() => expect(release).toBeDefined());
+  expect(readOllamaHealth).toHaveBeenCalled();
+  release!(
+    Response.json({
+      hits: [
+        {
+          title: "Official calendar",
+          url: "https://example.test/elections",
+          snippet: "Published calendar fixture",
+        },
+      ],
+      cached: false,
+    }),
+  );
+  const result = await asked;
+  expect(result.web.state).toBe("connected");
+  expect(result.conversation.messages.at(-1).metadata.web.hits[0].url).toBe(
+    "https://example.test/elections",
+  );
+  expect(vi.mocked(handleChat).mock.calls[0]![1]).toContain("Published calendar fixture");
+  expect(vi.mocked(handleChat).mock.calls[0]![1]).toContain("currentTime");
+});
+it("reports a search outage truthfully and keeps explicit Off from making a web request", async () => {
+  const c = await create();
+  vi.mocked(handleSearch).mockResolvedValue(new Response("{}", { status: 502 }));
+  const result = await ask(c, "Latest news", { web: "on" });
+  expect(result.web.state).toBe("unavailable");
+  expect(vi.mocked(handleChat).mock.calls[0]![1]).toContain("Do not claim current verification");
+  vi.mocked(handleSearch).mockClear();
+  await ask(result.conversation, "Latest news", { web: "off" });
+  expect(handleSearch).not.toHaveBeenCalled();
 });
