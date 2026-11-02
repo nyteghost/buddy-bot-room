@@ -24,3 +24,8 @@ Back up the mounted vault separately from Pixel Pals' `/data` volume. The app's 
 - Explicitly scoped integrations with preview and undo. No autonomous external-app edits are enabled.
 
 `NicholasSpisak/second-brain` is inspiration only, not an installed dependency. Automatic extraction and complete conversation archiving are not enabled by this feature.
+
+
+## General Chat beta integration
+
+See [General Chat](GENERAL_CHAT.md), [Memory Keeper](MEMORY_KEEPER.md) and [Unraid deployment](ASSISTANT_UNRAID.md) for the new centralized service, container mounts, privacy scopes, backup/restore and remote Ollama settings. The existing Second Brain notes and external repository inspiration remain separate from the managed memory mirror; no external autonomous agent is installed.

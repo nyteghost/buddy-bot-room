@@ -220,6 +220,8 @@ export function resolveMention(text: string, mode?: CharacterMode): AgentId | nu
 export type Mode = "roundtable" | "broadcast" | "direct" | "solve" | "debate" | "smart";
 export const ALL_MODES: Mode[] = ["roundtable", "broadcast", "direct", "solve", "debate", "smart"];
 export type RoomMessage = UIMessage<{
+  memoryIds?: string[];
+  memoryEpoch?: number;
   agentId?: AgentId;
   round?: number;
   verdict?: boolean;

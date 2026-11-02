@@ -15,6 +15,7 @@ import { Route as WorkRouteImport } from './routes/work'
 import { Route as ApiAccountLocalRouteImport } from './routes/api.account-local'
 import { Route as ApiAccountsRouteImport } from './routes/api.accounts'
 import { Route as ApiAddonsRouteImport } from './routes/api.addons'
+import { Route as ApiAssistantRouteImport } from './routes/api.assistant'
 import { Route as ApiBackupRouteImport } from './routes/api.backup'
 import { Route as ApiBriefRouteImport } from './routes/api.brief'
 import { Route as ApiCalendarRouteImport } from './routes/api.calendar'
@@ -97,6 +98,11 @@ const ApiAccountsRoute = ApiAccountsRouteImport.update({
 const ApiAddonsRoute = ApiAddonsRouteImport.update({
   id: '/api/addons',
   path: '/api/addons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAssistantRoute = ApiAssistantRouteImport.update({
+  id: '/api/assistant',
+  path: '/api/assistant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiBackupRoute = ApiBackupRouteImport.update({
@@ -372,6 +378,7 @@ export interface FileRoutesByFullPath {
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/accounts': typeof ApiAccountsRoute
   '/api/addons': typeof ApiAddonsRoute
+  '/api/assistant': typeof ApiAssistantRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/brief': typeof ApiBriefRoute
   '/api/calendar': typeof ApiCalendarRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByTo {
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/accounts': typeof ApiAccountsRoute
   '/api/addons': typeof ApiAddonsRoute
+  '/api/assistant': typeof ApiAssistantRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/brief': typeof ApiBriefRoute
   '/api/calendar': typeof ApiCalendarRoute
@@ -495,6 +503,7 @@ export interface FileRoutesById {
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/accounts': typeof ApiAccountsRoute
   '/api/addons': typeof ApiAddonsRoute
+  '/api/assistant': typeof ApiAssistantRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/brief': typeof ApiBriefRoute
   '/api/calendar': typeof ApiCalendarRoute
@@ -558,6 +567,7 @@ export interface FileRouteTypes {
     | '/api/account-local'
     | '/api/accounts'
     | '/api/addons'
+    | '/api/assistant'
     | '/api/backup'
     | '/api/brief'
     | '/api/calendar'
@@ -619,6 +629,7 @@ export interface FileRouteTypes {
     | '/api/account-local'
     | '/api/accounts'
     | '/api/addons'
+    | '/api/assistant'
     | '/api/backup'
     | '/api/brief'
     | '/api/calendar'
@@ -680,6 +691,7 @@ export interface FileRouteTypes {
     | '/api/account-local'
     | '/api/accounts'
     | '/api/addons'
+    | '/api/assistant'
     | '/api/backup'
     | '/api/brief'
     | '/api/calendar'
@@ -742,6 +754,7 @@ export interface RootRouteChildren {
   ApiAccountLocalRoute: typeof ApiAccountLocalRoute
   ApiAccountsRoute: typeof ApiAccountsRoute
   ApiAddonsRoute: typeof ApiAddonsRoute
+  ApiAssistantRoute: typeof ApiAssistantRoute
   ApiBackupRoute: typeof ApiBackupRoute
   ApiBriefRoute: typeof ApiBriefRoute
   ApiCalendarRoute: typeof ApiCalendarRoute
@@ -837,6 +850,13 @@ declare module '@tanstack/react-router' {
       path: '/api/addons'
       fullPath: '/api/addons'
       preLoaderRoute: typeof ApiAddonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/assistant': {
+      id: '/api/assistant'
+      path: '/api/assistant'
+      fullPath: '/api/assistant'
+      preLoaderRoute: typeof ApiAssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/backup': {
@@ -1234,6 +1254,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAccountLocalRoute: ApiAccountLocalRoute,
   ApiAccountsRoute: ApiAccountsRoute,
   ApiAddonsRoute: ApiAddonsRoute,
+  ApiAssistantRoute: ApiAssistantRoute,
   ApiBackupRoute: ApiBackupRoute,
   ApiBriefRoute: ApiBriefRoute,
   ApiCalendarRoute: ApiCalendarRoute,

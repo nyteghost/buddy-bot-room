@@ -21,6 +21,21 @@ export type SettingField = {
 };
 
 export const SETTING_FIELDS: SettingField[] = [
+  {key:"MEMORY_VAULT_GID",label:"Obsidian group for managed memory notes (optional)",group:"obsidian",kind:"number",placeholder:"100",help:"Match the GID used by your Obsidian container. When set, only managed Pixel Pals/Memory folders/files get group access (2770/0660); other vault notes and private application data are untouched. Empty keeps owner-only files."},
+
+  {key:"CHAT_MASK_IDENTIFIERS",label:"Also mask standalone email addresses in AI chat",group:"ollama",kind:"select",options:["off","on"],help:"Recognizable credentials and labelled login details are always scrubbed. On also masks standalone email addresses before server-side inference. Provider/settings credential fields stay functional."},
+
+  {key:"MEMORY_BATCH_CHARS",label:"Memory processing batch size",group:"ollama",kind:"number",placeholder:"12000",help:"2000–12000 characters per incremental checkpoint. One background job runs at a time, yielding to active conversations."},
+  {key:"MEMORY_VERSION_KEEP",label:"Memory versions retained per record",group:"obsidian",kind:"number",placeholder:"20",help:"1–20 previous edits. Reducing this limit takes effect on the next edit. Conversations are never automatically deleted; use recoverable trash and explicit exports/backups."},
+
+  {key:"MEMORY_KEEPER_ENABLED",label:"Memory Keeper background processing",group:"ollama",kind:"select",options:["on","off"],help:"One local worker. Per-chat Off/Review/Auto controls what it may collect. Review is the default; pending candidates are not retrieved."},
+  {key:"MEMORY_KEEPER_MODEL",label:"Memory Keeper Ollama model",group:"ollama",kind:"text",placeholder:"auto",help:"Independent of your answering model. Auto chooses a smaller installed non-coder model; no model is downloaded automatically. Exact names stay queued if unavailable."},
+  {key:"MEMORY_EMBED_MODEL",label:"Memory semantic retrieval model (optional)",group:"ollama",kind:"text",placeholder:"nomic-embed-text",help:"Leave empty for offline keyword ranking. If configured and installed, hybrid ranking uses local embeddings with a bounded timeout and keyword fallback."},
+  {key:"ASSISTANT_CONTEXT_CHARS",label:"General Chat recent context budget",group:"ollama",kind:"number",placeholder:"16000",help:"4000–48000 characters, approximately 1000–12000 tokens. Full history remains on disk; checkpoints provide older context."},
+  {key:"MEMORY_CONTEXT_CHARS",label:"Retrieved memory context budget",group:"ollama",kind:"number",placeholder:"2400",help:"400–6000 characters of authorized relevant memory only."},
+  {key:"MEMORY_OBSIDIAN_SYNC",label:"Mirror Memory Keeper into Obsidian",group:"obsidian",kind:"select",options:["off","on"],help:"Off by default. Uses OBSIDIAN_VAULT_DIR inside the container; writes only managed Pixel Pals/Memory notes. Private records are excluded. Conflicts never overwrite manual edits."},
+  {key:"MEMORY_CLOUD_CONTEXT",label:"Allow retrieved memory in cloud answers",group:"ollama",kind:"select",options:["off","on"],help:"Off by default. Explicit opt-in allows authorized retrieved memory to configured cloud providers. Local-Only still blocks all cloud AI."},
+
   { key: "OLLAMA_URL", label: "Ollama address", group: "ollama", kind: "url", placeholder: "http://10.200.1.50:11434", help: "Where your Ollama runs: the ollama container (http://ollama:11434) or another machine, such as the PC with the RTX 3080. That machine's Ollama must listen on the network (OLLAMA_HOST=0.0.0.0)." },
   { key: "OLLAMA_VRAM_GB", label: "Ollama machine's GPU memory (GB)", group: "ollama", kind: "number", placeholder: "10", help: "Only needed when Ollama runs on another machine (for example the RTX 3080 PC has 10 GB). Pixel Pals can't see that GPU, so this tells it what fits. Leave empty when Ollama is the container in this stack." },
   { key: "OLLAMA_RAM_GB", label: "Ollama machine's RAM (GB)", group: "ollama", kind: "number", placeholder: "32", help: "Only for a remote Ollama: used for model suggestions. Leave empty for the container in this stack." },

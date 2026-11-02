@@ -65,3 +65,8 @@ Keep `data.broken` until you are sure you do not need it.
 | `/root/.ollama` (ollama) | `appdata/pixelpals/ollama` | downloaded models |
 
 Container health: `buddy-bot-room` is healthy when `/__health` answers; `buddy-ollama` is healthy when the Ollama server answers (not when a model is loaded).
+
+
+## General Chat beta integration
+
+See [General Chat](GENERAL_CHAT.md), [Memory Keeper](MEMORY_KEEPER.md) and [Unraid deployment](ASSISTANT_UNRAID.md) for the new centralized service, container mounts, privacy scopes, backup/restore and remote Ollama settings. The existing Second Brain notes and external repository inspiration remain separate from the managed memory mirror; no external autonomous agent is installed.

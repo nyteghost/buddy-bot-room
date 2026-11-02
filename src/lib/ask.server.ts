@@ -1,3 +1,4 @@
+import { scrubChatText } from "./chat-scrub";
 import { readOllamaHealth } from "./ollama-health.server";
 import { installedName, modelProblem } from "./ollama-health";
 import { generateText } from "ai";
@@ -58,6 +59,7 @@ export function askChain(s: EngineSettings, prompt: string, forceLocal = false):
 export type AskResult = { ok: true; text: string; via: string } | { ok: false; error: string };
 
 export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean; signal?: AbortSignal | undefined } = {}): Promise<AskResult> {
+  prompt=scrubChatText(prompt,{maskIdentifiers:process.env["CHAT_MASK_IDENTIFIERS"]==="on"});
   if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
@@ -93,7 +95,7 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
       const provider = createOpenAICompatible({ name: p.kind, apiKey: m.key || "none", baseURL: m.base });
       // Only connection-type failures are retried (twice, with backoff), so an answer is never produced twice.
       const out = await withRetry<{ text: string }>(() => generateText({ model: provider(m.model), system, prompt: user, maxOutputTokens: Math.min(1500, opts.maxTokens ?? 700), maxRetries: 0, abortSignal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000) }), { retries: p.kind === "ollama-server" ? 2 : 0, ...(opts.signal ? { signal: opts.signal } : {}), onRetry: (n, e, ms) => logServer("warn", `ask retry ${n} in ${ms}ms: ${e instanceof Error ? e.message.slice(0, 80) : "error"}`) });
-      const text = out.text.trim();
+      const text = scrubChatText(out.text.trim());
       if (text) return { ok: true, text, via: p.kind === "ollama-server" ? `Local AI (${m.model})` : p.kind };
       lastError = "empty answer";
     } catch (e) {

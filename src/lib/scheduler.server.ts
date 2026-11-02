@@ -1,3 +1,4 @@
+import { scheduleKeeper } from "./memory-keeper.server";
 import { backupAgeMs, backupConfig, runBackup } from "./backup.server";
 import { briefConfig, sendBrief } from "./brief.server";
 import { isDue, zonedParts } from "./schedule";
@@ -23,6 +24,7 @@ const dataDir = () => (process.env["BUDDY_DATA_DIR"] ?? "").trim();
 const holder = globalThis as unknown as { __buddyScheduler?: S };
 
 export function startScheduler(): void {
+  scheduleKeeper();
   if (ollamaBase()) startFeedTimer();
   startProviderTimer();
   if (holder.__buddyScheduler?.timer) return;

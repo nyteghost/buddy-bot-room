@@ -1,3 +1,4 @@
+import { scrubChatText, scrubChatData } from "./chat-scrub";
 import type { FoodSession } from "./focus-food";
 
 export type FoodChatTurn = {
@@ -23,7 +24,14 @@ export function readFoodChat(value: unknown, stepCount: number): FoodChatTurn[] 
       !["prep", "cook", "done"].includes(v.stage)
     )
       return [];
-    return [{ question: v.question, answer: v.answer, index: v.index, stage: v.stage }];
+    return [
+      {
+        question: scrubChatText(v.question),
+        answer: scrubChatText(v.answer),
+        index: v.index,
+        stage: v.stage,
+      },
+    ];
   });
 }
 export function foodChatPlace(stage: FoodChatTurn["stage"], index: number): string {
@@ -39,14 +47,16 @@ export function foodChatBody(session: FoodSession, question: string): string | n
   const history = readFoodChat(session.chatHistory, steps.length).slice(-4);
   while (history.length && JSON.stringify(history).length > 8000) history.shift();
   const make = () =>
-    JSON.stringify({
-      op: "chat",
-      question: question.trim(),
-      recipe: { title, ingredients, steps, servings, nutrition, source },
-      index: session.index,
-      stage: session.stage,
-      history,
-    });
+    JSON.stringify(
+      scrubChatData({
+        op: "chat",
+        question: question.trim(),
+        recipe: { title, ingredients, steps, servings, nutrition, source },
+        index: session.index,
+        stage: session.stage,
+        history,
+      }),
+    );
   const bytes = (value: string) => new TextEncoder().encode(value).length;
   while (history.length && bytes(make()) > 30000) history.shift();
   const body = make();

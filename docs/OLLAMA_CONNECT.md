@@ -23,3 +23,8 @@ Ollama's official network/service configuration: https://docs.ollama.com/faq#how
 ## Remote routing/status follow-up
 
 The sidebar and proxied modes now share authenticated backend health. Local AI, Ollama and Auto use the shared task/default model when the backend path is active; legacy direct URL/model fields are retained for explicit browser-direct operation. Missing task/Pal models have individual repair controls, and Local-Only mode bypasses cloud rotation. See [REMOTE_OLLAMA_BETA.md](REMOTE_OLLAMA_BETA.md) for root causes, hardware provenance, validation and existing Compose Manager update instructions.
+
+
+## General Chat beta integration
+
+See [General Chat](GENERAL_CHAT.md), [Memory Keeper](MEMORY_KEEPER.md) and [Unraid deployment](ASSISTANT_UNRAID.md) for the new centralized service, container mounts, privacy scopes, backup/restore and remote Ollama settings. The existing Second Brain notes and external repository inspiration remain separate from the managed memory mirror; no external autonomous agent is installed.

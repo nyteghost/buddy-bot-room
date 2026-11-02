@@ -1,3 +1,4 @@
+import { scrubChatData } from "./chat-scrub";
 import { accountsEnabled } from "./accounts";
 import { currentUser } from "./accounts.server";
 import { logServer } from "./server-log.server";
@@ -10,7 +11,7 @@ import { logServer } from "./server-log.server";
 const MAX_CHATS = 300;
 const MAX_ROW_BYTES = 2_000_000;
 const ID = /^[A-Za-z0-9-]{8,64}$/;
-type Row = { id: string; title: string; messages: unknown[]; theme: string; mode: string; updatedAt: string; owner?: string; shared?: boolean };
+export type Row = { assistant?: import("./assistant").AssistantMeta; id: string; title: string; messages: unknown[]; theme: string; mode: string; updatedAt: string; owner?: string; shared?: boolean };
 
 async function fs() {
   return (await import(/* @vite-ignore */ "node:" + "fs/promises")) as typeof import("node:fs/promises");
@@ -31,7 +32,7 @@ async function load(): Promise<Row[]> {
   const f = await fs();
   try {
     const parsed: unknown = JSON.parse(await f.readFile(file(), "utf8"));
-    return Array.isArray(parsed) ? (parsed as Row[]) : [];
+    return Array.isArray(parsed) ? scrubChatData(parsed as Row[]) : [];
   } catch (e) {
     if ((e as { code?: string }).code === "ENOENT") return [];
     throw e;
@@ -41,7 +42,7 @@ async function save(rows: Row[]) {
   const f = await fs();
   await f.mkdir(dir(), { recursive: true });
   const tmp = `${file()}.tmp`;
-  await f.writeFile(tmp, JSON.stringify(rows), "utf8");
+  await f.writeFile(tmp, JSON.stringify(scrubChatData(rows)), {encoding:"utf8",mode:0o600});
   await f.rename(tmp, file());
 }
 
@@ -76,24 +77,26 @@ export async function handleStore(request: Request) {
     const me = user ? lower(user.username) : "";
     const url = new URL(request.url);
     if (request.method === "GET") {
-      const rows = (await locked(load)).filter((r) => visibleTo(r, me)).map((r) => (accounts ? { ...r, mine: !r.owner || r.owner === me, ownerName: r.owner ?? "", shared: r.shared === true } : r));
+      const rows = (await locked(load)).filter((r) => !r.assistant && visibleTo(r, me)).map((r) => (accounts ? { ...r, mine: !r.owner || r.owner === me, ownerName: r.owner ?? "", shared: r.shared === true } : r));
       return Response.json({ enabled: true, rows });
     }
     if (request.method === "PUT") {
       const text = await request.text();
       if (text.length > MAX_ROW_BYTES) return Response.json({ error: "That chat is too large to save." }, { status: 413 });
-      const incoming: unknown = JSON.parse(text);
-      if (!validRow(incoming)) return Response.json({ error: "That chat wasn't valid." }, { status: 400 });
+      const incoming: unknown = scrubChatData(JSON.parse(text));
+      if (!validRow(incoming) || (incoming as Row).assistant !== undefined) return Response.json({ error: "That chat wasn't valid." }, { status: 400 });
       // The browser never decides who owns a chat or whether it is shared.
       const { owner: _o, shared: _s, ...row } = incoming as Row;
       const result = await locked(async () => {
         const all = await load();
         const existing = all.find((r) => r.id === row.id);
+        if (existing?.assistant) return "assistant";
         if (me && existing?.owner && existing.owner !== me) return "forbidden";
         const next: Row = me ? { ...row, owner: me, shared: existing ? existing.shared === true || !existing.owner : false } : row;
-        await save(capPerOwner([next, ...all.filter((r) => r.id !== row.id)], MAX_CHATS));
+        await save([...all.filter(r=>r.assistant), ...capPerOwner([next, ...all.filter((r) => r.id !== row.id && !r.assistant)], MAX_CHATS)]);
         return "ok";
       });
+      if (result === "assistant") return Response.json({error:"Manage this conversation in General Chat."},{status:409});
       return result === "forbidden" ? Response.json({ error: "That chat belongs to someone else. Open it and keep chatting to save your own copy." }, { status: 403 }) : Response.json({ ok: true });
     }
     if (request.method === "POST") {
@@ -105,7 +108,7 @@ export async function handleStore(request: Request) {
         const all = await load();
         const i = all.findIndex((r) => r.id === id && (r.owner === me || !r.owner));
         const row = all[i];
-        if (!row) return false;
+        if (!row || row.assistant) return false;
         all[i] = { ...row, owner: me, shared: body.shared as boolean };
         await save(all);
         return true;
@@ -119,6 +122,7 @@ export async function handleStore(request: Request) {
         const all = await load();
         const existing = all.find((r) => r.id === id);
         if (!existing) return "ok";
+        if (existing.assistant) return "forbidden";
         if (me && existing.owner && existing.owner !== me && !user?.owner) return "forbidden";
         await save(all.filter((r) => r.id !== id));
         return "ok";
@@ -131,3 +135,7 @@ export async function handleStore(request: Request) {
     return Response.json({ error: "The server couldn't read or write saved chats. Check the buddy-data volume." }, { status: 500 });
   }
 }
+
+/** Shared transaction boundary for live conversations and legacy saved discussions. */
+export function chatTransaction<T>(fn:(rows:Row[])=>Promise<{rows:Row[];value:T}>):Promise<T>{return locked(async()=>{const result=await fn(await load());await save(result.rows);return result.value;});}
+export const readChatRows=()=>locked(load);

@@ -1,3 +1,4 @@
+import { scrubChatData } from "./chat-scrub";
 import type { RoomMessage, Mode } from "./agents";
 import { isCharacterMode, type CharacterMode } from "./hellraiser";
 
@@ -10,10 +11,10 @@ export function readDiscussions(): SavedDiscussion[] {
   if (!Array.isArray(rows) || !rows.every(row => row && typeof row.id === "string" && typeof row.title === "string" && typeof row.updatedAt === "string" && isCharacterMode(row.theme) && ["roundtable", "broadcast", "direct", "solve", "debate", "smart"].includes(row.mode) && Array.isArray(row.messages) && row.messages.every((m: RoomMessage) => m && typeof m.id === "string" && ["user", "assistant", "system"].includes(m.role) && Array.isArray(m.parts)))) {
     throw new Error("Saved discussions could not be read. Existing data has not been changed.");
   }
-  return rows;
+  return scrubChatData(rows);
 }
 export function writeDiscussions(rows: SavedDiscussion[]) {
-  try { localStorage.setItem(savedDiscussionsKey, JSON.stringify(rows)); }
+  try { localStorage.setItem(savedDiscussionsKey, JSON.stringify(scrubChatData(rows))); }
   catch { throw new Error("Browser storage is full or unavailable. Download a copy before clearing anything."); }
 }import { messageText } from "./agents";
 /** Title for an auto-saved chat: the first thing the user typed. */

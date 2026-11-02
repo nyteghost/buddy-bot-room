@@ -1,3 +1,4 @@
+import { scrubChatText } from "@/lib/chat-scrub";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { foodChatBody, foodChatPlace, type FoodChatTurn } from "@/lib/food-chat";
@@ -61,7 +62,11 @@ export function FoodStepChat({
     pending.current = controller;
     setBusy(true);
     setNote("");
-    const asked = { question: question.trim(), index: session.index, stage: session.stage };
+    const asked = {
+      question: scrubChatText(question.trim()),
+      index: session.index,
+      stage: session.stage,
+    };
     try {
       const response = await fetch("/api/focus-food", {
         method: "POST",
@@ -90,7 +95,7 @@ export function FoodStepChat({
         );
         return;
       }
-      onHistory([...history, { ...asked, answer: data.text.trim() }].slice(-6));
+      onHistory([...history, { ...asked, answer: scrubChatText(data.text.trim()) }].slice(-6));
       setQuestion("");
     } catch {
       if (!controller.signal.aborted)
@@ -185,7 +190,7 @@ export function FoodStepChat({
                 rows={3}
                 maxLength={1000}
                 value={question}
-                onChange={(e) => setQuestion(e.target.value)}
+                onChange={(e) => setQuestion(scrubChatText(e.target.value))}
                 placeholder="What does this instruction mean?"
               />
             </label>

@@ -1,3 +1,4 @@
+import { scrubChatData, scrubChatText } from "@/lib/chat-scrub";
 import { useOllamaHealth, refreshOllamaHealth } from "@/lib/ollama-health-store";
 import { serverOllamaTransport } from "@/lib/ollama-health";
 import { explainAiError } from "@/lib/ai-error";
@@ -185,10 +186,10 @@ export function Room() {
   const messages = chats[mode];
   const topic = drafts[mode];
   function setMessagesIn(target: Mode, value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) {
-    setChats((all) => ({ ...all, [target]: typeof value === "function" ? value(all[target]) : value }));
+    setChats((all) => ({ ...all, [target]: scrubChatData(typeof value === "function" ? value(all[target]) : value) }));
   }
   function setDraftIn(target: Mode, value: string | ((current: string) => string)) {
-    setDrafts((all) => ({ ...all, [target]: typeof value === "function" ? value(all[target]) : value }));
+    setDrafts((all) => ({ ...all, [target]: scrubChatText(typeof value === "function" ? value(all[target]) : value) }));
   }
   const setMessages = (value: RoomMessage[] | ((current: RoomMessage[]) => RoomMessage[])) => setMessagesIn(mode, value);
   const setTopic = (value: string | ((current: string) => string)) => setDraftIn(mode, value);
@@ -538,12 +539,12 @@ export function Room() {
       const savedAll = localStorage.getItem(chatsKey);
       if (savedAll) {
         const parsed = JSON.parse(savedAll);
-        if (parsed && typeof parsed === "object") setChats((c) => ({ ...c, ...Object.fromEntries(ALL_MODES.filter((m) => validList(parsed[m])).map((m) => [m, parsed[m]])) }));
+        if (parsed && typeof parsed === "object") setChats((c) => ({ ...c, ...scrubChatData(Object.fromEntries(ALL_MODES.filter((m) => validList(parsed[m])).map((m) => [m, parsed[m]]))) }));
       } else {
         // Before the mode windows there was one chat; it becomes the Roundtable chat.
         const legacy = localStorage.getItem(storageKey);
         const parsed = legacy ? JSON.parse(legacy) : null;
-        if (validList(parsed)) setChats((c) => ({ ...c, roundtable: parsed }));
+        if (validList(parsed)) setChats((c) => ({ ...c, roundtable: scrubChatData(parsed) }));
       }
     } catch {
       setSaveError("Your saved conversation could not be opened.");
@@ -1900,6 +1901,7 @@ export function Room() {
       <div className="workspace-frame">
         <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
+          <Button variant="ghost" className="sidebar-item" onClick={() => window.dispatchEvent(new Event("pixelpals:general-chat"))}><MessageSquare /><span>General Chat · Ask Anything</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Today: weather, calendar, mail, tasks and a pick" aria-pressed={todayOpen} onClick={() => setTodayOpen((value) => !value)}><Sun /><span>Today</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Just Start: one tiny first step, with optional Pal body doubling" onClick={() => beginFocusTask()}><Sparkles /><span>Just Start</span></Button>
           <Button variant="ghost" className="sidebar-item" title="Focus Food: cook one recipe at a time" aria-pressed={foodOpen} onClick={() => setFoodOpen(v => !v)}><CookingPot /><span>Focus Food</span></Button>
@@ -2172,6 +2174,7 @@ export function Room() {
         </div>
       </div>
       {mobileMoreOpen && <div id="mobile-more-tools" className="mobile-more-menu" role="group" aria-label="More mobile tools" onKeyDown={e => { if (e.key === "Escape") { setMobileMoreOpen(false); document.getElementById("mobile-more-trigger")?.focus(); } }}>
+        <button type="button" onClick={() => { setMobileMoreOpen(false); window.dispatchEvent(new Event("pixelpals:general-chat")); }}><MessageSquare /> General Chat · Ask Anything</button>
         <button type="button" onClick={() => { mobileTab("food"); setMobileMoreOpen(false); }}><CookingPot /> Focus Food</button>
         <button type="button" onClick={() => { mobileTab("notes"); setMobileMoreOpen(false); }}><ListTodo /> Notes</button>
         <button type="button" onClick={() => { mobileTab("room"); setMobileMoreOpen(false); }}><Users /> Pal Room</button>

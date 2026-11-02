@@ -1,3 +1,7 @@
+# Architecture notes
+
+Current beta: [General Chat and centralized Memory Keeper architecture](docs/ASSISTANT_ARCHITECTURE.md). The historical sections below describe the original workspace; General Chat adds owner-persistent conversations while keeping those legacy paths intact.
+
 # Architecture notes (branch `upgrade/local-first`)
 
 ## Release 1 changes

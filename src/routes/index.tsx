@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Room } from "@/components/room";
+import { PixelPalsApp } from "@/components/pixel-pals-app";
 export const Route = createFileRoute("/")({
-  component: Room,
+  component: PixelPalsApp,
   head: () => ({
     meta: [
-      { title: "Pixel Pals Chat — The discussion room" },
+      { title: "Pixel Pals — General Chat & Ask Anything" },
       {
         name: "description",
         content:
           "Choose your pixel pals, give them a topic, and start a real multi-model AI discussion.",
       },
-      { property: "og:title", content: "Pixel Pals Chat — The discussion room" },
+      { property: "og:title", content: "Pixel Pals — General Chat & Ask Anything" },
       {
         property: "og:description",
         content: "A little room for big ideas. Start a roundtable with your pixel AI pals.",

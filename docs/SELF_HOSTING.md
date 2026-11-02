@@ -167,3 +167,8 @@ Set `PLEX_URL` (for example `http://10.200.1.X:32400`) and `PLEX_TOKEN` in the s
 - `/watch` (or `/watch something cozy`, or Ctrl+K → *What should we watch tonight?*) gives the pals your recently added titles and has them debate and recommend one or two **from that list only**. If nothing fits they say what you could request with `@seerr`.
 
 Nuvio is a player app with no server or API of its own, so there is nothing for Pixel Pals to connect to there; it just plays what you choose.
+
+
+## General Chat beta integration
+
+See [General Chat](GENERAL_CHAT.md), [Memory Keeper](MEMORY_KEEPER.md) and [Unraid deployment](ASSISTANT_UNRAID.md) for the new centralized service, container mounts, privacy scopes, backup/restore and remote Ollama settings. The existing Second Brain notes and external repository inspiration remain separate from the managed memory mirror; no external autonomous agent is installed.

@@ -56,6 +56,8 @@ await step("create the first account", async () => {
   }
   await page.locator("main").first().waitFor({ timeout: 45000 });
 });
+await page.goto(URL_ + "/?workspace=1");
+await page.locator('.modular-workspace[aria-busy="false"]').waitFor({ timeout: 45000 });
 await page.waitForTimeout(3000);
 // Some entries live under the sidebar's "More" group.
 await step("two chat rooms retain all six conversation styles", async () => {
@@ -791,7 +793,7 @@ await step("Remote Ollama backend inference, missing models, policy and authenti
   if (!status.reachable || !status.models.some(m => m.name === "qwen3.5:9b")) throw Error("Backend health did not see installed Ollama");
   if (JSON.stringify(status).includes("127.0.0.1")) throw Error("Health response exposed a private endpoint");
   const anonymous = await browser.newContext();
-  for (const path of ["/api/ollama-health", "/api/ollama"]) {
+  for (const path of ["/api/ollama-health", "/api/ollama", "/api/assistant", "/api/assistant?view=memory"]) {
     const denied = await anonymous.request.get(`${URL_}${path}`);
     if (![401, 403].includes(denied.status())) throw Error(`${path} exposed internal metadata without authentication`);
   }
@@ -837,11 +839,60 @@ await step("Remote Ollama backend inference, missing models, policy and authenti
   if (directRequests.length) throw Error("A proxied mode contacted an Ollama endpoint from the browser");
   await page.request.post(`${URL_}/api/settings`, { data: { values: { LOCAL_ONLY_AI: "off" } } });
 });
+await step("General Chat, independent drafts, automatic scrub and Memory Center on desktop/mobile", async () => {
+  await page.setViewportSize({width:1500,height:900});
+  await page.goto(URL_);
+  const chat = page.locator('.general-assistant');
+  const input = chat.getByRole('textbox', {name:'Ask Anything',exact:true});
+  await input.waitFor();
+  await input.fill('How do I restart Ollama? password=smoke-secret-not-real');
+  if ((await input.inputValue()).includes('smoke-secret-not-real')) throw Error('Credential remained in chat input');
+  const answer = page.waitForResponse(r => r.url().endsWith('/api/assistant') && r.request().postDataJSON()?.op === 'ask');
+  await chat.getByRole('button',{name:'Send question',exact:true}).click();
+  const replied = await answer; const data = await replied.json();
+  if (!replied.ok() || data.conversation.messages.at(-1).parts[0].text !== 'Local fixture reply.') throw Error('General Chat failed backend answer: '+JSON.stringify(data));
+  if (JSON.stringify(data).includes('smoke-secret-not-real')) throw Error('General Chat saved raw credentials');
+  const first = data.conversation.id;
+  await input.fill('Keep this draft in the first chat');
+  const drawer = chat.getByRole('button',{name:'Conversations',exact:true});
+  if (await drawer.count()) await drawer.click();
+  const created = page.waitForResponse(r => r.url().endsWith('/api/assistant') && r.request().postDataJSON()?.op === 'create');
+  await chat.getByRole('button',{name:'New Chat',exact:true}).click();
+  await created;
+  await chat.locator('h2').filter({hasText:/^General Chat$/}).waitFor();
+  await page.waitForFunction(() => document.querySelector('.assistant-top button')?.getAttribute('aria-expanded') === 'false');
+  await input.fill('Independent second draft');
+  const open = chat.getByRole('button',{name:'Conversations',exact:true}); if(await open.count()) await open.click();
+  await chat.locator('.assistant-chat-link').filter({hasText:/How do I restart Ollama/}).first().click();
+  await page.waitForFunction(() => document.querySelector('#ask-anything')?.value === 'Keep this draft in the first chat');
+  if(await input.inputValue() !== 'Keep this draft in the first chat') throw Error('Switching conversations lost draft');
+  const saved = await (await page.request.get(URL_+'/api/assistant?id='+first)).json();
+  if(saved.conversation.messages.length !== 2) throw Error('Independent conversations mixed history');
+  const memory = await page.request.post(URL_+'/api/assistant',{data:{op:'memory-save',title:'Smoke Ollama service',text:'Ollama runs as a systemd service on CachyOS.',scope:'global'}});
+  if(!memory.ok()) throw Error('Owner could not save a memory');
+  await chat.getByRole('button',{name:'Memory Center',exact:true}).click();
+  const center = chat.getByRole('region',{name:'Memory Center',exact:true});
+  await center.getByText('Smoke Ollama service',{exact:true}).waitFor();
+  await center.getByRole('button',{name:'Sync Obsidian',exact:true}).click();
+  await center.getByRole('status').filter({hasText:/Sync|synced|notes|Saved/i}).waitFor();
+  for (const width of [320,390,700]) {
+    await page.setViewportSize({width,height:844});
+    const dimensions=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:innerWidth}));
+    if(dimensions.body>dimensions.view+1) throw Error('General Chat/Memory Center overflows at '+width);
+  }
+  await page.screenshot({path:process.env.SMOKE_MEMORY_SHOT || '/tmp/pixel-memory-mobile.png'});
+  await chat.getByRole('button',{name:'Ask Anything',exact:true}).click();
+  await input.waitFor();
+  await page.reload();
+  await input.waitFor();
+  if(await input.inputValue() !== 'Keep this draft in the first chat') throw Error('Draft did not survive reload');
+});
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
 });
 await page.screenshot({ path: process.env.SMOKE_SHOT || "smoke.png", fullPage: false }).catch(() => undefined);
+if (process.env.SMOKE_STORAGE_STATE) await page.context().storageState({path:process.env.SMOKE_STORAGE_STATE});
 await browser.close();
 
 console.log(notes.join("\n"));
