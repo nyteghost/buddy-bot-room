@@ -2,16 +2,16 @@ import { OllamaConnect } from "./ollama-connect";
 import { AddonSettings } from "@/components/addons";
 import { parseServiceKeyFile } from "@/lib/gcal";
 import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, Circle, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { groupItems, setupSummary, type SetupItem, type SetupTest } from "@/lib/setup";
+import { groupItems, SETUP_GROUPS, setupSummary, type SetupItem, type SetupTest } from "@/lib/setup";
 import { setHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import type { SettingState } from "@/lib/settings";
 
 /** What's connected and what isn't. Each card opens its settings (saved on the server; secrets are write-only and never sent back), with a Test button. */
-export function SetupPanel({ open }: { open: boolean }) {
+export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: string; request: number } | null }) {
   const [items, setItems] = useState<SetupItem[] | null>(null);
   const [error, setError] = useState("");
   const [results, setResults] = useState<Record<string, SetupTest | "running">>({});
@@ -19,6 +19,17 @@ export function SetupPanel({ open }: { open: boolean }) {
   const [fields, setFields] = useState<SettingState[]>([]);
   const [openId, setOpenId] = useState("");
   const [openGroups, setOpenGroups] = useState<string[]>(["basics"]);
+  const focusedRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (!open || !items || !focus || focusedRequest.current === focus.request) return;
+    const group = SETUP_GROUPS.find(g => g.ids.includes(focus.id));
+    if (!group) return;
+    focusedRequest.current = focus.request;
+    setOpenGroups(groups => groups.includes(group.id) ? groups : [...groups, group.id]);
+    setOpenId(focus.id);
+    const frame=requestAnimationFrame(() => document.querySelector(`[data-integration-id="${focus.id}"]`)?.scrollIntoView({ block: "nearest" }));
+    return () => cancelAnimationFrame(frame);
+  }, [open, items, focus]);
   const [drafts, setDrafts] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState("");
   const [saveNote, setSaveNote] = useState<Record<string, string>>({});
@@ -86,7 +97,7 @@ export function SetupPanel({ open }: { open: boolean }) {
         const mine = fields.filter((f) => f.group === i.id);
         const isOpen = openId === i.id;
         return (
-          <div key={i.id} className="grid gap-1 rounded-md border px-3 py-2">
+          <div key={i.id} data-integration-id={i.id} className="grid gap-1 rounded-md border px-3 py-2">
             <div className="flex items-center gap-2">
               {i.configured ? <CheckCircle2 className="size-4 shrink-0 text-green-500" /> : <Circle className="size-4 shrink-0 text-muted-foreground" />}
               <span className="min-w-0 flex-1 truncate font-medium">{i.name}</span>
@@ -176,6 +187,8 @@ export function SetupPanel({ open }: { open: boolean }) {
         <input type="checkbox" checked={hide} onChange={(e) => setHideSecrets(e.target.checked)} />
         <span>Hide secrets on this device <span className="text-xs text-muted-foreground">(blurs links and addresses so screenshots are safe)</span></span>
       </label>
+      <h2 className="font-semibold">Integrations</h2>
+      <p className="text-xs text-muted-foreground">Connect services here. Save an address and key, then use Test—no .env editing or restart needed.</p>
       {items && groupItems(items).map((g) => {
         const expanded = openGroups.includes(g.id);
         return (

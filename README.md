@@ -10,7 +10,7 @@
 
 ---
 
-The beta opens the existing **Today** window first. **General Chat / Ask Anything** remains available in navigation, with independent conversations and one local **Memory Keeper**. Open **Pixel Pals workspace** for existing rooms and tools. [Chat guide](docs/GENERAL_CHAT.md) · [Memory guide](docs/MEMORY_KEEPER.md) · [Unraid update](docs/ASSISTANT_UNRAID.md) · [Changelog](CHANGELOG.md). Recognizable chat credentials are scrubbed automatically; provider keys belong in AI settings.
+The beta opens the existing **Today** window first. **General Chat / Ask Anything** remains available in navigation, with independent conversations and one local **Memory Keeper**. General Chat is a movable, resizable workspace window alongside your existing rooms and tools. [Chat guide](docs/GENERAL_CHAT.md) · [Memory guide](docs/MEMORY_KEEPER.md) · [Unraid update](docs/ASSISTANT_UNRAID.md) · [Changelog](CHANGELOG.md). Recognizable chat credentials are scrubbed automatically; provider keys belong in AI settings.
 
 ## Table of contents
 
@@ -328,6 +328,8 @@ Powers `/search` and `/research`.
 ### 7.2 Seerr (requests)
 
 Lets you request movies and TV from chat: `@seerr Dune Part Two 4k` or `/request Dune 4k`. Pixel Pals looks the title up and asks you to **confirm** before requesting.
+
+Open **Settings → Integrations → Movies & shows → Seerr**, enter the address and API key, then **Save** and **Test**. The test verifies the saved key using a read-only request; no restart is needed. The request dialog also has a **Seerr integration settings** shortcut. Keys remain in the protected server credentials store and are never returned by the settings API.
 
 | Variable | Value |
 |---|---|

@@ -1,3 +1,4 @@
+import { testSeerrConnection } from "./seerr.server";
 import { currentUser } from "./accounts.server";
 import { backupConfig } from "./backup.server";
 import { briefConfig } from "./brief.server";
@@ -18,7 +19,7 @@ const configured: Record<string, () => boolean> = {
   ollama: () => !!ollamaBase(),
   searxng: () => !!env("SEARXNG_URL"),
   plex: () => !!env("PLEX_URL"),
-  seerr: () => !!env("SEERR_URL"),
+  seerr: () => !!env("SEERR_URL") && !!env("SEERR_API_KEY"),
   jellyfin: () => !!env("JELLYFIN_URL"),
   trakt: () => !!env("TRAKT_CLIENT_ID"),
   unraid: () => !!unraidConfig(),
@@ -53,7 +54,7 @@ const tests: Record<string, () => Promise<SetupTest>> = {
   ollama: () => reach(ollamaBase(), "/api/tags"),
   searxng: () => reach(env("SEARXNG_URL")),
   plex: () => reach(env("PLEX_URL"), "/identity", env("PLEX_TOKEN") ? { "X-Plex-Token": env("PLEX_TOKEN") } : {}),
-  seerr: () => reach(env("SEERR_URL"), "/api/v1/status"),
+  seerr: testSeerrConnection,
   jellyfin: () => reach(env("JELLYFIN_URL"), "/System/Ping"),
   trakt: () => reach("https://api.trakt.tv", "/movies/trending?limit=1", { "trakt-api-version": "2", "trakt-api-key": env("TRAKT_CLIENT_ID") }),
   unraid: async () => { const u = unraidConfig(); return u ? reach(u.base) : { ok: false, note: "Not set up." }; },

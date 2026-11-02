@@ -1,6 +1,6 @@
 # General Chat architecture — beta
 
-General Chat is additive to the original mounted workspace. The owner-authenticated /api/assistant route stores conversation rows with optional assistant metadata in the existing chats.json. Legacy chat routes exclude these rows and refuse sharing, replacement or deletion of assistant IDs. Existing legacy rows are not silently migrated or destroyed. Explicit import makes a copy.
+General Chat is a lazily loaded WorkspaceWindow inside the original workspace. It stays mounted after first opening, uses the shared geometry/layout manager and never takes over the page. Today remains home; explicit chat links open the chat window. The owner-authenticated /api/assistant route stores conversation rows with optional assistant metadata in the existing chats.json. Legacy chat routes exclude these rows and refuse sharing, replacement or deletion of assistant IDs. Existing legacy rows are not silently migrated or destroyed. Explicit import makes a copy.
 
 memory-keeper.json is the single schema-versioned durable memory source, queue and derived vector cache. Store transactions serialize atomic writes, use owner-only permissions and preserve corrupt input on failure. No second competing conversation database or external Second Brain agent is installed. Version 1 starts empty when the new file does not exist; old chats retain their existing schema and gain assistant metadata only through explicit copy/creation.
 

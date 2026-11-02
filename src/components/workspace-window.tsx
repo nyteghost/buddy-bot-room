@@ -17,10 +17,10 @@ function readSize(raw: string | null): Size | null {
   } catch { return null; }
 }
 
-export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className }: {
+export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className, focusVersion }: {
   className?: string;
   id: string; title: string; icon: ReactNode; open: boolean; onClose: () => void;
-  children: ReactNode; resetVersion: number;
+  children: ReactNode; resetVersion: number; focusVersion?: number;
 }) {
   const ref = useRef<HTMLElement>(null);
   const drag = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
@@ -44,7 +44,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
       setFront(++windowStack);
       if (window.matchMedia("(max-width: 700px)").matches) ref.current?.focus({ preventScroll: true });
     }
-  }, [open]);
+  }, [open, focusVersion]);
   useEffect(() => {
     try {
       setPosition(readWindowPosition(localStorage.getItem(key)));

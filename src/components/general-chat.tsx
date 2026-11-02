@@ -1,9 +1,7 @@
 import { scrubChatText } from "@/lib/chat-scrub";
-import { LocalAccountButton } from "./local-account-button";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Message, MessageContent, MessageResponse } from "./ai-elements/message";
-import { EngineSettingsDialog } from "./engine-settings";
 import { MemoryCenter } from "./memory-center";
 import { assistantApi } from "@/lib/assistant-client";
 import { useEngine, turnProviders } from "@/lib/engine";
@@ -147,8 +145,8 @@ export function GeneralChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   useEffect(() => {
-    if (open) setView(initialView);
-  }, [initialView, open]);
+    setView(initialView);
+  }, [initialView]);
   useEffect(() => {
     const c = currentRef.current;
     if (!c || sensitive(draft)) return;
@@ -275,14 +273,6 @@ export function GeneralChat({
           </Button>
           <Button variant="outline" onClick={() => setView("memory")}>
             Memory Center
-          </Button>
-          <EngineSettingsDialog />
-          <LocalAccountButton theme="normal" onTheme={() => {}} />
-          <Button
-            variant="outline"
-            onClick={() => window.dispatchEvent(new Event("pixelpals:workspace"))}
-          >
-            Pixel Pals workspace
           </Button>
         </div>
       </header>
@@ -739,8 +729,8 @@ export function GeneralChat({
             </>
           ) : (
             <p>
-              Connecting to persistent conversations… Open the Pixel Pals workspace if server
-              storage is unavailable.
+              Connecting to persistent conversations… Check workspace settings if server storage is
+              unavailable.
             </p>
           )}
         </main>

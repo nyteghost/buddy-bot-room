@@ -3,6 +3,12 @@ import { createServer } from "node:http";
 const names = ["smoke-local:7b", "qwen3.5:9b", "qwen3:8b", "qwen2.5-coder:7b"];
 const server = createServer(async (request, response) => {
   response.setHeader("Content-Type", "application/json");
+  // Seerr settings smoke uses this same isolated server; no media requests are accepted.
+  if (request.method === "GET" && request.url === "/api/v1/auth/me") {
+    response.statusCode = request.headers["x-api-key"] === "smoke-seerr-settings-key" ? 200 : 401;
+    return response.end(JSON.stringify(response.statusCode === 200 ? { id: 1 } : { error: "Invalid fixture key" }));
+  }
+  if (request.method === "GET" && request.url.startsWith("/api/v1/search?")) return response.end('{"results":[]}');
   if (request.method === "GET" && request.url === "/api/tags") return response.end(JSON.stringify({ models: names.map(name => ({ name, size: 5 * 1024 ** 3 })) }));
   if (request.method === "GET" && request.url === "/api/ps") return response.end('{"models":[]}');
   if (request.method === "GET" && request.url === "/api/version") return response.end('{"version":"smoke-fixture"}');

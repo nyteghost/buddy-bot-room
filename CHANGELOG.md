@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.0.819 — Workspace chat and integration settings
+
+- Make Settings → Integrations explicit; open Seerr configuration directly from its request dialog. Save existing address/key fields securely without a restart, and verify the API key with a read-only authenticated test.
+- Show General Chat and Memory Center in the existing movable, resizable workspace window instead of a separate full-screen page. Maximize, restore, hide and saved geometry use the shared window manager.
+- Preserve drafts and running answers while hidden; keep Today as home and support chat direct links. Remove duplicate account/provider headers; existing workspace controls remain available.
+
 ## Beta 1.0.818 — Today opens first
 
 - Open the existing Today window by default on desktop and mobile, including when a previous session closed it.

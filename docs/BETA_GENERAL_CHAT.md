@@ -1,8 +1,10 @@
-# Beta 1.0.818 validation and handoff
+# Beta 1.0.819 validation and handoff
 
 ## Implemented
 
-Since beta 1.0.818, the existing Today window is home. General Chat / Ask Anything remains available in navigation, with independent durable conversations, per-chat drafts, project association, pin/archive/recoverable trash, history search, automatic first-question titles and fresh continuation. The original workspace stays available and mounted.
+Seerr configuration is discoverable under Settings → Integrations, with a direct request-dialog shortcut, protected write-only key saving, immediate application and a read-only authenticated API test.
+
+Since beta 1.0.818, the existing Today window is home. General Chat / Ask Anything remains available in navigation, with independent durable conversations, per-chat drafts, project association, pin/archive/recoverable trash, history search, automatic first-question titles and fresh continuation. General Chat now lives in the shared workspace window manager, with movement, resizing, maximize/restore and hide/reopen state preservation.
 
 One local Memory Keeper provides durable incremental jobs, source-backed review candidates, checkpoints, scoped memory and keyword/optional hybrid retrieval. Memory Center supplies management, correction, history, export/restore, private grants and Obsidian synchronization with manual conflict review. Existing saved server chats can be explicitly copied rather than destructively migrated.
 
@@ -10,7 +12,7 @@ Recognizable credential text is scrubbed before AI chat inference and new persis
 
 ## Actual development checks
 
-- Full automated suite: 1,262 tests across 119 files passed. New coverage includes credentials/typing/idempotence, independent conversations/concurrency, authorized retrieval, private/project filtering, manual model rejection, Auto fallback, Local-Only, legacy-store forgery/sharing prevention, local worker queues, offline retry, evidence checks, Obsidian conflicts/recovery/symlinks and backup/restore.
+- Full automated suite: 1,270 tests across 120 files passed. New coverage includes credentials/typing/idempotence, independent conversations/concurrency, authorized retrieval, private/project filtering, manual model rejection, Auto fallback, Local-Only, legacy-store forgery/sharing prevention, local worker queues, offline retry, evidence checks, Obsidian conflicts/recovery/symlinks and backup/restore.
 - TypeScript noEmit passed; self-hosted production build passed.
 - Changed TypeScript lint passed with the repository's existing formatting rule disabled; six existing Room hook/directive warnings remain. Full repository lint is not clean (10,846 errors, 10,799 formatting errors in the measured run); this release does not reformat unrelated files or claim full lint passes.
 - Today startup/reload passed on desktop and mobile after closing Today in the previous session; explicit General Chat links still work.

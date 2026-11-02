@@ -193,3 +193,41 @@
     display: none;
   }
 }
+
+/* Share the existing window manager; geometry and maximize stay in WorkspaceWindow. */
+.window-general-chat {
+  container-type: inline-size;
+}
+.window-general-chat .assistant-top h1 {
+  display: none;
+}
+@media (min-width: 701px) {
+  .window-general-chat {
+    left: var(--window-x, 14%);
+    top: var(--window-y, 20px);
+    width: min(960px, 82%);
+    height: min(760px, calc(100% - 20px));
+  }
+}
+@container (max-width: 700px) {
+  .assistant-layout {
+    display: block;
+  }
+  .assistant-sidebar {
+    display: none;
+    max-height: 45vh;
+    border-bottom: 1px solid var(--border);
+  }
+  .drawer-open .assistant-sidebar {
+    display: flex;
+  }
+  .assistant-main {
+    padding: 12px;
+  }
+  .assistant-top {
+    padding: 10px;
+  }
+  .assistant-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

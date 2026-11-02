@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { SeerrQuery, SeerrResult } from "@/lib/seerr";
 
 type RequestState = "idle" | "sending" | "done" | string;
@@ -11,10 +17,12 @@ export function SeerrDialog({
   query,
   onClose,
   onRequested,
+  onConfigure,
 }: {
   query: SeerrQuery | null;
   onClose: () => void;
   onRequested: (summary: string) => void;
+  onConfigure?: () => void;
 }) {
   const [results, setResults] = useState<SeerrResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,7 +46,10 @@ export function SeerrDialog({
         if (!res.ok) throw new Error(json.error ?? "Seerr lookup failed.");
         if (!stop) setResults(json.results ?? []);
       })
-      .catch((err: unknown) => !stop && setError(err instanceof Error ? err.message : "Seerr lookup failed."))
+      .catch(
+        (err: unknown) =>
+          !stop && setError(err instanceof Error ? err.message : "Seerr lookup failed."),
+      )
       .finally(() => !stop && setLoading(false));
     return () => {
       stop = true;
@@ -57,7 +68,9 @@ export function SeerrDialog({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error ?? "Request failed.");
       setStates((s) => ({ ...s, [r.id]: "done" }));
-      onRequested(`Requested ${r.title}${r.year ? ` (${r.year})` : ""} in ${query.is4k ? "4K" : "standard quality"} through Seerr.`);
+      onRequested(
+        `Requested ${r.title}${r.year ? ` (${r.year})` : ""} in ${query.is4k ? "4K" : "standard quality"} through Seerr.`,
+      );
     } catch (err) {
       setStates((s) => ({ ...s, [r.id]: err instanceof Error ? err.message : "Request failed." }));
     }
@@ -68,13 +81,31 @@ export function SeerrDialog({
       <DialogContent className="seerr-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Clapperboard className="size-4" /> Request “{query?.title}” {query?.is4k ? "in 4K" : ""}
+            <Clapperboard className="size-4" /> Request “{query?.title}”{" "}
+            {query?.is4k ? "in 4K" : ""}
           </DialogTitle>
-          <DialogDescription>Pick the right match. Nothing is requested until you press Request.</DialogDescription>
+          <DialogDescription>
+            Pick the right match. Nothing is requested until you press Request.
+          </DialogDescription>
         </DialogHeader>
+        {onConfigure && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={() => {
+              onClose();
+              onConfigure();
+            }}
+          >
+            <Settings2 className="size-4" /> Seerr integration settings
+          </Button>
+        )}
         {loading && <p className="text-sm text-muted-foreground">Searching Seerr…</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {!loading && !error && results.length === 0 && <p className="text-sm text-muted-foreground">No movies or shows found.</p>}
+        {!loading && !error && results.length === 0 && (
+          <p className="text-sm text-muted-foreground">No movies or shows found.</p>
+        )}
         <ul className="seerr-list">
           {results.map((r) => {
             const state = states[r.id] ?? "idle";
@@ -82,16 +113,29 @@ export function SeerrDialog({
             return (
               <li key={`${r.mediaType}-${r.id}`}>
                 <div>
-                  <b>{r.title}</b> <span>{r.year} · {r.mediaType === "tv" ? "TV show" : "Movie"}</span>
+                  <b>{r.title}</b>{" "}
+                  <span>
+                    {r.year} · {r.mediaType === "tv" ? "TV show" : "Movie"}
+                  </span>
                   {r.overview && <p>{r.overview}</p>}
-                  {state !== "idle" && state !== "sending" && state !== "done" && <p className="text-destructive">{state}</p>}
+                  {state !== "idle" && state !== "sending" && state !== "done" && (
+                    <p className="text-destructive">{state}</p>
+                  )}
                 </div>
                 <Button
                   size="sm"
                   disabled={state === "sending" || state === "done" || have !== "none"}
                   onClick={() => void request(r)}
                 >
-                  {state === "done" ? "Requested ✓" : have === "available" ? "Already there" : have === "requested" ? "Already requested" : state === "sending" ? "Sending…" : "Request"}
+                  {state === "done"
+                    ? "Requested ✓"
+                    : have === "available"
+                      ? "Already there"
+                      : have === "requested"
+                        ? "Already requested"
+                        : state === "sending"
+                          ? "Sending…"
+                          : "Request"}
                 </Button>
               </li>
             );

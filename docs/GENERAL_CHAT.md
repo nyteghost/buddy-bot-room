@@ -1,6 +1,6 @@
 # General Chat and Ask Anything
 
-Open Pixel Pals and sign in as the owner. The existing Today window is the home screen. Open General Chat from workspace navigation (mobile: More → General Chat), or use /?chat=1. Ask Anything needs no category, project or Pal selection. **Pixel Pals workspace** opens the existing rooms, Food Focus and tools; those windows remain mounted when you return to General Chat.
+Open Pixel Pals and sign in as the owner. The existing Today window is the home screen. Open General Chat from workspace navigation (mobile: More → General Chat), or use /?chat=1. Ask Anything needs no category, project or Pal selection. General Chat opens as a workspace window alongside Today, Food Focus and the other tools. Drag its title bar, resize an edge, or use Maximize/Restore. Hiding it keeps drafts, answers and the selected conversation mounted. On phones it follows the existing one-window-at-a-time workspace navigation. AI and account settings remain in the shared workspace header.
 
 ## Conversations
 

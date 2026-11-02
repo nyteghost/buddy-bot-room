@@ -22,8 +22,7 @@ No SearXNG yet? `docker compose --profile search up -d` starts one using `config
 then set `SEARXNG_URL=http://searxng:8080`.
 
 ### Seerr (`@seerr Dune 4k`)
-Set `SEERR_URL` and `SEERR_API_KEY` in `.env.local` (Seerr → Settings → General → API key). The key is
-only ever read by the server. Anyone who can open the app can request through it, so keep the app on
+Use **Settings → Integrations → Movies & shows → Seerr** to enter its address and API key, then Save and Test; changes apply without a restart. The request dialog links directly to this card. Existing `SEERR_URL` and `SEERR_API_KEY` environment configuration remains supported. The key is stored in protected server credentials and is never returned to the browser. Anyone who can open the app can request through it, so keep the app on
 your LAN.
 
 ### Experimental production build
