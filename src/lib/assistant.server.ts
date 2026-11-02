@@ -922,7 +922,12 @@ export async function handleAssistant(
         question, c, fresh, numberSetting("MEMORY_CONTEXT_CHARS", 2400, 400, 6000), semantic,
       );
       const budget = numberSetting("ASSISTANT_CONTEXT_CHARS", 16000, 4000, 48000);
-      const messages = contextMessages(c, fresh, budget);
+      // Discord defaults to no memory sharing. Withholding freshly retrieved
+      // records is insufficient if past replies carried retrieved memory.
+      const discordMemoryOff = !!internal && process.env["DISCORD_MEMORY_ACCESS"] !== "on";
+      const messages = contextMessages(c, fresh, budget).filter(
+        (m) => !discordMemoryOff || !m.metadata?.memoryIds?.length,
+      );
       const search = webResult.search;
       let tool: unknown = null;
       if (!internal && /\b(my tasks|my to.?dos|plan my day)\b/i.test(question)) {
@@ -1014,7 +1019,7 @@ export async function handleAssistant(
             ? messages
             : messages.filter((m) => !m.metadata?.memoryIds?.length);
           const summary =
-            allowMemory && c.assistant.summaryEpoch === fresh.epoch ? c.assistant.summary : "";
+            allowMemory && !discordMemoryOff && c.assistant.summaryEpoch === fresh.epoch ? c.assistant.summary : "";
           const restored =
             allowMemory && c.assistant.continuation?.epoch === fresh.epoch
               ? c.assistant.continuation.text
