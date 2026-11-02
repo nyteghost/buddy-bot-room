@@ -38,7 +38,7 @@ const ollamaProbe = makeProbe(async () => {
 /** A local answer may take a while on a big model, but never forever. */
 const LOCAL_REPLY_LIMIT_MS = 5 * 60_000;
 
-export async function handleChat(request: Request, assistantContext?: string) {
+export async function handleChat(request: Request, assistantContext?: string, trustedServerOwner = false) {
   try {
     const body = await request.json();
     const scrubOptions={maskIdentifiers:process.env["CHAT_MASK_IDENTIFIERS"]==="on"||body.maskIdentifiers===true};
@@ -207,7 +207,7 @@ export async function handleChat(request: Request, assistantContext?: string) {
     }
     {
       const localServer = engine.kind === "ollama-server";
-      if (localServer && accountsEnabled(process.env) && !(await currentUser(request))?.owner) return Response.json({ error: "Owner sign-in required for server Local AI." }, { status: 403 });
+      if (localServer && accountsEnabled(process.env) && !trustedServerOwner && !(await currentUser(request))?.owner) return Response.json({ error: "Owner sign-in required for server Local AI." }, { status: 403 });
       if (localServer && !ollamaBase())
         return Response.json({ error: "Local AI isn't set up on this server. Add Ollama to the stack (see the README) or choose another engine." }, { status: 400 });
       let localModel = localServer ? String(engine.model ?? "") : "";
