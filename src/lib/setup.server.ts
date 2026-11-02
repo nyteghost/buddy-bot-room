@@ -10,6 +10,7 @@ import { mailSendReady } from "./mailbox.server";
 import { ollamaBase } from "./ollama.server";
 import { INTEGRATIONS, itemById, type SetupItem, type SetupTest } from "./setup";
 import { telegramEnabled, telegramSend } from "./telegram.server";
+import { discordEnabled, testDiscordConnection } from "./discord.server";
 import { unraidConfig } from "./unraid.server";
 import { getWeather, weatherConfigured } from "./weather.server";
 
@@ -27,6 +28,7 @@ const configured: Record<string, () => boolean> = {
   ntfy: () => env("NTFY_URL").startsWith("http"),
   today: () => (env("TODAY_NUDGES") || "on") !== "off" && (env("NTFY_URL").startsWith("http") || telegramEnabled()),
   telegram: () => telegramEnabled(),
+  discord: () => discordEnabled(),
   whisper: () => !!env("WHISPER_URL"),
   weather: () => weatherConfigured(),
   calendar: () => !!env("CALENDAR_ICS_URLS"),
@@ -66,6 +68,7 @@ const tests: Record<string, () => Promise<SetupTest>> = {
     } catch { return { ok: false, note: "Couldn't reach the push service." }; }
   },
   telegram: async () => ((await telegramSend("Pixel Pals test: if you can read this, Telegram works.")) ? { ok: true, note: "Sent. Check Telegram." } : { ok: false, note: "Couldn't send. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (and message the bot once first)." }),
+  discord: testDiscordConnection,
   whisper: () => reach(env("WHISPER_URL"), "/health"),
   weather: async () => { const r = await getWeather(); return "weather" in r ? { ok: true, note: `${r.weather.place}: found.` } : { ok: false, note: r.error }; },
   calendar: async () => { const c = await calendarData(7); return c.errors.length ? { ok: false, note: c.errors[0] ?? "Failed." } : { ok: true, note: `${c.feeds} feed${c.feeds === 1 ? "" : "s"} read, ${c.items.length} event${c.items.length === 1 ? "" : "s"} in the next 7 days.` }; },

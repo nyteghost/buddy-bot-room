@@ -14,6 +14,7 @@ import { tickCaldav } from "./reminders-sync.server";
 import { isReviewDay, sendWeekly, weeklyConfig } from "./weekly.server";
 import { tickSchedules } from "./schedules.server";
 import { startTelegram } from "./telegram.server";
+import { startDiscord } from "./discord.server";
 import { tickPlaytests } from "./playtests.server";
 import { tickMailAlerts } from "./mail-alerts.server";
 import { tickAddons } from "./addons.server";
@@ -29,6 +30,7 @@ export function startScheduler(): void {
   startProviderTimer();
   if (holder.__buddyScheduler?.timer) return;
   startTelegram();
+  startDiscord();
   if (!backupConfig() && !briefConfig() && !weeklyConfig() && !dataDir()) return;
   const s: S = (holder.__buddyScheduler ??= { lastBackupDay: "", lastBriefDay: "" });
   logServer("info", "Scheduler started");

@@ -21,7 +21,7 @@ import { withRetry } from "./ai/reliability";
  * Only free keys and Local AI are used here: paid providers (Claude, custom) never run without you in the room,
  * so nothing can spend money while you're away.
  */
-async function ownerEngineJson(): Promise<string | null> {
+export async function ownerEngineJson(): Promise<string | null> {
   const dir = (process.env["BUDDY_DATA_DIR"] ?? "").trim().replace(/\/+$/, "");
   const name = await ownerName();
   if (!dir || !name) return null;

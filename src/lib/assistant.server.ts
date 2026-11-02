@@ -3,7 +3,8 @@ import { readCaptures } from "./capture.server";
 import { webMode, needsWeb, clockContext, type WebReceipt } from "./assistant-web";
 import { scrubChatData, scrubChatText } from "./chat-scrub";
 import { randomUUID } from "node:crypto";
-import { currentUser } from "./accounts.server";
+import { currentUser, ownerName } from "./accounts.server";
+import { ownerEngineJson } from "./ask.server";
 import { accountsEnabled } from "./accounts";
 import { chatTransaction, readChatRows, type Row } from "./store.server";
 import {
@@ -55,6 +56,8 @@ import { models, type RoomMessage } from "./agents";
 const reply = (v: unknown, status = 200) =>
   Response.json(v, { status, headers: { "Cache-Control": "no-store" } });
 const running = new Set<string>();
+type DiscordInternal = { ownerName: string };
+let discordBusy = false;
 const mine = (rows: Row[], owner: string) =>
   rows.filter((r) => r.assistant && r.owner === owner && !r.shared) as Conversation[];
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -224,6 +227,7 @@ function streamedAnswer(req: Request, data: Record<string, unknown>): Response {
 export async function handleAssistant(
   req: Request,
   preview?: (text: string) => Promise<void>,
+  internal?: DiscordInternal,
 ): Promise<Response> {
   if (!keeperRoot())
     return reply(
@@ -237,7 +241,7 @@ export async function handleAssistant(
       { error: "Enable local accounts and sign in as owner to use persistent assistant memory." },
       403,
     );
-  const user = await currentUser(req);
+  const user = internal ? { owner: true, username: internal.ownerName } : await currentUser(req);
   if (!user?.owner) return reply({ error: "Owner sign-in required" }, 403);
   const owner = user.username.toLowerCase();
   scheduleKeeper();
@@ -377,7 +381,7 @@ export async function handleAssistant(
         id: randomUUID(),
         title: text(data["title"], 100) || "General Chat",
         messages,
-        mode: "direct",
+        mode: internal ? "discord" : "direct",
         theme: "normal",
         updatedAt: new Date().toISOString(),
         owner,
@@ -914,18 +918,14 @@ export async function handleAssistant(
         lookupWeb(question, data, req),
       ]);
       const web = webResult.web;
-      const memories = retrieve(
-        question,
-        c,
-        fresh,
-        numberSetting("MEMORY_CONTEXT_CHARS", 2400, 400, 6000),
-        semantic,
+      const memories = internal && process.env["DISCORD_MEMORY_ACCESS"] !== "on" ? [] : retrieve(
+        question, c, fresh, numberSetting("MEMORY_CONTEXT_CHARS", 2400, 400, 6000), semantic,
       );
       const budget = numberSetting("ASSISTANT_CONTEXT_CHARS", 16000, 4000, 48000);
       const messages = contextMessages(c, fresh, budget);
       const search = webResult.search;
       let tool: unknown = null;
-      if (/\b(my tasks|my to.?dos|plan my day)\b/i.test(question)) {
+      if (!internal && /\b(my tasks|my to.?dos|plan my day)\b/i.test(question)) {
         const r = await handleToday(
           new Request("http://localhost/api/today", { headers: req.headers }),
         );
@@ -1161,4 +1161,42 @@ export async function handleAssistant(
       req.signal.aborted ? 499 : 400,
     );
   }
+}
+
+
+/** Owner-verified server-side bridge: no fabricated cookies or new public API.
+ * Its persistent conversation is stored by the existing General Chat/Memory Keeper.
+ * Discord is local-Ollama-only and cannot request tools, scopes, or provider changes.
+ */
+export async function askDiscordCompanion(question: string): Promise<{ ok: boolean; text: string }> {
+  if (discordBusy) return { ok: false, text: "Pixel Pals is already answering another Discord question. Try again shortly." };
+  discordBusy = true;
+  try {
+    const username = (await ownerName())?.toLowerCase();
+    if (!username) return { ok: false, text: "Create the Pixel Pals owner account first." };
+    const engine = await ownerEngineJson();
+    if (!engine) return { ok: false, text: "Save your Local AI settings in Pixel Pals before chatting in Discord." };
+    const internal: DiscordInternal = { ownerName: username };
+    const call = (data: Record<string, unknown>) => handleAssistant(new Request("http://localhost/api/assistant", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data),
+    }), undefined, internal);
+    let conversation = mine(await readChatRows(), username).find(c => c.mode === "discord" && c.assistant.status === "active");
+    if (!conversation) {
+      const created = await call({ op: "create", title: "Discord Companion" });
+      const data = (await created.json()) as { conversation?: Conversation; error?: string };
+      if (!created.ok || !data.conversation) return { ok: false, text: data.error ?? "Couldn't create Discord conversation." };
+      conversation = data.conversation;
+    }
+    const res = await call({
+      op: "ask", id: conversation.id, revision: conversation.assistant.revision,
+      question: question.slice(0, 1800), engine: JSON.parse(engine) as unknown,
+      provider: "ollama-server", research: false, web: "off", timeZone: process.env["BUDDY_TZ"] ?? "UTC",
+    });
+    const data = (await res.json()) as { conversation?: Conversation; error?: string };
+    if (!res.ok || !data.conversation) return { ok: false, text: data.error ?? "Local AI couldn't answer. Check Ollama." };
+    const last = data.conversation.messages.at(-1);
+    return { ok: true, text: last ? messageString(last) : "No answer returned." };
+  } catch {
+    return { ok: false, text: "Pixel Pals couldn't answer. Check General Chat and Ollama." };
+  } finally { discordBusy = false; }
 }
