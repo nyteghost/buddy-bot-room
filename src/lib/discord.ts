@@ -9,11 +9,11 @@ export type DiscordConfig = {
 const snowflake = (value: string): boolean => /^\d{17,20}$/.test(value);
 
 export function discordConfig(env: Record<string, string | undefined>): DiscordConfig | null {
-  const token = (env.DISCORD_BOT_TOKEN ?? "").trim();
-  const appId = (env.DISCORD_APP_ID ?? "").trim();
-  const ownerId = (env.DISCORD_OWNER_USER_ID ?? "").trim();
-  const guildId = (env.DISCORD_GUILD_ID ?? "").trim();
-  if (env.DISCORD_ENABLED !== "on" || !token || !snowflake(appId) || !snowflake(ownerId) || !snowflake(guildId)) return null;
+  const token = (env["DISCORD_BOT_TOKEN"] ?? "").trim();
+  const appId = (env["DISCORD_APP_ID"] ?? "").trim();
+  const ownerId = (env["DISCORD_OWNER_USER_ID"] ?? "").trim();
+  const guildId = (env["DISCORD_GUILD_ID"] ?? "").trim();
+  if (env["DISCORD_ENABLED"] !== "on" || !token || !snowflake(appId) || !snowflake(ownerId) || !snowflake(guildId)) return null;
   return { token, appId, ownerId, guildId };
 }
 
