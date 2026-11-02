@@ -121,7 +121,7 @@ export function startDiscord(): void {
   const key = cfg ? [cfg.token, cfg.appId, cfg.guildId, cfg.ownerId].join("|") : "";
   if (previous?.active && cfg && previous.key === key) return;
   if (previous) stop(previous);
-  if (!cfg) { holder.__pixelDiscordRun = undefined; return; }
+  if (!cfg) { delete holder.__pixelDiscordRun; return; }
   const run: Run = { key, active: true, failures: 0, sequence: null, connected: false };
   holder.__pixelDiscordRun = run;
   void connect(run, cfg);
