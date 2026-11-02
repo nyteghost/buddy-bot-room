@@ -1,3 +1,4 @@
+import { responseLines, answerPreview } from "./assistant-stream";
 import { readCaptures } from "./capture.server";
 import { webMode, needsWeb, clockContext, type WebReceipt } from "./assistant-web";
 import { scrubChatData, scrubChatText } from "./chat-scrub";
@@ -112,35 +113,118 @@ async function invalidateSummaries() {
     return { rows, value: undefined };
   });
 }
-async function parseAnswer(response: Response): Promise<string> {
+async function parseAnswer(
+  response: Response,
+  signal: AbortSignal,
+  preview?: (text: string) => Promise<void>,
+  maskIdentifiers = false,
+): Promise<string> {
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     if (data.code === "ollama-model" || data.code === "local-only")
       throw Error(String(data.error).slice(0, 400));
     throw Error("The selected provider could not answer. Check AI settings or choose Auto.");
   }
-  const raw = await response.text();
-  let result = "";
-  for (const line of raw.split("\n")) {
-    if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
+  let result = "",
+    lastPreview = "",
+    lastSent = 0,
+    completed = false;
+  for await (const line of responseLines(response, signal)) {
+    if (line === "data: [DONE]") {
+      completed = true;
+      continue;
+    }
+    if (!line.startsWith("data: ")) continue;
     let d;
     try {
       d = JSON.parse(line.slice(6));
     } catch {
-      continue;
+      throw Error("The provider sent an invalid response. Your question is saved; retry.");
     }
-    if (d.type === "error")
+    if (d.type === "finish") completed = true;
+    if (d.type === "error" || d.type === "abort" || d.finishReason === "error")
       throw Error(
         "The provider interrupted this answer. Your question is saved; retry or choose another provider.",
       );
     if (d.type === "text-delta" && typeof d.delta === "string") result += d.delta;
     if (result.length > 50000)
       throw Error("Answer exceeded the size limit. Ask a narrower question.");
+    if (preview && Date.now() - lastSent >= 150) {
+      const safe = answerPreview(result, { maskIdentifiers });
+      if (safe !== lastPreview) {
+        await preview(safe);
+        lastPreview = safe;
+        lastSent = Date.now();
+      }
+    }
   }
+  if (!completed)
+    throw Error(
+      "The provider disconnected before completing the answer. Your question is saved; retry.",
+    );
   if (!result.trim()) throw Error("The provider returned no text. Your question is saved.");
   return result.trim();
 }
-export async function handleAssistant(req: Request): Promise<Response> {
+function streamedAnswer(req: Request, data: Record<string, unknown>): Response {
+  const cancelled = new AbortController();
+  const signal = AbortSignal.any([req.signal, cancelled.signal, AbortSignal.timeout(180000)]);
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (value: { type: string; [key: string]: unknown }) => {
+        signal.throwIfAborted();
+        if (value.type === "preview" && (controller.desiredSize ?? 0) <= 0) return;
+        controller.enqueue(encoder.encode(JSON.stringify(value) + "\n"));
+      };
+      send({ type: "status", text: "Checking context and available AI…" });
+      void (async () => {
+        try {
+          const response = await handleAssistant(
+            new Request(req.url, {
+              method: "POST",
+              headers: req.headers,
+              body: JSON.stringify({ ...data, stream: false }),
+              signal,
+            }),
+            async (text) => send({ type: "preview", text }),
+          );
+          const result = await response.json();
+          send(
+            response.ok
+              ? { type: "done", result }
+              : { type: "error", error: result.error, status: response.status },
+          );
+        } catch {
+          if (!signal.aborted)
+            send({
+              type: "error",
+              error: "The answer was interrupted. Your question is saved; retry when connected.",
+            });
+        } finally {
+          try {
+            controller.close();
+          } catch {
+            /* The browser cancelled the stream. */
+          }
+        }
+      })();
+    },
+    cancel() {
+      cancelled.abort();
+    },
+  });
+  return new Response(body, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+export async function handleAssistant(
+  req: Request,
+  preview?: (text: string) => Promise<void>,
+): Promise<Response> {
   if (!keeperRoot())
     return reply(
       {
@@ -227,6 +311,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
     const data = JSON.parse(raw) as Record<string, unknown>;
     if (!data || typeof data !== "object") return reply({ error: "Invalid request" }, 400);
     const op = data["op"];
+    if (op === "ask" && data["stream"] === true && !preview) return streamedAnswer(req, data);
     if (op === "create" || op === "import-legacy" || op === "continue") {
       if (all.length >= 300)
         return reply(
@@ -919,6 +1004,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
       for (const p of providers) {
         if (req.signal.aborted) throw Error("Cancelled");
         try {
+          await preview?.("");
           const allowMemory =
             p.kind === "ollama-server" || process.env["MEMORY_CLOUD_CONTEXT"] === "on";
           supplied = allowMemory ? memories : [];
@@ -967,10 +1053,26 @@ export async function handleAssistant(req: Request): Promise<Response> {
             }),
             context,
           );
-          answer = scrubChatText(await parseAnswer(r), {
-            maskIdentifiers:
+          answer = scrubChatText(
+            await parseAnswer(
+              r,
+              req.signal,
+              preview
+                ? async (text) => {
+                    if ((await keeperSnapshot()).epoch !== fresh.epoch)
+                      throw Error(
+                        "Memory permissions changed during this answer. Retry with fresh context.",
+                      );
+                    await preview(text);
+                  }
+                : undefined,
               process.env["CHAT_MASK_IDENTIFIERS"] === "on" || data["maskIdentifiers"] === true,
-          });
+            ),
+            {
+              maskIdentifiers:
+                process.env["CHAT_MASK_IDENTIFIERS"] === "on" || data["maskIdentifiers"] === true,
+            },
+          );
           provider = p;
           actualModel = r.headers.get("x-pixelpals-model") ?? p.model ?? p.kind;
           break;
@@ -984,6 +1086,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
           { error: lastError || "No provider could answer. Your question is saved." },
           503,
         );
+      req.signal.throwIfAborted();
       // Recheck privacy epoch before saving the receipt; a concurrent correction invalidates this turn.
       if ((await keeperSnapshot()).epoch !== fresh.epoch)
         return reply(
@@ -1016,10 +1119,13 @@ export async function handleAssistant(req: Request): Promise<Response> {
         ...(suggestion ? { project: suggestion.id } : {}),
         archive: false,
       };
-      await chatTransaction(async (rows) => ({
-        rows: rows.map((r) => (r.id === c.id ? c : r)),
-        value: undefined,
-      }));
+      await chatTransaction(async (rows) => {
+        req.signal.throwIfAborted();
+        const stored = rows.find((r) => r.id === c.id);
+        if (!stored || stored.assistant?.revision !== c.assistant.revision - 1)
+          throw Error("Conversation changed during this answer. Reload before retrying.");
+        return { rows: rows.map((r) => (r.id === c.id ? c : r)), value: undefined };
+      });
       await enqueueKeeper(c);
       return reply({
         conversation: c,
@@ -1046,7 +1152,7 @@ export async function handleAssistant(req: Request): Promise<Response> {
           : e instanceof SyntaxError
             ? "Invalid request JSON"
             : e instanceof Error &&
-                /Memory changed|Approve|scope|Invalid|limit|Credentials|unavailable|Version/.test(
+                /Memory changed|Conversation changed|Approve|scope|Invalid|limit|Credentials|unavailable|Version/.test(
                   e.message,
                 )
               ? e.message

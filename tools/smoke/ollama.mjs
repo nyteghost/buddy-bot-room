@@ -24,6 +24,14 @@ const server = createServer(async (request, response) => {
     }
     if (!body.stream) return response.end(JSON.stringify({ id: "smoke-food-chat", object: "chat.completion", created: 1, model: body.model, choices: [{ index: 0, message: { role: "assistant", content: "Local fixture reply." }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }));
     response.setHeader("Content-Type", "text/event-stream");
+    if (JSON.stringify(body.messages?.at(-1)).includes('Streaming fixture verification')) {
+      const frame=(delta,finish_reason=null)=>response.write(`data: ${JSON.stringify({id:'smoke-stream',object:'chat.completion.chunk',created:1,model:body.model,choices:[{index:0,delta,finish_reason}]})}\n\n`);
+      frame({role:'assistant',content:'Early streaming fixture reply. '});
+      const timer=setTimeout(()=>{frame({content:'Complete streaming fixture reply.'});frame({},'stop');response.end('data: [DONE]\n\n');},4000);
+      response.on('close',()=>clearTimeout(timer));
+      return;
+    }
+
     for (const [delta, reason] of [[{ role: "assistant", content: "Local fixture reply." }, null], [{}, "stop"]]) response.write(`data: ${JSON.stringify({ id: "smoke-chat", object: "chat.completion.chunk", created: 1, model: body.model, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`);
     return response.end('data: [DONE]\n\n');
   }

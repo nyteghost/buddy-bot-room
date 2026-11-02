@@ -24,7 +24,7 @@ Browser inference uses an isolated local Ollama protocol fixture, not the user's
 
 ## Remaining limitations
 
-This is an owner-only beta, not shared multi-user project permissions. The new General Chat buffers answers; original Pals still streams. Semantic candidates and cache are bounded and optional, rather than a full semantic index of the vault. Organization uses conservative title/project cues; AI related-chat grouping and automatic archival suggestions are not implemented. Character budgets approximate tokens. Legacy tool chats are not all automatically ingested into Memory Keeper.
+This is an owner-only beta, not shared multi-user project permissions. General Chat streams scrubbed temporary previews with authoritative final receipts; original Pals retains its existing streaming path. Semantic candidates and cache are bounded and optional, rather than a full semantic index of the vault. Organization uses conservative title/project cues; AI related-chat grouping and automatic archival suggestions are not implemented. Character budgets approximate tokens. Legacy tool chats are not all automatically ingested into Memory Keeper.
 
 Credential detection cannot guarantee removal of unlabelled passwords, uncommon/encoded secrets, images, previous external copies or backups. Obsidian conflict files are preserved for review. Private memory is not mirrored. Checkpoint extraction/contradiction matching can be imperfect and should be reviewed. Real model quality, GPU contention with other apps, the user's actual mounts/permissions and an actual Unraid restart remain deployment checks.
 

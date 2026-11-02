@@ -26,6 +26,17 @@ page.on("console", (m) => {
   if (!IGNORE.some((r) => r.test(t))) problems.push(`console error: ${t.slice(0, 300)}`);
 });
 
+async function assistantResult(request) {
+  // Inspect the application's final UI and durable receipt; CDP does not reliably retain stream bodies.
+  await page.locator('.general-assistant .assistant-notice').filter({hasText:/^Answered with/}).waitFor();
+  await page.getByTestId('assistant-stream-preview').waitFor({state:'hidden'});
+  const id=request.postDataJSON().id;
+  const saved=await (await page.request.get(URL_+'/api/assistant?id='+id)).json();
+  const message=saved.conversation?.messages.at(-1);
+  if(message?.role!=='assistant') throw Error('Streaming UI did not commit a completed assistant reply: '+JSON.stringify(saved));
+  return { conversation:saved.conversation, web:message.metadata.web, route:saved.conversation.assistant.provider };
+}
+
 async function step(name, fn) {
   try { await fn(); notes.push(`ok   ${name}`); console.log(`ok   ${name}`); }
   catch (e) { await page.screenshot({path:"/tmp/pixel-smoke-failure.png"}).catch(()=>undefined); problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); console.log(`FAIL ${name}: ${e.message}`); }
@@ -908,10 +919,10 @@ await step("General Chat, independent drafts, automatic scrub and Memory Center 
   if(await input.inputValue()!=='Draft survives hiding this window') throw Error('Closing the window discarded the draft');
   await input.fill('How do I restart Ollama? password=smoke-secret-not-real');
   if ((await input.inputValue()).includes('smoke-secret-not-real')) throw Error('Credential remained in chat input');
-  const answer = page.waitForResponse(r => r.url().endsWith('/api/assistant') && r.request().postDataJSON()?.op === 'ask');
+  const answer = page.waitForRequest(r => r.url().endsWith('/api/assistant') && r.postDataJSON()?.op === 'ask');
   await chat.getByRole('button',{name:'Send question',exact:true}).click();
-  const replied = await answer; const data = await replied.json();
-  if (!replied.ok() || data.conversation.messages.at(-1).parts[0].text !== 'Local fixture reply.') throw Error('General Chat failed backend answer: '+JSON.stringify(data));
+  const replied = await answer; const data = await assistantResult(replied);
+  if (data.conversation.messages.at(-1).parts[0].text !== 'Local fixture reply.') throw Error('General Chat failed backend answer: '+JSON.stringify(data));
   if (JSON.stringify(data).includes('smoke-secret-not-real')) throw Error('General Chat saved raw credentials');
   await page.screenshot({path:process.env.SMOKE_CHAT_WINDOW_SHOT || '/tmp/pixel-general-window.png'});
   const first = data.conversation.id;
@@ -970,14 +981,14 @@ await step("Web Auto uses configured search and displays sources while Off stays
   const chat=page.locator('.general-assistant');
   await chat.getByRole('combobox',{name:'Web search mode',exact:true}).selectOption('auto');
   await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('When are the midterms?');
-  const result=page.waitForResponse(r=>r.url().endsWith('/api/assistant')&&r.request().postDataJSON()?.op==='ask');
+  const result=page.waitForRequest(r=>r.url().endsWith('/api/assistant')&&r.postDataJSON()?.op==='ask');
   await chat.getByRole('button',{name:'Send question',exact:true}).click();
-  const web=(await (await result).json()).web;if(web.state!=='connected')throw Error('Auto did not use configured search: '+JSON.stringify(web));
+  const web=(await assistantResult(await result)).web;if(web.state!=='connected')throw Error('Auto did not use configured search: '+JSON.stringify(web));
   const sources=chat.locator('details').filter({has:page.locator('summary',{hasText:/^Web sources/})}).last();await sources.locator('summary').click();
   await sources.getByRole('link',{name:'Current information fixture',exact:true}).waitFor();
   await chat.getByRole('combobox',{name:'Web search mode',exact:true}).selectOption('off');
   await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('Latest news');
-  const noWeb=page.waitForResponse(r=>r.url().endsWith('/api/assistant')&&r.request().postDataJSON()?.op==='ask');await chat.getByRole('button',{name:'Send question',exact:true}).click();if((await (await noWeb).json()).web.state!=='off')throw Error('Explicit Off was ignored');
+  const noWeb=page.waitForRequest(r=>r.url().endsWith('/api/assistant')&&r.postDataJSON()?.op==='ask');await chat.getByRole('button',{name:'Send question',exact:true}).click();if((await assistantResult(await noWeb)).web.state!=='off')throw Error('Explicit Off was ignored');
 });
 await step("Capture Inbox stores, reviews and starts a task; Today brief reflects the durable task",async()=>{
   await page.request.post(URL_+'/api/settings',{data:{values:{CAPTURE_AUTO_PROCESS:'off'}}});
@@ -1007,6 +1018,39 @@ await step("Voice memos survive capture and are transcribed through the local qu
   await inbox.getByRole('button',{name:'Save voice memo',exact:true}).click();
   await inbox.getByText('I need to prepare lunches.',{exact:true}).waitFor({timeout:90000});
   const data=await (await page.request.get(URL_+'/api/inbox')).json();const voice=data.items.find(i=>i.inbox.source==='audio');if(!voice||voice.inbox.audio||!voice.inbox.suggestions.length)throw Error('Voice processing did not retain a reviewable transcript and remove processed audio');
+});
+await step("General Chat shows an early reply on desktop/mobile and Stop keeps partials out of history", async () => {
+  await page.setViewportSize({width:1500,height:900});
+  await page.evaluate(() => window.dispatchEvent(new Event('pixelpals:general-chat')));
+  const chat=page.locator('.general-assistant');
+  await chat.getByRole('combobox',{name:'Web search mode',exact:true}).selectOption('off');
+  for (const width of [1500,390]) {
+    await page.setViewportSize({width,height:844});
+    await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('Streaming fixture verification '+width);
+    const finished=page.waitForRequest(r=>r.url().endsWith('/api/assistant')&&r.postDataJSON()?.op==='ask');
+    await chat.getByRole('button',{name:'Send question',exact:true}).click();
+    const preview=chat.getByTestId('assistant-stream-preview');
+    await preview.getByText('Early streaming fixture reply.',{exact:true}).waitFor();
+    await chat.getByRole('button',{name:'Stop answer',exact:true}).waitFor();
+    if(width===1500) {
+      await chat.getByRole('button',{name:'Stop answer',exact:true}).click();
+      await preview.waitFor({state:'hidden'});
+      await chat.getByText('Answer stopped. Your draft is kept; completed history is unchanged.',{exact:true}).waitFor();
+      const stopped=await finished;
+      const id=stopped.postDataJSON().id;
+      const saved=await (await page.request.get(URL_+'/api/assistant?id='+id)).json();
+      if(saved.conversation.messages.some(m=>m.role==='assistant'&&m.parts.some(p=>p.text?.includes('Early streaming fixture')))) throw Error('Stopped preview was persisted');
+    } else {
+      await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('Next question drafted while streaming');
+      await page.locator('[data-window-id="general-chat"]').getByRole('button',{name:'Hide General Chat',exact:true}).click();
+      await page.evaluate(() => window.dispatchEvent(new Event('pixelpals:general-chat')));
+      await preview.waitFor();
+      const result=await assistantResult(await finished);
+      if(!result.conversation.messages.at(-1).parts[0].text.includes('Complete streaming fixture reply.')) throw Error('Stream completion was not saved');
+      await preview.waitFor({state:'hidden'});
+      if(await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).inputValue()!=='Next question drafted while streaming') throw Error('Stream completion discarded a follow-up draft');
+    }
+  }
 });
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);

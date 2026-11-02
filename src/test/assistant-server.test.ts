@@ -8,7 +8,7 @@ import { currentUser } from "@/lib/accounts.server";
 import { handleChat } from "@/lib/chat.server";
 import { readOllamaHealth } from "@/lib/ollama-health.server";
 import { keeperSnapshot, keeperTransaction } from "@/lib/keeper-store.server";
-import { readChatRows } from "@/lib/store.server";
+import { chatTransaction, readChatRows } from "@/lib/store.server";
 vi.mock("@/lib/search.server", () => ({ handleSearch: vi.fn() }));
 vi.mock("@/lib/accounts.server", () => ({ currentUser: vi.fn() }));
 vi.mock("@/lib/chat.server", () => ({ handleChat: vi.fn() }));
@@ -521,4 +521,200 @@ it("reports a search outage truthfully and keeps explicit Off from making a web 
   vi.mocked(handleSearch).mockClear();
   await ask(result.conversation, "Latest news", { web: "off" });
   expect(handleSearch).not.toHaveBeenCalled();
+});
+
+const streamAsk = (c: Conversation, extra = {}) =>
+  handleAssistant(
+    req({
+      op: "ask",
+      stream: true,
+      id: c.id,
+      revision: c.assistant.revision,
+      question: "Explain Ollama",
+      engine: { localChat: "auto" },
+      ...extra,
+    }),
+  );
+const events = async (r: Response) =>
+  (await r.text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+function controlledAnswer() {
+  let writer!: ReadableStreamDefaultController<Uint8Array>;
+  const response = new Response(
+    new ReadableStream<Uint8Array>({
+      start(c) {
+        writer = c;
+      },
+    }),
+    { headers: { "x-pixelpals-model": "qwen3.5:9b" } },
+  );
+  const delta = (text: string) =>
+    writer.enqueue(
+      new TextEncoder().encode(
+        "data: " + JSON.stringify({ type: "text-delta", delta: text }) + "\n\n",
+      ),
+    );
+  const finish = () => {
+    writer.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+    writer.close();
+  };
+  return { response, delta, finish };
+}
+it("streams an early scrubbed preview before saving one complete answer and its receipts", async () => {
+  const c = await create(),
+    upstream = controlledAnswer();
+  vi.mocked(handleChat).mockResolvedValue(upstream.response);
+  const response = await streamAsk(c);
+  expect(response.headers.get("content-type")).toContain("application/x-ndjson");
+  expect(response.headers.get("x-accel-buffering")).toBe("no");
+  const { responseLines } = await import("@/lib/assistant-stream");
+  const iterator = responseLines(response)[Symbol.asyncIterator]();
+  expect(JSON.parse((await iterator.next()).value!).type).toBe("status");
+  await vi.waitFor(() => expect(handleChat).toHaveBeenCalled());
+  upstream.delta("An early useful answer. ");
+  let early;
+  do {
+    early = JSON.parse((await iterator.next()).value!);
+  } while (early.type !== "preview" || !early.text);
+  expect(early.text).toContain("early useful");
+  expect((await readChatRows()).find((r) => r.id === c.id)!.messages).toHaveLength(1);
+  upstream.delta("password=private-fixture-value");
+  upstream.finish();
+  const rest = [];
+  for await (const line of { [Symbol.asyncIterator]: () => iterator }) rest.push(JSON.parse(line));
+  const done = rest.find((e) => e.type === "done");
+  expect(done.result.route.model).toBe("qwen3.5:9b");
+  expect(done.result.conversation.messages).toHaveLength(2);
+  expect(done.result.conversation.messages[1].parts[0].text).toContain("[hidden]");
+  expect(JSON.stringify([early, ...rest])).not.toContain("private-fixture-value");
+  expect(JSON.stringify(await readChatRows())).not.toContain("private-fixture-value");
+});
+it("consumer cancellation aborts inference and releases the conversation without saving a partial answer", async () => {
+  const c = await create(),
+    upstream = controlledAnswer();
+  vi.mocked(handleChat).mockResolvedValue(upstream.response);
+  const response = await streamAsk(c);
+  const reader = response.body!.getReader();
+  await reader.read();
+  await vi.waitFor(() => expect(handleChat).toHaveBeenCalled());
+  const signal = vi.mocked(handleChat).mock.calls[0]![0].signal;
+  await reader.cancel();
+  await vi.waitFor(() => expect(signal.aborted).toBe(true));
+  const { keeperRuntime } = await import("@/lib/memory-keeper.server");
+  await vi.waitFor(() => expect(keeperRuntime().active).toBe(0));
+  const saved = (await readChatRows()).find((r) => r.id === c.id)!;
+  expect(saved.messages).toHaveLength(1);
+  vi.mocked(handleChat).mockResolvedValue(
+    new Response('data: {"type":"text-delta","delta":"Retry completed"}\n\ndata: [DONE]\n\n'),
+  );
+  expect((await ask(saved as Conversation)).conversation.messages).toHaveLength(2);
+});
+it("rejects incomplete provider streams rather than persisting a partial reply", async () => {
+  const c = await create();
+  vi.mocked(handleChat).mockResolvedValue(
+    new Response('data: {"type":"text-delta","delta":"An unfinished answer "}\n\n'),
+  );
+  const result = await events(await streamAsk(c, { provider: "ollama-server" }));
+  expect(result.at(-1).type).toBe("error");
+  expect(result.at(-1).error).toContain("disconnected");
+  expect((await readChatRows()).find((r) => r.id === c.id)!.messages).toHaveLength(1);
+});
+it("rejects a concurrent memory restriction before further preview or final persistence", async () => {
+  const c = await create(),
+    upstream = controlledAnswer();
+  vi.mocked(handleChat).mockResolvedValue(upstream.response);
+  const response = await streamAsk(c, { provider: "ollama-server" });
+  await vi.waitFor(() => expect(handleChat).toHaveBeenCalled());
+  await keeperTransaction((s) => {
+    s.epoch++;
+  });
+  upstream.delta("Restricted context must not appear. ");
+  upstream.finish();
+  const result = await events(response);
+  expect(result.some((e) => e.type === "preview" && e.text?.includes("Restricted"))).toBe(false);
+  expect(result.at(-1).type).toBe("error");
+  expect((await readChatRows()).find((r) => r.id === c.id)!.messages).toHaveLength(1);
+});
+it("preserves concurrent conversation changes and never resurrects archived chats", async () => {
+  const c = await create(),
+    upstream = controlledAnswer();
+  vi.mocked(handleChat).mockResolvedValue(upstream.response);
+  const response = await streamAsk(c);
+  await vi.waitFor(() => expect(handleChat).toHaveBeenCalled());
+  const saved = (await readChatRows()).find((r) => r.id === c.id)!;
+  await expect(
+    api({
+      op: "update",
+      id: c.id,
+      revision: saved.assistant!.revision,
+      patch: { status: "archived" },
+    }),
+  ).rejects.toThrow("Stop or finish");
+  // A restore/other process can still change durable state while this worker is active.
+  await chatTransaction(async (rows) => {
+    const row = rows.find((r) => r.id === c.id)!;
+    row.assistant!.status = "archived";
+    row.assistant!.revision++;
+    return { rows, value: undefined };
+  });
+  upstream.delta("Answer no longer needed. ");
+  upstream.finish();
+  expect((await events(response)).at(-1).type).toBe("error");
+  const archived = (await readChatRows()).find((r) => r.id === c.id)!;
+  expect(archived.assistant!.status).toBe("archived");
+  expect(archived.messages).toHaveLength(1);
+});
+it("keeps streaming owner-only and preserves provider fallback receipts", async () => {
+  const c = await create();
+  vi.mocked(currentUser).mockResolvedValueOnce(null);
+  expect((await streamAsk(c)).status).toBe(403);
+  vi.mocked(handleChat).mockResolvedValueOnce(
+    Response.json({ error: "Unavailable" }, { status: 503 }),
+  );
+  const result = await events(await streamAsk(c, { engine: { groqKey: "fixture-only-key" } }));
+  expect(result.at(-1).result.route.provider).toBe("groq");
+  expect(result.at(-1).result.conversation.messages).toHaveLength(2);
+});
+it("keeps two active streaming conversations and their final history isolated", async () => {
+  const a = await create(),
+    b = await create(),
+    first = controlledAnswer(),
+    second = controlledAnswer();
+  vi.mocked(handleChat)
+    .mockResolvedValueOnce(first.response)
+    .mockResolvedValueOnce(second.response);
+  const ra = await streamAsk(a),
+    rb = await streamAsk(b);
+  await vi.waitFor(() => expect(handleChat).toHaveBeenCalledTimes(2));
+  const ea = events(ra),
+    eb = events(rb);
+  first.delta("Only the first conversation. ");
+  second.delta("Only the second conversation. ");
+  second.finish();
+  first.finish();
+  const [doneA, doneB] = await Promise.all([ea, eb]);
+  expect(doneA.at(-1).result.conversation.messages.at(-1).parts[0].text).toBe(
+    "Only the first conversation.",
+  );
+  expect(doneB.at(-1).result.conversation.messages.at(-1).parts[0].text).toBe(
+    "Only the second conversation.",
+  );
+});
+it("replaces a failed provider preview when Auto falls back rather than combining replies", async () => {
+  const c = await create();
+  vi.mocked(handleChat).mockResolvedValueOnce(
+    new Response(
+      'data: {"type":"text-delta","delta":"Discard this failed provider reply. "}\n\ndata: {"type":"error","errorText":"fixture failure"}\n\n',
+    ),
+  );
+  const result = await events(await streamAsk(c, { engine: { groqKey: "fixture-only-key" } }));
+  expect(result.at(-1).result.route.provider).toBe("groq");
+  expect(result.at(-1).result.conversation.messages.at(-1).parts[0].text).toBe("Working answer");
+  const firstPreview = result.findIndex((e) => e.type === "preview" && e.text?.includes("Discard"));
+  expect(firstPreview).toBeGreaterThan(0);
+  expect(result.slice(firstPreview + 1).some((e) => e.type === "preview" && e.text === "")).toBe(
+    true,
+  );
 });

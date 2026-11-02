@@ -23,3 +23,7 @@ Synthetic local Bun run: 1,000 scoped records, 100 keyword retrievals in 202 ms 
 ## Current beta additions
 
 General Chat runs semantic lookup, health and configured search concurrently. Web source receipts are persisted with replies. Capture Inbox extends capture.json and uses the central Memory Keeper worker, canonical today.json and the existing scoped memory store. See [Capture Inbox](CAPTURE_INBOX.md) and [current information](CURRENT_INFORMATION.md).
+
+## Streaming General Chat
+
+The owner-authenticated assistant handler offers an opt-in NDJSON transport around the same turn pipeline. It incrementally parses the existing AI SDK SSE stream, throttles credential-scrubbed preview snapshots and validates the memory epoch before releasing them. Only complete upstream answers pass the final epoch/revision checks into chats.json and the existing Keeper queue. Consumer cancellation propagates through the upstream request/reader; foreground locks release in finally blocks. Previews live only in a per-conversation client map. Legacy JSON callers retain the same response shape. See [General Chat](GENERAL_CHAT.md).

@@ -18,3 +18,7 @@ See [[GENERAL_CHAT]], [[MEMORY_KEEPER]], [[ASSISTANT_UNRAID]] and [[ASSISTANT_AR
 If General Chat says it cannot verify current information, expand its web status. Set Web search mode to On for a question Auto did not recognize. Configure and Test SearXNG in Settings → Integrations, including JSON results support on the search server. A working Ollama connection does not itself supply live search. See [current information](CURRENT_INFORMATION.md).
 
 If a voice memo stays queued, verify local Whisper settings and that Memory Keeper/capture processing are enabled. The app remains usable with text/manual review while the PC is off. HTTP origins normally cannot record a live microphone: upload a memo or use HTTPS. Keep overly long recordings and split them into shorter clips; the worker refuses to silently truncate their transcripts. See [Capture Inbox](CAPTURE_INBOX.md).
+
+## Replies appear all at once
+
+Beta 1.0.821 enables streaming in General Chat automatically. Check the displayed build after pulling/updating and refresh the browser. Credential-like output intentionally waits for full scrubbing. Initial health, context and web lookups still finish before the provider starts. A reverse proxy can buffer responses despite the application's no-buffering headers; disable buffering for `/api/assistant` in that proxy. A slow provider/model load also delays the first text. No live RTX 3080 benchmark is implied by browser fixture tests.

@@ -1,3 +1,4 @@
+import { responseLines } from "@/lib/assistant-stream";
 import { webMode as readWebMode, type WebMode } from "@/lib/assistant-web";
 import { scrubChatText } from "@/lib/chat-scrub";
 import { useEffect, useRef, useState } from "react";
@@ -38,6 +39,7 @@ export function GeneralChat({
     [inspector, setInspector] = useState<Pick<Memory, "id" | "title" | "text" | "scope">[] | null>(
       null,
     );
+  const [previews, setPreviews] = useState<Record<string, { question: string; text: string }>>({});
   const [privateRecords, setPrivateRecords] = useState<Memory[] | null>(null),
     [grants, setGrants] = useState<string[]>([]);
   const currentRef = useRef<Conversation | null>(null),
@@ -199,12 +201,14 @@ export function GeneralChat({
     controllers.current.set(c.id, controller);
     setPending([...controllers.current.keys()]);
     setNote("");
+    setPreviews((p) => ({ ...p, [c.id]: { question: q, text: "" } }));
     try {
       const r = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           op: "ask",
+          stream: true,
           id: c.id,
           revision: c.assistant.revision,
           question: q,
@@ -217,17 +221,40 @@ export function GeneralChat({
         }),
         signal: controller.signal,
       });
-      const d = await r.json();
-      if (!r.ok) throw Error(d.error || "Could not answer");
-      drafts.current[c.id] = "";
-      try {
-        localStorage.removeItem("pixel-pals-assistant-draft-" + c.id);
-      } catch {
-        /* Browser storage may be unavailable; server history stays authoritative. */
+      let d;
+      if (r.headers.get("content-type")?.includes("application/x-ndjson")) {
+        for await (const line of responseLines(r, controller.signal)) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === "preview")
+            setPreviews((p) => ({ ...p, [c.id]: { question: q, text: event.text } }));
+          if (event.type === "error") throw Error(event.error || "Could not answer");
+          if (event.type === "done") d = event.result;
+        }
+        if (!d)
+          throw Error(
+            "Connection ended before the answer was saved. Your question is saved; retry.",
+          );
+      } else {
+        d = await r.json();
+        if (!r.ok) throw Error(d.error || "Could not answer");
+      }
+      setPreviews((p) => {
+        const next = { ...p };
+        delete next[c.id];
+        return next;
+      });
+      if ((drafts.current[c.id] ?? q) === q) {
+        drafts.current[c.id] = "";
+        try {
+          localStorage.removeItem("pixel-pals-assistant-draft-" + c.id);
+        } catch {
+          /* Server history stays authoritative if optional browser storage is unavailable. */
+        }
       }
       if (currentRef.current?.id === c.id) {
         setCurrent(d.conversation);
-        setDraft("");
+        if (draftRef.current === q) setDraft("");
         setNote(
           `Answered with ${d.route.provider} · ${d.route.model}${d.usedMemories.length ? ` · ${d.usedMemories.length} relevant memories` : ""}`,
         );
@@ -235,11 +262,16 @@ export function GeneralChat({
       await refresh();
     } catch (e) {
       if (!controller.signal.aborted) setNote((e as Error).message);
-      else setNote("Answer stopped; your question is saved.");
+      else setNote("Answer stopped. Your draft is kept; completed history is unchanged.");
       const d = await assistantApi(undefined, "?id=" + c.id).catch(() => null);
       if (d && currentRef.current?.id === c.id) setCurrent(d.conversation);
     } finally {
       controllers.current.delete(c.id);
+      setPreviews((p) => {
+        const next = { ...p };
+        delete next[c.id];
+        return next;
+      });
       setPending([...controllers.current.keys()]);
     }
   };
@@ -704,6 +736,36 @@ export function GeneralChat({
                     )}
                   </Message>
                 ))}
+                {previews[current.id] && (
+                  <>
+                    {!(
+                      current.messages.at(-1)?.role === "user" &&
+                      messageString(current.messages.at(-1)!) === previews[current.id]!.question
+                    ) && (
+                      <Message from="user">
+                        <MessageContent>
+                          <p className="assistant-text">
+                            {scrubChatText(previews[current.id]!.question, { maskIdentifiers })}
+                          </p>
+                        </MessageContent>
+                      </Message>
+                    )}
+                    <Message from="assistant">
+                      <MessageContent>
+                        <div data-testid="assistant-stream-preview" aria-busy="true">
+                          {previews[current.id]!.text ? (
+                            <MessageResponse>{previews[current.id]!.text}</MessageResponse>
+                          ) : (
+                            <p>Preparing your answer…</p>
+                          )}
+                        </div>
+                        <p className="assistant-muted" role="status">
+                          Answering… Partial reply; saved when complete.
+                        </p>
+                      </MessageContent>
+                    </Message>
+                  </>
+                )}
               </div>
               {inspector && (
                 <aside className="assistant-card" aria-label="Response memory inspector">

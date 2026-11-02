@@ -27,3 +27,15 @@ Memory Center → **Scrub existing chat history** cleans live chat and memory re
 ## Web search
 
 Use the visible Web search mode beside Ask Anything: Auto for common current-information questions, On to explicitly search, or Off. Source receipts show the actual returned links, cache status and unavailable/empty results. Configure SearXNG in Settings → Integrations. See [current information](CURRENT_INFORMATION.md) for privacy, setup and performance details.
+
+## Streaming replies (beta 1.0.821)
+
+General Chat displays the reply while the selected provider generates it. No setting is required. The temporary reply is labelled as partial; the complete answer replaces it with the answering model, memory inspector and web sources. Streaming makes text appear sooner; it does not increase GPU token generation speed.
+
+Stop cancels the active request and removes the partial preview. Your draft is kept. The submitted question is saved once server validation completes; only a completed answer enters durable history and Memory Keeper. If the connection drops near completion, reload the conversation to see authoritative history before retrying. Incomplete upstream responses are rejected rather than saved as finished answers.
+
+You can switch conversations or hide the window without mixing previews or discarding a follow-up draft. Leaving/reloading the application cancels active browser requests. Auto may retry another configured permitted provider; a new attempt replaces the old preview rather than joining answers. Credential-like lines and remaining output wait for complete scrubbing, so some answers can appear only when complete. Credential detection retains its existing limitations.
+
+The owner-only `/api/assistant` supports `stream: true` for newline-delimited JSON status/preview/done/error frames. Existing callers without this flag still receive JSON. Final done frames contain the existing authoritative conversation and receipts. Preview frames are disposable snapshots, not durable messages. Updates are throttled and can be skipped for slow readers; the final answer remains complete. A stream is bounded to three minutes.
+
+For reverse proxies, disable response buffering for this route and allow long-lived responses. Pixel Pals sends `Cache-Control: no-store, no-transform` and `X-Accel-Buffering: no`; an upstream proxy may require its own configuration. General Chat still checks context, provider availability and web search before generation begins.

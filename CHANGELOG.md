@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.0.821 — Streaming General Chat replies
+
+- Show temporary, scrubbed answer previews as providers generate text, on desktop and mobile, while preserving the existing JSON API for older callers.
+- Stop/disconnect cancels inference; incomplete replies are not committed or processed by Memory Keeper. Retain follow-up drafts and per-conversation previews across navigation.
+- Preserve final model, memory and web-source receipts. Recheck memory authorization during previews and durable conversation revision before saving. Hold credential-like content until final scrubbing.
+- Bound/throttle preview updates, prevent slow-reader preview buildup and reject incomplete provider streams. Add cancellation, privacy, fallback, UTF-8 boundary and browser regression coverage.
+
 ## Beta 1.0.820 — Current information and reviewed captures
 
 - Add visible General Chat Web Auto/On/Off, current date/time-zone context, actual search source receipts and truthful search failures. Run independent health, memory and search lookups concurrently.

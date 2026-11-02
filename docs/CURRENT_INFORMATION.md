@@ -19,4 +19,4 @@ No search service is installed or enabled automatically by this update. Your Oll
 
 ## Performance
 
-General Chat starts independent model health, semantic-memory lookup and web-search work concurrently. Its final answer still uses the existing buffered response path. Background Memory Keeper and capture jobs share one worker and yield to foreground chat. This reduces redundant waiting and competing background work; it does not guarantee faster model token generation. Actual RTX 3080 throughput has not been measured by repository tests.
+General Chat starts independent model health, semantic-memory lookup and web-search work concurrently. General Chat displays temporary streaming previews and saves the complete answer with its source receipts. Credential-like content is held until final scrubbing; older API callers can still request the buffered JSON response. Background Memory Keeper and capture jobs share one worker and yield to foreground chat. This reduces redundant waiting and competing background work; it does not guarantee faster model token generation. Actual RTX 3080 throughput has not been measured by repository tests.
