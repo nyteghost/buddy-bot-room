@@ -1,6 +1,6 @@
 # General Chat and Ask Anything
 
-Open Pixel Pals and sign in as the owner. General Chat is the default self-hosted conversational interface. Ask Anything needs no category, project or Pal selection. **Pixel Pals workspace** opens the existing rooms, Food Focus and tools; those windows remain mounted when you return to General Chat.
+Open Pixel Pals and sign in as the owner. The existing Today window is the home screen. Open General Chat from workspace navigation (mobile: More → General Chat), or use /?chat=1. Ask Anything needs no category, project or Pal selection. **Pixel Pals workspace** opens the existing rooms, Food Focus and tools; those windows remain mounted when you return to General Chat.
 
 ## Conversations
 

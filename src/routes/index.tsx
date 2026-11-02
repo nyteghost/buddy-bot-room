@@ -4,13 +4,13 @@ export const Route = createFileRoute("/")({
   component: PixelPalsApp,
   head: () => ({
     meta: [
-      { title: "Pixel Pals — General Chat & Ask Anything" },
+      { title: "Pixel Pals — Today at a glance" },
       {
         name: "description",
         content:
-          "Choose your pixel pals, give them a topic, and start a real multi-model AI discussion.",
+          "Your day at a glance: tasks, calendar, weather, Focus Assist and General Chat.",
       },
-      { property: "og:title", content: "Pixel Pals — General Chat & Ask Anything" },
+      { property: "og:title", content: "Pixel Pals — Today at a glance" },
       {
         property: "og:description",
         content: "A little room for big ideas. Start a roundtable with your pixel AI pals.",

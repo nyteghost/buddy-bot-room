@@ -6,7 +6,7 @@
 2. In Docker → Compose Manager → **pixelpals**, keep the service image **ghcr.io/nyteghost/buddy-bot-room:beta**. Do not switch to latest/main.
 3. Preserve the existing /data volume, credentials, accounts and .env. Keep **OLLAMA_URL=http://10.200.1.149:11434**; the verified PC/network/firewall setup needs no change.
 4. Press **Compose Pull**, then **Compose Up** (or the corresponding Pull/Update then Up controls in your plugin). An ordinary container restart does not install a new image. Do not delete appdata or run down -v.
-5. Open http://10.200.1.30:8090, sign in as owner, and refresh once. General Chat should appear. Pixel Pals workspace opens your existing tools/rooms.
+5. Open http://10.200.1.30:8090, sign in as owner, and refresh once. The existing Today window should appear first. General Chat is available in workspace navigation (mobile: More → General Chat).
 6. Ask a short question; confirm the answering model. Create a second chat and switch back. Check Memory Center, review queued records and verify persistence after a normal restart.
 
 ## Required mounts

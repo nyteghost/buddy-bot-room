@@ -1,8 +1,8 @@
-# Beta 1.0.817 validation and handoff
+# Beta 1.0.818 validation and handoff
 
 ## Implemented
 
-General Chat / Ask Anything is the default owner self-hosted interface, with independent durable conversations, per-chat drafts, project association, pin/archive/recoverable trash, history search, automatic first-question titles and fresh continuation. The original workspace stays available and mounted.
+Since beta 1.0.818, the existing Today window is home. General Chat / Ask Anything remains available in navigation, with independent durable conversations, per-chat drafts, project association, pin/archive/recoverable trash, history search, automatic first-question titles and fresh continuation. The original workspace stays available and mounted.
 
 One local Memory Keeper provides durable incremental jobs, source-backed review candidates, checkpoints, scoped memory and keyword/optional hybrid retrieval. Memory Center supplies management, correction, history, export/restore, private grants and Obsidian synchronization with manual conflict review. Existing saved server chats can be explicitly copied rather than destructively migrated.
 
@@ -10,9 +10,10 @@ Recognizable credential text is scrubbed before AI chat inference and new persis
 
 ## Actual development checks
 
-- Full automated suite: 1,260 tests across 118 files passed. New coverage includes credentials/typing/idempotence, independent conversations/concurrency, authorized retrieval, private/project filtering, manual model rejection, Auto fallback, Local-Only, legacy-store forgery/sharing prevention, local worker queues, offline retry, evidence checks, Obsidian conflicts/recovery/symlinks and backup/restore.
+- Full automated suite: 1,262 tests across 119 files passed. New coverage includes credentials/typing/idempotence, independent conversations/concurrency, authorized retrieval, private/project filtering, manual model rejection, Auto fallback, Local-Only, legacy-store forgery/sharing prevention, local worker queues, offline retry, evidence checks, Obsidian conflicts/recovery/symlinks and backup/restore.
 - TypeScript noEmit passed; self-hosted production build passed.
 - Changed TypeScript lint passed with the repository's existing formatting rule disabled; six existing Room hook/directive warnings remain. Full repository lint is not clean (10,846 errors, 10,799 formatting errors in the measured run); this release does not reformat unrelated files or claim full lint passes.
+- Today startup/reload passed on desktop and mobile after closing Today in the previous session; explicit General Chat links still work.
 - Production Chromium smoke passed for existing Pal modes, Focus Assist, Food Focus/restaurant/cooking chat, Mail, Second Brain, mobile navigation, Connect Ollama, authenticated server routing, Local-Only, new General Chat drafts/scrubbing/Memory Center and no horizontal overflow at 320/390/700 px.
 - A real development server-process restart preserved the owner session, independent conversations and saved answer using the same persistent data directory. This was not an actual Unraid Docker restart.
 - A 1,000-record synthetic keyword retrieval run took about 2 ms/query; see ASSISTANT_ARCHITECTURE.md for measurement scope.

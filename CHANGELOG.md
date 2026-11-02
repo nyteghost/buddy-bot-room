@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.0.818 — Today opens first
+
+- Open the existing Today window by default on desktop and mobile, including when a previous session closed it.
+- Keep General Chat available through navigation and /?chat=1; /?workspace=1 resumes the saved workspace. Chat drafts, messages, named layouts and window geometry are preserved.
+
 ## Beta 1.0.817 — Compact local memory processing
 
 - Memory Keeper explicitly requests non-thinking JSON output, preserving its bounded summary budget on supported Ollama reasoning models. Main conversational model behavior stays under the existing AI settings.

@@ -54,7 +54,21 @@ await step("create the first account", async () => {
       await signIn.click();
     }
   }
-  await page.locator("main").first().waitFor({ timeout: 45000 });
+  await page.locator('.modular-workspace[aria-busy="false"]').waitFor({ timeout: 45000 });
+});
+await step("Today is the opening window on desktop and mobile", async () => {
+  for(const width of [1500,390]) {
+    await page.setViewportSize({width,height:844});
+    await page.goto(URL_);
+    await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
+    const today=page.locator('[data-window-id="today"]');
+    await today.waitFor({state:'visible'});
+    if(await page.locator('.general-assistant').isVisible()) throw Error('General Chat replaced Today on startup');
+    if(width===390 && await page.locator('.mobile-tabbar button', {hasText:'Home'}).getAttribute('aria-pressed') !== 'true') throw Error('Home tab was not selected');
+    if(width===390) await page.screenshot({path:process.env.SMOKE_TODAY_SHOT || '/tmp/pixel-today-home.png'});
+    await page.locator('.workspace-sidebar .sidebar-item', {hasText:/^\s*Today\s*$/}).evaluate(button=>button.click());
+  }
+  await page.setViewportSize({width:1500,height:900});
 });
 await page.goto(URL_ + "/?workspace=1");
 await page.locator('.modular-workspace[aria-busy="false"]').waitFor({ timeout: 45000 });
@@ -841,7 +855,7 @@ await step("Remote Ollama backend inference, missing models, policy and authenti
 });
 await step("General Chat, independent drafts, automatic scrub and Memory Center on desktop/mobile", async () => {
   await page.setViewportSize({width:1500,height:900});
-  await page.goto(URL_);
+  await page.goto(URL_ + "/?chat=1");
   const chat = page.locator('.general-assistant');
   const input = chat.getByRole('textbox', {name:'Ask Anything',exact:true});
   await input.waitFor();

@@ -10,7 +10,7 @@
 
 ---
 
-The self-hosted beta now opens **General Chat / Ask Anything**, with independent conversations and one local **Memory Keeper**. Open **Pixel Pals workspace** for existing rooms and tools. [Chat guide](docs/GENERAL_CHAT.md) · [Memory guide](docs/MEMORY_KEEPER.md) · [Unraid update](docs/ASSISTANT_UNRAID.md) · [Changelog](CHANGELOG.md). Recognizable chat credentials are scrubbed automatically; provider keys belong in AI settings.
+The beta opens the existing **Today** window first. **General Chat / Ask Anything** remains available in navigation, with independent conversations and one local **Memory Keeper**. Open **Pixel Pals workspace** for existing rooms and tools. [Chat guide](docs/GENERAL_CHAT.md) · [Memory guide](docs/MEMORY_KEEPER.md) · [Unraid update](docs/ASSISTANT_UNRAID.md) · [Changelog](CHANGELOG.md). Recognizable chat credentials are scrubbed automatically; provider keys belong in AI settings.
 
 ## Table of contents
 

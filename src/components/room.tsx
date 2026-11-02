@@ -1,3 +1,4 @@
+import { appEntry } from "@/lib/app-entry";
 import { scrubChatData, scrubChatText } from "@/lib/chat-scrub";
 import { useOllamaHealth, refreshOllamaHealth } from "@/lib/ollama-health-store";
 import { serverOllamaTransport } from "@/lib/ollama-health";
@@ -517,6 +518,11 @@ export function Room() {
         if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
       }
     } catch { /* optional layout preferences */ }
+    // Home opens the existing Today window after restoring preferences. Explicit
+    // workspace/chat links retain their original saved-window behavior.
+    if (appEntry(location.search) === "today") mobileTab("today");
+    // Bootstrap once: selecting another tab later must not reopen Today.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (!ready) return;
