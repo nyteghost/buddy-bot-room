@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.0.817 — Compact local memory processing
+
+- Memory Keeper explicitly requests non-thinking JSON output, preserving its bounded summary budget on supported Ollama reasoning models. Main conversational model behavior stays under the existing AI settings.
+
 ## Beta 1.0.816 — General Chat, Memory Keeper and chat credential scrubbing
 
 - Added persistent independent conversations, default General Chat / Ask Anything, search, pin/archive/recoverable trash, project organization, separate drafts and compact continuation.

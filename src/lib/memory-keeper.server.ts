@@ -231,6 +231,8 @@ export async function processKeeperQueue(): Promise<void> {
         body: JSON.stringify({
           model,
           stream: false,
+          // Checkpoints need compact JSON, not a reasoning preamble that consumes the output budget.
+          think: false,
           format: "json",
           keep_alive: 0,
           options: { num_predict: 1200, num_ctx: 8192 },

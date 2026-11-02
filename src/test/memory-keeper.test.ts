@@ -94,6 +94,7 @@ it("uses one smaller local model and stores an incremental checkpoint plus sourc
   const body = JSON.parse(vi.mocked(fetch).mock.calls[0]![1]!.body as string);
   expect(body.model).toBe("small:3b");
   expect(body.keep_alive).toBe(0);
+  expect(body.think).toBe(false);
   expect((await readChatRows())[0]!.assistant!.summary).toContain("Review interface");
   expect((await readChatRows())[0]!.assistant!.processed).toBe(2);
   expect(s.jobs).toHaveLength(0);
