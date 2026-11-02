@@ -9,6 +9,8 @@ export type Suggestion = {
   quote: string;
 };
 export type InboxMeta = {
+  parked?: boolean;
+  context?: { task: string; step: string };
   version: 1;
   status: "pending" | "reviewed" | "archived";
   revision: number;
@@ -108,6 +110,12 @@ export function validInbox(value: unknown): value is InboxMeta {
   const v = value as InboxMeta;
   return (
     v["version"] === 1 &&
+    (v.parked === undefined || typeof v.parked === "boolean") &&
+    (!v.context ||
+      (typeof v.context.task === "string" &&
+        v.context.task.length <= 280 &&
+        typeof v.context.step === "string" &&
+        v.context.step.length <= 180)) &&
     ["pending", "reviewed", "archived"].includes(v["status"]) &&
     Number.isInteger(v["revision"]) &&
     v["revision"] > 0 &&

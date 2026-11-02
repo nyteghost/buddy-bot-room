@@ -415,8 +415,9 @@ export function Room() {
   const [captureFocus,setCaptureFocus]=useState(0);
   const [captureOpen, setCaptureOpen] = useState(false);
   const captureSeen=useEverTrue(captureOpen);
+  const [captureFilter,setCaptureFilter]=useState("pending");
   const [captureId,setCaptureId]=useState<string|undefined>(undefined);
-  useEffect(()=>{const show=(event:Event)=>{const id=(event as CustomEvent<{id?:string}>).detail?.id;setCaptureId(id);setCaptureFocus(v=>v+1);if(window.matchMedia("(max-width: 700px)").matches)mobileTab("capture");else setCaptureOpen(true);};window.addEventListener("pixelpals:inbox",show);return()=>window.removeEventListener("pixelpals:inbox",show);
+  useEffect(()=>{const show=(event:Event)=>{const id=(event as CustomEvent<{id?:string}>).detail?.id;setCaptureId(id);setCaptureFilter((event as CustomEvent<{filter?:string}>).detail?.filter??"pending");setCaptureFocus(v=>v+1);if(window.matchMedia("(max-width: 700px)").matches)mobileTab("capture");else setCaptureOpen(true);};window.addEventListener("pixelpals:inbox",show);return()=>window.removeEventListener("pixelpals:inbox",show);
   // Fixed destination; opening does not replace mounted editor state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -2024,7 +2025,7 @@ export function Room() {
         <div className="workspace-stage">
           <main className="window-canvas" aria-label="Floating workspace">
             <WorkspaceWindow focusVersion={captureFocus} id="capture-inbox" title="Capture Inbox" icon={<Mic className="size-4" />} open={captureOpen} onClose={()=>{setCaptureOpen(false);if(window.matchMedia("(max-width: 700px)").matches)mobileTab("today");}} resetVersion={resetVersion}>
-              {captureSeen&&<Suspense fallback={<p className="p-4">Opening Capture Inbox…</p>}><CaptureInbox open={captureOpen} initialId={captureId} onStart={beginFocusTask}/></Suspense>}
+              {captureSeen&&<Suspense fallback={<p className="p-4">Opening Capture Inbox…</p>}><CaptureInbox open={captureOpen} initialId={captureId} initialFilter={captureFilter} onStart={beginFocusTask}/></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="general-chat" title="General Chat" icon={<MessageSquare className="size-4" />} open={generalOpen} onClose={closeGeneral} resetVersion={resetVersion}>
               {generalSeen && <Suspense fallback={<p className="p-4" role="status">Loading General Chat…</p>}><GeneralChat open={generalOpen} /></Suspense>}

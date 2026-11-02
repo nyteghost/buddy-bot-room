@@ -902,3 +902,5 @@ The Playtests window (sidebar, under More) watches sources for newly opened beta
 See [Current information](docs/CURRENT_INFORMATION.md) for General Chat Web Auto/On/Off and SearXNG setup, and [Capture Inbox](docs/CAPTURE_INBOX.md) for reviewed text/voice capture, Today briefing, task starts and local processing. Existing Unraid installations use [the beta update instructions](docs/ASSISTANT_UNRAID.md).
 
 General Chat now [streams temporary scrubbed replies](docs/GENERAL_CHAT.md#streaming-replies-beta-10821), with Stop, preserved follow-up drafts and authoritative final history/source receipts.
+
+Adaptive Today development: [usage and recovery](docs/ADAPTIVE_TODAY.md), [master roadmap audit and remaining increments](docs/MASTER_ROADMAP_AUDIT.md).

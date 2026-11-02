@@ -1,3 +1,5 @@
+import { TodaySection } from "./today-section";
+import type { TodaySectionId } from "@/lib/adaptive-today";
 import { useCallback, useEffect, useState } from "react";
 import { Flag, ListChecks, Plus, Trash2, CalendarDays } from "lucide-react";
 import { BrainDump } from "./brain-dump";
@@ -120,6 +122,7 @@ const Block = ({ title, children }: { title: string; children: React.ReactNode }
   </section>
 );
 /** All details stay visible on desktop; phones start with a compact summary. */
+function DaySection({id,today,children}:{id:TodaySectionId;today:boolean;children:React.ReactNode}) { return today?<TodaySection id={id}>{children}</TodaySection>:<>{children}</>; }
 function MobileBlock({ title, summary, children }: { title: string; summary: string; children: React.ReactNode }) {
   // Match SSR on the first render; the media-query effect then collapses phones.
   const [expanded, setExpanded] = useState(true);
@@ -173,24 +176,24 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
   const queue = watchQueue(trakt.data?.items ?? [], 6);
   return (
     <div className="grid gap-3 p-3 text-sm">
-      <div className="flex items-center justify-between gap-2">
+      <div style={{order:-30}} className="flex items-center justify-between gap-2">
         <div className="font-medium">{dayOffset === 0 ? dayLabel(Date.now(), tz) : dayOffset === 1 ? "Tomorrow" : "Day after tomorrow"} · {new Intl.DateTimeFormat(undefined, { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" }).format(new Date(day + "T12:00:00Z"))}</div>
         <Button size="sm" variant="outline" title="Open the full /today planner: your plan, times, week and focus timer" onClick={() => window.location.assign("/today")}><ListChecks className="size-4" /> /today</Button>
       </div>
       {dayOffset === 0 && <TodayOverview open={open} onResumeFocus={onResumeFocus} onStart={(task) => onJustStart?.(task)} onBrainDump={() => window.dispatchEvent(new Event("pixelpals:brain-dump"))} onOpenTasks={() => onOpenTasks?.()} onOpenMail={() => onOpenMail?.()} />}
-      <nav className="grid grid-cols-3 gap-1.5" aria-label="Day overview">
+      <nav style={{order:-27}} className="grid grid-cols-3 gap-1.5" aria-label="Day overview">
         {([0, 1, 2] as const).map((offset) => (
           <Button key={offset} size="sm" variant={dayOffset === offset ? "default" : "outline"} aria-pressed={dayOffset === offset} onClick={() => setDayOffset(offset)} className="min-w-0 px-1.5 text-xs">
             {offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : "Day after"}
           </Button>
         ))}
       </nav>
-      <p className="text-xs text-muted-foreground" aria-live="polite">
+      <p style={{order:-26}} className="text-xs text-muted-foreground" aria-live="polite">
         <CalendarDays className="mr-1 inline size-3.5" />
         {events.length} calendar {events.length === 1 ? "event" : "events"} · {todayReminders.length} scheduled {todayReminders.length === 1 ? "reminder" : "reminders"}
         {forecast ? " · " + forecastDescription(forecast.code).text : ""}
       </p>
-      <MobileBlock title={dayOffset === 0 ? "Weather" : "Weather forecast"} summary={forecast ? forecast.hi + "° / " + forecast.lo + "° · " + forecastDescription(forecast.code).text : "Today’s conditions"}>
+      <DaySection id="weather" today={dayOffset===0}><MobileBlock title={dayOffset === 0 ? "Weather" : "Weather forecast"} summary={forecast ? forecast.hi + "° / " + forecast.lo + "° · " + forecastDescription(forecast.code).text : "Today’s conditions"}>
         {dayOffset === 0 && weather.data?.weather ? <p>{describeCode(weather.data.weather.now.code).icon} {weather.data.weather.place}: {weatherLine(weather.data.weather)}</p>
           : forecast ? <p>{forecastDescription(forecast.code).icon} {weather.data?.weather?.place}: {forecastDescription(forecast.code).text}, {forecast.hi}°/{forecast.lo}°{forecast.rain >= 30 ? " · " + forecast.rain + "% chance of rain" : ""}</p>
           : <Quiet>{weather.error || "Forecast not available for this day yet."}</Quiet>}
@@ -212,38 +215,38 @@ export function TodayPanel({ open, onOpenMail, onOpenCalendar, onOpenTasks, onJu
             </div>
           </div>
         )}
-      </MobileBlock>
-      <MobileBlock title="Calendar" summary={events.length + " events"}>
+      </MobileBlock></DaySection>
+      <DaySection id="calendar" today={dayOffset===0}><MobileBlock title="Calendar" summary={events.length + " events"}>
         {cal.data?.configured === false && <Quiet>No calendar connected. Open Calendar for the one-minute setup.</Quiet>}
         {cal.data?.configured && !events.length && <Quiet>No calendar events for this day.</Quiet>}
         {events.map((e, i) => <button key={`${e.start}-${i}`} type="button" className="flex min-w-0 gap-3 rounded-sm text-left hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={onOpenCalendar} title="Open Calendar"><span className="w-16 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : clock(e.start, tz)}</span><span className="truncate">{e.title}</span></button>)}
         {!cal.data && <Quiet>{cal.error || "Loading…"}</Quiet>}
-      </MobileBlock>
-      {dayOffset === 0 && <MobileBlock title="Mail" summary={mail.data?.configured ? mail.data.items.length + " unread" : "Inbox"}>
+      </MobileBlock></DaySection>
+      {dayOffset === 0 && <DaySection id="mail" today={dayOffset===0}><MobileBlock title="Mail" summary={mail.data?.configured ? mail.data.items.length + " unread" : "Inbox"}>
         {mail.data?.configured === false && <Quiet>No mailbox connected. Open Mail for setup.</Quiet>}
         {mail.data?.configured && <p>{mail.data.items.length ? mail.data.items.length + " unread" : "No unread mail."}</p>}
         {mail.data?.items.slice(0, 3).map((m, i) => <button key={i} type="button" className="block w-full truncate rounded-sm text-left text-xs text-muted-foreground hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-ring" title="Open Mail inbox" onClick={onOpenMail}>{m.subject} · {m.from}</button>)}
         {!mail.data && <Quiet>{mail.error || "Loading…"}</Quiet>}
-      </MobileBlock>}
-      <MobileBlock title="Tasks" summary={open_.length + " open · " + todayReminders.length + " reminders"}>
+      </MobileBlock></DaySection>}
+      <DaySection id="tasks" today={dayOffset===0}><MobileBlock title="Tasks" summary={open_.length + " open · " + todayReminders.length + " reminders"}>
         {!open_.length && !todayReminders.length && <Quiet>{dayOffset === 0 ? "Nothing open. Add something in Brain Dump or Tasks." : "No timed tasks or reminders for this day."}</Quiet>}
         {todayReminders.map((r) => <button type="button" key={r.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>⏰ {whenLabel(r.at, tz)} — {r.text}</button>)}
         {open_.slice(0, 6).map((t) => <button type="button" key={t.id} title="Open Tasks and reminders" className="w-full truncate rounded-sm text-left hover:bg-accent/40" onClick={onOpenTasks}>☐ {t.scheduledAt ? clock(t.scheduledAt, tz) + " — " : ""}{t.text}</button>)}
-      </MobileBlock>
-      <BrainDump />
-      {dayOffset === 0 && <Block title="Tonight">
+      </MobileBlock></DaySection>
+      <DaySection id="brain-dump" today={dayOffset===0}><BrainDump /></DaySection>
+      {dayOffset === 0 && <DaySection id="tonight" today={dayOffset===0}><Block title="Tonight">
         {pick ? <p>{pick.kind === "show" ? "📺" : "🎬"} {pick.title}{pick.year ? " (" + pick.year + ")" : ""}{pick.inPlex ? " · in Plex" : ""}</p> : <Quiet>{trakt.error ? "Connect Trakt to get a pick." : trakt.data ? "Nothing unwatched on your list." : "Loading…"}</Quiet>}
         {pick && <Quiet>{queue.find((q) => q.item.title === pick.title)?.reason}</Quiet>}
-      </Block>}
+      </Block></DaySection>}
       {dayOffset === 0 && queue.length > 0 && (
-        <Block title="Watch queue">
+        <DaySection id="watch-queue" today={dayOffset===0}><Block title="Watch queue">
           {queue.map((q) => (
             <div key={`${q.item.kind}-${q.item.title}`} className="flex items-center gap-2">
               <span className="min-w-0 flex-1"><span className="block truncate">{q.item.kind === "show" ? "📺" : "🎬"} {q.item.title}{q.item.year ? ` (${q.item.year})` : ""}</span><span className="block truncate text-xs text-muted-foreground">{q.reason}</span></span>
               {q.action === "request" && <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={() => window.dispatchEvent(new CustomEvent("pixelpals:request", { detail: { title: q.item.title } }))}>Request</Button>}
             </div>
           ))}
-        </Block>
+        </Block></DaySection>
       )}
     </div>
   );

@@ -1,3 +1,5 @@
+import { ParkingButton } from "./parking-lot";
+import { useAdaptiveToday, saveAdaptiveFocus } from "@/lib/adaptive-store";
 import { useEffect, useRef, useState } from "react";
 import "./focus-companion-size.css";
 import { Bookmark, Check, ChevronDown, Coffee, Play, RotateCcw, X, FileText } from "lucide-react";
@@ -21,6 +23,19 @@ const modeNames: Record<CompanionMode, string> = {
 /** Optional, nonmodal body double: the rest of Pixel Pals stays usable. */
 export function FocusCompanion({ session, onChange, paused = false, onPauseChange }: Props) {
   const saved = useFocusCheckpoint();
+  const {adaptive}=useAdaptiveToday();
+  const checkpointId=useRef("");
+  const [syncNote,setSyncNote]=useState("");
+  useEffect(()=>{checkpointId.current="";},[session?.task]);
+  useEffect(()=>{
+    if(!session)return;
+    const localSaved=saveFocusCheckpoint(session);
+    checkpointId.current ||= globalThis.crypto?.randomUUID?.()??'focus-'+Date.now().toString(36);
+    let active=true;
+    const id=checkpointId.current;
+    const timer=window.setTimeout(()=>{void saveAdaptiveFocus(id,session).then(()=>{if(active)setSyncNote('Your next step is saved on Unraid.');}).catch(()=>{if(active)setSyncNote(localSaved?'Saved in this browser. Unraid sync is unavailable; retry Save on Unraid.':'Your place could not be saved. Keep this window open and retry.');});},800);
+    return()=>{active=false;window.clearTimeout(timer);};
+  },[session]);
   const [checkin, setCheckin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -36,16 +51,23 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   useEffect(() => { workPending.current?.abort(); setWorkDraft(""); setWorkSource(""); setWorkNote(""); setWorkBusy(false); }, [session?.task]);
   useEffect(() => {
     setCheckin(false);
-    if (session?.mode !== "checkins" || paused) return;
+    if (session?.mode !== "checkins" || paused || adaptive.mode === "focused") return;
     const timer = window.setInterval(() => {
       if (!document.hidden) setCheckin(true);
     }, 10 * 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [session?.mode, session?.task, paused]);
+  }, [session?.mode, session?.task, paused, adaptive.mode]);
 
   const save = () => {
     if (!session) return;
     setNote(saveFocusCheckpoint(session) ? "Your place is saved in this browser. Resume from Home or this companion." : "This browser could not save your place.");
+  };
+  const saveServer = async () => {
+    if(!session)return;
+    saveFocusCheckpoint(session);
+    checkpointId.current ||= globalThis.crypto?.randomUUID?.()??'focus-'+Date.now().toString(36);
+    try { await saveAdaptiveFocus(checkpointId.current,session);setNote('Saved on Unraid and in this browser. Resume from Today → Memory and Resume.'); }
+    catch {setNote('Could not save on Unraid. Check Today’s saved-settings status; your browser checkpoint is still available.');}
   };
   const forget = () => {
     if (!saveFocusCheckpoint(null)) setNote("This browser could not clear your saved place.");
@@ -155,6 +177,9 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
         {onPauseChange && <Button variant="outline" size="sm" onClick={() => onPauseChange(!paused)}>{paused ? <Play className="size-4" /> : <Coffee className="size-4" />}{paused ? " I am back" : " Break together"}</Button>}
         <Button variant="outline" size="sm" onClick={() => { window.dispatchEvent(new CustomEvent("pixelpals:review-memory", { detail: focusMemoryProposal(session) })); setNote("A summary is ready in Notes → Second Brain. Review it there before saving to Obsidian."); }}>Review in Second Brain</Button>
         <Button variant="outline" size="sm" onClick={save}><Bookmark className="size-4" /> Save my place</Button>
+        <Button variant="outline" size="sm" onClick={()=>void saveServer()}>Save on Unraid</Button>
+        <ParkingButton task={session.task} step={session.step}/>
+        <p role="status" className="text-xs text-muted-foreground">{syncNote}</p>
         <Button variant="outline" size="sm" disabled={workBusy || paused} onClick={() => void workTogether()}><FileText className="size-4" /> {workBusy ? "Preparing…" : "Pal: make a sample"}</Button>
       </div>
       {workDraft && <section className="grid gap-2 rounded-md border p-2" aria-label="Pal's sample work">

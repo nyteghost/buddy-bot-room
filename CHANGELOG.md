@@ -1,5 +1,14 @@
 # Changelog
 
+## Beta 1.0.822 — Adaptive Today foundation
+
+- Add compact NOW/NEXT/LATER, offline I'm Stuck, everyday Pal and energy preferences, optional available-time suggestions, and server-persisted section visibility/order/collapse.
+- Extend the existing Today store with owner-only Focus Assist checkpoints, local fallback, revision conflict protection, editing, resume and three previous versions.
+- Park unrelated thoughts in the existing Capture Inbox without automatic inference, task creation, permanent memories or pending counters.
+- Preserve General Chat streaming, original planner/browser tasks, windowed navigation and reviewed Obsidian workflows.
+- Document the master-roadmap audit and remaining calendar, Working Pals, Meeting Memory and voice increments. These are not included as completed features.
+
+
 ## Beta 1.0.821 — Streaming General Chat replies
 
 - Show temporary, scrubbed answer previews as providers generate text, on desktop and mobile, while preserving the existing JSON API for older callers.

@@ -26,7 +26,9 @@ async function write(s: TodayState): Promise<void> {
   await f.writeFile(`${file()}.tmp`, JSON.stringify(s), { encoding: "utf8", mode: 0o600 });
   await f.rename(`${file()}.tmp`, file());
 }
-const update = (fn: (s: TodayState) => TodayState | Promise<TodayState>): Promise<TodayState> => locked(async () => { const next = await fn(await read()); await write(next); return next; });
+export const updateToday = (fn: (s: TodayState) => TodayState | Promise<TodayState>): Promise<TodayState> => locked(async () => { const next = await fn(await read()); await write(next); return next; });
+
+const update = updateToday;
 
 const dayKey = (now: number) => new Intl.DateTimeFormat("en-CA", { timeZone: tz(), year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(now));
 const localMinutes = (now: number) => { const p = new Intl.DateTimeFormat("en-GB", { timeZone: tz(), hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(now)); return +p.find((x) => x.type === "hour")!.value * 60 + +p.find((x) => x.type === "minute")!.value; };

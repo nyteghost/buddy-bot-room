@@ -1,3 +1,4 @@
+import { parseAdaptive, type AdaptiveToday } from "./adaptive-today";
 // ADHD "Today" planner: pure logic (no I/O). Design follows the whatnow day planner: hold the day loosely in
 // Must / Should / Could tiers, pick one thing for right now, and make big things smaller.
 export type Tier = "must" | "should" | "could";
@@ -21,7 +22,7 @@ export type Pick = { id: string; reason: string; fallback: boolean; at: number }
 export type TodayDay = { date: string; pace: number; mood: string; opening: string };
 /** A focus session on one task: when it started and how long it is. Check-ins go out at the halfway point and at the end. */
 export type Focus = { id: string; title: string; start: number; mins: number };
-export type TodayState = { tasks: TodayTask[]; day: TodayDay | null; pick: Pick | null; nudged: string[]; routines: Routine[]; focus: Focus | null };
+export type TodayState = { adaptive?: AdaptiveToday; tasks: TodayTask[]; day: TodayDay | null; pick: Pick | null; nudged: string[]; routines: Routine[]; focus: Focus | null };
 
 export const PACE_LABELS = ["running on fumes", "gentle", "steady", "full steam", "go hard"] as const;
 export const paceLabel = (p: number) => PACE_LABELS[Math.min(5, Math.max(1, Math.round(p))) - 1]!;
@@ -68,7 +69,7 @@ export function parseState(raw: unknown): TodayState {
   }).slice(0, 40);
   const f = r["focus"] as Record<string, unknown> | null | undefined;
   const focus = f && f["id"] && Number(f["start"]) > 0 && Number(f["mins"]) > 0 ? { id: clip(f["id"], 24), title: clip(f["title"], 200), start: Number(f["start"]), mins: Math.min(180, Math.max(1, Math.round(Number(f["mins"])))) } : null;
-  return { tasks, day, pick, nudged, routines, focus };
+  return { tasks, day, pick, nudged, routines, focus, ...(r["adaptive"] ? {adaptive:parseAdaptive(r["adaptive"])} : {}) };
 }
 
 export const openTasks = (s: TodayState) => s.tasks.filter((t) => t.status === "open");

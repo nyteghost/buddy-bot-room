@@ -28,3 +28,13 @@
   .focus-companion .focus-companion-pal { width: 76px; height: 88px; min-width: 76px; }
   .focus-companion .focus-companion-pal.focus-companion-pal-directional { width: 92px; height: 100px; min-width: 92px; }
 }
+
+/* Focused mode quiets companion decoration without disabling controls. */
+html[data-day-mode="focused"] .focus-companion .pixel-character,
+html[data-day-mode="focused"] .focus-companion .pixel-character *,
+html[data-day-mode="focused"] .focus-companion .pal-art,
+html[data-day-mode="focused"] .pal-room-idle-bubble {
+  animation: none !important;
+  transition: none !important;
+}
+html[data-day-mode="focused"] .pal-room-idle-bubble { display: none; }

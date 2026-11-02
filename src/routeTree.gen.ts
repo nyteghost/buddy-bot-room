@@ -14,6 +14,7 @@ import { Route as TodayRouteImport } from './routes/today'
 import { Route as WorkRouteImport } from './routes/work'
 import { Route as ApiAccountLocalRouteImport } from './routes/api.account-local'
 import { Route as ApiAccountsRouteImport } from './routes/api.accounts'
+import { Route as ApiAdaptiveTodayRouteImport } from './routes/api.adaptive-today'
 import { Route as ApiAddonsRouteImport } from './routes/api.addons'
 import { Route as ApiAssistantRouteImport } from './routes/api.assistant'
 import { Route as ApiBackupRouteImport } from './routes/api.backup'
@@ -94,6 +95,11 @@ const ApiAccountLocalRoute = ApiAccountLocalRouteImport.update({
 const ApiAccountsRoute = ApiAccountsRouteImport.update({
   id: '/api/accounts',
   path: '/api/accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdaptiveTodayRoute = ApiAdaptiveTodayRouteImport.update({
+  id: '/api/adaptive-today',
+  path: '/api/adaptive-today',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAddonsRoute = ApiAddonsRouteImport.update({
@@ -383,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/work': typeof WorkRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/accounts': typeof ApiAccountsRoute
+  '/api/adaptive-today': typeof ApiAdaptiveTodayRoute
   '/api/addons': typeof ApiAddonsRoute
   '/api/assistant': typeof ApiAssistantRoute
   '/api/backup': typeof ApiBackupRoute
@@ -446,6 +453,7 @@ export interface FileRoutesByTo {
   '/work': typeof WorkRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/accounts': typeof ApiAccountsRoute
+  '/api/adaptive-today': typeof ApiAdaptiveTodayRoute
   '/api/addons': typeof ApiAddonsRoute
   '/api/assistant': typeof ApiAssistantRoute
   '/api/backup': typeof ApiBackupRoute
@@ -510,6 +518,7 @@ export interface FileRoutesById {
   '/work': typeof WorkRoute
   '/api/account-local': typeof ApiAccountLocalRoute
   '/api/accounts': typeof ApiAccountsRoute
+  '/api/adaptive-today': typeof ApiAdaptiveTodayRoute
   '/api/addons': typeof ApiAddonsRoute
   '/api/assistant': typeof ApiAssistantRoute
   '/api/backup': typeof ApiBackupRoute
@@ -575,6 +584,7 @@ export interface FileRouteTypes {
     | '/work'
     | '/api/account-local'
     | '/api/accounts'
+    | '/api/adaptive-today'
     | '/api/addons'
     | '/api/assistant'
     | '/api/backup'
@@ -638,6 +648,7 @@ export interface FileRouteTypes {
     | '/work'
     | '/api/account-local'
     | '/api/accounts'
+    | '/api/adaptive-today'
     | '/api/addons'
     | '/api/assistant'
     | '/api/backup'
@@ -701,6 +712,7 @@ export interface FileRouteTypes {
     | '/work'
     | '/api/account-local'
     | '/api/accounts'
+    | '/api/adaptive-today'
     | '/api/addons'
     | '/api/assistant'
     | '/api/backup'
@@ -765,6 +777,7 @@ export interface RootRouteChildren {
   WorkRoute: typeof WorkRoute
   ApiAccountLocalRoute: typeof ApiAccountLocalRoute
   ApiAccountsRoute: typeof ApiAccountsRoute
+  ApiAdaptiveTodayRoute: typeof ApiAdaptiveTodayRoute
   ApiAddonsRoute: typeof ApiAddonsRoute
   ApiAssistantRoute: typeof ApiAssistantRoute
   ApiBackupRoute: typeof ApiBackupRoute
@@ -856,6 +869,13 @@ declare module '@tanstack/react-router' {
       path: '/api/accounts'
       fullPath: '/api/accounts'
       preLoaderRoute: typeof ApiAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/adaptive-today': {
+      id: '/api/adaptive-today'
+      path: '/api/adaptive-today'
+      fullPath: '/api/adaptive-today'
+      preLoaderRoute: typeof ApiAdaptiveTodayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/addons': {
@@ -1273,6 +1293,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorkRoute: WorkRoute,
   ApiAccountLocalRoute: ApiAccountLocalRoute,
   ApiAccountsRoute: ApiAccountsRoute,
+  ApiAdaptiveTodayRoute: ApiAdaptiveTodayRoute,
   ApiAddonsRoute: ApiAddonsRoute,
   ApiAssistantRoute: ApiAssistantRoute,
   ApiBackupRoute: ApiBackupRoute,

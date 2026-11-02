@@ -4,7 +4,18 @@ import { FocusHub } from "./focus-hub";
 import type { FocusSession } from "@/lib/focus-companion";
 import type { TodayTask } from "@/lib/today";
 import type { Todo } from "@/lib/workbench";
+import { AdaptiveControls } from "./adaptive-controls";
+import { TodaySection } from "./today-section";
+import { WorkCheckpoints } from "./work-checkpoints";
+import { StuckLaunchpad } from "./stuck-launchpad";
+import { ParkingButton } from "./parking-lot";
+import { useAdaptiveToday } from "@/lib/adaptive-store";
+import { adaptiveBrief } from "@/lib/adaptive-today";
+import { makeFocusSession } from "@/lib/focus-companion";
+import { fallbackStartStep } from "@/lib/focus-assist";
+import { useFocusCheckpoint } from "@/lib/focus-checkpoint-store";
 type Overview = {
+  adaptive: ReturnType<typeof adaptiveBrief>;
   priorities: TodayTask[];
   taskCount: number;
   pendingCaptures: number;
@@ -33,6 +44,9 @@ export function TodayOverview({
   onOpenMail: () => void;
   onResumeFocus?: ((s: FocusSession) => void) | undefined;
 }) {
+  const { adaptive } = useAdaptiveToday();
+  const saved = useFocusCheckpoint();
+  const [easier, setEasier] = useState(false);
   const [data, setData] = useState<Overview | null>(null);
   useEffect(() => {
     if (!open) return;
@@ -50,16 +64,17 @@ export function TodayOverview({
     load();
     const timer = setInterval(load, 60000);
     const changed = () => {
-      setData(null);
       load();
     };
     window.addEventListener("pixelpals:inbox-changed", changed);
     window.addEventListener("pixelpals:memory-changed", changed);
+    window.addEventListener("pixelpals:adaptive-changed", changed);
     return () => {
       alive = false;
       clearInterval(timer);
       window.removeEventListener("pixelpals:inbox-changed", changed);
       window.removeEventListener("pixelpals:memory-changed", changed);
+      window.removeEventListener("pixelpals:adaptive-changed", changed);
     };
   }, [open]);
   const todos: Todo[] = (data?.priorities ?? []).map((t) => ({
@@ -73,59 +88,104 @@ export function TodayOverview({
   return (
     <>
       <section
-        className="grid gap-2 rounded-md border p-3"
+        style={{ order: -29 }}
+        className="grid min-w-0 gap-3 rounded-md border p-3"
         aria-label="Personalized Today briefing"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold">Your day, a little clearer</h3>
+          <h3 className="font-semibold">Today at a glance</h3>
           <Button
             size="sm"
             variant="outline"
             onClick={() => window.dispatchEvent(new Event("pixelpals:inbox"))}
           >
             Capture a thought
-            {data?.pendingCaptures ? " · " + data.pendingCaptures + " to review" : ""}
           </Button>
+        </div>
+        <div className="grid gap-2">
+          <h4 className="text-xs font-semibold text-primary">NOW</h4>
+          <p className="break-words font-medium">
+            {data?.adaptive.task?.title ?? "Choose one small starting point"}
+          </p>
+          <p>
+            {easier
+              ? fallbackStartStep(data?.adaptive.task?.title ?? "Get started", "smaller")
+              : (data?.adaptive.step ?? "Name one thing you would like to begin.")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => {
+                const task = data?.adaptive.task?.title;
+                if (!task) {
+                  onStart("");
+                  return;
+                }
+                const step = easier ? fallbackStartStep(task, "smaller") : data!.adaptive.step;
+                const session = makeFocusSession(task, step, adaptive.favorite, "quiet");
+                if (session && onResumeFocus) onResumeFocus(session);
+                else onStart(task);
+              }}
+            >
+              Start
+            </Button>
+            <Button variant="outline" onClick={() => setEasier(true)}>
+              Make it easier
+            </Button>
+            <StuckLaunchpad
+              task={data?.adaptive.task?.title ?? ""}
+              onStart={onResumeFocus}
+              resume={saved}
+            />
+            {saved && (
+              <Button variant="outline" onClick={() => onResumeFocus?.(saved)}>
+                Resume interrupted task
+              </Button>
+            )}
+          </div>
+          <small className="text-muted-foreground">{data?.adaptive.reason}</small>
+        </div>
+        <div className="grid gap-1 border-t pt-2">
+          <h4 className="text-xs font-semibold">NEXT</h4>
+          {data?.adaptive.next ? (
+            <p>
+              {data.adaptive.next.title} ·{" "}
+              {new Date(data.adaptive.next.start).toLocaleString([], {
+                dateStyle: "short",
+                timeStyle: "short",
+                timeZone: data.zone,
+              })}{" "}
+              (scheduled)
+            </p>
+          ) : (
+            <p>No upcoming timed commitment in the available data.</p>
+          )}
+          {adaptive.timeAware &&
+            data?.adaptive.available !== null &&
+            data?.adaptive.available !== undefined && (
+              <small>
+                {data.adaptive.available} minutes available, allowing five minutes to prepare. A
+                scheduled event does not confirm attendance.
+              </small>
+            )}
+        </div>
+        <div className="grid gap-1 border-t pt-2">
+          <h4 className="text-xs font-semibold">LATER</h4>
+          {data?.adaptive.later.length ? (
+            data.adaptive.later.map((t) => (
+              <button
+                key={t.id}
+                className="break-words rounded p-1 text-left hover:bg-accent"
+                onClick={() => onStart(t.title)}
+              >
+                {t.title}
+              </button>
+            ))
+          ) : (
+            <p>You can leave the rest for later.</p>
+          )}
         </div>
         {data ? (
           <>
-            <p>
-              {data.taskCount} open planner tasks · {data.pendingCaptures} captures waiting for
-              review
-            </p>
-            <p>
-              {data.nextEvent ? (
-                <>
-                  Next: {data.nextEvent.title} ·{" "}
-                  {data.nextEvent.allDay
-                    ? "All day"
-                    : new Date(data.nextEvent.start).toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        timeZone: data.zone,
-                      })}
-                </>
-              ) : data.calendarAvailable ? (
-                "No more calendar events today."
-              ) : (
-                "Calendar is not connected or could not be checked."
-              )}
-            </p>
-            {data.priorities.map((t) => (
-              <div key={t.id} className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 break-words">
-                  {t.title}
-                  {t.mins ? " · ~" + t.mins + " min" : ""}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onStart(t.title + (t.notes ? "\n" + t.notes : ""))}
-                >
-                  Help me start
-                </Button>
-              </div>
-            ))}
             {data.idea && (
               <details>
                 <summary>A saved idea to revisit</summary>
@@ -173,14 +233,35 @@ export function TodayOverview({
           </p>
         )}
       </section>
-      <FocusHub
-        serverTodos={todos}
-        onStart={onStart}
-        onBrainDump={onBrainDump}
-        onOpenTasks={todos.length ? () => location.assign("/today") : onOpenTasks}
-        onOpenMail={onOpenMail}
-        onResumeFocus={onResumeFocus}
-      />
+      <AdaptiveControls />
+      <TodaySection id="memory">
+        <WorkCheckpoints onResume={onResumeFocus} />
+      </TodaySection>
+      <TodaySection id="parking">
+        <div className="grid gap-2 rounded-md border p-3">
+          <ParkingButton />
+          <Button
+            variant="outline"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("pixelpals:inbox", { detail: { filter: "parked" } }),
+              )
+            }
+          >
+            Review parked thoughts
+          </Button>
+        </div>
+      </TodaySection>
+      <TodaySection id="focus">
+        <FocusHub
+          serverTodos={todos}
+          onStart={onStart}
+          onBrainDump={onBrainDump}
+          onOpenTasks={todos.length ? () => location.assign("/today") : onOpenTasks}
+          onOpenMail={onOpenMail}
+          onResumeFocus={onResumeFocus}
+        />
+      </TodaySection>
     </>
   );
 }

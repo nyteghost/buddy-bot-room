@@ -1,3 +1,5 @@
+import { adaptiveBrief, adaptiveDefaults } from "./adaptive-today";
+import { readReminders } from "./reminders.server";
 import * as fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { currentUser } from "./accounts.server";
@@ -50,17 +52,18 @@ async function bodyBytes(req: Request, limit: number) {
   return all;
 }
 export async function homeOverview(zone: string, now = Date.now()) {
-  const [state, memory, captures, calendar] = await Promise.all([
+  const [state, memory, captures, calendar, reminders] = await Promise.all([
     todaySnapshot(),
     keeperSnapshot(),
     readCaptures(),
     Promise.race([
-      calendarData(1).catch(() => null),
+      calendarData(7).catch(() => null),
       new Promise<null>((resolve) => {
         const timer = setTimeout(() => resolve(null), 2500);
         timer.unref?.();
       }),
     ]),
+    readReminders(),
   ]);
   const day = zoneDateKey(now, zone);
   const tasks = state.tasks.filter((t) => t.status === "open");
@@ -84,9 +87,46 @@ export async function homeOverview(zone: string, now = Date.now()) {
   return {
     day,
     zone,
+    adaptive: adaptiveBrief(
+      state.tasks,
+      [
+        ...(calendar?.items ?? []).map((e, i) => ({
+          id: "calendar-" + i,
+          title: scrubChatText(e.title),
+          start: e.start,
+          end: e.end,
+          allDay: e.allDay,
+          kind: "calendar" as const,
+        })),
+        ...reminders
+          .filter((r) => r.at > now)
+          .map((r) => ({
+            id: r.id,
+            title: scrubChatText(r.text),
+            start: r.at,
+            end: r.at + 60000,
+            allDay: false,
+            kind: "reminder" as const,
+          })),
+        ...tasks
+          .filter((t) => t.at && t.at > now)
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            start: t.at!,
+            end: t.at! + (t.mins ?? 1) * 60000,
+            allDay: false,
+            kind: "task" as const,
+          })),
+      ],
+      state.adaptive ?? adaptiveDefaults(),
+      now,
+      zone,
+    ),
     priorities,
     taskCount: tasks.length,
-    pendingCaptures: captures.filter((c) => c.inbox?.status === "pending").length,
+    pendingCaptures: captures.filter((c) => c.inbox?.status === "pending" && !c.inbox.parked)
+      .length,
     nextEvent: events[0]
       ? { title: scrubChatText(events[0].title), start: events[0].start, allDay: events[0].allDay }
       : null,
@@ -203,9 +243,24 @@ export async function handleCaptureInbox(req: Request): Promise<Response> {
         }
         if (rows.length >= 100)
           throw Error("Capture limit reached. Review or remove old captures first.");
-        rows.push({ id, kind: "note", text, at: Date.now(), inbox: inboxMeta(text) });
+        const inbox = inboxMeta(text);
+        if (data["parked"] === true) {
+          const context = data["context"] as Record<string, unknown> | undefined;
+          inbox.parked = true;
+          inbox.context = {
+            task: clean(context?.["task"], 280),
+            step: clean(context?.["step"], 180),
+          };
+          inbox.job = {
+            state: "done",
+            attempts: 0,
+            next: 0,
+            note: "Parked for later. Background processing is paused.",
+          };
+        }
+        rows.push({ id, kind: "note", text, at: Date.now(), inbox });
       });
-      scheduleKeeper(1000);
+      if (data["parked"] !== true) scheduleKeeper(1000);
       return reply({ ok: true, id });
     }
     const result = await captureTransaction(async (rows) => {

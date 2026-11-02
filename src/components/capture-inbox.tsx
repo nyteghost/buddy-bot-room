@@ -31,12 +31,24 @@ async function call(body?: unknown) {
 export function CaptureInbox({
   open,
   initialId,
+  initialFilter,
   onStart,
 }: {
   open: boolean;
   initialId?: string | undefined;
+  initialFilter?: string | undefined;
   onStart: (task: string) => void;
 }) {
+  useEffect(() => {
+    if (initialFilter) setFilter(initialFilter);
+  }, [initialFilter]);
+  useEffect(() => {
+    const select = (e: Event) => {
+      if ((e as CustomEvent<{ filter?: string }>).detail?.filter === "parked") setFilter("parked");
+    };
+    window.addEventListener("pixelpals:inbox", select);
+    return () => window.removeEventListener("pixelpals:inbox", select);
+  }, []);
   const [data, setData] = useState<InboxData | null>(null),
     [text, setText] = useState(""),
     [note, setNote] = useState(""),
@@ -339,6 +351,7 @@ export function CaptureInbox({
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="pending">Pending review</option>
+          <option value="parked">Parked thoughts</option>
           <option value="reviewed">Reviewed</option>
           <option value="archived">Archived</option>
           <option value="all">All captures</option>
@@ -465,7 +478,16 @@ export function CaptureInbox({
         </form>
       )}
       {data?.items
-        .filter((c) => filter === "all" || c.inbox!.status === filter || c.id === initialId)
+        .filter(
+          (c) =>
+            filter === "all" ||
+            (filter === "parked"
+              ? c.inbox!.parked && c.inbox!.status === "pending"
+              : filter === "pending"
+                ? c.inbox!.status === "pending" && !c.inbox!.parked
+                : c.inbox!.status === filter) ||
+            c.id === initialId,
+        )
         .map((c) => (
           <article key={c.id} className="grid gap-2 rounded-md border p-3" id={"capture-" + c.id}>
             <strong>
@@ -473,6 +495,12 @@ export function CaptureInbox({
               {new Date(c.at).toLocaleString()}
             </strong>
             <p className="whitespace-pre-wrap break-words">{c.text}</p>
+            {c.inbox!.parked && (
+              <p className="text-xs text-muted-foreground">
+                Parked{c.inbox!.context?.task ? " while: " + c.inbox!.context.task : " for later"}.
+                No automatic task or memory was created.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               {c.inbox!.status} · {c.inbox!.job.note}
             </p>

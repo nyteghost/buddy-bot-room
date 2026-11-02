@@ -22,3 +22,7 @@ If a voice memo stays queued, verify local Whisper settings and that Memory Keep
 ## Replies appear all at once
 
 Beta 1.0.821 enables streaming in General Chat automatically. Check the displayed build after pulling/updating and refresh the browser. Credential-like output intentionally waits for full scrubbing. Initial health, context and web lookups still finish before the provider starts. A reverse proxy can buffer responses despite the application's no-buffering headers; disable buffering for `/api/assistant` in that proxy. A slow provider/model load also delays the first text. No live RTX 3080 benchmark is implied by browser fixture tests.
+
+### Today says another device changed the saved state
+
+The save was refused to protect newer work. Keep or copy your editor text, use Refresh saved Today, then apply your change again. Focus Assist retains a browser checkpoint if the server save fails. See [Adaptive Today](ADAPTIVE_TODAY.md) for limits and recovery.

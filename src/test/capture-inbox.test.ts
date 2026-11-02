@@ -216,3 +216,25 @@ it("requires exact evidence and labels durations as bounded suggestions", () => 
   expect(parsed[0]!.firstStep).not.toContain("secret");
   expect(fallbackSuggestion("password=secret")[0]!.text).not.toContain("secret");
 });
+it("parks thoughts without scheduling AI or creating tasks, and excludes them from pending counters", async () => {
+  const { scheduleKeeper } = await import("@/lib/memory-keeper.server");
+  vi.mocked(scheduleKeeper).mockClear();
+  expect(
+    (
+      await api({
+        op: "add",
+        id: "parked-test-001",
+        text: "Another idea",
+        parked: true,
+        context: { task: "Current task", step: "password=fictional-secret" },
+      })
+    ).r.ok,
+  ).toBe(true);
+  const rows = await readCaptures();
+  expect(rows[0]!.inbox!.parked).toBe(true);
+  expect(rows[0]!.inbox!.context!.step).not.toContain("fictional-secret");
+  expect(rows[0]!.inbox!.job.state).toBe("done");
+  expect(scheduleKeeper).not.toHaveBeenCalled();
+  expect((await homeOverview("UTC")).pendingCaptures).toBe(0);
+  await expect(fs.stat(dir + "/today.json")).rejects.toThrow();
+});

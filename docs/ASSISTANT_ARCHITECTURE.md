@@ -27,3 +27,7 @@ General Chat runs semantic lookup, health and configured search concurrently. We
 ## Streaming General Chat
 
 The owner-authenticated assistant handler offers an opt-in NDJSON transport around the same turn pipeline. It incrementally parses the existing AI SDK SSE stream, throttles credential-scrubbed preview snapshots and validates the memory epoch before releasing them. Only complete upstream answers pass the final epoch/revision checks into chats.json and the existing Keeper queue. Consumer cancellation propagates through the upstream request/reader; foreground locks release in finally blocks. Previews live only in a per-conversation client map. Legacy JSON callers retain the same response shape. See [General Chat](GENERAL_CHAT.md).
+
+### Adaptive Today work state
+
+`/api/adaptive-today` is owner-session-only. Preferences and compact Focus Assist checkpoints share `today.json` and its serialized atomic writer; they do not create another memory database. A global revision rejects concurrent stale edits. Checkpoints carry their own revision and three previous versions. Temporary state is not injected into General Chat or mirrored into Obsidian. Source/provenance fields are user-editable text, never fetched URLs or executable instructions. Capture parking reuses `capture.json`, marks items for separate review and does not enqueue inference.
