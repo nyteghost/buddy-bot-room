@@ -30,3 +30,7 @@ Not complete: automatic voice commands, global project activity capture outside 
 5. Living World and voice: existing assets and activity state, compact Nook, explicit invitations, one speaker, opt-in continuous microphone sessions and honest foreground-only standby. Test iPhone permission and interruption behavior on hardware.
 
 Each increment needs focused regression tests, full production validation, simple user documentation and a beta-only release. This audit does not enable work integrations or change separate ShowPilot/Vibelight repositories.
+
+## Optional Discord Companion text increment
+
+An opt-in Discord text front end has been added separately from the core ADHD/calendar/meeting phase order, after the Adaptive Today increment. It supports owner-only guild slash commands, private responses, local-Ollama General Chat continuity and server-side bot settings; it does not enable voice recording, Meeting Vault, multi-Pal selection or unsolicited actions. See [Discord Companion](DISCORD_COMPANION.md). Actual token registration and Discord client behavior must be checked with an owner account after the beta container is deployed.

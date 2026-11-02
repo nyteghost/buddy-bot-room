@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta — Discord Companion text integration (after 1.0.822)
+
+- Add opt-in owner-only Discord slash commands (`/ask`, `/ping`, `/help`) using an outbound Gateway connection from Unraid. No public port or message-content intent.
+- Route Discord questions through existing persistent General Chat and Memory Keeper, using local Ollama only; approved Second Brain retrieval remains separately opt-in.
+- Add bot settings, secret token storage, setup testing, restricted guild/user IDs and private ephemeral command replies. Add authorization tests and setup documentation.
+- Discord voice, meeting audio recording, working-Pals alerts and multi-Pal selection remain future work, not implemented here. Live Discord credentials and gateway behavior require installation testing.
+
+
 ## Beta 1.0.822 — Adaptive Today foundation
 
 - Add compact NOW/NEXT/LATER, offline I'm Stuck, everyday Pal and energy preferences, optional available-time suggestions, and server-persisted section visibility/order/collapse.
