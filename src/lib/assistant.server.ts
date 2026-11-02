@@ -1052,6 +1052,7 @@ export async function handleAssistant(
               signal: req.signal,
             }),
             context,
+            internal !== undefined,
           );
           answer = scrubChatText(
             await parseAnswer(
