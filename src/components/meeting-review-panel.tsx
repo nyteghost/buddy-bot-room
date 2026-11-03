@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { MeetingWhisperPanel } from "@/components/meeting-whisper-panel";
 import { MAX_MEETING_SPEAKER_NOTES, MAX_MEETING_SUMMARY, MAX_MEETING_TRANSCRIPT, reviewExportCurrent, type MeetingReview } from "@/lib/meeting-review";
 
 type Draft = { transcript: string; summary: string; speakerNotes: string };
@@ -68,6 +69,7 @@ export function MeetingReviewPanel({id,open}:{id:string;open:boolean}) {
       </p>
     </div>
     {!review?<p className="text-xs text-muted-foreground">Loading private meeting review…</p>:<>
+      <MeetingWhisperPanel id={id} open={open} hasTranscript={!!review.transcript.trim()}/>
       <label className="grid gap-1 text-xs">Transcript (editable, up to 100,000 characters)
         <textarea className="w-full resize-y rounded-md border bg-background p-2 text-sm"
           rows={8} maxLength={MAX_MEETING_TRANSCRIPT} value={draft.transcript}

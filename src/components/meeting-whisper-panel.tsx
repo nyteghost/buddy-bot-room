@@ -19,7 +19,7 @@ async function action(id: string, op: string, confirm=false): Promise<void> {
     throw Error(data.error ?? "Couldn't update transcription");
   }
 }
-export function MeetingWhisperPanel({id,open}:{id:string;open:boolean}) {
+export function MeetingWhisperPanel({id,open,hasTranscript}:{id:string;open:boolean;hasTranscript:boolean}) {
   const [data,setData]=useState<StatusResponse|null>(null);
   const [permission,setPermission]=useState(false);
   const [busy,setBusy]=useState("");
@@ -77,7 +77,7 @@ export function MeetingWhisperPanel({id,open}:{id:string;open:boolean}) {
       {!!state.error && <p role="alert" className="text-destructive">{state.error}</p>}
       {state.status==="draft-ready" && <p role="status">A local transcript draft was saved. Use <strong>Reload review</strong> below to inspect and correct it. It has not been approved.</p>}
     </div>}
-    {!running && state?.status!=="draft-ready" && data?.configured && <>
+    {!running && !hasTranscript && state?.status!=="draft-ready" && data?.configured && <>
       <label className="flex items-start gap-2 text-xs">
         <input type="checkbox" checked={permission} disabled={!!busy} onChange={e=>setPermission(e.target.checked)}/>
         <span>I confirm this recording is authorized for transcription by my private local Whisper server. I understand the transcript needs manual review.</span>
