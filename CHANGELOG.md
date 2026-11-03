@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta — Reviewed-meeting action approval
+
+- Add separate owner-confirmed creation of a Today task from an explicitly approved Meeting Review.
+- Save deterministic idempotent task IDs and provenance; refuse stale/draft reviews and duplicate retries.
+- No automatic task extraction, assignee inference, memory writes or reminders. Includes regression tests.
+
+
 ## Beta — Reviewable Meeting Threads Smart Linking
 
 - Provide owner-requested deterministic keyword suggestions for unlinked reviewed meetings based on existing approved thread links.

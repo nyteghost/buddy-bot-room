@@ -68,3 +68,7 @@ Implemented on beta: private owner-only, on-demand Meeting Threads brief of up t
 ## Meeting Intelligence increment 3 — opt-in Smart Linking proposals
 
 Implemented on beta: owner-only, on-demand keyword-overlap suggestions from linked, approved meetings to unlinked approved meetings. The UI displays supporting reviewed meeting titles and matched keywords; it fills an editable proposal but does not save until the owner explicitly confirms via the pre-existing revision-checked link API. Suggested project labels are organizational metadata only; no new project permissions are granted. Still outstanding: semantic/hybrid search, timestamp-verified source quotations, independent meeting action-item approval, smart calendar matching and fully tested mobile voice flows.
+
+## Meeting Intelligence increment 4 — owner-confirmed meeting action → Today
+
+Implemented on beta: after a review is approved, the owner can explicitly enter an action title, optional notes, check a separate confirmation and create a single idempotent Today task. The Today source is marked `meeting`; notes retain the meeting ID and approved review revision. Draft reviews, unauthorized sessions, stale revisions and non-confirmed requests are refused. No AI-generated assignments, automatic due dates, calendar changes, reminders, or permanent memories. [Review guide](MEETING_REVIEW_BETA.md).
