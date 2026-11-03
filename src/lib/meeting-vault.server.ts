@@ -42,6 +42,15 @@ export async function meetingSourceForReview(id: string): Promise<MeetingRecord>
   if (record.status !== "ready") throw Error("Finish uploading the original recording first");
   return record;
 }
+/** Internal-only verified media path, never returned through the public JSON API. */
+export async function meetingOriginalForTranscription(id: string): Promise<{ path: string; record: MeetingRecord }> {
+  const record = await meetingSourceForReview(id);
+  const filename = audioPath(record);
+  const stat = await lstat(filename);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size !== record.bytes ||
+      await fileHash(filename) !== record.sha256) throw Error("Original recording integrity check failed");
+  return { path: filename, record };
+}
 async function storeMeeting(record: MeetingRecord): Promise<void> {
   const tmp = metaPath(record.id) + "." + randomUUID() + ".tmp";
   try {

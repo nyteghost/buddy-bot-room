@@ -39,6 +39,25 @@ async function readReview(id: string): Promise<MeetingReview> {
     throw e;
   }
 }
+/** Internal-only draft access for an owner-authorized Whisper job. */
+export async function reviewForLocalTranscription(id: string): Promise<MeetingReview> {
+  return locked(() => readReview(id));
+}
+/** Commit a Whisper transcript only if the owner has not edited the draft since starting. */
+export async function acceptLocalTranscription(id: string, expectedRevision: number, raw: string): Promise<boolean> {
+  const transcript = normalizeReviewText(raw, MAX_MEETING_TRANSCRIPT);
+  if (!transcript) throw Error("Transcription was empty or exceeded 100,000 characters");
+  return locked(async () => {
+    const review = await readReview(id);
+    if (review.revision !== expectedRevision || !!review.transcript.trim() || review.status !== "draft") return false;
+    const next = reviewEditable(review, {
+      transcript, summary: "", speakerNotes: review.speakerNotes,
+    }, new Date().toISOString());
+    next.transcriptSource = "local-whisper";
+    await writeReview(next);
+    return true;
+  });
+}
 async function writeReview(review: MeetingReview): Promise<void> {
   if (!validMeetingReview(review)) throw Error("Invalid review update");
   const target = reviewFile(review.meetingId);
