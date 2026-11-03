@@ -43,6 +43,7 @@ it("requires an explicit approval followed by a separate Run click before any jo
   expect(await screen.findByText("Help me start")).toBeInTheDocument();
   await waitFor(()=>expect(rows[0]?.status).toBe("proposed"));
   expect(api.mock.calls.filter(x=>x[1] && JSON.parse(String(x[1].body)).op==="run")).toHaveLength(0);
+  await waitFor(()=>expect(screen.getByRole("button",{name:"Approve"})).toBeEnabled());
   fireEvent.click(screen.getByRole("button",{name:"Approve"}));
   await waitFor(()=>expect(screen.getByRole("button",{name:"Run approved job"})).toBeEnabled());
   expect(rows[0]?.status).toBe("approved");
