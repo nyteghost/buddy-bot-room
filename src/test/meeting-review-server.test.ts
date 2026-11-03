@@ -7,6 +7,7 @@ import { askPals } from "@/lib/ask.server";
 import { meetingSourceForReview } from "@/lib/meeting-vault.server";
 import { handleMeetingReview } from "@/lib/meeting-review.server";
 import { emptyMeetingReview, type MeetingReview } from "@/lib/meeting-review";
+import { todaySnapshot } from "@/lib/today.server";
 
 vi.mock("@/lib/accounts.server",()=>({currentUser:vi.fn()}));
 vi.mock("@/lib/ask.server",()=>({askPals:vi.fn()}));
@@ -82,6 +83,24 @@ describe("Meeting Review owner-only, revisioned workflow",()=>{
     const second=await data();
     expect(second.exportedPath).not.toBe(final.exportedPath);
     expect(await readFile(join(vault,final.exportedPath),"utf8")).toBe(original);
+  });
+  it("creates an explicit reviewed meeting task exactly once and blocks drafts or stale revisions",async()=>{
+    expect((await change({op:"create-task",revision:1,title:"Follow up",notes:"",confirm:true})).status).toBe(409);
+    await change({op:"save",revision:1,transcript:"We discussed setup.",summary:"Approved setup notes.",speakerNotes:""});
+    const draft=await data();
+    expect((await change({op:"create-task",revision:draft.revision,title:"Follow up",notes:"",confirm:true})).status).toBe(409);
+    await change({op:"approve",revision:draft.revision});
+    const review=await data();
+    expect((await change({op:"create-task",revision:review.revision,title:"Follow up",notes:"",confirm:false})).status).toBe(400);
+    const request={op:"create-task",revision:review.revision,title:"Follow up on setup",notes:"Open the checklist",confirm:true};
+    expect((await change(request)).status).toBe(200);
+    expect((await change(request)).status).toBe(200); // Safe retry.
+    const tasks=(await todaySnapshot()).tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({title:"Follow up on setup",source:"meeting"});
+    expect(tasks[0]?.notes).toContain(id);
+    expect((await change({...request,revision:review.revision-1})).status).toBe(409);
+    expect((await todaySnapshot()).tasks).toHaveLength(1);
   });
   it("never follows symlinked Obsidian Meetings folder",async()=>{
     await mkdir(join(vault,"Pixel Pals"));
