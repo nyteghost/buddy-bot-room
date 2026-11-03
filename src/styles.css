@@ -455,6 +455,9 @@ h1 {
 .agent-saiyan {
   --agent-color: var(--saiyan);
 }
+.agent-mimic {
+  --agent-color: oklch(0.74 0.18 305);
+}
 .pixel-character {
   width: 32px;
   height: 32px;
@@ -1295,6 +1298,17 @@ h1 {
 .sprite-o { fill: var(--sprite-olive); }
 .sprite-q { fill: var(--sprite-gold); }
 .sprite-c { fill: var(--sprite-glass); }
+/* An independent chest-monster palette, consistent even when another room theme is active. */
+.agent-mimic .sprite-i { fill: oklch(0.19 0.04 305); }
+.agent-mimic .sprite-b { fill: oklch(0.40 0.075 63); }
+.agent-mimic .sprite-h { fill: oklch(0.55 0.10 68); }
+.agent-mimic .sprite-g { fill: oklch(0.60 0.05 75); }
+.agent-mimic .sprite-q { fill: oklch(0.80 0.13 80); }
+.agent-mimic .sprite-w { fill: oklch(0.94 0.026 96); }
+.agent-mimic .sprite-n { fill: oklch(0.27 0.07 312); }
+.agent-mimic .sprite-r { fill: oklch(0.58 0.21 310); }
+.agent-mimic .sprite-u { fill: oklch(0.76 0.18 318); }
+.agent-mimic .sprite-c { fill: oklch(0.91 0.16 98); }
 .message-heading { flex-wrap: wrap; }
 .message-heading .reply-voice { width: 28px; height: 28px; flex-shrink: 0; color: var(--muted-foreground); }
 .message-heading .reply-voice[aria-pressed="true"] { color: var(--primary); }
