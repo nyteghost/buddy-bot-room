@@ -36,6 +36,12 @@ async function readMeeting(id: string): Promise<MeetingRecord> {
   if (!record || record.id !== id) throw Error("Invalid meeting record");
   return record;
 }
+/** Internal-only source lookup. HTTP callers must pass the owner-session gate first. */
+export async function meetingSourceForReview(id: string): Promise<MeetingRecord> {
+  const record = await readMeeting(id);
+  if (record.status !== "ready") throw Error("Finish uploading the original recording first");
+  return record;
+}
 async function storeMeeting(record: MeetingRecord): Promise<void> {
   const tmp = metaPath(record.id) + "." + randomUUID() + ".tmp";
   try {
