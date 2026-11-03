@@ -44,7 +44,7 @@ it("requires an explicit approval followed by a separate Run click before any jo
   await waitFor(()=>expect(rows[0]?.status).toBe("proposed"));
   expect(api.mock.calls.filter(x=>x[1] && JSON.parse(String(x[1].body)).op==="run")).toHaveLength(0);
   fireEvent.click(screen.getByRole("button",{name:"Approve"}));
-  expect(await screen.findByRole("button",{name:"Run approved job"})).toBeInTheDocument();
+  await waitFor(()=>expect(screen.getByRole("button",{name:"Run approved job"})).toBeEnabled());
   expect(rows[0]?.status).toBe("approved");
   fireEvent.click(screen.getByRole("button",{name:"Run approved job"}));
   expect(await screen.findByText("Start by opening the planner.")).toBeInTheDocument();
