@@ -72,3 +72,7 @@ Implemented on beta: owner-only, on-demand keyword-overlap suggestions from link
 ## Meeting Intelligence increment 4 — owner-confirmed meeting action → Today
 
 Implemented on beta: after a review is approved, the owner can explicitly enter an action title, optional notes, check a separate confirmation and create a single idempotent Today task. The Today source is marked `meeting`; notes retain the meeting ID and approved review revision. Draft reviews, unauthorized sessions, stale revisions and non-confirmed requests are refused. No AI-generated assignments, automatic due dates, calendar changes, reminders, or permanent memories. [Review guide](MEETING_REVIEW_BETA.md).
+
+## Personal Pal milestone — Mimic
+
+Implemented on beta: independent ninth Pal **Mimic** with a 32×32 native pixel-art chest sprite, owner-inspired conversation profile, preserved voice across themes, opt-in seating, direct chat selection, character settings and own-only default memory / no live-data permissions. Distilled profile: [MIMIC_PERSONA.md](MIMIC_PERSONA.md). Raw Discord exports, ChatGPT history and sensitive identifiers have **not** been imported into the app or repository. This is a transparent AI character, not the owner or their spokesperson. Still to do: on-device visual QA across mobile/desktop widths, preferred sound/animation polish, and optional owner-approved Mimic Discord command/memory permissions. Do not update Unraid until the beta CI and image publish for the final commit pass.

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Your own changes to the eight pals: name, role, personality, what memories they may see and whether they may read your calendar, mail and tasks.
- * The built-in characters (and every theme's own cast) stay as they are; an override only applies in the normal theme, and "Reset" removes it.
+ * Your own changes to the registered pals: name, role, personality, what memories they may see and whether they may read your calendar, mail and tasks.
+ * The built-in characters (and every theme's own cast) stay as they are; overrides generally apply in normal mode (Mimic keeps its identity in all themes), and "Reset" removes them.
  * Stored in this browser (and your account's synced settings); the server receives it with each message and checks it again.
  */
 export type MemoryAccess = "all" | "own" | "none";

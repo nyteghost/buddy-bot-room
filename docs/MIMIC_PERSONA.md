@@ -1,6 +1,6 @@
 # Mimic — Pixel Pals character and behavioral profile
 
-**Status:** Character specification / implementation input, not evidence that the character has been registered in the app.
+**Status:** Implemented as a selectable ninth Pal on beta. See `src/lib/mimic-persona.ts` for the condensed runtime prompt, `src/lib/agents.ts` for registration and `src/lib/character-sprites.ts` for its original chest sprite. Release readiness depends on successful CI, image publication and device testing.
 
 **Sources:** The owner's November 3, 2026 Discord *Write Like Me* profile (31,481 exported messages, 29,871 text-bearing, 2016–2026), plus observable interaction patterns from prior ChatGPT conversations. Weight recent Discord style more heavily for casual language; weight ChatGPT interaction history more heavily for troubleshooting, technical decisions, and collaboration. The combined profile is a behavioral approximation, not a psychological diagnosis or an exhaustive record.
 

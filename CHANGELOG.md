@@ -1,5 +1,14 @@
 # Changelog
 
+## Beta — Mimic, the ninth Pal (owner-inspired, not owner impersonation)
+
+- Add an opt-in **Mimic** AI Pal, distinct from the original eight, with a 32×32 pixel-art treasure-chest sprite, purple tongue, independent thinking prop, room motion and consistent voice across themes.
+- Build its character from the owner's supplied Discord writing-style profile plus observed ChatGPT collaboration patterns. Preserve natural directness, curiosity, practical troubleshooting, specific enthusiasm and occasional humor without robotic catchphrases.
+- Default Mimic to Pal-only memories and no live calendar/mail/task context. Add explicit permission controls in Character settings; do not commit raw Discord exports or private chats.
+- Include regression tests for persona, sprite, privacy defaults, and theme consistency. Mimic is clearly labeled as AI and does not post as the owner.
+- Discord Companion still uses its existing owner-only assistant; Mimic-specific Discord commands are not implemented by this milestone.
+
+
 ## Beta — Reviewed-meeting action approval
 
 - Add separate owner-confirmed creation of a Today task from an explicitly approved Meeting Review.

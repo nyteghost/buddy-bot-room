@@ -11,7 +11,7 @@ const MEMORY_LABEL: Record<MemoryAccess, string> = {
   none: "Nothing (no memories or to-dos)",
 };
 
-/** Change one of the eight pals: its name, job, personality, memory access and whether it may read your calendar, mail and tasks.
+/** Change any registered Pal: its name, job, personality, memory access and whether it may read your calendar, mail and tasks.
  *  Applies in the normal theme; the themed casts keep their own characters. Reset puts the built-in pal back. */
 export function CharacterSection() {
   const all = useOverrides();
@@ -53,7 +53,7 @@ export function CharacterSection() {
         <Button type="button" size="sm" variant="outline" disabled={!all[palId]} onClick={() => updateOverrides((cur) => setOverride(cur, palId, null))}><RotateCcw size={13} /> Reset {base.name}</Button>
       </div>
       {palId === "mimic" && <p className="docs-note">Mimic starts with only its own authorized memories and no calendar, mail or task access. Explicitly change permissions here if needed. Mimic is a separate AI Pal, not your account or spokesperson.</p>}
-      <p className="docs-note">Applies in the normal theme; themed casts keep their own characters. Art and room seats stay the same. Names in older messages and the pixel room update after a reload.</p>
+      <p className="docs-note">Applies in the normal theme; Mimic keeps its identity across themes. Other themed casts keep their own characters. Art and room seats remain distinct; name changes in old messages may require a reload.</p>
     </section>
   );
 }
