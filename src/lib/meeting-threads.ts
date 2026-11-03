@@ -32,7 +32,7 @@ export function validMeetingThreadLink(raw: unknown): raw is MeetingThreadLink {
     s.source==="owner-reviewed";
 }
 export function parseThreadInput(thread: unknown, project: unknown): {thread:string;project:string}|null {
-  if (typeof thread!=="string" || typeof project!=="string") return null;
+  if (typeof thread!=="string" || typeof project!=="string" || /[\r\n\x00]/.test(thread)) return null;
   const name=thread.trim().replace(/\s+/g," ");
   const group=project.trim();
   if(!name || name.length>80 || /[\r\n\0]/.test(name) ||
