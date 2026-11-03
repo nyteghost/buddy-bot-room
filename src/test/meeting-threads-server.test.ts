@@ -69,6 +69,26 @@ describe("Meeting Threads approved-only index",()=>{
     vi.mocked(currentUser).mockResolvedValueOnce(null);
     expect((await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?brief=Planning&project=home"))).status).toBe(403);
   });
+  it("shows suggestions from reviewed, explicitly linked sources only and never saves a link",async()=>{
+    vi.mocked(reviewedMeetingForThread).mockImplementation(async meeting=>{
+      if(meeting===id)return {meetingId:id,status:"reviewed",approvedAt:"2026-11-02T10:00:00Z",
+        summary:"Blue Lantern lighting requirements approved brightness specifications",
+        transcript:"Confirmed lighting requirements and brightness."} as Awaited<ReturnType<typeof reviewedMeetingForThread>>;
+      if(meeting===second)return {meetingId:second,status:"reviewed",approvedAt:"2026-11-02T11:00:00Z",
+        summary:"Blue Lantern brightness specifications for lighting",
+        transcript:"Lighting requirements include brightness."} as Awaited<ReturnType<typeof reviewedMeetingForThread>>;
+      return null;
+    });
+    await post({op:"link",id,thread:"Lighting",project:"home",revision:0});
+    const resp=await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?suggest=1"));
+    expect(resp.status).toBe(200);
+    const data=await resp.json() as {suggestions:{meetingId:string;proposedThread:string;sharedTerms:string[]}[]};
+    expect(data.suggestions.some(x=>x.meetingId===second&&x.proposedThread==="Lighting")).toBe(true);
+    const list=await (await api()).json() as {items:MeetingThreadHit[]};
+    expect(list.find(x=>x.meetingId===second)?.thread).toBe("");
+    vi.mocked(currentUser).mockResolvedValueOnce(null);
+    expect((await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?suggest=1"))).status).toBe(403);
+  });
   it("never allows linking an unreviewed meeting or granting permissions via project labels",async()=>{
     expect((await post({op:"link",id:second,thread:"Draft",project:"private",revision:0})).status).toBe(409);
     expect((await post({op:"link",id,thread:"Planning",project:"../outside",revision:0})).status).toBe(400);
