@@ -60,3 +60,7 @@ Added owner-only, opt-in long-recording transcription using the existing configu
 ## Meeting Intelligence increment 1 — reviewed-only Meeting Threads
 
 Implemented on beta: an owner-only Meeting Threads view in Capture Inbox, exact-term search across approved meeting reviews, source title and audio-SHA receipts, and explicit thread/project label assignment with revision CAS and unlink. Draft/unreviewed transcripts do not enter the index; project labels are organization metadata and do not grant memory/project authorization. This is a minimal search/grouping foundation, not inferred attendance, automatic cross-project linking, verified word timestamps, action ownership or meeting-generated tasks. [Meeting Threads](MEETING_THREADS_BETA.md).
+
+## Meeting Intelligence increment 2 — manually requested source-grounded preparation
+
+Implemented on beta: private owner-only, on-demand Meeting Threads brief of up to 12 approved meeting summaries, exact thread/project filtering, source receipts (meeting ID, approved date, audio SHA-256 and link revision), and copy-to-clipboard. The brief never searches draft notes, grants Discord permissions or infers attendance or action ownership. It does not autonomously monitor calendars or invoke the AI. [Meeting Threads guide](MEETING_THREADS_BETA.md). Future: reviewable Smart Linking, timestamp corrections, approved action item extraction, calendar-scoped suggestions and richer hybrid memory retrieval.

@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta — Meeting Threads source-grounded preparation
+
+- Add manual **Prepare brief** for each explicitly linked reviewed meeting thread/project, with source receipts and a copyable bounded summary.
+- Enforce owner-only API access and exact project filtering; omit unapproved/unlinked meetings and avoid inferred attendance or task ownership.
+- Add tests for cross-project isolation and unauthorized requests. No automatic sharing, transcription, task creation or AI inference.
+
+
 ## Beta — Meeting Threads reviewed-only search and manual links
 
 - Add owner-only search over **approved** meeting summaries and transcripts, with bounded excerpts and original-audio SHA-256 evidence receipts.

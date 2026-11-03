@@ -24,3 +24,9 @@ Changes require the latest link revision. You can unlink a meeting without delet
 - No task, reminder, approved memory or Obsidian note is created by adding or removing a thread label.
 
 Future work includes verified timestamp evidence, reviewable Smart Linking suggestions, per-meeting action item approval, and pre-meeting briefing suggestions sourced from confirmed notes.
+
+## On-demand preparation brief
+
+After linking at least one **reviewed** meeting into a named thread, click **Prepare brief** beside its thread name (and project label, when set). Pixel Pals assembles up to 12 most recently approved meeting summaries into a plain-text briefing. Each entry includes its meeting ID, approval date, original audio SHA-256, and thread-link revision. Use **Copy brief** only when you have permission to share these meeting details. The brief is generated only when you click, remains on your current device, and is not sent to any AI model, Discord, or external app.
+
+The feature requires an owner session and an exact thread and project match. Unreviewed, unlinked, or other-project meetings are excluded. No upcoming calendar attendance, speaker identity, task owner or action completion is assumed. The on-demand brief is a source compilation, **not** a future-meeting calendar notification or autonomous AI action. Older approved summaries may be outdated; check their recordings before relying on decisions.
