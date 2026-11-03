@@ -10,7 +10,7 @@
 
 ---
 
-The beta opens the existing **Today** window first. **General Chat / Ask Anything** remains available in navigation, with independent conversations and one local **Memory Keeper**. General Chat is a movable, resizable workspace window alongside your existing rooms and tools. [Chat guide](docs/GENERAL_CHAT.md) · [Discord Companion setup](docs/DISCORD_COMPANION.md) · [Settings guide](docs/SETTINGS_NAVIGATION.md) · [Working Pals](docs/WORKING_PALS_BETA.md) · [Meeting Vault](docs/MEETING_VAULT_BETA.md) · [ICS calendar guide](docs/CALENDAR_ICS_BETA.md) · [Memory guide](docs/MEMORY_KEEPER.md) · [Unraid update](docs/ASSISTANT_UNRAID.md) · [Changelog](CHANGELOG.md). Recognizable chat credentials are scrubbed automatically; provider keys belong in AI settings.
+The beta opens the existing **Today** window first. **General Chat / Ask Anything** remains available in navigation, with independent conversations and one local **Memory Keeper**. General Chat is a movable, resizable workspace window alongside your existing rooms and tools. [Chat guide](docs/GENERAL_CHAT.md) · [Discord Companion setup](docs/DISCORD_COMPANION.md) · [Settings guide](docs/SETTINGS_NAVIGATION.md) · [Working Pals](docs/WORKING_PALS_BETA.md) · [Meeting Vault](docs/MEETING_VAULT_BETA.md) · [Meeting Review](docs/MEETING_REVIEW_BETA.md) · [ICS calendar guide](docs/CALENDAR_ICS_BETA.md) · [Memory guide](docs/MEMORY_KEEPER.md) · [Unraid update](docs/ASSISTANT_UNRAID.md) · [Changelog](CHANGELOG.md). Recognizable chat credentials are scrubbed automatically; provider keys belong in AI settings.
 
 ## Table of contents
 

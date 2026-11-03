@@ -1,5 +1,14 @@
 # Changelog
 
+## Beta — Meeting Review and approved Obsidian meeting notes
+
+- Add an owner-only Meeting Review panel for completed recordings with editable transcript, summary and speaker-correction drafts.
+- Optional local Ollama summary is triggered only by the owner's separate click and is limited to a bounded single-pass transcript; transcripts and summaries never become tasks or permanent Memory Keeper entries automatically.
+- Require distinct Save, Approve and Export actions. Protect revisions against simultaneous edits and write versioned Markdown notes into `Pixel Pals/Meetings` using exclusive creation; never overwrite hand-edited Obsidian notes.
+- Include tests for owner access, stale saves, explicit approvals, local-only inference, export conflicts and symlinked vault folders.
+- Original audio remains in Meeting Vault; this increment does **not** yet implement Whisper transcription of long recordings, accurate diarization, meeting-linked tasks or automatic reminders.
+
+
 ## Beta — Meeting Vault original-audio import foundation
 
 - Introduce protected, owner-only Meeting Vault storage separate from 8 MB Capture Inbox voice clips, with up to 512 MB per recording.
