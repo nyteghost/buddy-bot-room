@@ -85,7 +85,7 @@ describe("Meeting Threads approved-only index",()=>{
     const data=await resp.json() as {suggestions:{meetingId:string;proposedThread:string;sharedTerms:string[]}[]};
     expect(data.suggestions.some(x=>x.meetingId===second&&x.proposedThread==="Lighting")).toBe(true);
     const list=await (await api()).json() as {items:MeetingThreadHit[]};
-    expect(list.find(x=>x.meetingId===second)?.thread).toBe("");
+    expect(list.items.find(x=>x.meetingId===second)?.thread).toBe("");
     vi.mocked(currentUser).mockResolvedValueOnce(null);
     expect((await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?suggest=1"))).status).toBe(403);
   });
