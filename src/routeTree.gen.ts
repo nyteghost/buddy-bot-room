@@ -49,6 +49,7 @@ import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
 import { Route as ApiMeetingVaultRouteImport } from './routes/api.meeting-vault'
+import { Route as ApiMeetingReviewRouteImport } from './routes/api.meeting-review'
 import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
@@ -274,6 +275,11 @@ const ApiMeetingVaultRoute = ApiMeetingVaultRouteImport.update({
   path: '/api/meeting-vault',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeetingReviewRoute = ApiMeetingReviewRouteImport.update({
+  id: '/api/meeting-review',
+  path: '/api/meeting-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
   id: '/api/working-pals',
   path: '/api/working-pals',
@@ -436,6 +442,7 @@ export interface FileRoutesByFullPath {
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
+  '/api/meeting-review': typeof ApiMeetingReviewRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -502,6 +509,7 @@ export interface FileRoutesByTo {
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
+  '/api/meeting-review': typeof ApiMeetingReviewRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -569,6 +577,7 @@ export interface FileRoutesById {
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
+  '/api/meeting-review': typeof ApiMeetingReviewRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -637,6 +646,7 @@ export interface FileRouteTypes {
     | '/api/repos'
     | '/api/schedules'
     | '/api/meeting-vault'
+    | '/api/meeting-review'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -703,6 +713,7 @@ export interface FileRouteTypes {
     | '/api/repos'
     | '/api/schedules'
     | '/api/meeting-vault'
+    | '/api/meeting-review'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -769,6 +780,7 @@ export interface FileRouteTypes {
     | '/api/repos'
     | '/api/schedules'
     | '/api/meeting-vault'
+    | '/api/meeting-review'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -836,6 +848,7 @@ export interface RootRouteChildren {
   ApiReposRoute: typeof ApiReposRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
   ApiMeetingVaultRoute: typeof ApiMeetingVaultRoute
+  ApiMeetingReviewRoute: typeof ApiMeetingReviewRoute
   ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
@@ -1142,6 +1155,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeetingVaultRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meeting-review': {
+      id: '/api/meeting-review'
+      path: '/api/meeting-review'
+      fullPath: '/api/meeting-review'
+      preLoaderRoute: typeof ApiMeetingReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/working-pals': {
       id: '/api/working-pals'
       path: '/api/working-pals'
@@ -1368,6 +1388,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReposRoute: ApiReposRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,
   ApiMeetingVaultRoute: ApiMeetingVaultRoute,
+  ApiMeetingReviewRoute: ApiMeetingReviewRoute,
   ApiWorkingPalsRoute: ApiWorkingPalsRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
