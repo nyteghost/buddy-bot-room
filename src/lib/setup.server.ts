@@ -71,7 +71,7 @@ const tests: Record<string, () => Promise<SetupTest>> = {
   discord: testDiscordConnection,
   whisper: () => reach(env("WHISPER_URL"), "/health"),
   weather: async () => { const r = await getWeather(); return "weather" in r ? { ok: true, note: `${r.weather.place}: found.` } : { ok: false, note: r.error }; },
-  calendar: async () => { const c = await calendarData(7); return c.errors.length ? { ok: false, note: c.errors[0] ?? "Failed." } : { ok: true, note: `${c.feeds} feed${c.feeds === 1 ? "" : "s"} read, ${c.items.length} event${c.items.length === 1 ? "" : "s"} in the next 7 days.` }; },
+  calendar: async () => { const c = await calendarData(7, true); return c.errors.length ? { ok: false, note: c.errors[0] ?? "Failed." } : { ok: true, note: `${c.feeds} feed${c.feeds === 1 ? "" : "s"} read, ${c.items.length} event${c.items.length === 1 ? "" : "s"} in the next 7 days.` }; },
   gcal: async () => ((await gcalReady()) ? { ok: true, note: "Connected. Shifts can be pushed from Work tools and your events show in Calendar." } : { ok: false, note: "Keys saved, but not signed in yet. Open Work tools → My shifts and press Add or update in Google Calendar." }),
   github: async () => {
     const t = env("GITHUB_TOKEN");
