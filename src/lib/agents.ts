@@ -90,6 +90,7 @@ export const agents = [
 export type AgentId = (typeof agents)[number]["id"];
 setKnownPals(agents.map((a) => a.id));
 export const cenobites: Record<AgentId, { name: string; role: string; tone: string }> = {
+  mimic: { name: "Mimic", role: MIMIC_ROLE, tone: MIMIC_TONE },
   nova: {
     name: "The Hell Priest",
     role: "Lead Cenobite of the Order of the Gash",
@@ -132,6 +133,7 @@ export const cenobites: Record<AgentId, { name: string; role: string; tone: stri
   },
 };
 export const horrorIcons: Record<AgentId, { name: string; role: string; tone: string }> = {
+  mimic: { name: "Mimic", role: MIMIC_ROLE, tone: MIMIC_TONE },
   nova: {
     name: "Ghostface",
     role: "The horror-movie fanatic",
@@ -189,7 +191,7 @@ function themePersona(id: AgentId, hell: boolean, horror = false, mode?: Charact
   if (id === "mimic") {
     const base = agents.find(a => a.id === "mimic")!;
     // Theme changes must not turn an owner-inspired Pal into an unrelated licensed character.
-    return withOverride(base, (overrides ?? getOverrides()).mimic);
+    return withOverride(base, (overrides ?? getOverrides())["mimic"]);
   }
   if (mode === "dcc") return dccCast[id];
   if (mode === "matrix") return matrixCast[id];
