@@ -67,6 +67,10 @@ async function listMeetings(): Promise<MeetingRecord[]> {
   for (const id of names) records.push(await readMeeting(id));
   return records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+/** Owner-only callers may enumerate completed sources without exposing audio paths. */
+export async function completedMeetingSources(): Promise<MeetingRecord[]> {
+  return (await listMeetings()).filter(record => record.status === "ready");
+}
 async function bytesFrom(request: Request, max: number): Promise<Buffer> {
   const reported = Number(request.headers.get("content-length") ?? "0");
   if (reported > max) throw Error("Audio part too large");

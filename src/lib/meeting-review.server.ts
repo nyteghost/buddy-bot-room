@@ -58,6 +58,11 @@ export async function acceptLocalTranscription(id: string, expectedRevision: num
     return true;
   });
 }
+/** Internal read for Meeting Threads; only approved reviews can become searchable. */
+export async function reviewedMeetingForThread(id: string): Promise<MeetingReview | null> {
+  const r = await readReview(id);
+  return r.status === "reviewed" ? r : null;
+}
 async function writeReview(review: MeetingReview): Promise<void> {
   if (!validMeetingReview(review)) throw Error("Invalid review update");
   const target = reviewFile(review.meetingId);
