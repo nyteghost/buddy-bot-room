@@ -86,6 +86,7 @@ export async function saveSettings(changes: Record<string, unknown>): Promise<{ 
     const errors: Record<string, string> = {};
     const saved: string[] = [];
     if (!dir()) return { saved, errors: { _: "Saving needs BUDDY_DATA_DIR (the Docker stack sets it)." } };
+    const previousCalendarFeeds = process.env["CALENDAR_ICS_URLS"] ?? "";
     const values = { ...state().store.values };
     const secrets = { ...state().store.secrets };
     for (const [key, raw] of Object.entries(changes)) {
@@ -102,6 +103,11 @@ export async function saveSettings(changes: Record<string, unknown>): Promise<{ 
       await writeJson(SECRETS_FILE, secrets, true);
       state().store = { values, secrets };
       apply();
+      if (saved.includes("CALENDAR_ICS_URLS")) {
+        await (await import("./calendar-feed.server")).removeUnsubscribedCalendarSnapshots(
+          previousCalendarFeeds, process.env["CALENDAR_ICS_URLS"] ?? "",
+        );
+      }
       logServer("info", `Settings saved in the app: ${saved.join(", ")}`);
       await restartAfter(saved);
     }
