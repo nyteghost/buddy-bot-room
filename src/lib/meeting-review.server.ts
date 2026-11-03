@@ -184,10 +184,10 @@ export async function handleMeetingReview(request: Request): Promise<Response> {
       return respond({ source: { id: source.id, title: source.title, sha256: source.sha256 }, review: await locked(() => readReview(id)) });
     if (request.method !== "POST") return new Response(null, { status: 405 });
     const op = body["op"];
-    if (op === "save") return saveEdits(id, body);
-    if (op === "approve") return approveEdits(id, revisionFrom(body));
-    if (op === "summarize") return summarizeLocally(id, revisionFrom(body));
-    if (op === "publish") return publishReview(id, revisionFrom(body));
+    if (op === "save") return await saveEdits(id, body);
+    if (op === "approve") return await approveEdits(id, revisionFrom(body));
+    if (op === "summarize") return await summarizeLocally(id, revisionFrom(body));
+    if (op === "publish") return await publishReview(id, revisionFrom(body));
     return respond({ error: "Unknown meeting review operation." }, 400);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unable to process the meeting";
