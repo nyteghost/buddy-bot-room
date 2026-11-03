@@ -37,8 +37,8 @@ export function cleanOverrides(v: unknown, ids: readonly string[]): Overrides {
     if (name) o.name = name;
     if (role) o.role = role;
     if (tone) o.tone = tone;
-    if (r["memory"] === "all" || r["memory"] === "own" || r["memory"] === "none") { if (r["memory"] !== "all") o.memory = r["memory"]; }
-    if (r["realData"] === false) o.realData = false;
+    if (r["memory"] === "all" || r["memory"] === "own" || r["memory"] === "none") { if (id === "mimic" || r["memory"] !== "all") o.memory = r["memory"]; }
+    if (r["realData"] === false || (id === "mimic" && r["realData"] === true)) o.realData = r["realData"] as boolean;
     if (Object.keys(o).length) out[id] = o;
   }
   return out;
@@ -49,8 +49,8 @@ export function withOverride<T extends { name: string; role: string; tone: strin
   return o && (o.name || o.role || o.tone) ? { ...base, name: o.name ?? base.name, role: o.role ?? base.role, tone: o.tone ?? base.tone } : base;
 }
 
-export const memoryAccess = (o: Overrides, id: string): MemoryAccess => o[id]?.memory ?? "all";
-export const mayUseRealData = (o: Overrides, id: string): boolean => o[id]?.realData !== false;
+export const memoryAccess = (o: Overrides, id: string): MemoryAccess => o[id]?.memory ?? (id === "mimic" ? "own" : "all");
+export const mayUseRealData = (o: Overrides, id: string): boolean => o[id]?.realData ?? (id !== "mimic");
 export const setOverride = (all: Overrides, id: string, patch: Override | null): Overrides => {
   const rest = { ...all };
   delete rest[id];
