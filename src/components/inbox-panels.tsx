@@ -6,7 +6,7 @@ import { Mailbox } from "@/components/mailbox";
 import { MailAlertRules } from "@/components/mail-alerts";
 
 type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
-type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean; mode?: string }; items: CalItem[]; errors: string[]; error?: string };
+type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean; mode?: string }; items: CalItem[]; errors: string[]; error?: string; feedStatus?: { name: string; syncedAt: number | null; cached: boolean; stale: boolean }[] };
 type MailItem = { from: string; subject: string; date: string; source: string };
 type MailData = { configured: boolean; imap: boolean; m365: boolean; items: MailItem[]; errors: string[]; error?: string };
 
@@ -14,10 +14,10 @@ export function useFeed<T extends { error?: string }>(url: string, open: boolean
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState("");
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     setLoading(true);
     try {
-      const res = await fetch(url);
+      const res = await fetch(force && url.startsWith("/api/calendar?") ? url + "&refresh=1" : url);
       const json = (await res.json()) as T;
       if (!res.ok) setFailed(json.error ?? "Couldn't load.");
       else { setData(json); setFailed(""); }
@@ -28,7 +28,7 @@ export function useFeed<T extends { error?: string }>(url: string, open: boolean
     if (!open) return;
     return startPolling(load, 5 * 60_000);
   }, [open, load]);
-  return { data, loading, failed, reload: load };
+  return { data, loading, failed, reload: () => load(true) };
 }
 
 export const Setup = ({ children }: { children: React.ReactNode }) => <div className="grid gap-2 rounded-md border p-3 text-sm text-muted-foreground">{children}</div>;
@@ -71,6 +71,13 @@ export function CalendarPanel({ open }: { open: boolean }) {
   return (
     <div className="grid gap-3 p-3 text-sm">
       <Header title="Next 7 days" loading={loading} onReload={() => void reload()} />
+      <p className="text-xs text-muted-foreground">Use Refresh to check calendar subscriptions now. Offline copies are shown when a feed is temporarily unreachable.</p>
+      {data?.feedStatus?.length ? <div className="grid gap-1 rounded-md border p-2 text-xs" aria-label="Calendar subscription status">
+        {data.feedStatus.map((s, i) => <div key={s.name + i} className="flex flex-wrap justify-between gap-2">
+          <span className={s.stale ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}>{s.name}{s.stale ? " · Offline copy" : s.syncedAt ? " · Synced" : " · Needs attention"}</span>
+          <span className="text-muted-foreground">{s.syncedAt ? new Date(s.syncedAt).toLocaleString() : "Never synced"}</span>
+        </div>)}
+      </div> : null}
       {failed && <p className="text-destructive">{failed}</p>}
       {data?.google && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
@@ -95,7 +102,7 @@ export function CalendarPanel({ open }: { open: boolean }) {
             <li><b>iCloud:</b> Calendar → share → <i>Public Calendar</i> → copy the link.</li>
             <li><b>Outlook.com:</b> Settings → Calendar → <i>Shared calendars</i> → publish → copy the ICS link.</li>
           </ul>
-          <span>Put the link(s) in <code>CALENDAR_ICS_URLS</code> (comma separated) on the stack and redeploy. A work Microsoft 365 calendar can be added with <code>/m365 connect</code>.</span>
+          <span>Open <b>Settings → Calendar & mail → Calendar feeds</b> to add an approved private ICS link. Pixel Pals stores it server-side and does not require a redeploy. Do not import employer calendar data without authorization.</span>
         </Setup>
       )}
       {data?.configured && !groups.size && !failed && <p className="text-muted-foreground">Nothing coming up in the next 7 days.</p>}
