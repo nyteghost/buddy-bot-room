@@ -1,5 +1,6 @@
 import { OllamaConnect } from "./ollama-connect";
 import { AddonSettings } from "@/components/addons";
+import { WorkingPalsPanel } from "@/components/working-pals-panel";
 import { parseServiceKeyFile } from "@/lib/gcal";
 import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -187,7 +188,7 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
   const allGroups = items ? groupItems(items) : [];
   const searching = search.trim().length > 0;
   const filtered = items ? filterSetupItems(items, fields, search, statusFilter) : [];
-  const selected = allGroups.find((g) => g.id === selectedGroup) ?? allGroups[0];
+  const selected = allGroups.find((g) => g.id === selectedGroup) ?? (selectedGroup === "addons" || selectedGroup === "working-pals" ? undefined : allGroups[0]);
   const shown = searching
     ? filtered
     : filtered.filter((i) => selected?.items.some((member) => member.id === i.id));
@@ -239,11 +240,16 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
             className={`min-w-fit rounded-lg border px-3 py-2 text-left text-sm hover:bg-muted ${!searching && selectedGroup === "addons" ? "border-primary bg-primary/10 font-medium" : "border-transparent"}`}
             onClick={() => { setSelectedGroup("addons"); setSearch(""); setStatusFilter("all"); setOpenId(""); }}
           >Add-ons</button>
+          <button type="button" aria-current={!searching && selectedGroup === "working-pals" ? "page" : undefined}
+            className={`min-w-fit rounded-lg border px-3 py-2 text-left text-sm hover:bg-muted ${!searching && selectedGroup === "working-pals" ? "border-primary bg-primary/10 font-medium" : "border-transparent"}`}
+            onClick={() => {setSelectedGroup("working-pals");setSearch("");setStatusFilter("all");setOpenId("");}}>
+            Working Pals
+          </button>
         </nav>
         <main className="grid min-w-0 content-start gap-3 rounded-xl border p-3" aria-label="Selected settings">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="font-semibold">{searching ? `Search results for “${search.trim()}”` : selectedGroup === "addons" ? "Add-ons" : selectionLabel}</h3>
+              <h3 className="font-semibold">{searching ? `Search results for “${search.trim()}”` : selectedGroup === "addons" ? "Add-ons" : selectedGroup === "working-pals" ? "Working Pals" : selectionLabel}</h3>
               {!searching && selected && <p className="text-xs text-muted-foreground">{selected.blurb}</p>}
             </div>
             <Button size="sm" variant="ghost" aria-pressed={showDetails} onClick={() => setShowDetails(!showDetails)}><SlidersHorizontal className="mr-1 size-3" /> {showDetails ? "Hide details" : "Show details"}</Button>
@@ -258,7 +264,7 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
             </div>
           )}
           {!searching && selected?.id === "basics" && <OllamaConnect onConnected={() => { void load(); void loadFields(); }} />}
-          {!searching && selectedGroup === "addons" ? <AddonSettings /> : (
+          {!searching && selectedGroup === "addons" ? <AddonSettings /> : !searching && selectedGroup === "working-pals" ? <WorkingPalsPanel open={open} /> : (
             <div className="grid min-w-0 content-start gap-2">
               {shown.length ? shown.map(renderItem) : <p className="rounded-md border p-3 text-sm text-muted-foreground">No settings match this view. Try All or clear the search.</p>}
               {!searching && selected?.id === "maintenance" && <><BackupSection open={open} /><SchedulesSection open={open} /></>}
