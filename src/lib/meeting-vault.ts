@@ -35,7 +35,7 @@ export function parseMeetingMeta(value: unknown): MeetingRecord | null {
       v.chunkBytes!==MEETING_CHUNK_BYTES ||
       v.parts!==Math.ceil((v.bytes??0)/MEETING_CHUNK_BYTES) ||
       !Array.isArray(v.received) || v.received.length>v.parts ||
-      v.received.some(i=>!Number.isInteger(i)||i<0||i>=v.parts) ||
+      v.received.some(i=>!Number.isInteger(i)||i<0||i>=(v.parts ?? 0)) ||
       new Set(v.received).size!==v.received.length ||
       !["uploading","ready"].includes(v.status??"") ||
       typeof v.createdAt!=="string" || typeof v.updatedAt!=="string" ||
