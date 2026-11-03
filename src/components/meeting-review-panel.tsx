@@ -22,6 +22,23 @@ export function MeetingReviewPanel({id,open}:{id:string;open:boolean}) {
   const [draft,setDraft]=useState<Draft>({transcript:"",summary:"",speakerNotes:""});
   const [notice,setNotice]=useState("");
   const [busy,setBusy]=useState("");
+  const [taskTitle,setTaskTitle]=useState("");
+  const [taskNotes,setTaskNotes]=useState("");
+  const [taskConsent,setTaskConsent]=useState(false);
+  const addTodayTask=async()=>{
+    if(!review||review.status!=="reviewed"||changed||!taskConsent||!taskTitle.trim())return;
+    setBusy("create-task");setNotice("");
+    try {
+      const result=await meetingReviewApi(id,"create-task",{
+        revision:review.revision,title:taskTitle.trim(),notes:taskNotes.trim(),confirm:true,
+      });
+      const saved=result["task"] as {title:string};
+      setNotice("Owner-approved Today task saved: "+saved.title+". Check Today to manage it.");
+      setTaskTitle("");setTaskNotes("");setTaskConsent(false);
+    }catch(e){setNotice(e instanceof Error?e.message:"Couldn't save the task");}
+    finally{setBusy("");}
+  };
+
   const load=useCallback(async()=>{
     const data=await meetingReviewApi(id);
     const received=data["review"] as MeetingReview;
@@ -107,6 +124,33 @@ export function MeetingReviewPanel({id,open}:{id:string;open:boolean}) {
         <Button size="sm" disabled={!!busy||changed||review.status!=="reviewed"||reviewExportCurrent(review)}
           onClick={()=>void action("publish")}>Export approved note to Obsidian</Button>
       </div>
+      <details className="rounded-md border p-3">
+        <summary className="cursor-pointer font-medium">Create a Today task from this approved meeting…</summary>
+        <div className="mt-2 grid gap-2">
+          <p className="text-xs text-muted-foreground">
+            This requires approved meeting notes and a separate explicit confirmation.
+            Enter the action yourself; Pixel Pals will not infer an assignee or automatically create tasks.
+            The task includes the source meeting ID for traceability.
+          </p>
+          <label className="grid gap-1 text-xs">Task title
+            <input className="rounded-md border bg-background p-2 text-sm" maxLength={200}
+              value={taskTitle} onChange={e=>setTaskTitle(e.target.value)}
+              placeholder="Follow up on the agreed lighting requirements"/>
+          </label>
+          <label className="grid gap-1 text-xs">Your notes (optional)
+            <textarea className="rounded-md border bg-background p-2 text-sm" rows={2}
+              maxLength={400} value={taskNotes} onChange={e=>setTaskNotes(e.target.value)}
+              placeholder="What needs doing? No owner is inferred from the meeting." />
+          </label>
+          <label className="flex items-start gap-2 text-xs">
+            <input type="checkbox" checked={taskConsent} onChange={e=>setTaskConsent(e.target.checked)} />
+            <span>I reviewed this action and explicitly approve adding it to my private Today planner.</span>
+          </label>
+          <Button size="sm" disabled={!!busy||changed||review.status!=="reviewed"||!taskTitle.trim()||!taskConsent}
+            onClick={()=>void addTodayTask()}>Create approved Today task</Button>
+          {review.status!=="reviewed"&&<p className="text-xs text-muted-foreground">Approve the meeting review before adding tasks.</p>}
+        </div>
+      </details>
       {review.exportedPath && <p className="break-all text-xs text-muted-foreground">
         Last approved export: {review.exportedPath}
       </p>}
