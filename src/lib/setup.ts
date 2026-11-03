@@ -34,7 +34,7 @@ export const itemById = (id: string) => INTEGRATIONS.find((i) => i.id === id);
 export function setupSummary(items: SetupItem[]): string {
   const on = items.filter((i) => i.configured).length;
   const next = items.find((i) => !i.configured);
-  return `${on} of ${items.length} connections set up.${next ? " Choose a category or search to connect more." : " Everything is set up."}`;
+  return `${on} of ${items.length} set up.${next ? " Choose a category or search to connect more." : " Everything is set up."}`;
 }
 
 /** The Settings window groups its cards under these headings, in this order. Anything not listed lands in "More" so nothing can go missing. */
