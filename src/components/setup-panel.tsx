@@ -3,10 +3,10 @@ import { AddonSettings } from "@/components/addons";
 import { parseServiceKeyFile } from "@/lib/gcal";
 import { BackupSection, SchedulesSection } from "@/components/maintenance-panels";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Circle, Loader2, Search, X, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { groupItems, SETUP_GROUPS, setupSummary, type SetupItem, type SetupTest } from "@/lib/setup";
+import { groupItems, SETUP_GROUPS, setupSummary, filterSetupItems, type SetupItem, type SetupTest } from "@/lib/setup";
 import { setHideSecrets, useHideSecrets } from "@/lib/privacy-store";
 import type { SettingState } from "@/lib/settings";
 
@@ -18,14 +18,19 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
   const hide = useHideSecrets();
   const [fields, setFields] = useState<SettingState[]>([]);
   const [openId, setOpenId] = useState("");
-  const [openGroups, setOpenGroups] = useState<string[]>(["basics"]);
+  const [selectedGroup, setSelectedGroup] = useState("basics");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "configured" | "unconfigured">("all");
+  const [showDetails, setShowDetails] = useState(false);
   const focusedRequest = useRef<number | null>(null);
   useEffect(() => {
     if (!open || !items || !focus || focusedRequest.current === focus.request) return;
     const group = SETUP_GROUPS.find(g => g.ids.includes(focus.id));
     if (!group) return;
     focusedRequest.current = focus.request;
-    setOpenGroups(groups => groups.includes(group.id) ? groups : [...groups, group.id]);
+    setSelectedGroup(group.id);
+    setSearch("");
+    setStatusFilter("all");
     setOpenId(focus.id);
     const frame=requestAnimationFrame(() => document.querySelector(`[data-integration-id="${focus.id}"]`)?.scrollIntoView({ block: "nearest" }));
     return () => cancelAnimationFrame(frame);
@@ -160,7 +165,12 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
                           onChange={(e) => set(e.target.value)}
                         />
                       )}
-                      {f.help && <span className="text-muted-foreground">{f.help}</span>}
+                      {f.help && (
+                        <details className="text-muted-foreground">
+                          <summary className="w-fit cursor-pointer select-none text-xs hover:underline">What does this setting do?</summary>
+                          <p className="mt-1 leading-relaxed">{f.help}</p>
+                        </details>
+                      )}
                     </label>
                   );
                 })}
@@ -174,44 +184,88 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
           </div>
         );
   };
+  const allGroups = items ? groupItems(items) : [];
+  const searching = search.trim().length > 0;
+  const filtered = items ? filterSetupItems(items, fields, search, statusFilter) : [];
+  const selected = allGroups.find((g) => g.id === selectedGroup) ?? allGroups[0];
+  const shown = searching
+    ? filtered
+    : filtered.filter((i) => selected?.items.some((member) => member.id === i.id));
+  const selectionLabel = selected?.name ?? "Integrations";
+
   return (
     <div className="grid gap-3 p-3 text-sm">
-      <OllamaConnect onConnected={() => { void load(); void loadFields(); }} />
-      {error && <p className="text-destructive">{error}</p>}
-      {items && <p className="font-medium">{setupSummary(items)}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" disabled={checking || !items} onClick={() => void checkAll()}>{checking ? <Loader2 className="size-3 animate-spin" /> : null} Is everything connected?</Button>
-        {health && <span className="text-xs">{health}</span>}
+      <header className="grid gap-1">
+        <h2 className="text-base font-semibold">Settings</h2>
+        <p className="text-xs text-muted-foreground">Find what you need. All existing integrations and saved settings are preserved.</p>
+        {items && <p className="text-xs text-muted-foreground">{setupSummary(items)}</p>}
+      </header>
+      {error && <p role="alert" className="text-destructive">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={checking || !items} onClick={() => void checkAll()}>{checking ? <Loader2 className="mr-1 size-3 animate-spin" /> : null} Check connections</Button>
+        <Button size="sm" variant="ghost" onClick={() => { void load(); void loadFields(); }}>Refresh status</Button>
       </div>
-      <label className="flex items-center gap-2 rounded-md border px-3 py-2">
-        <input type="checkbox" checked={hide} onChange={(e) => setHideSecrets(e.target.checked)} />
-        <span>Hide secrets on this device <span className="text-xs text-muted-foreground">(blurs links and addresses so screenshots are safe)</span></span>
+      {health && <p role="status" className="rounded-md border px-3 py-2 text-xs">{health}</p>}
+      <label className="relative grid gap-1">
+        <span className="font-medium">Find a setting</span>
+        <span className="relative flex items-center">
+          <Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
+          <Input aria-label="Find a setting" className="pl-9 pr-10" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search Discord, calendar, passwords, memory…" />
+          {search && <button type="button" aria-label="Clear settings search" className="absolute right-2 rounded p-1 hover:bg-muted" onClick={() => setSearch("")}><X className="size-4" /></button>}
+        </span>
       </label>
-      <h2 className="font-semibold">Integrations</h2>
-      <p className="text-xs text-muted-foreground">Connect services here. Save an address and key, then use Test—no .env editing or restart needed.</p>
-      {items && groupItems(items).map((g) => {
-        const expanded = openGroups.includes(g.id);
-        return (
-          <section key={g.id} className="rounded-md border">
-            <button type="button" aria-expanded={expanded} className="flex w-full items-center gap-2 px-3 py-2 text-left" onClick={() => setOpenGroups((list) => (list.includes(g.id) ? list.filter((x) => x !== g.id) : [...list, g.id]))}>
-              <span className="min-w-0 flex-1">
-                <span className="block font-medium">{g.name}</span>
-                <span className="block truncate text-xs text-muted-foreground">{g.blurb}</span>
-              </span>
-              {g.items.length > 0 && <span className={`shrink-0 text-xs ${g.on === g.items.length ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>{g.on} of {g.items.length} set up</span>}
-              <ChevronDown className={`size-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Settings status filter">
+        {([["all", "All"], ["configured", "Connected"], ["unconfigured", "Not set up"]] as const).map(([value, label]) => (
+          <Button key={value} size="sm" variant={statusFilter === value ? "default" : "outline"} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}>{label}</Button>
+        ))}
+      </div>
+      <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(160px,210px)_minmax(0,1fr)]">
+        <nav aria-label="Settings categories" className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
+          {allGroups.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              aria-current={!searching && selected?.id === g.id ? "page" : undefined}
+              className={`flex min-w-fit items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-muted md:min-w-0 ${!searching && selected?.id === g.id ? "border-primary bg-primary/10 font-medium" : "border-transparent"}`}
+              onClick={() => { setSelectedGroup(g.id); setSearch(""); setStatusFilter("all"); setOpenId(""); }}
+            >
+              <span className="truncate">{g.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{g.on}/{g.items.length}</span>
             </button>
-            {expanded && (
-              <div className="grid gap-2 border-t p-2">
-                {g.items.map(renderItem)}
-                {g.id === "maintenance" && <><BackupSection open={open} /><SchedulesSection open={open} /></>}
-              </div>
-            )}
-          </section>
-        );
-      })}
-      <AddonSettings />
-      <p className="text-xs text-muted-foreground">Settings you save here are kept on the server and take effect right away. A value saved here wins over the one in the stack settings (.env); clear it to go back to that. Keys and passwords are write-only and are left out of backups. Things the stack itself needs (COMPOSE_PROFILES, Tailscale, the Radicale password, the Ollama runtime) stay in the stack settings.</p>
+          ))}
+          <button
+            type="button"
+            aria-current={!searching && selectedGroup === "addons" ? "page" : undefined}
+            className={`min-w-fit rounded-lg border px-3 py-2 text-left text-sm hover:bg-muted ${!searching && selectedGroup === "addons" ? "border-primary bg-primary/10 font-medium" : "border-transparent"}`}
+            onClick={() => { setSelectedGroup("addons"); setSearch(""); setStatusFilter("all"); setOpenId(""); }}
+          >Add-ons</button>
+        </nav>
+        <main className="grid min-w-0 content-start gap-3 rounded-xl border p-3" aria-label="Selected settings">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold">{searching ? `Search results for “${search.trim()}”` : selectedGroup === "addons" ? "Add-ons" : selectionLabel}</h3>
+              {!searching && selected && <p className="text-xs text-muted-foreground">{selected.blurb}</p>}
+            </div>
+            <Button size="sm" variant="ghost" aria-pressed={showDetails} onClick={() => setShowDetails(!showDetails)}><SlidersHorizontal className="mr-1 size-3" /> {showDetails ? "Hide details" : "Show details"}</Button>
+          </div>
+          {showDetails && (
+            <div className="grid gap-2 rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={hide} onChange={(e) => setHideSecrets(e.target.checked)} />
+                Hide sensitive values on this device
+              </label>
+              <p>Saved values take effect without editing Docker. Credentials stay server-side. Some stack-only settings still require editing Unraid Compose.</p>
+            </div>
+          )}
+          {!searching && selected?.id === "basics" && <OllamaConnect onConnected={() => { void load(); void loadFields(); }} />}
+          {!searching && selectedGroup === "addons" ? <AddonSettings /> : (
+            <div className="grid min-w-0 content-start gap-2">
+              {shown.length ? shown.map(renderItem) : <p className="rounded-md border p-3 text-sm text-muted-foreground">No settings match this view. Try All or clear the search.</p>}
+              {!searching && selected?.id === "maintenance" && <><BackupSection open={open} /><SchedulesSection open={open} /></>}
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
