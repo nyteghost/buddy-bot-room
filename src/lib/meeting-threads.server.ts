@@ -5,6 +5,7 @@ import { currentUser } from "./accounts.server";
 import { completedMeetingSources } from "./meeting-vault.server";
 import { reviewedMeetingForThread } from "./meeting-review.server";
 import { meetingId } from "./meeting-vault";
+import { prepareReviewedMeetingBrief } from "./meeting-briefing";
 import {
   matchingExcerpt, parseThreadInput, validMeetingThreadLink,
   type MeetingThreadLink, type MeetingThreadHit,
@@ -67,8 +68,19 @@ export async function handleMeetingThreads(request:Request):Promise<Response>{
   if(!root())return response({error:"Meeting Threads requires the private Unraid data directory."},503);
   try{
     if(request.method==="GET"){
-      const q=new URL(request.url).searchParams.get("q")??"";
+      const params=new URL(request.url).searchParams;
+      const q=params.get("q")??"";
       if(q.length>100)return response({error:"Search query is too long."},400);
+      const brief=params.get("brief");
+      if(brief!==null){
+        const project=params.get("project")??"";
+        if(brief.length>80||/[\\r\\n\\0]/.test(brief)||project.length>80||!/^([a-z0-9_-]{1,80})?$/i.test(project))
+          return response({error:"Invalid reviewed thread selection."},400);
+        const reviewed=await locked(()=>visibleMeetings(""));
+        const result=prepareReviewedMeetingBrief(reviewed,brief,project,new Date().toISOString());
+        return result ? response({brief:result}) :
+          response({error:"No owner-approved, explicitly linked meetings exist for this thread and project."},404);
+      }
       return response({items:await locked(()=>visibleMeetings(q.trim()))});
     }
     if(request.method!=="POST")return new Response(null,{status:405});
