@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MeetingThreadHit } from "@/lib/meeting-threads";
+import type { ReviewedMeetingBrief } from "@/lib/meeting-briefing";
 
 async function meetingThreadsApi(query: string, op?:Record<string,unknown>):Promise<Record<string,unknown>>{
   const url=op?"/api/meeting-threads":"/api/meeting-threads?q="+encodeURIComponent(query);
@@ -20,6 +21,20 @@ export function MeetingThreadsPanel({open}:{open:boolean}) {
   const [busy,setBusy]=useState(false);
   const [loaded,setLoaded]=useState(false);
   const [notice,setNotice]=useState("");
+  const [brief,setBrief]=useState<ReviewedMeetingBrief|null>(null);
+  const [briefLoading,setBriefLoading]=useState(false);
+  const prepareBrief=async(threadName:string,projectName:string)=>{
+    setBriefLoading(true);setNotice("");setBrief(null);
+    try{
+      const url="/api/meeting-threads?brief="+encodeURIComponent(threadName)+"&project="+encodeURIComponent(projectName);
+      const r=await fetch(url);
+      const result=await r.json() as {brief?:ReviewedMeetingBrief;error?:string};
+      if(!r.ok||!result.brief)throw Error(result.error??"Couldn't prepare approved meeting brief");
+      setBrief(result.brief);
+    }catch(e){setNotice(e instanceof Error?e.message:"Couldn't prepare the meeting brief");}
+    finally{setBriefLoading(false);}
+  };
+
   const load=useCallback(async(q:string)=>{
     const result=await meetingThreadsApi(q);
     setItems(Array.isArray(result["items"])?result["items"] as MeetingThreadHit[]:[]);
@@ -70,7 +85,14 @@ export function MeetingThreadsPanel({open}:{open:boolean}) {
     </div>
     {loaded&&!items.length&&<p className="text-xs text-muted-foreground">No approved meetings match. Finish a recording's Review step first; drafts are never indexed.</p>}
     {[...grouped].map(([group,meetings])=><div key={group} className="grid gap-2">
-      <h4 className="font-medium">{group}</h4>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="font-medium">{group}</h4>
+        {group!=="Unlinked reviewed meetings"&&[...new Set(meetings.map(m=>m.project))].map(projectName=>
+          <Button key={projectName} size="sm" variant="outline" disabled={briefLoading}
+            onClick={()=>void prepareBrief(group,projectName)}>
+            Prepare brief{projectName?" · "+projectName:""}
+          </Button>)}
+      </div>
       {meetings.map(m=><article className="grid gap-2 rounded-md border p-3" key={m.meetingId}>
         <div className="flex flex-wrap justify-between gap-2">
           <strong>{m.title}</strong>
@@ -107,6 +129,21 @@ export function MeetingThreadsPanel({open}:{open:boolean}) {
         </div>}
       </article>)}
     </div>)}
+    {brief&&<section className="grid gap-2 rounded-lg border p-3" aria-label="Reviewed meeting preparation">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="font-semibold">Meeting preparation · {brief.thread}</h4>
+        <Button size="sm" variant="outline" onClick={()=>void navigator.clipboard.writeText(brief.text).then(()=>{
+          setNotice("Approved-source brief copied. Review it before sharing.");
+        }).catch(()=>setNotice("Clipboard unavailable; select the brief text manually."))}>Copy brief</Button>
+      </div>
+      <p className="text-xs text-muted-foreground">{brief.reviewedSources} approved source(s).
+        This is a reference summary, not an assumption about upcoming attendees or decisions.
+        Do not share private meeting notes outside an authorized environment.
+      </p>
+      <textarea aria-label="Reviewed-source briefing" className="min-h-56 w-full resize-y rounded-md border bg-background p-2 text-xs"
+        readOnly value={brief.text} />
+      <Button size="sm" variant="ghost" onClick={()=>setBrief(null)}>Close brief</Button>
+    </section>}
     {notice&&<p role="status" className="rounded bg-muted/40 p-2 text-xs">{notice}</p>}
   </section>;
 }
