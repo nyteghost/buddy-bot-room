@@ -48,6 +48,7 @@ import { Route as ApiProvidersRouteImport } from './routes/api.providers'
 import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
+import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
@@ -267,6 +268,11 @@ const ApiSchedulesRoute = ApiSchedulesRouteImport.update({
   path: '/api/schedules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
+  id: '/api/working-pals',
+  path: '/api/working-pals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSearchRoute = ApiSearchRouteImport.update({
   id: '/api/search',
   path: '/api/search',
@@ -423,6 +429,7 @@ export interface FileRoutesByFullPath {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
+  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
   '/api/seerr': typeof ApiSeerrRoute
@@ -487,6 +494,7 @@ export interface FileRoutesByTo {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
+  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
   '/api/seerr': typeof ApiSeerrRoute
@@ -552,6 +560,7 @@ export interface FileRoutesById {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
+  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
   '/api/seerr': typeof ApiSeerrRoute
@@ -618,6 +627,7 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
+    | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
     | '/api/seerr'
@@ -682,6 +692,7 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
+    | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
     | '/api/seerr'
@@ -746,6 +757,7 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
+    | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
     | '/api/seerr'
@@ -811,6 +823,7 @@ export interface RootRouteChildren {
   ApiRemindersRoute: typeof ApiRemindersRoute
   ApiReposRoute: typeof ApiReposRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
+  ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
@@ -1109,6 +1122,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/working-pals': {
+      id: '/api/working-pals'
+      path: '/api/working-pals'
+      fullPath: '/api/working-pals'
+      preLoaderRoute: typeof ApiWorkingPalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/search': {
       id: '/api/search'
       path: '/api/search'
@@ -1327,6 +1347,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRemindersRoute: ApiRemindersRoute,
   ApiReposRoute: ApiReposRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,
+  ApiWorkingPalsRoute: ApiWorkingPalsRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
   ApiSeerrRoute: ApiSeerrRoute,
