@@ -67,7 +67,11 @@ async function readCache(url: string, now: number): Promise<Snapshot | null> {
     const data = JSON.parse(await fs.readFile(path, "utf8")) as Snapshot;
     if (typeof data.savedAt !== "number" || typeof data.body !== "string" ||
       data.body.length > MAX_BYTES || !data.body.includes("BEGIN:VCALENDAR") ||
-      data.savedAt > now + 60_000 || now - data.savedAt > MAX_CACHE_AGE) return null;
+      data.savedAt > now + 60_000) return null;
+    if (now - data.savedAt > MAX_CACHE_AGE) {
+      await fs.rm(path, { force: true }).catch(() => {});
+      return null;
+    }
     return data;
   } catch { return null; }
 }
@@ -119,5 +123,20 @@ export async function fetchCalendarSnapshot(url: string, force = false, now = Da
   } catch {
     if (cached) return { text: cached.body, syncedAt: cached.savedAt, stale: true, cached: true, warning: "Using the last successful calendar snapshot; refresh failed." };
     throw Error("Calendar feed unavailable, invalid, or blocked for safety");
+  }
+}
+
+
+/** When an owner removes/replaces a subscription, purge its saved calendar events too. */
+export async function removeUnsubscribedCalendarSnapshots(before: string, after: string): Promise<void> {
+  const urls = (list: string) => list.split(/[\s,]+/).filter(Boolean).flatMap((part) => {
+    try { return [new URL(part.replace(/^webcal:/i, "https:")).toString()]; }
+    catch { return []; }
+  });
+  const stillUsed = new Set(urls(after));
+  for (const old of urls(before)) {
+    if (stillUsed.has(old)) continue;
+    const path = cachePath(old);
+    if (path) await fs.rm(path, { force: true }).catch(() => {});
   }
 }
