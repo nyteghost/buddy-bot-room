@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta — Meeting Threads reviewed-only search and manual links
+
+- Add owner-only search over **approved** meeting summaries and transcripts, with bounded excerpts and original-audio SHA-256 evidence receipts.
+- Add explicit thread and optional project labels with stale-revision conflict checks, unlink controls, and a compact Capture Inbox view. Unreviewed transcripts are never indexed.
+- No AI-generated links, inferred attendees, automatic task ownership, or cross-user project permissions are introduced.
+- Later phases: transcript evidence verification, meeting-linked task approval, briefing suggestions, speaker diarization and more capable semantic search.
+
+
 ## Beta — explicit local Whisper transcription of long recordings
 
 - Introduce a separate owner-only local Whisper job for completed Meeting Vault audio: an explicit permission checkbox, Start/Pause/Resume/Reset controls, persisted per-segment checkpoints and crash recovery.

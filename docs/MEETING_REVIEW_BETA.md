@@ -27,3 +27,7 @@
 - An existing exported note remains unchanged when a later revision is approved; re-export creates a new revisioned note, never overwrites manually edited content.
 - A failure before completing an export can leave a note on disk without updating the receipt. The next attempt refuses to overwrite that note; inspect it in Obsidian to reconcile.
 - An explicit local-Whisper transcription worker is now available for long recordings, with three-minute chunks, recoverable progress and approximate segment ranges. Word-level timestamps, automatic speaker diarization, meeting threads and final hardware validation remain planned.
+
+## Meeting Threads after review
+
+After approving a meeting review, open **Capture Inbox → Meeting Threads** to search the approved summary/transcript and optionally link it to a manually named thread or project label. These links are not automatic and do not grant other users permission to access the meeting. See [Meeting Threads](MEETING_THREADS_BETA.md).
