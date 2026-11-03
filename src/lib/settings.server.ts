@@ -115,6 +115,7 @@ async function restartAfter(keys: string[]): Promise<void> {
     if (keys.some((k) => k.startsWith("UNRAID_"))) (await import("./unraid.server")).restartWatcher();
     if (keys.some((k) => k.startsWith("TELEGRAM_"))) (await import("./telegram.server")).startTelegram();
     if (keys.some((k) => k.startsWith("DISCORD_"))) (await import("./discord.server")).startDiscord();
+    if (keys.some((k) => k.startsWith("CALENDAR_"))) (await import("./inbox.server")).clearCalendarCache();
     if (keys.some((k) => ["BRIEF_TIME", "REVIEW_DAY", "REVIEW_TIME", "BUDDY_BACKUP_TIME", "BUDDY_BACKUP_KEEP", "BUDDY_TZ"].includes(k))) (await import("./scheduler.server")).startScheduler();
   } catch (error) { logServer("warn", "Couldn't restart a background job after saving settings", error); }
 }
