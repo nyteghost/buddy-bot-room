@@ -56,6 +56,19 @@ describe("Meeting Threads approved-only index",()=>{
     expect((await post({op:"unlink",id,revision:1})).status).toBe(409);
     expect((await (await api()).json() as {items:MeetingThreadHit[]}).items[0]?.thread).toBe("");
   });
+  it("prepares a private brief only after an explicit owner-approved thread link",async()=>{
+    const noLinks=await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?brief=Planning&project=home"));
+    expect(noLinks.status).toBe(404);
+    expect((await post({op:"link",id,thread:"Planning",project:"home",revision:0})).status).toBe(200);
+    const good=await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?brief=Planning&project=home"));
+    expect(good.status).toBe(200);
+    const data=await good.json() as {brief:{text:string;sources:{meetingId:string}[]}};
+    expect(data.brief.sources.map(x=>x.meetingId)).toEqual([id]);
+    expect(data.brief.text).toContain("Blue Lantern project decisions reviewed.");
+    expect((await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?brief=Planning&project=other"))).status).toBe(404);
+    vi.mocked(currentUser).mockResolvedValueOnce(null);
+    expect((await handleMeetingThreads(new Request("http://localhost/api/meeting-threads?brief=Planning&project=home"))).status).toBe(403);
+  });
   it("never allows linking an unreviewed meeting or granting permissions via project labels",async()=>{
     expect((await post({op:"link",id:second,thread:"Draft",project:"private",revision:0})).status).toBe(409);
     expect((await post({op:"link",id,thread:"Planning",project:"../outside",revision:0})).status).toBe(400);
