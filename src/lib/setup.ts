@@ -59,3 +59,24 @@ export function groupItems(items: SetupItem[]): SetupGroupView[] {
   if (rest.length) groups.push({ id: "more", name: "More", blurb: "Everything else", items: rest, on: rest.filter((i) => i.configured).length });
   return groups.filter((g) => g.items.length || g.id === "maintenance");
 }
+
+/** Search across integration names, user-visible setting labels and help. No stored values or secrets are searched. */
+export function filterSetupItems(
+  items: SetupItem[],
+  fields: { group: string; key: string; label: string; help?: string }[],
+  query: string,
+  status: "all" | "configured" | "unconfigured" = "all",
+): SetupItem[] {
+  const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+  return items.filter((item) => {
+    if (status === "configured" && !item.configured) return false;
+    if (status === "unconfigured" && item.configured) return false;
+    if (!terms.length) return true;
+    const group = SETUP_GROUPS.find((g) => g.ids.includes(item.id));
+    const index = [
+      item.name, item.what, item.id, group?.name ?? "",
+      ...fields.filter((f) => f.group === item.id).flatMap((f) => [f.label, f.help ?? "", f.key]),
+    ].join(" ").toLocaleLowerCase();
+    return terms.every((term) => index.includes(term));
+  });
+}
