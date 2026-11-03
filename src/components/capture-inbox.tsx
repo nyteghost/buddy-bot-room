@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { MeetingVaultPanel } from "./meeting-vault-panel";
+import { MeetingThreadsPanel } from "./meeting-threads-panel";
 import type { Capture } from "@/lib/capture";
 import { AUDIO_TYPES, MAX_AUDIO, type Suggestion } from "@/lib/capture-inbox";
 import { scrubChatText } from "@/lib/chat-scrub";
@@ -57,6 +58,7 @@ export function CaptureInbox({
     [filter, setFilter] = useState("pending"),
     [voice, setVoice] = useState<Blob | null>(null),
     [vaultOpen,setVaultOpen] = useState(false),
+    [threadsOpen,setThreadsOpen] = useState(false),
     [recording, setRecording] = useState(false);
   const [editor, setEditor] = useState<{ capture: Capture; suggestion: Suggestion } | null>(null),
     [kind, setKind] = useState<Suggestion["kind"]>("task"),
@@ -342,6 +344,10 @@ export function CaptureInbox({
       <details onToggle={e=>setVaultOpen(e.currentTarget.open)}>
         <summary className="cursor-pointer py-2 font-medium">Meeting Vault · longer recordings</summary>
         {vaultOpen && <MeetingVaultPanel open={open && vaultOpen}/>}
+      </details>
+      <details onToggle={e=>setThreadsOpen(e.currentTarget.open)}>
+        <summary className="cursor-pointer py-2 font-medium">Meeting Threads · reviewed notes and decisions</summary>
+        {threadsOpen && <MeetingThreadsPanel open={open && threadsOpen}/>}
       </details>
       {data && !data.enabled && (
         <p>
