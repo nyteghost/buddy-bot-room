@@ -73,6 +73,13 @@ describe("Meeting Vault secure streaming and recovery",()=>{
     expect(audio.status).toBe(200);
     expect(new Uint8Array(await audio.arrayBuffer())).toEqual(bytes);
   }, 25000);
+  it("ignores unfinished atomic-create directories without losing saved meetings",async()=>{
+    const other=join(folder,"meeting-vault",".creating-9fe4e7d4-ea39-4b8d-8efa-cb63c1620ba2");
+    await (await import("node:fs/promises")).mkdir(other,{recursive:true});
+    const record=await make(4);
+    const payload=await (await listing()).json() as {meetings:MeetingRecord[]};
+    expect(payload.meetings.map(x=>x.id)).toEqual([record.id]);
+  });
   it("requires revision and explicit confirmation to delete originals",async()=>{
     const record=await make(4);
     const blob=new Uint8Array([9,7,5,3]);

@@ -228,8 +228,18 @@ export async function handleMeetingVault(request: Request): Promise<Response> {
       return locked(async () => {
         const list = await listMeetings();
         if (list.length >= MEETING_MAX_COUNT) return reply({ error: "Meeting Vault is full; review older recordings." }, 409);
-        await secureDir(folder(record.id));
-        await storeMeeting(record);
+        // Publish the new recording directory atomically. A crash while
+        // creating metadata must not strand an empty UUID folder that breaks listing.
+        const pending = join(root(), ".creating-" + record.id);
+        await secureDir(pending);
+        try {
+          await writeFile(join(pending, "record.json"), JSON.stringify(record),
+            { mode: 0o600, flag: "wx" });
+          await rename(pending, folder(record.id));
+        } catch (error) {
+          await rm(pending, { recursive: true, force: true }).catch(() => undefined);
+          throw error;
+        }
         return reply({ record }, 201);
       });
     }
