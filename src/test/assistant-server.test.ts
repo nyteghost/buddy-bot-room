@@ -3,14 +3,16 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import type { Conversation } from "@/lib/assistant";
-import { handleAssistant } from "@/lib/assistant.server";
-import { currentUser } from "@/lib/accounts.server";
+import { askDiscordCompanion, handleAssistant } from "@/lib/assistant.server";
+import { ownerEngineJson } from "@/lib/ask.server";
+import { currentUser, ownerName } from "@/lib/accounts.server";
 import { handleChat } from "@/lib/chat.server";
 import { readOllamaHealth } from "@/lib/ollama-health.server";
 import { keeperSnapshot, keeperTransaction } from "@/lib/keeper-store.server";
 import { chatTransaction, readChatRows } from "@/lib/store.server";
 vi.mock("@/lib/search.server", () => ({ handleSearch: vi.fn() }));
-vi.mock("@/lib/accounts.server", () => ({ currentUser: vi.fn() }));
+vi.mock("@/lib/accounts.server", () => ({ currentUser: vi.fn(), ownerName: vi.fn() }));
+vi.mock("@/lib/ask.server", () => ({ ownerEngineJson: vi.fn() }));
 vi.mock("@/lib/chat.server", () => ({ handleChat: vi.fn() }));
 vi.mock("@/lib/ollama-health.server", () => ({ readOllamaHealth: vi.fn() }));
 const req = (data: unknown) =>
@@ -31,6 +33,8 @@ beforeEach(async () => {
   vi.stubEnv("LOCAL_ONLY_AI", "off");
   vi.stubEnv("MEMORY_CLOUD_CONTEXT", "off");
   vi.mocked(currentUser).mockReset().mockResolvedValue({ username: "owner", owner: true });
+  vi.mocked(ownerName).mockReset().mockResolvedValue("owner");
+  vi.mocked(ownerEngineJson).mockReset().mockResolvedValue(JSON.stringify({ kind: "local-server", localChat: "auto" }));
   vi.mocked(readOllamaHealth)
     .mockReset()
     .mockResolvedValue({
@@ -89,6 +93,23 @@ it("persists independent conversations, titles, drafts and contextual turns in e
     patch: { draft: "My unfinished question" },
   });
   expect(saved.conversation.assistant.draft).toBe("My unfinished question");
+});
+it("makes Discord conversations visible and reusable through the normal General Chat API", async () => {
+  const first = await askDiscordCompanion("Hello from Discord");
+  expect(first).toEqual({ ok: true, text: "Working answer" });
+  const response = await handleAssistant(new Request("http://localhost/api/assistant"));
+  expect(response.status).toBe(200);
+  const listing = (await response.json()) as { conversations: Conversation[] };
+  const companion = listing.conversations.find((c) => c.title === "Discord Companion");
+  expect(companion?.mode).toBe("discord");
+  expect(companion?.assistant.status).toBe("active");
+  const detail = await handleAssistant(new Request("http://localhost/api/assistant?id=" + companion!.id));
+  expect((await detail.json()).conversation.messages).toHaveLength(2);
+  expect((await askDiscordCompanion("One more Discord question")).ok).toBe(true);
+  const rows = await readChatRows();
+  expect(rows.filter((r) => r.mode === "discord")).toHaveLength(1);
+  expect(rows.find((r) => r.id === companion!.id)?.messages).toHaveLength(4);
+  expect(vi.mocked(handleChat).mock.calls.at(-1)?.[2]).toBe(true);
 });
 it("supplies only relevant authorized memories and stores a memory inspector receipt", async () => {
   const home = (await api({ op: "project", name: "Homelab" })).project;
