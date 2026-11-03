@@ -51,6 +51,7 @@ import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
 import { Route as ApiMeetingVaultRouteImport } from './routes/api.meeting-vault'
 import { Route as ApiMeetingReviewRouteImport } from './routes/api.meeting-review'
 import { Route as ApiMeetingTranscribeRouteImport } from './routes/api.meeting-transcribe'
+import { Route as ApiMeetingThreadsRouteImport } from './routes/api.meeting-threads'
 import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
@@ -286,6 +287,11 @@ const ApiMeetingTranscribeRoute = ApiMeetingTranscribeRouteImport.update({
   path: '/api/meeting-transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeetingThreadsRoute = ApiMeetingThreadsRouteImport.update({
+  id: '/api/meeting-threads',
+  path: '/api/meeting-threads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
   id: '/api/working-pals',
   path: '/api/working-pals',
@@ -450,6 +456,7 @@ export interface FileRoutesByFullPath {
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/meeting-review': typeof ApiMeetingReviewRoute
   '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
+  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -518,6 +525,7 @@ export interface FileRoutesByTo {
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/meeting-review': typeof ApiMeetingReviewRoute
   '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
+  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -587,6 +595,7 @@ export interface FileRoutesById {
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/meeting-review': typeof ApiMeetingReviewRoute
   '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
+  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -657,6 +666,7 @@ export interface FileRouteTypes {
     | '/api/meeting-vault'
     | '/api/meeting-review'
     | '/api/meeting-transcribe'
+    | '/api/meeting-threads'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -725,6 +735,7 @@ export interface FileRouteTypes {
     | '/api/meeting-vault'
     | '/api/meeting-review'
     | '/api/meeting-transcribe'
+    | '/api/meeting-threads'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -793,6 +804,7 @@ export interface FileRouteTypes {
     | '/api/meeting-vault'
     | '/api/meeting-review'
     | '/api/meeting-transcribe'
+    | '/api/meeting-threads'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -862,6 +874,7 @@ export interface RootRouteChildren {
   ApiMeetingVaultRoute: typeof ApiMeetingVaultRoute
   ApiMeetingReviewRoute: typeof ApiMeetingReviewRoute
   ApiMeetingTranscribeRoute: typeof ApiMeetingTranscribeRoute
+  ApiMeetingThreadsRoute: typeof ApiMeetingThreadsRoute
   ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
@@ -1182,6 +1195,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeetingTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meeting-threads': {
+      id: '/api/meeting-threads'
+      path: '/api/meeting-threads'
+      fullPath: '/api/meeting-threads'
+      preLoaderRoute: typeof ApiMeetingThreadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/working-pals': {
       id: '/api/working-pals'
       path: '/api/working-pals'
@@ -1410,6 +1430,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeetingVaultRoute: ApiMeetingVaultRoute,
   ApiMeetingReviewRoute: ApiMeetingReviewRoute,
   ApiMeetingTranscribeRoute: ApiMeetingTranscribeRoute,
+  ApiMeetingThreadsRoute: ApiMeetingThreadsRoute,
   ApiWorkingPalsRoute: ApiWorkingPalsRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
