@@ -74,7 +74,7 @@ export async function handleMeetingThreads(request:Request):Promise<Response>{
       const brief=params.get("brief");
       if(brief!==null){
         const project=params.get("project")??"";
-        if(brief.length>80||/[\\r\\n\\0]/.test(brief)||project.length>80||!/^([a-z0-9_-]{1,80})?$/i.test(project))
+        if(brief.length>80||/[\r\n\0]/.test(brief)||project.length>80||!/^([a-z0-9_-]{1,80})?$/i.test(project))
           return response({error:"Invalid reviewed thread selection."},400);
         const reviewed=await locked(()=>visibleMeetings(""));
         const result=prepareReviewedMeetingBrief(reviewed,brief,project,new Date().toISOString());
