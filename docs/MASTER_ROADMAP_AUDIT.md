@@ -40,3 +40,7 @@ An opt-in Discord text front end has been added separately from the core ADHD/ca
 - ICS feeds now use HTTPS URL guards, 8 MB streaming limits, redirect blocking, protected hashed offline cache, refresh/test support, and clear stale state. Old removed/expired snapshots are purged.
 - RDATE date instances, daylight-saving and cancellation tests added. Full named subscriptions, local ICS uploads, provider-specific complex RRULEs, and advanced network-level egress hardening remain.
 - See SETTINGS_NAVIGATION.md and CALENDAR_ICS_BETA.md for usage and limits.
+
+## Working Pals increment 1 — permission gate
+
+Implemented on beta: owner-only propose/approve/run/pause/revoke, per-job revision conflict checking, per-job result and failure state, serialized durable JSON in BUDDY_DATA_DIR and reuse of the existing inference job lane. Restart-interrupted work is marked for manual retry rather than resumed silently. Only explicitly approved read-only local Ollama summaries run; no unsanctioned actions, external messaging or Obsidian/memory changes are permitted. See [Working Pals](WORKING_PALS_BETA.md). General scoped recurring missions, persistent mission runners, granular action permission grants and Working Pals inbox notifications remain future work.

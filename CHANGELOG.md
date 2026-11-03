@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta — Working Pals approval-first foundation
+
+- Add private owner-only Working Pals jobs inbox in Settings. Propose, approve, run, pause, revoke and review each job explicitly.
+- Store revisioned job records and outcomes in the existing Unraid persistent volume and use the shared inference job lane; interrupted runs require manual retry.
+- No autonomous external actions, scheduled jobs, Discord-triggered execution, calendar/memory writes or notifications. First increment is local Ollama read-only summarization only.
+- Add tests for owner authorization, permission boundaries, revision conflicts and recovery, and route documentation.
+
+
 ## Beta — Settings simplification and calendar reliability
 - Reworked Settings: selected categories, search by service and field, connected/not set up filters, progressive help, same saved values and secret handling.
 - Calendar: safer HTTPS-only public feed checks, no redirect following, bounded streaming, last-good offline snapshots in protected Unraid data, refresh-on-demand and sync status.
