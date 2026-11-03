@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { MeetingReviewPanel } from "@/components/meeting-review-panel";
 import { Input } from "@/components/ui/input";
 import { MEETING_CHUNK_BYTES, MEETING_MAX_BYTES, MEETING_TYPES, type MeetingMime, type MeetingRecord } from "@/lib/meeting-vault";
 
@@ -32,6 +33,7 @@ export function MeetingVaultPanel({open}:{open:boolean}) {
   const [busy,setBusy]=useState(false);
   const [progress,setProgress]=useState(0);
   const [notice,setNotice]=useState("");
+  const [expandedReviews,setExpandedReviews]=useState<string[]>([]);
   const abort=useRef<AbortController|null>(null);
   const refresh=useCallback(async()=>{
     try {
@@ -157,7 +159,13 @@ export function MeetingVaultPanel({open}:{open:boolean}) {
         {m.status==="ready" ? <>
           <audio controls preload="none" className="w-full" src={"/api/meeting-vault?id="+encodeURIComponent(m.id)+"&audio=1"} />
           <p className="text-xs text-muted-foreground">Original SHA-256: <span className="break-all font-mono">{m.sha256}</span></p>
-          <p className="text-xs text-muted-foreground">Notes and transcript: Not started. Review-first AI processing will be a separate feature.</p>
+          <details onToggle={e=>{
+            const visible=e.currentTarget.open;
+            setExpandedReviews(ids=>visible?[...new Set([...ids,m.id])]:ids.filter(id=>id!==m.id));
+          }}>
+            <summary className="cursor-pointer py-2 font-medium">Review transcript and meeting notes</summary>
+            <MeetingReviewPanel id={m.id} open={expandedReviews.includes(m.id)} />
+          </details>
         </> : <p className="text-xs text-muted-foreground">Reselect {m.filename} above to resume. Keep your original file until this says Original stored.</p>}
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" disabled={busy} onClick={()=>void remove(m)}>Delete recording…</Button>
