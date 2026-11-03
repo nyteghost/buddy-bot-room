@@ -11,6 +11,7 @@ const activities: Record<AgentId, readonly PalActivity[]> = {
   rune: [{ emoji: "⚙️", text: "Testing a gadget" }, { emoji: "🔍", text: "Inspecting a gizmo" }, { emoji: "🧰", text: "Organizing inventions" }],
   claude: [{ emoji: "📓", text: "Reviewing a notebook" }, { emoji: "🫖", text: "Making tea" }, { emoji: "📐", text: "Sketching a diagram" }],
   saiyan: [{ emoji: "💪", text: "Practicing a power-up" }, { emoji: "🧘", text: "Stretching" }, { emoji: "🥤", text: "Getting some water" }],
+  mimic: [{ emoji: "🧰", text: "Rummaging for overlooked ideas" }, { emoji: "👀", text: "Peeking out of its chest" }, { emoji: "✨", text: "Admiring shiny little things" }],
 };
 export function palActivity(id: AgentId, phase: number): PalActivity {
   const list = activities[id];
