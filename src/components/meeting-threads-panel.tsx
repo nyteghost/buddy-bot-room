@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MeetingThreadHit } from "@/lib/meeting-threads";
 import type { ReviewedMeetingBrief } from "@/lib/meeting-briefing";
+import type { MeetingLinkSuggestion } from "@/lib/meeting-link-suggestions";
 
 async function meetingThreadsApi(query: string, op?:Record<string,unknown>):Promise<Record<string,unknown>>{
   const url=op?"/api/meeting-threads":"/api/meeting-threads?q="+encodeURIComponent(query);
@@ -23,6 +24,20 @@ export function MeetingThreadsPanel({open}:{open:boolean}) {
   const [notice,setNotice]=useState("");
   const [brief,setBrief]=useState<ReviewedMeetingBrief|null>(null);
   const [briefLoading,setBriefLoading]=useState(false);
+  const [suggestions,setSuggestions]=useState<MeetingLinkSuggestion[]>([]);
+  const [suggestLoading,setSuggestLoading]=useState(false);
+  const suggest=async()=>{
+    setSuggestLoading(true);setNotice("");
+    try{
+      const r=await fetch("/api/meeting-threads?suggest=1");
+      const data=await r.json() as {suggestions?:MeetingLinkSuggestion[];error?:string};
+      if(!r.ok||!Array.isArray(data.suggestions))throw Error(data.error??"Couldn't check reviewed meeting links");
+      setSuggestions(data.suggestions);
+      if(!data.suggestions.length)setNotice("No strong shared-keyword suggestions from approved meetings. You can still link manually.");
+    }catch(e){setNotice(e instanceof Error?e.message:"Couldn't check links");}
+    finally{setSuggestLoading(false);}
+  };
+
   const prepareBrief=async(threadName:string,projectName:string)=>{
     setBriefLoading(true);setNotice("");setBrief(null);
     try{
@@ -81,9 +96,39 @@ export function MeetingThreadsPanel({open}:{open:boolean}) {
     </form>
     <div className="flex justify-between gap-2">
       <p className="text-xs text-muted-foreground">{loaded?items.length+" approved review(s)":"Loading approved reviews…"}</p>
-      <Button size="sm" variant="ghost" onClick={()=>void load(searched).catch(e=>setNotice(e instanceof Error?e.message:"Couldn't refresh"))}>Refresh</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={suggestLoading} onClick={()=>void suggest()}>
+          {suggestLoading?"Checking reviewed notes…":"Suggest thread links"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={()=>void load(searched).catch(e=>setNotice(e instanceof Error?e.message:"Couldn't refresh"))}>Refresh</Button>
+      </div>
     </div>
     {loaded&&!items.length&&<p className="text-xs text-muted-foreground">No approved meetings match. Finish a recording's Review step first; drafts are never indexed.</p>}
+    {!!suggestions.length&&<section aria-label="Suggested reviewed meeting links" className="grid gap-2 rounded-lg border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="font-medium">Suggestions to review · {suggestions.length}</h4>
+        <Button size="sm" variant="ghost" onClick={()=>setSuggestions([])}>Dismiss suggestions</Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        These are simple shared-keyword matches between approved notes—not verified project relationships.
+        Choosing a suggestion only fills the existing link form; you must press Save reviewed link separately.
+      </p>
+      {suggestions.map((suggestion,i)=><article key={suggestion.meetingId+"-"+i} className="grid gap-2 rounded-md bg-muted/30 p-2">
+        <div className="text-sm font-medium">{suggestion.title}</div>
+        <p className="text-xs">Suggested: {suggestion.proposedThread}{suggestion.proposedProject?" · "+suggestion.proposedProject:""}</p>
+        <p className="text-xs text-muted-foreground">Based on reviewed meeting: {suggestion.evidenceTitle}.
+          Shared terms: {suggestion.sharedTerms.join(", ")}. This is not AI-verified evidence.</p>
+        <Button size="sm" variant="outline" disabled={busy} onClick={()=>{
+          setEditId(suggestion.meetingId);
+          setThread(suggestion.proposedThread);
+          setProject(suggestion.proposedProject);
+          setSuggestions([]);
+          setSearched("");
+          setSearch("");
+          setNotice("Suggestion selected. Review the evidence and press Save reviewed link in the unlinked meeting card to confirm.");
+        }}>Review in link form</Button>
+      </article>)}
+    </section>}
     {[...grouped].map(([group,meetings])=><div key={group} className="grid gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="font-medium">{group}</h4>
