@@ -50,6 +50,7 @@ import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
 import { Route as ApiMeetingVaultRouteImport } from './routes/api.meeting-vault'
 import { Route as ApiMeetingReviewRouteImport } from './routes/api.meeting-review'
+import { Route as ApiMeetingTranscribeRouteImport } from './routes/api.meeting-transcribe'
 import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
@@ -280,6 +281,11 @@ const ApiMeetingReviewRoute = ApiMeetingReviewRouteImport.update({
   path: '/api/meeting-review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeetingTranscribeRoute = ApiMeetingTranscribeRouteImport.update({
+  id: '/api/meeting-transcribe',
+  path: '/api/meeting-transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
   id: '/api/working-pals',
   path: '/api/working-pals',
@@ -443,6 +449,7 @@ export interface FileRoutesByFullPath {
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/meeting-review': typeof ApiMeetingReviewRoute
+  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -510,6 +517,7 @@ export interface FileRoutesByTo {
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/meeting-review': typeof ApiMeetingReviewRoute
+  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -578,6 +586,7 @@ export interface FileRoutesById {
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/meeting-review': typeof ApiMeetingReviewRoute
+  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -647,6 +656,7 @@ export interface FileRouteTypes {
     | '/api/schedules'
     | '/api/meeting-vault'
     | '/api/meeting-review'
+    | '/api/meeting-transcribe'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -714,6 +724,7 @@ export interface FileRouteTypes {
     | '/api/schedules'
     | '/api/meeting-vault'
     | '/api/meeting-review'
+    | '/api/meeting-transcribe'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -781,6 +792,7 @@ export interface FileRouteTypes {
     | '/api/schedules'
     | '/api/meeting-vault'
     | '/api/meeting-review'
+    | '/api/meeting-transcribe'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -849,6 +861,7 @@ export interface RootRouteChildren {
   ApiSchedulesRoute: typeof ApiSchedulesRoute
   ApiMeetingVaultRoute: typeof ApiMeetingVaultRoute
   ApiMeetingReviewRoute: typeof ApiMeetingReviewRoute
+  ApiMeetingTranscribeRoute: typeof ApiMeetingTranscribeRoute
   ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
@@ -1162,6 +1175,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeetingReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meeting-transcribe': {
+      id: '/api/meeting-transcribe'
+      path: '/api/meeting-transcribe'
+      fullPath: '/api/meeting-transcribe'
+      preLoaderRoute: typeof ApiMeetingTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/working-pals': {
       id: '/api/working-pals'
       path: '/api/working-pals'
@@ -1389,6 +1409,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSchedulesRoute: ApiSchedulesRoute,
   ApiMeetingVaultRoute: ApiMeetingVaultRoute,
   ApiMeetingReviewRoute: ApiMeetingReviewRoute,
+  ApiMeetingTranscribeRoute: ApiMeetingTranscribeRoute,
   ApiWorkingPalsRoute: ApiWorkingPalsRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
