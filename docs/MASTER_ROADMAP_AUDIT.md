@@ -44,3 +44,7 @@ An opt-in Discord text front end has been added separately from the core ADHD/ca
 ## Working Pals increment 1 — permission gate
 
 Implemented on beta: owner-only propose/approve/run/pause/revoke, per-job revision conflict checking, per-job result and failure state, serialized durable JSON in BUDDY_DATA_DIR and reuse of the existing inference job lane. Restart-interrupted work is marked for manual retry rather than resumed silently. Only explicitly approved read-only local Ollama summaries run; no unsanctioned actions, external messaging or Obsidian/memory changes are permitted. See [Working Pals](WORKING_PALS_BETA.md). General scoped recurring missions, persistent mission runners, granular action permission grants and Working Pals inbox notifications remain future work.
+
+## Meeting Memory increment 1 — protected original-audio vault
+
+Implemented on beta: owner-only Meeting Vault inside Capture Inbox, consent checkbox, 512 MB supported audio limit, SHA-256 verified 1 MiB resumable chunks, idempotent duplicate chunk retry, on-disk assembly and recorded digest, authenticated audio playback and revision-checked confirmed deletion. Storage is separated by recording in BUDDY_DATA_DIR/meeting-vault and kept private by filesystem permissions. This is only the recording-storage foundation; there is no transcription, speaker diarization, review inbox, approved Obsidian export or Discord voice ingestion yet. Real iPhone lock/background behavior and network interruption need hardware testing. [Setup and limitations](MEETING_VAULT_BETA.md).

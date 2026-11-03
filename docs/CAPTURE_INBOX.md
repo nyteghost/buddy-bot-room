@@ -35,3 +35,7 @@ Approved non-private memories use the existing managed Obsidian synchronization.
 Keep `/data` on persistent Unraid storage. Keep the existing backup/restore configuration and back up the data volume, including `capture.json`, `capture-audio`, `today.json`, chats and the existing Memory Keeper store. Test restoration separately before relying on a backup. Approved memory records follow existing Memory Center export/recovery rules; no competing memory database is introduced.
 
 Browser tests use controlled Whisper/Ollama/search fixtures. Real microphone permission, model quality and your live services still need a device check after deployment.
+
+## Long meetings: Meeting Vault
+
+The existing **Voice memo** tool is still intended for short clips (8 MB maximum). For longer conversations, expand **Meeting Vault · longer recordings** within Capture Inbox. It imports an audio file in resumable chunks, retains the verified original in private Unraid storage and offers playback. It requires explicit confirmation that you have permission to record and store the conversation. See [Meeting Vault](MEETING_VAULT_BETA.md). Meeting Vault does **not** automatically run AI, create action items, or publish anything into Obsidian.

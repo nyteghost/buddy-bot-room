@@ -1,5 +1,14 @@
 # Changelog
 
+## Beta — Meeting Vault original-audio import foundation
+
+- Introduce protected, owner-only Meeting Vault storage separate from 8 MB Capture Inbox voice clips, with up to 512 MB per recording.
+- Add verified, idempotent 1 MB chunk uploads so interrupted iPhone audio imports can be resumed by reselecting the original file; reassemble and fingerprint the original audio on Unraid.
+- Require an explicit recording/storage authorization checkbox, keep media in private filesystem directories, support authenticated streaming playback and deletion with confirmation.
+- Accessible under Capture Inbox → Meeting Vault. Importing does **not** start transcription, create memories, notify Working Pals, link projects or write Obsidian notes.
+- Still planned: local transcription, review and speaker corrections, Obsidian export, Meeting Threads, smart linking and Discord voice recording.
+
+
 ## Beta — Working Pals approval-first foundation
 
 - Add private owner-only Working Pals jobs inbox in Settings. Propose, approve, run, pause, revoke and review each job explicitly.
