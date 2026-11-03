@@ -19,7 +19,7 @@ describe("New character themes", () => {
   });
   it("new themes have distinct native 32 by 32 sprites for all seven agents", () => {
     for(const mode of ["matrix", "finalfantasy"] as const) {
-      const sprites = agents.filter(a => a.id !== "saiyan").map(a => characterSprite(a.id, mode)); // Saiyan has its own directional art
+      const sprites = agents.filter(a => a.id !== "saiyan" && a.id !== "mimic").map(a => characterSprite(a.id, mode)); // Saiyan has directional art; Mimic intentionally keeps its unique chest in every theme
       expect(new Set(sprites.map(s => s.join(""))).size).toBe(7);
       for(const sprite of sprites) { expect(sprite.length).toBe(32); expect(sprite.every(row => row.length === 32)).toBe(true); }
     }
