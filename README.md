@@ -904,3 +904,7 @@ See [Current information](docs/CURRENT_INFORMATION.md) for General Chat Web Auto
 General Chat now [streams temporary scrubbed replies](docs/GENERAL_CHAT.md#streaming-replies-beta-10821), with Stop, preserved follow-up drafts and authoritative final history/source receipts.
 
 Adaptive Today development: [usage and recovery](docs/ADAPTIVE_TODAY.md), [master roadmap audit and remaining increments](docs/MASTER_ROADMAP_AUDIT.md).
+
+### Beta 1.0.948 roadmap increment
+
+Working Pals now supports separately approved recurring read-only summaries and retained run receipts. Calendar supports named/color-coded retained ICS imports. Meeting review adds estimated segment timestamps and manual speaker correction; Discord `/ask` offers Pal selection (excluding Mimic until its separate privacy boundaries are supported). See [the master audit](docs/MASTER_ROADMAP_AUDIT.md) for remaining work and validation limits.

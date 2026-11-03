@@ -1,3 +1,4 @@
+import { jobs } from "./jobs.server";
 import { processCaptureJob } from "./capture-inbox-worker.server";
 import { readChatRows, chatTransaction } from "./store.server";
 import {
@@ -55,6 +56,7 @@ export function scheduleKeeper(delay = 45000) {
 export async function foregroundStart() {
   const r = runtime();
   r.active++;
+  for(const [id,state] of Object.entries(jobs().snapshot()))if(id.startsWith("working:")&&state.running)jobs().cancel(id);
   if (r.timer) {
     clearTimeout(r.timer);
     delete r.timer;

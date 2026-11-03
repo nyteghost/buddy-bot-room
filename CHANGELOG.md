@@ -1,3 +1,12 @@
+## Beta 1.0.948 — Approved recurrence and review controls
+
+- Working Pals: separately approved recurrence, retained receipts, Pause all, foreground-chat priority and stale-result protection.
+- Calendar: named/color-coded ICS imports with explicit consent, retained originals, visibility controls and subscription labels.
+- Meetings: validated Whisper segment times, format compatibility fallback, click-to-listen and draft speaker corrections.
+- Discord: optional Pal choice on the existing private local-AI bridge; Mimic stays excluded pending its privacy controls.
+- Second Brain: exact keyword matching and accurate idempotent import counts.
+- Preserve existing stores, originals and integrations. This milestone does not complete the full roadmap; see the master audit.
+
 # Changelog
 
 ## Beta — Mimic, the ninth Pal (owner-inspired, not owner impersonation)

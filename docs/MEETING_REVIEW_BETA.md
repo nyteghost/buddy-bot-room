@@ -37,3 +37,7 @@ After approving a meeting review, open **Capture Inbox → Meeting Threads** to 
 After approving the meeting notes, open **Create a Today task from this approved meeting…** under its Meeting Review. Enter a task title and optional notes, check the separate confirmation, then click **Create approved Today task**. This creates a private Today planner task with the reviewed meeting ID and review revision in its notes. The app does not extract assignments, infer an owner, or create reminders from the transcript. It does not create tasks while the review is in draft.
 
 Retries of the same approved meeting action are idempotent; a stale revision is refused and duplicate open task titles are not added. Edit or mark the task complete in Today as usual. The original recording, approved review, and Obsidian note are not modified by this action. To keep work data private, only use this after confirming your organization's policy allows its storage in Pixel Pals.
+
+## Listen and correct speakers
+
+Expand **Listen and correct speakers** for timestamped transcripts. **Listen from here** seeks the original recording only after your click. Enter a confirmed speaker name and apply it to an individual segment; this changes the draft only. Save edits and approve the review separately. Speaker names are never inferred from audio by this feature. Keep the original recording open in Meeting Vault for playback.

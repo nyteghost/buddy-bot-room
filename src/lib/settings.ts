@@ -75,6 +75,8 @@ export const SETTING_FIELDS: SettingField[] = [
   { key: "WEATHER_LOCATION", label: "Place", group: "weather", kind: "text", placeholder: "Atlanta, GA" },
   { key: "WEATHER_UNITS", label: "Units", group: "weather", kind: "select", options: ["imperial", "metric"] },
   { key: "CALENDAR_ICS_URLS", label: "Calendar feed links", group: "calendar", kind: "list", secret: true, placeholder: "https://…/basic.ics", help: "Google, iCloud, Outlook or Cozi share links (webcal:// becomes HTTPS). Up to six links. Use publicly reachable HTTPS addresses; private/local network hosts and redirects are blocked. Feed links are secret. Only import employer calendars with authorization." },
+  {key:"CALENDAR_ICS_NAMES",label:"Calendar feed names",group:"calendar",kind:"text",placeholder:"Personal, Family, Appointments",help:"Optional comma-separated names, in the same order as your secret feed links."},
+  {key:"CALENDAR_ICS_COLORS",label:"Calendar feed colors",group:"calendar",kind:"text",placeholder:"#93d9b6, #89abff",help:"Optional comma-separated hex colors, in the same order as feed links."},
   { key: "CALENDAR_REFRESH_MINUTES", label: "Refresh calendar every (minutes)", group: "calendar", kind: "number", placeholder: "30", help: "5 to 1440 minutes. Last successful calendar copies remain available offline for up to 30 days." },
   { key: "GOOGLE_CLIENT_ID", label: "Google client ID", group: "gcal", kind: "text", help: "From Google Cloud Console → Credentials → OAuth client (Web application). Lets Pixel Pals add your shifts to Google Calendar." },
   { key: "GOOGLE_CLIENT_SECRET", label: "Google client secret", group: "gcal", kind: "text", secret: true },

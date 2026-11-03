@@ -52,11 +52,11 @@ import { localOnlyOn } from "./ai/guard.server";
 import { handleSearch } from "./search.server";
 import { handleToday } from "./today.server";
 import { handleSecondBrain } from "./second-brain.server";
-import { models, type RoomMessage } from "./agents";
+import { agents, models, type AgentId, type RoomMessage } from "./agents";
 const reply = (v: unknown, status = 200) =>
   Response.json(v, { status, headers: { "Cache-Control": "no-store" } });
 const running = new Set<string>();
-type DiscordInternal = { ownerName: string };
+type DiscordInternal = { ownerName: string; pal:AgentId };
 let discordBusy = false;
 const mine = (rows: Row[], owner: string) =>
   rows.filter((r) => r.assistant && r.owner === owner && !r.shared) as Conversation[];
@@ -593,19 +593,18 @@ export async function handleAssistant(
       const body = (await r.json()) as { notes: { id: string; title: string; body: string }[] };
       const added = await keeperTransaction((s) => {
         let count = 0;
+        const existing=new Set(s.records.map(m=>m.id));
         for (const n of body.notes) {
           if (sensitive(n.body)) continue;
-          if (
-            createMemory(s, {
+          const record=createMemory(s, {
               title: n.title,
               text: n.body,
               scope: "private",
               verified: false,
               pending: true,
               key: n.id,
-            })
-          )
-            count++;
+            });
+          if(record&&!existing.has(record.id)){count++;existing.add(record.id);}
         }
         return count;
       });
@@ -1046,7 +1045,7 @@ export async function handleAssistant(
               method: "POST",
               headers: req.headers,
               body: JSON.stringify({
-                agentId: "echo",
+                agentId: internal?.pal??"echo",
                 model: models[0]!.id,
                 mode: "direct",
                 round: 1,
@@ -1104,7 +1103,7 @@ export async function handleAssistant(
         role: "assistant",
         parts: [{ type: "text", text: answer }],
         metadata: {
-          agentId: "echo",
+          agentId: internal?.pal??"echo",
           model: actualModel,
           via: provider.kind,
           memoryIds: supplied.map((m) => m.id),
@@ -1174,7 +1173,8 @@ export async function handleAssistant(
  * Its persistent conversation is stored by the existing General Chat/Memory Keeper.
  * Discord is local-Ollama-only and cannot request tools, scopes, or provider changes.
  */
-export async function askDiscordCompanion(question: string): Promise<{ ok: boolean; text: string }> {
+export async function askDiscordCompanion(question: string, pal:AgentId="echo"): Promise<{ ok: boolean; text: string }> {
+  if(pal === "mimic" || !agents.some(a=>a.id===pal))return {ok:false,text:"Choose a known Pal."};
   if (discordBusy) return { ok: false, text: "Pixel Pals is already answering another Discord question. Try again shortly." };
   discordBusy = true;
   try {
@@ -1182,7 +1182,7 @@ export async function askDiscordCompanion(question: string): Promise<{ ok: boole
     if (!username) return { ok: false, text: "Create the Pixel Pals owner account first." };
     const engine = await ownerEngineJson();
     if (!engine) return { ok: false, text: "Save your Local AI settings in Pixel Pals before chatting in Discord." };
-    const internal: DiscordInternal = { ownerName: username };
+    const internal: DiscordInternal = { ownerName: username, pal };
     const call = (data: Record<string, unknown>) => handleAssistant(new Request("http://localhost/api/assistant", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data),
     }), undefined, internal);

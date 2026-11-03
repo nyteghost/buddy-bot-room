@@ -35,6 +35,10 @@ import { Route as ApiKeytestRouteImport } from './routes/api.keytest'
 import { Route as ApiM365RouteImport } from './routes/api.m365'
 import { Route as ApiMailRouteImport } from './routes/api.mail'
 import { Route as ApiMailboxRouteImport } from './routes/api.mailbox'
+import { Route as ApiMeetingReviewRouteImport } from './routes/api.meeting-review'
+import { Route as ApiMeetingThreadsRouteImport } from './routes/api.meeting-threads'
+import { Route as ApiMeetingTranscribeRouteImport } from './routes/api.meeting-transcribe'
+import { Route as ApiMeetingVaultRouteImport } from './routes/api.meeting-vault'
 import { Route as ApiMemorySuggestRouteImport } from './routes/api.memory-suggest'
 import { Route as ApiNotesSyncRouteImport } from './routes/api.notes-sync'
 import { Route as ApiObsidianMemoryRouteImport } from './routes/api.obsidian-memory'
@@ -48,11 +52,6 @@ import { Route as ApiProvidersRouteImport } from './routes/api.providers'
 import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
-import { Route as ApiMeetingVaultRouteImport } from './routes/api.meeting-vault'
-import { Route as ApiMeetingReviewRouteImport } from './routes/api.meeting-review'
-import { Route as ApiMeetingTranscribeRouteImport } from './routes/api.meeting-transcribe'
-import { Route as ApiMeetingThreadsRouteImport } from './routes/api.meeting-threads'
-import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
 import { Route as ApiSeerrRouteImport } from './routes/api.seerr'
@@ -74,6 +73,7 @@ import { Route as ApiVaultRouteImport } from './routes/api.vault'
 import { Route as ApiVendorsRouteImport } from './routes/api.vendors'
 import { Route as ApiWeatherRouteImport } from './routes/api.weather'
 import { Route as ApiWeeklyRouteImport } from './routes/api.weekly'
+import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiGoogleCallbackRouteImport } from './routes/api.google.callback'
 import { Route as ApiGoogleStartRouteImport } from './routes/api.google.start'
 
@@ -207,6 +207,26 @@ const ApiMailboxRoute = ApiMailboxRouteImport.update({
   path: '/api/mailbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeetingReviewRoute = ApiMeetingReviewRouteImport.update({
+  id: '/api/meeting-review',
+  path: '/api/meeting-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeetingThreadsRoute = ApiMeetingThreadsRouteImport.update({
+  id: '/api/meeting-threads',
+  path: '/api/meeting-threads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeetingTranscribeRoute = ApiMeetingTranscribeRouteImport.update({
+  id: '/api/meeting-transcribe',
+  path: '/api/meeting-transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeetingVaultRoute = ApiMeetingVaultRouteImport.update({
+  id: '/api/meeting-vault',
+  path: '/api/meeting-vault',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMemorySuggestRoute = ApiMemorySuggestRouteImport.update({
   id: '/api/memory-suggest',
   path: '/api/memory-suggest',
@@ -270,31 +290,6 @@ const ApiReposRoute = ApiReposRouteImport.update({
 const ApiSchedulesRoute = ApiSchedulesRouteImport.update({
   id: '/api/schedules',
   path: '/api/schedules',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeetingVaultRoute = ApiMeetingVaultRouteImport.update({
-  id: '/api/meeting-vault',
-  path: '/api/meeting-vault',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeetingReviewRoute = ApiMeetingReviewRouteImport.update({
-  id: '/api/meeting-review',
-  path: '/api/meeting-review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeetingTranscribeRoute = ApiMeetingTranscribeRouteImport.update({
-  id: '/api/meeting-transcribe',
-  path: '/api/meeting-transcribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeetingThreadsRoute = ApiMeetingThreadsRouteImport.update({
-  id: '/api/meeting-threads',
-  path: '/api/meeting-threads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
-  id: '/api/working-pals',
-  path: '/api/working-pals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSearchRoute = ApiSearchRouteImport.update({
@@ -402,6 +397,11 @@ const ApiWeeklyRoute = ApiWeeklyRouteImport.update({
   path: '/api/weekly',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
+  id: '/api/working-pals',
+  path: '/api/working-pals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGoogleCallbackRoute = ApiGoogleCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
@@ -440,6 +440,10 @@ export interface FileRoutesByFullPath {
   '/api/m365': typeof ApiM365Route
   '/api/mail': typeof ApiMailRoute
   '/api/mailbox': typeof ApiMailboxRoute
+  '/api/meeting-review': typeof ApiMeetingReviewRoute
+  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
+  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
+  '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/memory-suggest': typeof ApiMemorySuggestRoute
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
@@ -453,11 +457,6 @@ export interface FileRoutesByFullPath {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
-  '/api/meeting-vault': typeof ApiMeetingVaultRoute
-  '/api/meeting-review': typeof ApiMeetingReviewRoute
-  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
-  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
-  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
   '/api/seerr': typeof ApiSeerrRoute
@@ -479,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/api/vendors': typeof ApiVendorsRoute
   '/api/weather': typeof ApiWeatherRoute
   '/api/weekly': typeof ApiWeeklyRoute
+  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/start': typeof ApiGoogleStartRoute
 }
@@ -509,6 +509,10 @@ export interface FileRoutesByTo {
   '/api/m365': typeof ApiM365Route
   '/api/mail': typeof ApiMailRoute
   '/api/mailbox': typeof ApiMailboxRoute
+  '/api/meeting-review': typeof ApiMeetingReviewRoute
+  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
+  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
+  '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/memory-suggest': typeof ApiMemorySuggestRoute
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
@@ -522,11 +526,6 @@ export interface FileRoutesByTo {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
-  '/api/meeting-vault': typeof ApiMeetingVaultRoute
-  '/api/meeting-review': typeof ApiMeetingReviewRoute
-  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
-  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
-  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
   '/api/seerr': typeof ApiSeerrRoute
@@ -548,6 +547,7 @@ export interface FileRoutesByTo {
   '/api/vendors': typeof ApiVendorsRoute
   '/api/weather': typeof ApiWeatherRoute
   '/api/weekly': typeof ApiWeeklyRoute
+  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/start': typeof ApiGoogleStartRoute
 }
@@ -579,6 +579,10 @@ export interface FileRoutesById {
   '/api/m365': typeof ApiM365Route
   '/api/mail': typeof ApiMailRoute
   '/api/mailbox': typeof ApiMailboxRoute
+  '/api/meeting-review': typeof ApiMeetingReviewRoute
+  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
+  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
+  '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/memory-suggest': typeof ApiMemorySuggestRoute
   '/api/notes-sync': typeof ApiNotesSyncRoute
   '/api/obsidian-memory': typeof ApiObsidianMemoryRoute
@@ -592,11 +596,6 @@ export interface FileRoutesById {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
-  '/api/meeting-vault': typeof ApiMeetingVaultRoute
-  '/api/meeting-review': typeof ApiMeetingReviewRoute
-  '/api/meeting-transcribe': typeof ApiMeetingTranscribeRoute
-  '/api/meeting-threads': typeof ApiMeetingThreadsRoute
-  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
   '/api/seerr': typeof ApiSeerrRoute
@@ -618,6 +617,7 @@ export interface FileRoutesById {
   '/api/vendors': typeof ApiVendorsRoute
   '/api/weather': typeof ApiWeatherRoute
   '/api/weekly': typeof ApiWeeklyRoute
+  '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/google/callback': typeof ApiGoogleCallbackRoute
   '/api/google/start': typeof ApiGoogleStartRoute
 }
@@ -650,6 +650,10 @@ export interface FileRouteTypes {
     | '/api/m365'
     | '/api/mail'
     | '/api/mailbox'
+    | '/api/meeting-review'
+    | '/api/meeting-threads'
+    | '/api/meeting-transcribe'
+    | '/api/meeting-vault'
     | '/api/memory-suggest'
     | '/api/notes-sync'
     | '/api/obsidian-memory'
@@ -663,11 +667,6 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
-    | '/api/meeting-vault'
-    | '/api/meeting-review'
-    | '/api/meeting-transcribe'
-    | '/api/meeting-threads'
-    | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
     | '/api/seerr'
@@ -689,6 +688,7 @@ export interface FileRouteTypes {
     | '/api/vendors'
     | '/api/weather'
     | '/api/weekly'
+    | '/api/working-pals'
     | '/api/google/callback'
     | '/api/google/start'
   fileRoutesByTo: FileRoutesByTo
@@ -719,6 +719,10 @@ export interface FileRouteTypes {
     | '/api/m365'
     | '/api/mail'
     | '/api/mailbox'
+    | '/api/meeting-review'
+    | '/api/meeting-threads'
+    | '/api/meeting-transcribe'
+    | '/api/meeting-vault'
     | '/api/memory-suggest'
     | '/api/notes-sync'
     | '/api/obsidian-memory'
@@ -732,11 +736,6 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
-    | '/api/meeting-vault'
-    | '/api/meeting-review'
-    | '/api/meeting-transcribe'
-    | '/api/meeting-threads'
-    | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
     | '/api/seerr'
@@ -758,6 +757,7 @@ export interface FileRouteTypes {
     | '/api/vendors'
     | '/api/weather'
     | '/api/weekly'
+    | '/api/working-pals'
     | '/api/google/callback'
     | '/api/google/start'
   id:
@@ -788,6 +788,10 @@ export interface FileRouteTypes {
     | '/api/m365'
     | '/api/mail'
     | '/api/mailbox'
+    | '/api/meeting-review'
+    | '/api/meeting-threads'
+    | '/api/meeting-transcribe'
+    | '/api/meeting-vault'
     | '/api/memory-suggest'
     | '/api/notes-sync'
     | '/api/obsidian-memory'
@@ -801,11 +805,6 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
-    | '/api/meeting-vault'
-    | '/api/meeting-review'
-    | '/api/meeting-transcribe'
-    | '/api/meeting-threads'
-    | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
     | '/api/seerr'
@@ -827,6 +826,7 @@ export interface FileRouteTypes {
     | '/api/vendors'
     | '/api/weather'
     | '/api/weekly'
+    | '/api/working-pals'
     | '/api/google/callback'
     | '/api/google/start'
   fileRoutesById: FileRoutesById
@@ -858,6 +858,10 @@ export interface RootRouteChildren {
   ApiM365Route: typeof ApiM365Route
   ApiMailRoute: typeof ApiMailRoute
   ApiMailboxRoute: typeof ApiMailboxRoute
+  ApiMeetingReviewRoute: typeof ApiMeetingReviewRoute
+  ApiMeetingThreadsRoute: typeof ApiMeetingThreadsRoute
+  ApiMeetingTranscribeRoute: typeof ApiMeetingTranscribeRoute
+  ApiMeetingVaultRoute: typeof ApiMeetingVaultRoute
   ApiMemorySuggestRoute: typeof ApiMemorySuggestRoute
   ApiNotesSyncRoute: typeof ApiNotesSyncRoute
   ApiObsidianMemoryRoute: typeof ApiObsidianMemoryRoute
@@ -871,11 +875,6 @@ export interface RootRouteChildren {
   ApiRemindersRoute: typeof ApiRemindersRoute
   ApiReposRoute: typeof ApiReposRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
-  ApiMeetingVaultRoute: typeof ApiMeetingVaultRoute
-  ApiMeetingReviewRoute: typeof ApiMeetingReviewRoute
-  ApiMeetingTranscribeRoute: typeof ApiMeetingTranscribeRoute
-  ApiMeetingThreadsRoute: typeof ApiMeetingThreadsRoute
-  ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
   ApiSeerrRoute: typeof ApiSeerrRoute
@@ -897,6 +896,7 @@ export interface RootRouteChildren {
   ApiVendorsRoute: typeof ApiVendorsRoute
   ApiWeatherRoute: typeof ApiWeatherRoute
   ApiWeeklyRoute: typeof ApiWeeklyRoute
+  ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1083,6 +1083,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMailboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meeting-review': {
+      id: '/api/meeting-review'
+      path: '/api/meeting-review'
+      fullPath: '/api/meeting-review'
+      preLoaderRoute: typeof ApiMeetingReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meeting-threads': {
+      id: '/api/meeting-threads'
+      path: '/api/meeting-threads'
+      fullPath: '/api/meeting-threads'
+      preLoaderRoute: typeof ApiMeetingThreadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meeting-transcribe': {
+      id: '/api/meeting-transcribe'
+      path: '/api/meeting-transcribe'
+      fullPath: '/api/meeting-transcribe'
+      preLoaderRoute: typeof ApiMeetingTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meeting-vault': {
+      id: '/api/meeting-vault'
+      path: '/api/meeting-vault'
+      fullPath: '/api/meeting-vault'
+      preLoaderRoute: typeof ApiMeetingVaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/memory-suggest': {
       id: '/api/memory-suggest'
       path: '/api/memory-suggest'
@@ -1172,41 +1200,6 @@ declare module '@tanstack/react-router' {
       path: '/api/schedules'
       fullPath: '/api/schedules'
       preLoaderRoute: typeof ApiSchedulesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/meeting-vault': {
-      id: '/api/meeting-vault'
-      path: '/api/meeting-vault'
-      fullPath: '/api/meeting-vault'
-      preLoaderRoute: typeof ApiMeetingVaultRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/meeting-review': {
-      id: '/api/meeting-review'
-      path: '/api/meeting-review'
-      fullPath: '/api/meeting-review'
-      preLoaderRoute: typeof ApiMeetingReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/meeting-transcribe': {
-      id: '/api/meeting-transcribe'
-      path: '/api/meeting-transcribe'
-      fullPath: '/api/meeting-transcribe'
-      preLoaderRoute: typeof ApiMeetingTranscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/meeting-threads': {
-      id: '/api/meeting-threads'
-      path: '/api/meeting-threads'
-      fullPath: '/api/meeting-threads'
-      preLoaderRoute: typeof ApiMeetingThreadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/working-pals': {
-      id: '/api/working-pals'
-      path: '/api/working-pals'
-      fullPath: '/api/working-pals'
-      preLoaderRoute: typeof ApiWorkingPalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/search': {
@@ -1356,6 +1349,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWeeklyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/working-pals': {
+      id: '/api/working-pals'
+      path: '/api/working-pals'
+      fullPath: '/api/working-pals'
+      preLoaderRoute: typeof ApiWorkingPalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/google/callback': {
       id: '/api/google/callback'
       path: '/callback'
@@ -1414,6 +1414,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiM365Route: ApiM365Route,
   ApiMailRoute: ApiMailRoute,
   ApiMailboxRoute: ApiMailboxRoute,
+  ApiMeetingReviewRoute: ApiMeetingReviewRoute,
+  ApiMeetingThreadsRoute: ApiMeetingThreadsRoute,
+  ApiMeetingTranscribeRoute: ApiMeetingTranscribeRoute,
+  ApiMeetingVaultRoute: ApiMeetingVaultRoute,
   ApiMemorySuggestRoute: ApiMemorySuggestRoute,
   ApiNotesSyncRoute: ApiNotesSyncRoute,
   ApiObsidianMemoryRoute: ApiObsidianMemoryRoute,
@@ -1427,11 +1431,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRemindersRoute: ApiRemindersRoute,
   ApiReposRoute: ApiReposRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,
-  ApiMeetingVaultRoute: ApiMeetingVaultRoute,
-  ApiMeetingReviewRoute: ApiMeetingReviewRoute,
-  ApiMeetingTranscribeRoute: ApiMeetingTranscribeRoute,
-  ApiMeetingThreadsRoute: ApiMeetingThreadsRoute,
-  ApiWorkingPalsRoute: ApiWorkingPalsRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
   ApiSeerrRoute: ApiSeerrRoute,
@@ -1453,6 +1452,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVendorsRoute: ApiVendorsRoute,
   ApiWeatherRoute: ApiWeatherRoute,
   ApiWeeklyRoute: ApiWeeklyRoute,
+  ApiWorkingPalsRoute: ApiWorkingPalsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

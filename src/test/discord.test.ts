@@ -32,3 +32,14 @@ describe("Discord Companion owner-only command guards", () => {
     expect(DISCORD_COMMANDS.map((x) => x.name)).toEqual(["ask", "ping", "help"]);
   });
 });
+it('validates optional Pal selection without changing default or accepting arbitrary identities',async()=>{
+ const {interactionPal}=await import('../lib/discord');
+ const base={id:'1',token:'fixture',type:2,application_id:'123',data:{name:'ask',options:[{name:'pal',value:'byte'}]}};
+ expect(interactionPal(base)).toBe('byte');expect(interactionPal({...base,data:{name:'ask'}})).toBe('echo');
+ expect(interactionPal({...base,data:{name:'ask',options:[{name:'pal',value:'../../secret'}]}})).toBeNull();
+});
+
+it("keeps Mimic off the Discord bridge until its separate privacy controls are supported", async () => {
+ const {interactionPal}=await import("../lib/discord");
+ expect(interactionPal({id:"1",token:"fixture",type:2,application_id:"123",data:{name:"ask",options:[{name:"pal",value:"mimic"}]}})).toBeNull();
+});

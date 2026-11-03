@@ -184,7 +184,8 @@ export function retrieve(
     .filter((m) => authorized(m, c) && !sensitive(m.text))
     .map((m) => {
       const text = normalize(m.title + " " + m.text);
-      const keyword = tokens.reduce((s, w) => s + (text.includes(w) ? 1 : 0), 0);
+      const vocabulary=new Set(text.split(" "));
+      const keyword = tokens.reduce((s, w) => s + (vocabulary.has(w) ? 1 : 0), 0);
       return {
         m,
         score:

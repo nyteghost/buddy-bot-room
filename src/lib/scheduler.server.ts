@@ -1,3 +1,4 @@
+import { tickWorkingPals } from "./working-pals.server";
 import { scheduleKeeper } from "./memory-keeper.server";
 import { backupAgeMs, backupConfig, runBackup } from "./backup.server";
 import { briefConfig, sendBrief } from "./brief.server";
@@ -53,6 +54,7 @@ async function tick(s: S): Promise<void> {
   const now = new Date();
   const ms = now.getTime();
   const j = jobs();
+  void j.run("working-pals-tick",()=>tickWorkingPals(ms),{timeoutMs:240_000});
   const quick = { timeoutMs: 120_000 };
   const cfg = backupConfig();
   if (cfg && isDue(now, cfg.tz, cfg.time, s.lastBackupDay)) {

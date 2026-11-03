@@ -123,3 +123,7 @@ it("detects credential material without rejecting ordinary questions about keys"
     expect(sensitive(text)).toBe(true);
   expect(sensitive("How do I create an API key for Ollama?")).toBe(false);
 });
+it('does not retrieve unrelated words solely because they contain a query substring',()=>{
+ const state=newKeeper();state.records=[m('global',{title:'Education',text:'Education plans for children'}),m('global',{id:'cat-care',title:'Cat',text:'Cat care preferences'})];
+ expect(retrieve('cat',c(),state).map(x=>x.id)).toEqual(['cat-care']);
+});

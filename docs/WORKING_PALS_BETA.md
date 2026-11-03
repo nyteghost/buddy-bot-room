@@ -21,3 +21,9 @@ The first Working Pals increment is a *private, owner-only* job inbox inside Pix
 
 ## Next increments
 Granular job categories and resource grants, repeat schedules with explicit owner permission, source/change receipts, user-approved Obsidian exports, and an approval inbox linked to the Pal Nook. These will be built separately with security and failure tests.
+
+## Approved recurring summaries
+
+Approve the exact read-only question first, then separately approve an hourly, daily or weekly interval. Recurrence never grants access to project files or tools: the project label is organizational only. Local Ollama performs the summary; no cloud fallback, message sending or calendar changes occur.
+
+Pause all Pal jobs disables recurrence and cancels active missions without removing results. Foreground General Chat has priority. Failed, cancelled and interrupted work needs explicit review before resuming; missed intervals do not produce catch-up bursts. Previous results are retained as receipts. At 100 receipts, further runs stop rather than deleting history. The existing working-pals.json file remains in the persistent data volume.

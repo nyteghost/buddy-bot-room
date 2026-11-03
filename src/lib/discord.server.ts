@@ -1,3 +1,4 @@
+import { interactionPal } from "./discord";
 import { DISCORD_COMMANDS, discordAllowed, discordConfig, interactionQuestion, type DiscordConfig, type DiscordInteraction } from "./discord";
 import { askDiscordCompanion } from "./assistant.server";
 import { logServer } from "./server-log.server";
@@ -53,13 +54,15 @@ async function onInteraction(i: DiscordInteraction, cfg: DiscordConfig): Promise
     await reply(i, { type: 4, data: { ...content("Pixel Pals Discord Companion is connected."), flags: 64 } }); return;
   }
   if (i.data?.name === "help") {
-    await reply(i, { type: 4, data: { ...content("Use /ask question:... to talk to Pixel Pals' local AI. Conversation history is saved in General Chat. Use /ping to check the bot. Voice recording is not included yet."), flags: 64 } }); return;
+    await reply(i, { type: 4, data: { ...content("Use /ask question:... to talk to Pixel Pals' local AI. Conversation history is saved in General Chat. Choose the optional pal field to pick who answers. Use /ping to check the bot. Voice recording is not included yet."), flags: 64 } }); return;
   }
   const question = interactionQuestion(i);
+  const pal=interactionPal(i);
+  if(!pal){await reply(i,{type:4,data:{...content("Choose a Pal from the /ask options."),flags:64}});return;}
   if (!question) { await reply(i, { type: 4, data: { ...content("Use /ask and enter a question (up to 1800 characters)."), flags: 64 } }); return; }
   // Discord requires the initial acknowledgement within three seconds.
   if (!(await reply(i, { type: 5, data: { flags: 64 } }))) return;
-  const result = await askDiscordCompanion(question);
+  const result = await askDiscordCompanion(question,pal);
   await finish(i, result.text || "No answer was returned.");
 }
 function stop(run: Run): void {

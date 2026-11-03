@@ -157,7 +157,7 @@ export function MeetingVaultPanel({open}:{open:boolean}) {
           {m.status==="uploading"?" · "+m.received.length+"/"+m.parts+" parts saved":""}
         </p>
         {m.status==="ready" ? <>
-          <audio controls preload="none" className="w-full" src={"/api/meeting-vault?id="+encodeURIComponent(m.id)+"&audio=1"} />
+          <audio data-meeting-id={m.id} controls preload="none" className="w-full" src={"/api/meeting-vault?id="+encodeURIComponent(m.id)+"&audio=1"} />
           <p className="text-xs text-muted-foreground">Original SHA-256: <span className="break-all font-mono">{m.sha256}</span></p>
           <details onToggle={e=>{
             const visible=e.currentTarget.open;

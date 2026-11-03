@@ -11,7 +11,8 @@ type Snapshot = { savedAt: number; body: string };
 export type CalendarFeedSnapshot = { text: string; syncedAt: number; stale: boolean; cached: boolean; warning?: string };
 
 export function publicCalendarAddress(address: string): boolean {
-  const ip = address.toLowerCase().replace(/^\[|\]$/g, "");
+  let ip = address.toLowerCase().replace(/^\[|\]$/g, "");
+  if(isIP(ip)===6)ip=new URL("http://["+ip+"]/").hostname.slice(1,-1);
   // A DNS name must be checked against every returned A and AAAA record.
   if (isIP(ip) === 4) {
     const v = ip.split(".").map(Number);
@@ -28,6 +29,7 @@ export function publicCalendarAddress(address: string): boolean {
       (a === 203 && b === 0 && c === 113));
   }
   if (isIP(ip) !== 6) return false;
+  if(!/^[23]/.test(ip))return false;
   // Deny unspecified, loopback, ULA, link-local, multicast, IPv4-mapped and transition ranges.
   if (ip === "::" || ip === "::1" || ip.startsWith("fe8") || ip.startsWith("fe9") ||
       ip.startsWith("fea") || ip.startsWith("feb") || ip.startsWith("fc") || ip.startsWith("fd") ||
@@ -63,10 +65,10 @@ async function readCache(url: string, now: number): Promise<Snapshot | null> {
   if (!path) return null;
   try {
     const stat = await fs.lstat(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_BYTES + 300) return null;
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_BYTES * 6 + 500) return null;
     const data = JSON.parse(await fs.readFile(path, "utf8")) as Snapshot;
     if (typeof data.savedAt !== "number" || typeof data.body !== "string" ||
-      data.body.length > MAX_BYTES || !data.body.includes("BEGIN:VCALENDAR") ||
+      Buffer.byteLength(data.body, "utf8") > MAX_BYTES || !data.body.includes("BEGIN:VCALENDAR") ||
       data.savedAt > now + 60_000) return null;
     if (now - data.savedAt > MAX_CACHE_AGE) {
       await fs.rm(path, { force: true }).catch(() => {});
@@ -114,7 +116,7 @@ export async function fetchCalendarSnapshot(url: string, force = false, now = Da
         if (bytes > MAX_BYTES) throw Error("Calendar file too large");
         parts.push(value);
       }
-    } finally { reader.releaseLock(); }
+    } finally { await reader.cancel().catch(()=>undefined); reader.releaseLock(); }
     const body = new TextDecoder().decode(Buffer.concat(parts));
     if (!body.includes("BEGIN:VCALENDAR") || !body.includes("END:VCALENDAR")) throw Error("Not a calendar file");
     // Cache persistence failure should not discard an otherwise successful sync.

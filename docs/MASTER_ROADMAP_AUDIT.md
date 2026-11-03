@@ -76,3 +76,17 @@ Implemented on beta: after a review is approved, the owner can explicitly enter 
 ## Personal Pal milestone — Mimic
 
 Implemented on beta: independent ninth Pal **Mimic** with a 32×32 native pixel-art chest sprite, owner-inspired conversation profile, preserved voice across themes, opt-in seating, direct chat selection, character settings and own-only default memory / no live-data permissions. Distilled profile: [MIMIC_PERSONA.md](MIMIC_PERSONA.md). Raw Discord exports, ChatGPT history and sensitive identifiers have **not** been imported into the app or repository. This is a transparent AI character, not the owner or their spokesperson. Still to do: on-device visual QA across mobile/desktop widths, preferred sound/animation polish, and optional owner-approved Mimic Discord command/memory permissions. Do not update Unraid until the beta CI and image publish for the final commit pass.
+
+## Beta 1.0.948: approved recurrence, calendar imports and review controls
+
+Extends beta 9b21959 and preserves the separately implemented opt-in Mimic Pal.
+
+Implemented: recurring immutable read-only Working Pal questions with separate consent, bounded retained receipts, pause-all, foreground priority, revision-safe late-result rejection; named/color-coded ICS snapshots with consent, protected atomic storage, deduplication and retained visibility controls; subscription labels/colors and cache/IPv6 fixes; validated Whisper segment estimates and compatibility fallback; click-to-listen and draft speaker annotations; optional Discord Pal selection on the existing bridge, excluding Mimic; exact-word retrieval matching and accurate repeated legacy import counts.
+
+Existing recordings, reviewed notes, settings and conversations are not migrated or deleted by this increment. New calendar snapshots share the existing persistent application data volume.
+
+Remaining: Working Pals authorized source/tool missions and richer permissions; full calendar week/month management and connection-pinned DNS validation; long-transcript hierarchical intelligence, diarization and evidence-backed automatic action extraction; Discord voice and Mimic-specific bridge privacy; further Living World/mobile behavior; broader Second Brain migration/conflict workflows. No claim that the full roadmap is complete.
+
+Live Unraid restart, actual local Whisper/GPU audio timing, iPhone playback and real Discord command registration require device/credential validation. Automated checks use isolated temporary storage and controlled fixtures, never the owner's data.
+
+Validation for this increment: TypeScript passed; 1,388 tests across 148 files passed; production build passed; changed-file ESLint passed with three existing fast-refresh warnings (legacy formatting rule excluded); high/critical dependency audit passed, with four lower-severity findings reported separately by Bun. Browser validation uses the existing desktop/mobile smoke suite plus explicit recurring-consent and retained calendar visibility flows. Live device/provider limitations above remain applicable.

@@ -24,7 +24,7 @@ describe("Calendar subscription boundary", () => {
   });
   it("blocks internal IP ranges but allows public IPv4 and IPv6", () => {
     for (const value of ["127.0.0.1", "10.1.2.3", "192.168.12.4", "172.24.0.5",
-      "169.254.169.254", "100.64.0.1", "198.19.0.1", "::1", "fe80::1", "fc00::1", "::ffff:127.0.0.1"]) {
+      "169.254.169.254", "100.64.0.1", "198.19.0.1", "::1", "fe80::1", "fc00::1", "::ffff:127.0.0.1", "0:0:0:0:0:ffff:7f00:1", "0:0:0:0:0:0:0:1"]) {
       expect(publicCalendarAddress(value), value).toBe(false);
     }
     expect(publicCalendarAddress("8.8.8.8")).toBe(true);
@@ -58,4 +58,12 @@ describe("Calendar subscription boundary", () => {
     expect(old.text).toBe(body);
     expect((await readdir(join(folder, "calendar-cache"))).join()).not.toContain("token");
   });
+});
+
+it("keeps offline snapshots whose JSON escaping is larger than the original calendar",async()=>{
+ folder=await mkdtemp(join(tmpdir(),"calendar-escaped-"));vi.stubEnv("BUDDY_DATA_DIR",folder);
+ const url="https://calendar.invalid/private";const key=createHash("sha256").update(url).digest("hex").slice(0,40);
+ await mkdir(join(folder,"calendar-cache"));const body='BEGIN:VCALENDAR\n'+ '"'.repeat(4100000)+'\nEND:VCALENDAR';
+ await writeFile(join(folder,"calendar-cache",key+".json"),JSON.stringify({savedAt:Date.now(),body}));
+ expect((await fetchCalendarSnapshot(url)).text).toBe(body);
 });

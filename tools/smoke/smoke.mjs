@@ -1089,6 +1089,52 @@ await step("General Chat shows an early reply on desktop/mobile and Stop keeps p
     }
   }
 });
+await step("Working Pals recurring approval and pause-all preserve results",async()=>{
+  await page.setViewportSize({width:1500,height:900});
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('pixelpals:configure-integration',{detail:{id:'seerr'}})));
+  const setup=page.locator('[data-window-id="setup"]');await setup.waitFor();
+  await setup.getByRole('button',{name:'Working Pals',exact:true}).click();
+  const inbox=setup.getByRole('region',{name:'Working Pals Inbox'});
+  await inbox.getByPlaceholder('Summarize my next steps').fill('Synthetic recurring mission');
+  await inbox.getByPlaceholder('Help me choose the smallest next step for my plan…').fill('Suggest one small first step.');
+  await inbox.getByRole('button',{name:'Add for approval',exact:true}).click();
+  const job=inbox.locator('article').filter({hasText:'Synthetic recurring mission'});
+  await job.getByRole('button',{name:'Approve',exact:true}).click();
+  await job.getByRole('button',{name:'Run approved job',exact:true}).waitFor();
+  await job.getByLabel('I approve repeating this exact local-only question').check();
+  await job.getByRole('button',{name:'Approve recurring mission',exact:true}).click();
+  await job.getByText(/Recurring: every 1440 minutes/).waitFor();
+  await inbox.getByRole('button',{name:'Pause all Pal jobs',exact:true}).click();
+  await job.getByText(/paused — approval required to resume/).waitFor();
+  const rows=await (await page.request.get(URL_+'/api/working-pals')).json();
+  if(rows.missions[0].schedule.enabled||rows.missions[0].status!=='paused')throw Error('Pause did not persist');
+});
+await step("Named ICS import is consented, persistent, and can be hidden without deletion",async()=>{
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('pixelpals:configure-integration',{detail:{id:'seerr'}})));
+  const setup=page.locator('[data-window-id="setup"]');
+  await setup.getByRole('navigation',{name:'Settings categories'}).getByRole('button',{name:/Calendar/}).click();
+  await setup.getByText('Manage imported calendars',{exact:true}).click();
+  await setup.getByLabel('Calendar name',{exact:true}).fill('Synthetic personal calendar');
+  await setup.getByLabel('ICS file (up to 1 MB)',{exact:true}).setInputFiles({name:'personal.ics',mimeType:'text/calendar',buffer:Buffer.from('BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR')});
+  await setup.getByLabel('I have permission to store this calendar on my personal server').check();
+  await setup.getByRole('button',{name:'Import snapshot',exact:true}).click();
+  const visible=setup.getByRole('checkbox',{name:/Synthetic personal calendar/});await visible.waitFor();
+  // The controlled checkbox confirms the saved server state asynchronously.
+  await visible.click();
+  await page.waitForFunction(async()=>{const r=await fetch('/api/calendar?uploads=1');return (await r.json()).snapshots.some(s=>s.name==='Synthetic personal calendar'&&!s.enabled);},undefined,{timeout:15000});
+  const data=await (await page.request.get(URL_+'/api/calendar?uploads=1')).json();
+  if(data.snapshots[0].body!==undefined)throw Error('Snapshot endpoint leaked full calendar');
+  for (const width of [1500,390,320]) {
+    await page.setViewportSize({width,height:900});
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('pixelpals:configure-integration',{detail:{id:'seerr'}})));
+    await setup.getByRole('navigation',{name:'Settings categories'}).getByRole('button',{name:/Calendar/}).click();
+    const summary=setup.getByText('Manage imported calendars',{exact:true});
+    const panel=summary.locator('..');
+    if((await panel.getAttribute('open'))===null) await summary.click();
+    if(await panel.evaluate(el=>el.scrollWidth>el.clientWidth+2)) throw Error('Calendar import overflows at '+width);
+  }
+
+});
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);

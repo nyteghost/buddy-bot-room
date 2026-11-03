@@ -1,3 +1,4 @@
+import { calendarUploads, handleCalendarUploads } from "./calendar-uploads.server";
 import { currentUser } from "./accounts.server";
 import { eventsInRange } from "./ics";
 import { fetchCalendarSnapshot } from "./calendar-feed.server";
@@ -16,15 +17,15 @@ import { TtlCache } from "./ttl-cache";
 const tz = () => validZone(process.env["BUDDY_TZ"]) ?? "UTC";
 const cache = new TtlCache<unknown>(60_000, 10);
 
-export type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
+export type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string; color?:string };
 
-function icsUrls(): { name: string; url: string }[] {
+function icsUrls(): { name: string; url: string; color:string }[] {
   return (process.env["CALENDAR_ICS_URLS"] ?? "").split(/[\s,]+/).map((u) => u.trim()).filter(Boolean).slice(0, 6).flatMap((u, i) => {
     try {
       const url = new URL(u.replace(/^webcal:/i, "https:"));
       const host = url.hostname.toLowerCase();
       const label = /(^|\.)cozi\.com$/.test(host) ? "Cozi" : /(^|\.)google\.com$/.test(host) ? "Google Calendar" : /icloud\.com$/.test(host) ? "iCloud" : /(outlook|office365|live)\./.test(host) ? "Outlook" : `Calendar ${i + 1}`;
-      return url.protocol === "https:" || url.protocol === "http:" ? [{ name: label, url: url.toString() }] : [];
+      return url.protocol === "https:" || url.protocol === "http:" ? [{ name: (process.env["CALENDAR_ICS_NAMES"]??"").split(",")[i]?.trim().slice(0,80)||label, color:/^#[0-9a-f]{6}$/i.test((process.env["CALENDAR_ICS_COLORS"]??"").split(",")[i]?.trim()??"")?(process.env["CALENDAR_ICS_COLORS"]??"").split(",")[i]!.trim():"#93d9b6", url: url.toString() }] : [];
     } catch { return []; }
   });
 }
@@ -41,7 +42,8 @@ export async function handleCalendar(request: Request): Promise<Response> {
   const denied = await owner(request);
   if (denied) return denied;
   const url = new URL(request.url);
-  return Response.json(await calendarData(Number(url.searchParams.get("days")), url.searchParams.get("refresh") === "1"));
+  if(request.method==="POST"||url.searchParams.get("uploads")==="1"){const r=await handleCalendarUploads(request);if(request.method==="POST"&&r.ok)cache.clear();return r;}
+  return Response.json(await calendarData(Number(url.searchParams.get("days")), url.searchParams.get("refresh") === "1"), {headers:{"Cache-Control":"private, no-store"}});
 }
 
 /** Calendar data without the request/owner check, for the owner's own morning brief. */
@@ -59,7 +61,7 @@ export async function calendarData(daysIn: number, force = false): Promise<Calen
   await Promise.all(feeds.map(async (f) => {
     try {
       const result = await fetchCalendarSnapshot(f.url, force);
-      for (const e of eventsInRange(result.text, from, to, tz())) items.push({ ...e, source: f.name });
+      for (const e of eventsInRange(result.text, from, to, tz())) items.push({ ...e, source: f.name,color:f.color });
       feedStatus.push({ name: f.name, syncedAt: result.syncedAt, cached: result.cached, stale: result.stale });
       if (result.stale) errors.push(`${f.name}: showing offline copy; last refresh failed`);
     } catch {
@@ -67,6 +69,7 @@ export async function calendarData(daysIn: number, force = false): Promise<Calen
       errors.push(`${f.name}: unable to load this feed. Check the HTTPS link and internet connection.`);
     }
   }));
+  try {for(const s of await calendarUploads()){if(!s.enabled)continue;for(const e of eventsInRange(s.body,from,to,tz()))items.push({...e,source:s.name,color:s.color});feedStatus.push({name:s.name,syncedAt:Date.parse(s.imported),cached:true,stale:false});}}catch{errors.push("Imported calendar snapshots could not be read; existing data was kept.");}
   let m365 = false;
   try { const r = await m365Range(from, to); if (r) { m365 = true; for (const e of r) items.push({ ...e, source: "Microsoft 365" }); } } catch { errors.push("Microsoft 365: couldn't read the calendar"); }
   const google = await gcalStatus();
@@ -76,7 +79,7 @@ export async function calendarData(daysIn: number, force = false): Promise<Calen
   const seen = new Set<string>();
   const unique = items.filter((e) => { const k = `${e.title.toLowerCase()}|${e.start}`; if (seen.has(k)) return false; seen.add(k); return true; });
   items.length = 0; items.push(...unique);
-  const body: CalendarData = { tz: tz(), configured: feeds.length > 0 || m365 || google.connected, google, feeds: feeds.length, m365, items: items.slice(0, 300), errors, feedStatus };
+  const body: CalendarData = { tz: tz(), configured: feedStatus.length > 0 || m365 || google.connected, google, feeds: feeds.length, m365, items: items.slice(0, 300), errors, feedStatus };
   cache.set(`cal|${days}`, body);
   return body;
 }

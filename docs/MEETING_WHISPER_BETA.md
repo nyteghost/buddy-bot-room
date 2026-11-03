@@ -28,3 +28,7 @@ Pixel Pals can now **explicitly** transcribe a completed Meeting Vault original 
 ## Validation still required
 
 Automated tests cover URL allowlisting, bounded segments, owner access, explicit permission, and restart recovery. The full ffmpeg-to-Whisper path must be tested with synthetic audio and your actual installed Whisper service before relying on it. Physical iPhone lock/background behavior, network interruption and disk-space recovery also need hardware testing.
+
+## Segment timing
+
+New transcriptions request verbose segment timestamps and offset them to the original recording. These are ASR estimates, not verified word alignment or speaker identity. Invalid or missing segment timestamps retain the plain transcript with the existing chunk interval. Engines rejecting verbose output with HTTP 400/422 get one JSON-format retry; network and server failures do not trigger automatic retries. Audio redirects are refused and response size is bounded. Previously saved transcription parts remain unchanged.

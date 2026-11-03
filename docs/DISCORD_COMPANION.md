@@ -36,3 +36,7 @@ Discord is an **optional** chat interface. The Pixel Pals backend stays on Unrai
 ## Future roadmap
 
 After real Discord-account testing: favorite-Pal selection, ADHD quick-capture commands, secure Working Pals notifications, voice conversations, and opt-in voice recording feeding the reviewed Meeting Memory/Obsidian pipeline. These remain unimplemented.
+
+## Choose a Pal
+
+The optional `/ask pal` choice selects an existing Pal for that answer; omitted choices still use Echo. The same owner/guild verification, ephemeral responses, local Ollama routing and existing General Chat storage apply. Restart/reconnect the configured bot to refresh slash-command definitions. Mimic is intentionally unavailable until its separate privacy controls can be enforced by this bridge. Voice support remains unfinished.

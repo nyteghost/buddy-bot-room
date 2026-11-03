@@ -95,8 +95,9 @@ it("persists independent conversations, titles, drafts and contextual turns in e
   expect(saved.conversation.assistant.draft).toBe("My unfinished question");
 });
 it("makes Discord conversations visible and reusable through the normal General Chat API", async () => {
-  const first = await askDiscordCompanion("Hello from Discord");
+  const first = await askDiscordCompanion("Hello from Discord", "byte");
   expect(first).toEqual({ ok: true, text: "Working answer" });
+  expect((await vi.mocked(handleChat).mock.calls.at(-1)![0].clone().json()).agentId).toBe("byte");
   const response = await handleAssistant(new Request("http://localhost/api/assistant"));
   expect(response.status).toBe(200);
   const listing = (await response.json()) as { conversations: Conversation[] };

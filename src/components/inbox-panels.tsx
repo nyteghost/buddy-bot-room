@@ -1,3 +1,4 @@
+import { CalendarUploads } from "./calendar-uploads";
 import { useCallback, useEffect, useState } from "react";
 import { startPolling } from "@/lib/poll";
 import { RefreshCw } from "lucide-react";
@@ -5,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Mailbox } from "@/components/mailbox";
 import { MailAlertRules } from "@/components/mail-alerts";
 
-type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string };
+type CalItem = { title: string; start: number; end: number; allDay: boolean; location: string; source: string; color?:string };
 type CalData = { tz: string; configured: boolean; feeds: number; m365: boolean; google?: { configured: boolean; connected: boolean; mode?: string }; items: CalItem[]; errors: string[]; error?: string; feedStatus?: { name: string; syncedAt: number | null; cached: boolean; stale: boolean }[] };
 type MailItem = { from: string; subject: string; date: string; source: string };
 type MailData = { configured: boolean; imap: boolean; m365: boolean; items: MailItem[]; errors: string[]; error?: string };
@@ -70,6 +71,7 @@ export function CalendarPanel({ open }: { open: boolean }) {
   const disconnect = async () => { await fetch("/api/google", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "disconnect" }) }).catch(() => null); void reload(); };
   return (
     <div className="grid gap-3 p-3 text-sm">
+      <CalendarUploads onChanged={()=>void reload()}/>
       <Header title="Next 7 days" loading={loading} onReload={() => void reload()} />
       <p className="text-xs text-muted-foreground">Use Refresh to check calendar subscriptions now. Offline copies are shown when a feed is temporarily unreachable.</p>
       {data?.feedStatus?.length ? <div className="grid gap-1 rounded-md border p-2 text-xs" aria-label="Calendar subscription status">
@@ -110,7 +112,7 @@ export function CalendarPanel({ open }: { open: boolean }) {
         <section key={label} className="grid gap-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h3>
           {items.map((e, i) => (
-            <div key={`${e.start}-${i}`} className="flex gap-3 rounded-md border px-3 py-2">
+            <div key={`${e.start}-${i}`} style={e.color?{borderLeftColor:e.color,borderLeftWidth:3}:undefined} className="flex gap-3 rounded-md border px-3 py-2">
               <span className="w-20 shrink-0 text-xs text-muted-foreground">{e.allDay ? "All day" : <>{clock(e.start, tz)}{e.end > e.start && <span className="block">to {clock(e.end, tz)}</span>}</>}</span>
               <span className="min-w-0"><span className="block truncate">{e.title}</span>{(e.location || data?.items.some((x) => x.source !== e.source)) && <span className="block truncate text-xs text-muted-foreground">{[e.location, e.source].filter(Boolean).join(" · ")}</span>}</span>
             </div>

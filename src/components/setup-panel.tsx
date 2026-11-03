@@ -1,3 +1,4 @@
+import { CalendarUploads } from "./calendar-uploads";
 import { OllamaConnect } from "./ollama-connect";
 import { AddonSettings } from "@/components/addons";
 import { WorkingPalsPanel } from "@/components/working-pals-panel";
@@ -264,6 +265,7 @@ export function SetupPanel({ open, focus }: { open: boolean; focus?: { id: strin
             </div>
           )}
           {!searching && selected?.id === "basics" && <OllamaConnect onConnected={() => { void load(); void loadFields(); }} />}
+          {!searching && selected?.id === "calendar-mail" && <CalendarUploads onChanged={()=>void load()}/>}
           {!searching && selectedGroup === "addons" ? <AddonSettings /> : !searching && selectedGroup === "working-pals" ? <WorkingPalsPanel open={open} /> : (
             <div className="grid min-w-0 content-start gap-2">
               {shown.length ? shown.map(renderItem) : <p className="rounded-md border p-3 text-sm text-muted-foreground">No settings match this view. Try All or clear the search.</p>}

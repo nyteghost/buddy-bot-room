@@ -72,3 +72,27 @@ describe("Owner-only local transcription command boundaries",()=>{
     expect(reset.finishedSegments).toBe(0);
   });
 });
+
+it("retries unsupported verbose output once as JSON without following redirects", async () => {
+  const { whisperText } = await import("@/lib/meeting-transcribe.server");
+  const formats: unknown[] = [];
+  const fake = vi.fn(async (_url: unknown, options: RequestInit) => {
+    formats.push((options.body as FormData).get("response_format"));
+    expect(options.redirect).toBe("error");
+    return formats.length === 1 ? new Response("Unsupported", { status: 422 }) : Response.json({text:"Preserved plain speech"});
+  });
+  vi.stubGlobal("fetch", fake);
+  try {
+    expect(await whisperText(Buffer.from("fixture"), "http://whisper:9000", new AbortController().signal, 180, 180)).toBe("Preserved plain speech");
+    expect(formats).toEqual(["verbose_json", "json"]);
+  } finally { vi.unstubAllGlobals(); }
+});
+it("does not retry failed Whisper servers", async () => {
+  const { whisperText } = await import("@/lib/meeting-transcribe.server");
+  const fake = vi.fn().mockResolvedValue(new Response("Unavailable", {status:503}));
+  vi.stubGlobal("fetch", fake);
+  try {
+    await expect(whisperText(Buffer.from("fixture"), "http://whisper:9000", new AbortController().signal, 0, 180)).rejects.toThrow("HTTP 503");
+    expect(fake).toHaveBeenCalledTimes(1);
+  } finally { vi.unstubAllGlobals(); }
+});

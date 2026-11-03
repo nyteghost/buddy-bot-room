@@ -29,3 +29,7 @@ Back up the mounted vault separately from Pixel Pals' `/data` volume. The app's 
 ## General Chat beta integration
 
 See [General Chat](GENERAL_CHAT.md), [Memory Keeper](MEMORY_KEEPER.md) and [Unraid deployment](ASSISTANT_UNRAID.md) for the new centralized service, container mounts, privacy scopes, backup/restore and remote Ollama settings. The existing Second Brain notes and external repository inspiration remain separate from the managed memory mirror; no external autonomous agent is installed.
+
+### Retrieval and repeated imports (beta 1.0.948)
+
+Keyword retrieval now matches whole normalized words, avoiding unrelated substring matches such as “cat” inside “education.” Authorization and semantic scoring still run through the existing central Memory Keeper. Repeating a legacy import reports only newly created records; existing duplicate records are not counted as new. Imported records remain private and pending review, and the original vault notes are preserved.

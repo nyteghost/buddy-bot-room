@@ -1,3 +1,4 @@
+import { TranscriptMoments } from "./transcript-moments";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MeetingWhisperPanel } from "@/components/meeting-whisper-panel";
@@ -87,6 +88,7 @@ export function MeetingReviewPanel({id,open}:{id:string;open:boolean}) {
     </div>
     {!review?<p className="text-xs text-muted-foreground">Loading private meeting review…</p>:<>
       <MeetingWhisperPanel id={id} open={open} hasTranscript={!!review.transcript.trim()}/>
+      <TranscriptMoments id={id} text={draft.transcript} onChange={value=>update("transcript",value)}/>
       <label className="grid gap-1 text-xs">Transcript (editable, up to 100,000 characters)
         <textarea className="w-full resize-y rounded-md border bg-background p-2 text-sm"
           rows={8} maxLength={MAX_MEETING_TRANSCRIPT} value={draft.transcript}
