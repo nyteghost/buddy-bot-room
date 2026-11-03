@@ -48,6 +48,11 @@ export function normalizeReviewText(value: unknown, max: number): string | null 
   if (typeof value !== "string" || value.length > max || value.includes("\0")) return null;
   return value.replace(/\r\n?/g,"\n").trim();
 }
+/** An existing export is current only if it matches the approved pre-export revision. */
+export function reviewExportCurrent(review: MeetingReview): boolean {
+  const match = /-r(\d+)\.md$/.exec(review.exportedPath);
+  return !!match && review.status === "reviewed" && Number(match[1]) === review.revision - 1;
+}
 export function reviewEditable(
   current: MeetingReview,
   patch: { transcript: string; summary: string; speakerNotes: string },
