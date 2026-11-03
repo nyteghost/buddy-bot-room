@@ -284,7 +284,7 @@ export function Room() {
   useEffect(() => { try { const v = JSON.parse(localStorage.getItem("pixel-pals-short-v1") ?? "null"); if (v && typeof v === "object") setShortOn((cur) => ({ ...cur, ...Object.fromEntries(ALL_MODES.map((m) => [m, v[m] === true])) })); } catch { /* optional storage */ } }, []);
   const setShort = (m: Mode, on: boolean) => setShortOn((cur) => { const next = { ...cur, [m]: on }; try { localStorage.setItem("pixel-pals-short-v1", JSON.stringify(next)); } catch { /* optional storage */ } return next; });
   const [partner, setPartner] = useState<AgentId>("claude");
-  const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan").map((a) => a.id)); // Saiyan joins when you switch him on
+  const [enabled, setEnabled] = useState<AgentId[]>(agents.filter((a) => a.id !== "saiyan" && a.id !== "mimic").map((a) => a.id)); // Optional Pals join only when selected
   useEffect(() => {
     const ids = seatKey.split(",").filter(Boolean) as AgentId[];
     if (ids.length) setEnabled(agents.filter((a) => ids.includes(a.id)).map((a) => a.id));
@@ -327,6 +327,7 @@ export function Room() {
     rune: agents[5].model,
     claude: agents[6].model,
     saiyan: agents[7].model,
+    mimic: agents[8].model,
   });
   const [running, setRunning] = useState(false);
   // Read replies aloud (opt-in, browser speech): after each discussion finishes, each new reply in its pal's voice.
@@ -862,12 +863,12 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: [projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
+            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
-            docContext: docText,
-            linuxContext: assistantRef.current ? await linuxContext(agent.id) : undefined,
+            docContext: agent.id === "mimic" && !mayUseRealData(personasNow, agent.id) ? "" : docText,
+            linuxContext: assistantRef.current && mayUseRealData(personasNow, agent.id) ? await linuxContext(agent.id) : undefined,
             realData: await realDataFor(agent.id),
           };
           const fetchPrompt = async () => {
