@@ -101,7 +101,11 @@ async function execute(id: string, expected: number): Promise<{ ok: boolean; mes
       m.revision++;
     });
   }
-  return { ok: runResult==="done", message:runResult==="done" ? "Job finished. Check its recorded result." : "Job stopped; its state was saved." };
+  const final = (await listMissions()).find(m=>m.id===id);
+  return { ok: final?.status==="completed", message:final?.status==="completed" ?
+    "Job finished. Review the recorded result." :
+    final?.status==="failed" ? (final.error || "Local AI couldn't finish.") :
+    "Job stopped or permission changed; its state was saved." };
 }
 /** Owner-only, explicitly approved, read-only Working Pals inbox. */
 export async function handleWorkingPals(request: Request): Promise<Response> {
@@ -122,10 +126,19 @@ export async function handleWorkingPals(request: Request): Promise<Response> {
       });
       return created ? Response.json({mission,status:"proposed"}) : Response.json({error:"Inbox full. Resolve or remove older jobs first."},{status:409});
     }
-    if (!["approve","revoke","pause","run"].includes(String(op))) return Response.json({error:"Unknown operation."},{status:400});
+    if (!["approve","revoke","pause","run","remove"].includes(String(op))) return Response.json({error:"Unknown operation."},{status:400});
     const id=typeof body["id"]==="string" ? body["id"] : "";
     const revision=body["revision"];
     if (!/^[0-9a-f-]{36}$/i.test(id) || typeof revision!=="number" || !Number.isInteger(revision)) return Response.json({error:"Invalid job or revision."},{status:400});
+    if (op==="remove") {
+      if (body["confirm"] !== true) return Response.json({error:"Deleting a job requires explicit confirmation."},{status:400});
+      const removed=await transaction(rows=>{
+        const index=rows.findIndex(x=>x.id===id && x.revision===revision && x.status!=="running");
+        if (index<0) return false;
+        rows.splice(index,1);return true;
+      });
+      return removed ? Response.json({ok:true}) : Response.json({error:"Job changed or is running. Pause it and refresh before deleting."},{status:409});
+    }
     if (op==="run") {
       const result=await execute(id,revision);
       return Response.json(result,{status:result.ok?200:409});
