@@ -12,7 +12,7 @@ describe("Settings navigation and search", () => {
   it("finds Discord by its user-facing fields and preserves status filters", () => {
     expect(filterSetupItems(items, SETTING_FIELDS, "discord").map((i) => i.id)).toEqual(["discord"]);
     expect(filterSetupItems(items, SETTING_FIELDS, "bot token").map((i) => i.id)).toContain("discord");
-    expect(filterSetupItems(items, SETTING_FIELDS, "bot token", "unconfigured")).toEqual([]);
+    expect(filterSetupItems(items, SETTING_FIELDS, "bot token", "unconfigured").map((i) => i.id)).toEqual(["telegram"]);
     expect(filterSetupItems(items, SETTING_FIELDS, "bot token", "configured").map((i) => i.id)).toEqual(["discord"]);
   });
   it("finds calendar feeds and Obsidian without exposing stored secret values", () => {
