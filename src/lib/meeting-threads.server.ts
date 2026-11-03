@@ -54,7 +54,7 @@ async function visibleMeetings(q:string):Promise<MeetingThreadHit[]>{
     const link=linkById.get(original.id);
     hits.push({
       meetingId:original.id,title:original.title,reviewedAt:review.approvedAt,
-      thread:link?.thread??"",project:link?.project??"",
+      thread:link?.thread??"",project:link?.project??"",linkRevision:link?.revision??0,
       excerpt,summary:review.summary.slice(0,1500),originalSha256:original.sha256,
     });
   }

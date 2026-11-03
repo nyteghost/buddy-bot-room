@@ -15,6 +15,7 @@ export type MeetingThreadHit = {
   reviewedAt: string;
   thread: string;
   project: string;
+  linkRevision: number;
   excerpt: string;
   summary: string;
   originalSha256: string;
