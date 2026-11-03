@@ -12,6 +12,7 @@ const r = (x: number, y: number, w: number, h: number, m: string, a?: string): P
 /** Each pal's signature "thinking" activity, drawn as a 16×16 pixel prop. */
 type Prop = { label: string; pixels: Px[] };
 const props: Record<AgentId, Prop> = {
+  mimic: { label: "peeking inside a treasure chest", pixels: [...r(2,8,12,6,"accent"), ...r(3,5,10,3,"metal"), ...r(4,8,8,2,"dark"), ...r(5,9,2,2,"paper"), ...r(9,9,2,2,"paper"), [12,4,"glow","tp-twinkle-a"]] },
   // Big-picture thinker: telescope gazing at twinkling stars.
   nova: {
     label: "stargazing through a telescope",
@@ -105,7 +106,7 @@ const fireball = (): Px[] => [...r(4, 5, 8, 7, "red", "tp-flicker"), ...r(6, 2, 
 const gunblade = (): Px[] => [...r(1, 6, 10, 2, "metal"), ...r(11, 5, 4, 4, "dark"), ...r(12, 9, 2, 4, "dark"), [3, 6, "paper", "tp-twinkle-a"], [7, 7, "paper", "tp-twinkle-b"]];
 const daggers = (): Px[] => [...r(2, 2, 1, 9, "metal", "tp-scribble"), ...r(1, 11, 3, 1, "accent"), ...r(13, 2, 1, 9, "metal", "tp-wrench"), ...r(12, 11, 3, 1, "accent"), [7, 6, "glow", "tp-twinkle-a"]];
 
-const themed: Partial<Record<CharacterMode, Record<Exclude<AgentId, "saiyan">, Prop>>> = {
+const themed: Partial<Record<CharacterMode, Partial<Record<AgentId, Prop>>>> = {
   horror: {
     nova: { label: "making a spooky phone call", pixels: phone() },
     byte: { label: "sharpening a machete", pixels: blade() },
