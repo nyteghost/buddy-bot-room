@@ -150,7 +150,17 @@ export function eventsInRange(text: string, from: number, to: number, defaultTz:
     const uid = get(e, "UID")?.value;
     const title = unescapeText(get(e, "SUMMARY")?.value ?? "") || "(no title)";
     const location = unescapeText(get(e, "LOCATION")?.value ?? "").slice(0, 80);
-    for (const t of occurrences(start, rule, from, to, tzDefault)) {
+    const instances = new Set(occurrences(start, rule, from, to, tzDefault));
+    // Explicit extra occurrences commonly accompany recurring Outlook/Google events.
+    // Do not infer PERIOD durations or treat recurrence changes as new master events.
+    for (const x of all(e, "RDATE")) {
+      for (const value of x.value.split(",")) {
+        if (value.includes("/")) continue; // PERIOD is not a simple instant.
+        const w = parseWhen({ ...x, value });
+        if (w) instances.add(toMs(w, tzDefault));
+      }
+    }
+    for (const t of [...instances].sort((a, b) => a - b)) {
       if (skip.has(t) || (!get(e, "RECURRENCE-ID") && uid && overridden.has(`${uid}|${t}`))) continue;
       const end = t + dur;
       if (end > from && t < to) out.push({ title: title.slice(0, 120), start: t, end, allDay: start.allDay, location });
