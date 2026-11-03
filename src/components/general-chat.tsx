@@ -161,6 +161,55 @@ export function GeneralChat({
   useEffect(() => {
     setView(initialView);
   }, [initialView]);
+  // A Discord bot or another signed-in device can add messages while this
+  // workspace remains mounted. Refresh the server-owned list on return and
+  // periodically while visible, without replacing local drafts or aborting a turn.
+  useEffect(() => {
+    if (!open) return;
+    let stopped = false;
+    let fetching = false;
+    const sync = async () => {
+      if (stopped || fetching || document.visibilityState === "hidden" || !loaded.current) return;
+      fetching = true;
+      try {
+        const d = await assistantApi(undefined, query ? "?q=" + encodeURIComponent(query) : "");
+        if (stopped) return;
+        setList(d.conversations);
+        setProjects(d.projects);
+        setLegacy(d.legacy);
+        const selected = currentRef.current;
+        if (!selected || controllers.current.has(selected.id)) return;
+        // Refresh an externally updated selected chat too, not just its sidebar row.
+        const row = d.conversations.find((c: Conversation) => c.id === selected.id);
+        if (row && row.assistant.revision > selected.assistant.revision) {
+          const detail = await assistantApi(undefined, "?id=" + encodeURIComponent(selected.id));
+          if (
+            !stopped &&
+            currentRef.current?.id === selected.id &&
+            !controllers.current.has(selected.id) &&
+            detail.conversation.assistant.revision > currentRef.current.assistant.revision
+          ) {
+            setCurrent(detail.conversation);
+          }
+        }
+      } catch {
+        // Offline or transient server errors must not erase existing conversations.
+      } finally {
+        fetching = false;
+      }
+    };
+    const onReturn = () => { void sync(); };
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    const timer = window.setInterval(onReturn, 30000);
+    void sync();
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, [open, query]);
   useEffect(() => {
     const c = currentRef.current;
     if (!c || sensitive(draft)) return;
@@ -353,6 +402,9 @@ export function GeneralChat({
               Search history
             </Button>
           </form>
+          <Button type="button" variant="outline" onClick={() => void refresh()}>
+            Refresh conversations
+          </Button>
           <label>
             Conversation list
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
