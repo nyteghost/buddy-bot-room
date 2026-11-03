@@ -40,18 +40,19 @@ export function CharacterSection() {
           <textarea aria-label="Pal personality" className="pal-note" maxLength={LIMITS.tone} placeholder={base.tone} value={o.tone ?? ""} onChange={(e) => field("tone", e.target.value)} />
         </label>
         <label className="grid gap-1 text-xs">What this pal remembers
-          <select aria-label="Memory access" className="h-9 rounded-md border border-input bg-background px-2" value={o.memory ?? "all"} onChange={(e) => patch({ ...o, memory: e.target.value as MemoryAccess })}>
+          <select aria-label="Memory access" className="h-9 rounded-md border border-input bg-background px-2" value={o.memory ?? (palId === "mimic" ? "own" : "all")} onChange={(e) => patch({ ...o, memory: e.target.value as MemoryAccess })}>
             {(Object.keys(MEMORY_LABEL) as MemoryAccess[]).map((k) => <option key={k} value={k}>{MEMORY_LABEL[k]}</option>)}
           </select>
         </label>
         <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={o.realData !== false} onChange={(e) => patch({ ...o, realData: e.target.checked ? undefined : false })} />
+          <input type="checkbox" checked={o.realData ?? (palId !== "mimic")} onChange={(e) => patch({ ...o, realData: e.target.checked ? (palId === "mimic" ? true : undefined) : false })} />
           May see my calendar, mail subjects and tasks when I ask
         </label>
       </div>
       <div className="docs-actions">
         <Button type="button" size="sm" variant="outline" disabled={!all[palId]} onClick={() => updateOverrides((cur) => setOverride(cur, palId, null))}><RotateCcw size={13} /> Reset {base.name}</Button>
       </div>
+      {palId === "mimic" && <p className="docs-note">Mimic starts with only its own authorized memories and no calendar, mail or task access. Explicitly change permissions here if needed. Mimic is a separate AI Pal, not your account or spokesperson.</p>}
       <p className="docs-note">Applies in the normal theme; themed casts keep their own characters. Art and room seats stay the same. Names in older messages and the pixel room update after a reload.</p>
     </section>
   );
