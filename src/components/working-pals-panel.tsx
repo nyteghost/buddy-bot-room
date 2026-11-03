@@ -98,6 +98,11 @@ export function WorkingPalsPanel({ open }: { open: boolean }) {
               <Button size="sm" variant="outline" onClick={()=>void call({op:"pause",id:m.id,revision:m.revision})}>Pause</Button>}
             {m.status!=="revoked" &&
               <Button size="sm" variant="outline" disabled={!!busy} onClick={()=>void call({op:"revoke",id:m.id,revision:m.revision})}>Revoke permission</Button>}
+            {m.status!=="running" &&
+              <Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>{
+                if (window.confirm("Delete this Working Pals job and its saved result? This cannot be undone without a backup."))
+                  void call({op:"remove",id:m.id,revision:m.revision,confirm:true});
+              }}>Delete job</Button>}
           </div>
         </article>
       ))}
