@@ -48,6 +48,17 @@ describe("Working Pals protected server flow",()=>{
     expect(rev.status).toBe(200);
     expect((await call({op:"run",id,revision:data.missions[0]!.revision+1})).status).toBe(409);
   });
+  it("records local inference failure accurately and requires confirmation to delete a job",async()=>{
+    const p=await (await call({op:"propose",title:"Summary",question:"Help",scope:"personal",project:""})).json() as {mission:{id:string}};
+    await call({op:"approve",id:p.mission.id,revision:1});
+    vi.mocked(askPals).mockResolvedValueOnce({ok:false,error:"Local Ollama is offline"});
+    expect((await call({op:"run",id:p.mission.id,revision:2})).status).toBe(409);
+    const saved=await (await list()).json() as {missions:{revision:number;status:string;error:string}[]};
+    expect(saved.missions[0]).toMatchObject({status:"failed",error:"Local Ollama is offline"});
+    expect((await call({op:"remove",id:p.mission.id,revision:saved.missions[0]!.revision})).status).toBe(400);
+    expect((await call({op:"remove",id:p.mission.id,revision:saved.missions[0]!.revision,confirm:true})).status).toBe(200);
+    expect(((await (await list()).json()) as {missions:unknown[]}).missions).toHaveLength(0);
+  });
   it("holds interrupted jobs for explicit approval-preserving retry",async()=>{
     const proposal=await (await call({op:"propose",title:"Test",question:"Recap?",scope:"personal",project:""})).json() as {mission:{id:string;revision:number}};
     await call({op:"approve",id:proposal.mission.id,revision:1});
