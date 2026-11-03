@@ -11,7 +11,7 @@ ARG BUN_VERSION=1
 FROM oven/bun:${BUN_VERSION} AS base
 WORKDIR /app
 # git lets the build stamp the real version and commit on the sidebar label.
-RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates && rm -rf /var/lib/apt/lists/* && git config --global --add safe.directory /app
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/* && git config --global --add safe.directory /app
 COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 COPY . .
