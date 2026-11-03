@@ -63,7 +63,7 @@ export function groupItems(items: SetupItem[]): SetupGroupView[] {
 /** Search across integration names, user-visible setting labels and help. No stored values or secrets are searched. */
 export function filterSetupItems(
   items: SetupItem[],
-  fields: { group: string; key: string; label: string; help?: string }[],
+  fields: { group: string; key: string; label: string; help?: string | undefined }[],
   query: string,
   status: "all" | "configured" | "unconfigured" = "all",
 ): SetupItem[] {
