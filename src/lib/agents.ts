@@ -1,4 +1,5 @@
 import type { UIMessage } from "ai";
+import { MIMIC_ROLE, MIMIC_TONE } from "./mimic-persona";
 import { getOverrides, setKnownPals, withOverride, type Overrides } from "./character-overrides";
 import type { CharacterMode } from "./hellraiser";
 import { matrixCast, fantasyCast, devCast, cyberCast, linuxCast, dccCast } from "./theme-personas";
@@ -76,6 +77,14 @@ export const agents = [
     tone: "Fired-up, loyal and wildly enthusiastic. Treat every problem like a training arc: push the group to try the bolder version, celebrate small wins loudly, and turn setbacks into the next power level. Keep the hype useful, with a concrete next move.",
     model: "google/gemini-3.8-flash",
     color: "saiyan",
+  },
+  {
+    id: "mimic",
+    name: "Mimic",
+    role: MIMIC_ROLE,
+    tone: MIMIC_TONE,
+    model: "google/gemini-3.1-flash-lite",
+    color: "mimic",
   },
 ] as const;
 export type AgentId = (typeof agents)[number]["id"];
@@ -166,7 +175,8 @@ export const horrorIcons: Record<AgentId, { name: string; role: string; tone: st
 };
 export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, assistant = false, overrides?: Overrides) {
   const base = themePersona(id, hell, horror, mode, overrides);
-  if (!assistant || mode === "linux" || mode === "assistant") return base;
+  // Mimic always keeps its approved style and privacy boundaries in every mode.
+  if (id === "mimic" || !assistant || mode === "linux" || mode === "assistant") return base;
   // Assistant Mode on any theme: keep the character's name and voice, take the assistant job.
   const job = linuxCast[id];
   return {
@@ -176,6 +186,11 @@ export function agentPersona(id: AgentId, hell: boolean, horror = false, mode?: 
   };
 }
 function themePersona(id: AgentId, hell: boolean, horror = false, mode?: CharacterMode, overrides?: Overrides) {
+  if (id === "mimic") {
+    const base = agents.find(a => a.id === "mimic")!;
+    // Theme changes must not turn an owner-inspired Pal into an unrelated licensed character.
+    return withOverride(base, (overrides ?? getOverrides()).mimic);
+  }
   if (mode === "dcc") return dccCast[id];
   if (mode === "matrix") return matrixCast[id];
   if (mode === "finalfantasy") return fantasyCast[id];
@@ -202,6 +217,7 @@ const mentionAliases: Record<AgentId, string[]> = {
   rune: ["system", "sys", "stats", "monitor", "rune"],
   claude: ["terminal", "term", "tux", "bash", "shell", "claude"],
   saiyan: ["goals", "habits", "motivation", "saiyan"],
+  mimic: ["mimic", "meish", "my-voice"],
 };
 /** "@calendar add lunch" → "sage". Matches role aliases, ids and the current theme's names. */
 export function resolveMention(text: string, mode?: CharacterMode): AgentId | null {
