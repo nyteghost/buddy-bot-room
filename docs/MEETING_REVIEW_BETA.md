@@ -5,7 +5,7 @@
 ## Using the feature
 
 1. Open **Capture Inbox → Meeting Vault · longer recordings**, select a recording labeled **Original stored**, then expand **Review transcript and meeting notes**.
-2. Paste a transcript from an authorized transcription tool (or write your own notes). The app does not automatically send original audio to any model. Save the private draft on Unraid.
+2. Either paste a transcript from an authorized transcription tool or explicitly run the **Transcribe with local Whisper** section (if configured). Imported audio is never forwarded to Whisper automatically. Local speech output is an unapproved draft that must be checked and corrected.
 3. Optionally click **Draft summary with local Ollama**. The saved transcript is sent only to the configured local Ollama provider, no web search or cloud-model fallback. This beta supports single-pass transcripts up to 16,000 characters; longer recordings need the future chunked pipeline.
 4. Edit and correct the resulting summary and speaker-uncertainty notes; AI output is never approved automatically.
 5. Click **Approve reviewed notes** only after confirming the transcript and summary. If you edit them again, the review reverts to draft and requires approval again.
@@ -26,4 +26,4 @@
 - The app uses per-review revision checks: an outdated tab cannot silently overwrite a newer saved draft.
 - An existing exported note remains unchanged when a later revision is approved; re-export creates a new revisioned note, never overwrites manually edited content.
 - A failure before completing an export can leave a note on disk without updating the receipt. The next attempt refuses to overwrite that note; inspect it in Obsidian to reconcile.
-- The existing local Whisper service is still only connected to short captures. Automatic chunked long-recording transcription, timestamps, confirmed speakers and meeting threads are planned separately.
+- An explicit local-Whisper transcription worker is now available for long recordings, with three-minute chunks, recoverable progress and approximate segment ranges. Word-level timestamps, automatic speaker diarization, meeting threads and final hardware validation remain planned.

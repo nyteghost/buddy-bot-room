@@ -33,6 +33,10 @@ This is **original-audio storage only**, not yet the Pal Meeting Memory transcri
 ## Troubleshooting
 
 If an import fails, leave the partial record in place, keep the original file and reselect that same file to resume. If the file's contents changed, the server rejects the conflicting chunk rather than silently replacing your original. Report problems without uploading private audio or secret URLs into public support channels.
-## Review notes (next beta increment)
+## Local Whisper transcription and review (later beta increment)
 
 Once Original stored is visible, expand **Review transcript and meeting notes**. You can paste a transcript, edit your speaker uncertainty notes and save a private draft. Optional local AI summary generation is separate and limited to 16,000 transcript characters for a single pass. Review and explicitly approve the result, then choose whether to export a note into Obsidian. Neither importing nor approving automatically publishes a note or creates tasks. See [Meeting Review](MEETING_REVIEW_BETA.md).
+
+## Explicit local Whisper
+
+Under each completed recording's **Review transcript and meeting notes**, choose **Transcribe with local Whisper** if your private Whisper endpoint is configured. Transcription is never started by uploading audio; it requires a separate confirmation. The worker processes the recording in three-minute segments and saves progress on Unraid so interrupted jobs can be manually resumed. It does not create approved notes or verified speaker labels. See [Local Whisper](MEETING_WHISPER_BETA.md).

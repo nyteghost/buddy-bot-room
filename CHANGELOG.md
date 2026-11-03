@@ -1,5 +1,14 @@
 # Changelog
 
+## Beta — explicit local Whisper transcription of long recordings
+
+- Introduce a separate owner-only local Whisper job for completed Meeting Vault audio: an explicit permission checkbox, Start/Pause/Resume/Reset controls, persisted per-segment checkpoints and crash recovery.
+- Bundle ffmpeg and ffprobe in the Unraid image to convert up to 12 hours of approved recorded audio into bounded three-minute Whisper segments. The configured transcription endpoint must be local/private; no public Whisper/cloud fallback.
+- After successful transcription, save only a **draft** transcript in Meeting Review, with approximate segment time ranges. The owner must still correct, approve and separately export notes to Obsidian.
+- Protect reviewed transcripts from overwrites via revision checks; preserve original audio and completed segment texts on interruption. Add local URL, duration, consent and restart tests.
+- Real Whisper inference, iPhone interruptions, accurate speaker diarization and word-level timestamps still require testing and later phases.
+
+
 ## Beta — Meeting Review and approved Obsidian meeting notes
 
 - Add an owner-only Meeting Review panel for completed recordings with editable transcript, summary and speaker-correction drafts.
