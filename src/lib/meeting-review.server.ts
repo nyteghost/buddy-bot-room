@@ -8,7 +8,7 @@ import { meetingSourceForReview } from "./meeting-vault.server";
 import { meetingId } from "./meeting-vault";
 import {
   MAX_LOCAL_SUMMARY_INPUT, MAX_MEETING_SPEAKER_NOTES, MAX_MEETING_SUMMARY, MAX_MEETING_TRANSCRIPT,
-  approvedReview, emptyMeetingReview, meetingMarkdown, normalizeReviewText, reviewEditable, validMeetingReview,
+  approvedReview, emptyMeetingReview, meetingMarkdown, reviewExportCurrent, normalizeReviewText, reviewEditable, validMeetingReview,
   type MeetingReview,
 } from "./meeting-review";
 
@@ -137,7 +137,7 @@ async function publishReview(id: string, expected: number | null): Promise<Respo
     if (review.revision !== expected) return conflict();
     if (review.status !== "reviewed" || !review.approvedAt)
       return respond({ error: "Approve the reviewed transcript and summary before exporting." }, 409);
-    if (review.exportedPath) return respond({ review, alreadyPublished: true });
+    if (reviewExportCurrent(review)) return respond({ review, alreadyPublished: true });
     const original = await meetingSourceForReview(id);
     const folder = await safeMeetingsDirectory();
     const fileName = id + "-r" + review.revision + ".md";

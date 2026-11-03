@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MAX_MEETING_SPEAKER_NOTES, MAX_MEETING_SUMMARY, MAX_MEETING_TRANSCRIPT, type MeetingReview } from "@/lib/meeting-review";
+import { MAX_MEETING_SPEAKER_NOTES, MAX_MEETING_SUMMARY, MAX_MEETING_TRANSCRIPT, reviewExportCurrent, type MeetingReview } from "@/lib/meeting-review";
 
 type Draft = { transcript: string; summary: string; speakerNotes: string };
 function asDraft(r: MeetingReview): Draft {
@@ -102,7 +102,7 @@ export function MeetingReviewPanel({id,open}:{id:string;open:boolean}) {
         </span>
         <Button size="sm" variant="outline" disabled={!!busy||changed||!review.transcript.trim()||!review.summary.trim()||
           review.status==="reviewed"} onClick={()=>void action("approve")}>Approve reviewed notes</Button>
-        <Button size="sm" disabled={!!busy||changed||review.status!=="reviewed"||!!review.exportedPath}
+        <Button size="sm" disabled={!!busy||changed||review.status!=="reviewed"||reviewExportCurrent(review)}
           onClick={()=>void action("publish")}>Export approved note to Obsidian</Button>
       </div>
       {review.exportedPath && <p className="break-all text-xs text-muted-foreground">
