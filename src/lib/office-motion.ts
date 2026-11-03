@@ -15,6 +15,7 @@ export const officeStations: Record<AgentId, Station> = {
   rune: { home: [49, 55.9], visit: [58, 53.9], label: "System", activity: "Reviewing stats", facing: "toward" },
   claude: { home: [80, 55.9], visit: [88, 51.9], label: "Tux", activity: "Thinking through a fix", facing: "toward" },
   saiyan: { home: [34, 55.9], visit: [42, 53.9], label: "Goals", activity: "Planning a training arc", facing: "toward" },
+  mimic: { home: [65, 55.9], visit: [72, 51.9], label: "Mimic", activity: "Looking for shiny ideas", facing: "toward" },
 };
 
 export type Heading = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
