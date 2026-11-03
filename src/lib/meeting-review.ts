@@ -42,7 +42,7 @@ export function validMeetingReview(value: unknown): value is MeetingReview {
       name => typeof m[name as keyof MeetingReview] === "string"
     ) &&
     (m.status !== "reviewed" || (!!m.approvedAt && !!m.transcript.trim())) &&
-    (m.exportedPath === "" || /^Pixel Pals\/Meetings\/[0-9a-f-]+-r\d+\.md$/.test(m.exportedPath));
+    (m.exportedPath === "" || /^Pixel Pals\/Meetings\/[0-9a-f-]+-r\d+\.md$/.test(m.exportedPath ?? ""));
 }
 export function normalizeReviewText(value: unknown, max: number): string | null {
   if (typeof value !== "string" || value.length > max || value.includes("\0")) return null;
