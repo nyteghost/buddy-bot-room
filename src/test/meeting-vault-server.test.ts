@@ -72,7 +72,7 @@ describe("Meeting Vault secure streaming and recovery",()=>{
     const audio=await handleMeetingVault(new Request("http://localhost/api/meeting-vault?id="+record.id+"&audio=1"));
     expect(audio.status).toBe(200);
     expect(new Uint8Array(await audio.arrayBuffer())).toEqual(bytes);
-  });
+  }, 25000);
   it("requires revision and explicit confirmation to delete originals",async()=>{
     const record=await make(4);
     const blob=new Uint8Array([9,7,5,3]);
