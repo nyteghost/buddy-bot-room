@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { publicCalendarAddress, safeCalendarUrl, fetchCalendarSnapshot } from "@/lib/calendar-feed.server";
+import { publicCalendarAddress, safeCalendarUrl, fetchCalendarSnapshot, removeUnsubscribedCalendarSnapshots } from "@/lib/calendar-feed.server";
 import { randomUUID, createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,6 +29,17 @@ describe("Calendar subscription boundary", () => {
     }
     expect(publicCalendarAddress("8.8.8.8")).toBe(true);
     expect(publicCalendarAddress("2606:4700:4700::1111")).toBe(true);
+  });
+  it("removes an ICS cache snapshot when the owner unsubscribes", async () => {
+    folder = await mkdtemp(join(tmpdir(), "calendar-delete-"));
+    vi.stubEnv("BUDDY_DATA_DIR", folder);
+    const removed = "https://calendar.example.com/work-private.ics?token=hidden";
+    const remain = "https://calendar.example.com/personal.ics";
+    const key = createHash("sha256").update(removed).digest("hex").slice(0, 40);
+    await mkdir(join(folder, "calendar-cache"));
+    await writeFile(join(folder, "calendar-cache", key + ".json"), "cached private calendar");
+    await removeUnsubscribedCalendarSnapshots(removed + "," + remain, remain);
+    expect(await readdir(join(folder, "calendar-cache"))).toEqual([]);
   });
   it("uses hashed private disk snapshots offline without storing the secret link in filenames", async () => {
     folder = await mkdtemp(join(tmpdir(), "calendar-safe-"));
