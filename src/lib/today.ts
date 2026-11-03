@@ -11,7 +11,7 @@ export const AREAS: Area[] = ["work", "home"];
 
 export type TodayTask = {
   id: string; title: string; notes: string; tier: Tier | null; size: Size | null; energy: Energy | null; feeling: string;
-  status: Status; source: "capture" | "dump" | "manual" | "smaller" | "routine"; createdAt: number; doneAt?: number; parentId?: string;
+  status: Status; source: "capture" | "dump" | "manual" | "smaller" | "routine" | "meeting"; createdAt: number; doneAt?: number; parentId?: string;
   /** Optional start time (epoch ms), rough length in minutes, and "this week" focus flag. */
   at?: number; mins?: number; week?: boolean; area?: Area;
 };
@@ -39,7 +39,7 @@ export function parseTask(raw: unknown): TodayTask | null {
   const task: TodayTask = {
     id, title, notes: clip(t["notes"], 600), tier: oneOf(t["tier"], TIERS), size: oneOf(t["size"], ["S", "M", "L"] as const), energy: oneOf(t["energy"], ["low", "med", "high"] as const),
     feeling: clip(t["feeling"], 80), status: oneOf(t["status"], ["open", "done", "dropped"] as const) ?? "open",
-    source: oneOf(t["source"], ["capture", "dump", "manual", "smaller", "routine"] as const) ?? "manual", createdAt: Number(t["createdAt"]) || 0,
+    source: oneOf(t["source"], ["capture", "dump", "manual", "smaller", "routine", "meeting"] as const) ?? "manual", createdAt: Number(t["createdAt"]) || 0,
   };
   if (Number(t["at"]) > 0) task.at = Number(t["at"]);
   if (Number(t["mins"]) > 0) task.mins = Math.min(960, Math.round(Number(t["mins"])));

@@ -202,3 +202,28 @@ export async function approveCaptureTask(capture:string,suggestion:string,title:
  const state=await update(s=>{if(s.tasks.some(t=>t.id===id))return s;if(s.tasks.length>=500)throw Error('Today task limit reached; review existing tasks first.');const duplicate=s.tasks.find(t=>t.status==='open'&&t.title.toLowerCase()===title.toLowerCase());if(duplicate)return s;return addTask(s,title,'capture',id,Date.now(),{notes:notes.slice(0,600),...(minutes?{mins:minutes}:{})});});
  const task=state.tasks.find(t=>t.id===id)??state.tasks.find(t=>t.status==='open'&&t.title.toLowerCase()===title.toLowerCase());if(!task)throw Error('Task was not saved');return task;
 }
+
+/** Owner-approved, idempotent meeting action. The caller must verify the review's approval and revision. */
+export async function createReviewedMeetingTask(
+  meetingId: string, reviewRevision: number, rawTitle: string, rawNotes: string,
+) {
+  const title = rawTitle.replace(/\s+/g," ").trim();
+  const notes = rawNotes.trim();
+  if (!/^[0-9a-f-]{36}$/i.test(meetingId) || !Number.isSafeInteger(reviewRevision) || reviewRevision < 1 ||
+      !title || title.length > 200 || notes.length > 400 || /\0/.test(notes)) throw Error("Invalid reviewed meeting task");
+  const id = "mtg-" + createHash("sha256")
+    .update(meetingId + ":" + reviewRevision + ":" + title.toLocaleLowerCase())
+    .digest("hex").slice(0,20);
+  const sourceNotes = "Reviewed meeting: " + meetingId + " (review revision " + reviewRevision + ")";
+  const combined = (notes ? notes + "\n" : "") + sourceNotes;
+  const state = await updateToday(s => {
+    if (s.tasks.some(x=>x.id===id)) return s; // Safe retry after network interruption.
+    if (s.tasks.length >= 500) throw Error("Today task limit reached");
+    if (s.tasks.some(x=>x.status==="open"&&x.title.toLocaleLowerCase()===title.toLocaleLowerCase())) return s;
+    return addTask(s,title,"meeting",id,Date.now(),{notes:combined.slice(0,600)});
+  });
+  const task = state.tasks.find(x=>x.id===id) ??
+    state.tasks.find(x=>x.status==="open"&&x.title.toLocaleLowerCase()===title.toLocaleLowerCase());
+  if (!task) throw Error("Could not save meeting task");
+  return task;
+}

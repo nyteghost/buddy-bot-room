@@ -5,6 +5,7 @@ import { currentUser } from "./accounts.server";
 import { askPals } from "./ask.server";
 import { jobs } from "./jobs.server";
 import { meetingSourceForReview } from "./meeting-vault.server";
+import { createReviewedMeetingTask } from "./today.server";
 import { meetingId } from "./meeting-vault";
 import {
   MAX_LOCAL_SUMMARY_INPUT, MAX_MEETING_SPEAKER_NOTES, MAX_MEETING_SUMMARY, MAX_MEETING_TRANSCRIPT,
@@ -185,6 +186,19 @@ async function publishReview(id: string, expected: number | null): Promise<Respo
     return respond({ review: updated, path: relativePath });
   });
 }
+/** An action item must be explicitly entered and approved by the owner. */
+async function createReviewedAction(id:string, body:Record<string,unknown>):Promise<Response>{
+  const revision=revisionFrom(body);
+  const title=typeof body["title"]==="string"?body["title"].replace(/\s+/g," ").trim():"";
+  const notes=typeof body["notes"]==="string"?body["notes"].trim():"";
+  if(body["confirm"]!==true||revision===null||!title||title.length>200||notes.length>400)
+    return respond({error:"Review the task title and confirm before adding it to Today."},400);
+  const approved=await locked(()=>readReview(id));
+  if(approved.revision!==revision)return conflict();
+  if(approved.status!=="reviewed")return respond({error:"Approve the meeting transcript and summary before creating a Today task."},409);
+  const task=await createReviewedMeetingTask(id,revision,title,notes);
+  return respond({task});
+}
 /** Meeting Review is always explicit, owner-only, and separate from permanent Memory Keeper. */
 export async function handleMeetingReview(request: Request): Promise<Response> {
   const user = await currentUser(request);
@@ -212,6 +226,7 @@ export async function handleMeetingReview(request: Request): Promise<Response> {
     if (op === "approve") return await approveEdits(id, revisionFrom(body));
     if (op === "summarize") return await summarizeLocally(id, revisionFrom(body));
     if (op === "publish") return await publishReview(id, revisionFrom(body));
+    if (op === "create-task") return await createReviewedAction(id, body);
     return respond({ error: "Unknown meeting review operation." }, 400);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unable to process the meeting";
