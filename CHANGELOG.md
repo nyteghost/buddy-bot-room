@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta — Settings simplification and calendar reliability
+- Reworked Settings: selected categories, search by service and field, connected/not set up filters, progressive help, same saved values and secret handling.
+- Calendar: safer HTTPS-only public feed checks, no redirect following, bounded streaming, last-good offline snapshots in protected Unraid data, refresh-on-demand and sync status.
+- Added RDATE recurring event support and tests for daylight saving, cancellations, moved instances and cached feed removal.
+- Remaining: full named/uploaded ICS source manager, complex recurrence coverage, Working Pals and Meeting Memory.
+
+
 ## Beta — Discord Companion text integration (after 1.0.822)
 
 - Add opt-in owner-only Discord slash commands (`/ask`, `/ping`, `/help`) using an outbound Gateway connection from Unraid. No public port or message-content intent.

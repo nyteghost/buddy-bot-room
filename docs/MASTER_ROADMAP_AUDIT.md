@@ -34,3 +34,9 @@ Each increment needs focused regression tests, full production validation, simpl
 ## Optional Discord Companion text increment
 
 An opt-in Discord text front end has been added separately from the core ADHD/calendar/meeting phase order, after the Adaptive Today increment. It supports owner-only guild slash commands, private responses, local-Ollama General Chat continuity and server-side bot settings; it does not enable voice recording, Meeting Vault, multi-Pal selection or unsolicited actions. See [Discord Companion](DISCORD_COMPANION.md). Actual token registration and Discord client behavior must be checked with an owner account after the beta container is deployed.
+
+## Calendar and Settings incremental beta update
+- Settings navigation shows only one selected category, has a searchable integration/setting index and status filters. All original settings and private server credentials remain.
+- ICS feeds now use HTTPS URL guards, 8 MB streaming limits, redirect blocking, protected hashed offline cache, refresh/test support, and clear stale state. Old removed/expired snapshots are purged.
+- RDATE date instances, daylight-saving and cancellation tests added. Full named subscriptions, local ICS uploads, provider-specific complex RRULEs, and advanced network-level egress hardening remain.
+- See SETTINGS_NAVIGATION.md and CALENDAR_ICS_BETA.md for usage and limits.
