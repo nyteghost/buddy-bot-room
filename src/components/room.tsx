@@ -786,9 +786,9 @@ export function Room() {
       const wbNow = getWorkbench();
       const project = activeProject.get() || undefined;
       const ids = (direct ? [partner] : enabled) as string[];
-      if (ids.some((id) => pickMemories(wbNow, topic, { pal: id, project, access: memoryAccess(personasNow, id) }).ranked)) {
+      if (ids.some((id) => pickMemories(wbNow, topic, { pal: id, project: id === "mimic" && memoryAccess(personasNow, id) !== "all" ? undefined : project, access: memoryAccess(personasNow, id) }).ranked)) {
         const seen = new Map<string, string>();
-        for (const id of ids) for (const v of visibleMemories(wbNow, { pal: id, project, access: memoryAccess(personasNow, id) })) seen.set(v.entry.id, v.entry.text);
+        for (const id of ids) for (const v of visibleMemories(wbNow, { pal: id, project: id === "mimic" && memoryAccess(personasNow, id) !== "all" ? undefined : project, access: memoryAccess(personasNow, id) })) seen.set(v.entry.id, v.entry.text);
         memBoost = await memoryBoost([...seen].map(([id, text]) => ({ id, text })), topic);
       }
     }
@@ -863,7 +863,7 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
+            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: agent.id === "mimic" && memoryAccess(personasNow, agent.id) !== "all" ? undefined : activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
             contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
