@@ -6,6 +6,7 @@ import { completedMeetingSources } from "./meeting-vault.server";
 import { reviewedMeetingForThread } from "./meeting-review.server";
 import { meetingId } from "./meeting-vault";
 import { prepareReviewedMeetingBrief } from "./meeting-briefing";
+import { suggestReviewedMeetingLinks } from "./meeting-link-suggestions";
 import {
   matchingExcerpt, parseThreadInput, validMeetingThreadLink,
   type MeetingThreadLink, type MeetingThreadHit,
@@ -71,6 +72,12 @@ export async function handleMeetingThreads(request:Request):Promise<Response>{
       const params=new URL(request.url).searchParams;
       const q=params.get("q")??"";
       if(q.length>100)return response({error:"Search query is too long."},400);
+      if(params.get("suggest")==="1") {
+        // Unreviewed recordings are excluded by visibleMeetings().
+        // The suggestions endpoint never modifies thread links.
+        const reviewed=await locked(()=>visibleMeetings(""));
+        return response({suggestions:suggestReviewedMeetingLinks(reviewed)});
+      }
       const brief=params.get("brief");
       if(brief!==null){
         const project=params.get("project")??"";
