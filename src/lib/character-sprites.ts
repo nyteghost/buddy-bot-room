@@ -2,8 +2,39 @@ import type { AgentId } from "./agents";
 import type { CharacterMode } from "./hellraiser";
 import { themedSprite } from "./themed-sprites";
 
+/** Original 32x32 treasure-chest mimic; native pixels, no imported image or theme asset. */
+export function mimicChestSprite(): string[] {
+  const g = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
+  const dot = (x: number, y: number, v: string) => { if (x >= 0 && x < 32 && y >= 0 && y < 32) g[y]![x] = v; };
+  const rect = (x: number, y: number, w: number, h: number, v: string) => {
+    for (let j=y;j<y+h;j++) for (let i=x;i<x+w;i++) dot(i,j,v);
+  };
+  // Chunky leather-bound wooden base, gold corner bindings and treasure latch.
+  rect(6,14,21,15,"i"); rect(7,15,19,12,"b");
+  rect(8,22,17,2,"h");rect(9,25,15,1,"h");
+  rect(6,15,3,13,"g"); rect(24,15,3,13,"g");
+  rect(6,26,21,3,"i");rect(8,27,17,1,"h");
+  rect(14,23,5,5,"q");rect(15,24,3,3,"i");dot(16,25,"q");
+  // Open top lid with heavy golden rim, dark maw and glowing lid eyes.
+  rect(4,5,23,10,"i");rect(5,6,21,7,"h");
+  rect(6,6,19,2,"b");rect(6,9,19,1,"q");rect(5,12,21,2,"g");
+  rect(6,7,2,6,"g");rect(24,7,2,6,"g");
+  rect(8,13,17,10,"i");rect(9,14,15,8,"n");
+  rect(11,10,3,2,"i");rect(18,10,3,2,"i");
+  rect(12,10,2,1,"c");rect(19,10,2,1,"c");
+  // Individual jagged upper and lower teeth.
+  for (const x of [9,12,15,18,21]) {rect(x,13,2,3,"w");dot(x+1,16,"w");}
+  for (const x of [10,13,16,19,22]) {rect(x,19,2,3,"w");dot(x,18,"w");}
+  // Purple lolling tongue curling above the chest's right side.
+  rect(15,16,6,3,"r");rect(19,15,6,3,"r");rect(23,13,4,3,"r");
+  rect(26,10,3,5,"r");rect(27,8,2,3,"r");dot(26,7,"r");
+  rect(16,16,4,1,"u");rect(21,15,3,1,"u");rect(25,12,2,1,"u");
+  return g.map(row=>row.join(""));
+}
+
 // Every entry is a native pixel on a 32×32 canvas. No source-grid scaling.
 export function characterSprite(id: AgentId, mode: CharacterMode): string[] {
+  if (id === "mimic") return mimicChestSprite();
   if (mode === "matrix" || mode === "finalfantasy" || mode === "devteam" || mode === "cyberpunk" || mode === "linux" || mode === "assistant") return themedSprite(id, mode === "assistant" ? "linux" : mode);
   const grid = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
   const dot = (x: number, y: number, c: string) => {
