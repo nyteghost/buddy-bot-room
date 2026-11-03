@@ -48,6 +48,7 @@ import { Route as ApiProvidersRouteImport } from './routes/api.providers'
 import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
+import { Route as ApiMeetingVaultRouteImport } from './routes/api.meeting-vault'
 import { Route as ApiWorkingPalsRouteImport } from './routes/api.working-pals'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
@@ -268,6 +269,11 @@ const ApiSchedulesRoute = ApiSchedulesRouteImport.update({
   path: '/api/schedules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeetingVaultRoute = ApiMeetingVaultRouteImport.update({
+  id: '/api/meeting-vault',
+  path: '/api/meeting-vault',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorkingPalsRoute = ApiWorkingPalsRouteImport.update({
   id: '/api/working-pals',
   path: '/api/working-pals',
@@ -429,6 +435,7 @@ export interface FileRoutesByFullPath {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
+  '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -494,6 +501,7 @@ export interface FileRoutesByTo {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
+  '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -560,6 +568,7 @@ export interface FileRoutesById {
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
   '/api/schedules': typeof ApiSchedulesRoute
+  '/api/meeting-vault': typeof ApiMeetingVaultRoute
   '/api/working-pals': typeof ApiWorkingPalsRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -627,6 +636,7 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
+    | '/api/meeting-vault'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -692,6 +702,7 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
+    | '/api/meeting-vault'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -757,6 +768,7 @@ export interface FileRouteTypes {
     | '/api/reminders'
     | '/api/repos'
     | '/api/schedules'
+    | '/api/meeting-vault'
     | '/api/working-pals'
     | '/api/search'
     | '/api/second-brain'
@@ -823,6 +835,7 @@ export interface RootRouteChildren {
   ApiRemindersRoute: typeof ApiRemindersRoute
   ApiReposRoute: typeof ApiReposRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
+  ApiMeetingVaultRoute: typeof ApiMeetingVaultRoute
   ApiWorkingPalsRoute: typeof ApiWorkingPalsRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
@@ -1122,6 +1135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meeting-vault': {
+      id: '/api/meeting-vault'
+      path: '/api/meeting-vault'
+      fullPath: '/api/meeting-vault'
+      preLoaderRoute: typeof ApiMeetingVaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/working-pals': {
       id: '/api/working-pals'
       path: '/api/working-pals'
@@ -1347,6 +1367,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRemindersRoute: ApiRemindersRoute,
   ApiReposRoute: ApiReposRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,
+  ApiMeetingVaultRoute: ApiMeetingVaultRoute,
   ApiWorkingPalsRoute: ApiWorkingPalsRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
