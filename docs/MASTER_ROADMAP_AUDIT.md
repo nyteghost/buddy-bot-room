@@ -64,3 +64,7 @@ Implemented on beta: an owner-only Meeting Threads view in Capture Inbox, exact-
 ## Meeting Intelligence increment 2 — manually requested source-grounded preparation
 
 Implemented on beta: private owner-only, on-demand Meeting Threads brief of up to 12 approved meeting summaries, exact thread/project filtering, source receipts (meeting ID, approved date, audio SHA-256 and link revision), and copy-to-clipboard. The brief never searches draft notes, grants Discord permissions or infers attendance or action ownership. It does not autonomously monitor calendars or invoke the AI. [Meeting Threads guide](MEETING_THREADS_BETA.md). Future: reviewable Smart Linking, timestamp corrections, approved action item extraction, calendar-scoped suggestions and richer hybrid memory retrieval.
+
+## Meeting Intelligence increment 3 — opt-in Smart Linking proposals
+
+Implemented on beta: owner-only, on-demand keyword-overlap suggestions from linked, approved meetings to unlinked approved meetings. The UI displays supporting reviewed meeting titles and matched keywords; it fills an editable proposal but does not save until the owner explicitly confirms via the pre-existing revision-checked link API. Suggested project labels are organizational metadata only; no new project permissions are granted. Still outstanding: semantic/hybrid search, timestamp-verified source quotations, independent meeting action-item approval, smart calendar matching and fully tested mobile voice flows.

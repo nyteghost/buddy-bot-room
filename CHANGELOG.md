@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta — Reviewable Meeting Threads Smart Linking
+
+- Provide owner-requested deterministic keyword suggestions for unlinked reviewed meetings based on existing approved thread links.
+- Show supporting approved source and matching terms; choosing one only fills the existing editor and still requires manual save.
+- No automatic linking, unapproved-note ingestion, AI model calls, Discord sharing or new project permissions. Add owner and no-write regression tests.
+
+
 ## Beta — Meeting Threads source-grounded preparation
 
 - Add manual **Prepare brief** for each explicitly linked reviewed meeting thread/project, with source receipts and a copyable bounded summary.

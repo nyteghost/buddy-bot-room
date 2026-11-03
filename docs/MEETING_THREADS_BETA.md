@@ -30,3 +30,9 @@ Future work includes verified timestamp evidence, reviewable Smart Linking sugge
 After linking at least one **reviewed** meeting into a named thread, click **Prepare brief** beside its thread name (and project label, when set). Pixel Pals assembles up to 12 most recently approved meeting summaries into a plain-text briefing. Each entry includes its meeting ID, approval date, original audio SHA-256, and thread-link revision. Use **Copy brief** only when you have permission to share these meeting details. The brief is generated only when you click, remains on your current device, and is not sent to any AI model, Discord, or external app.
 
 The feature requires an owner session and an exact thread and project match. Unreviewed, unlinked, or other-project meetings are excluded. No upcoming calendar attendance, speaker identity, task owner or action completion is assumed. The on-demand brief is a source compilation, **not** a future-meeting calendar notification or autonomous AI action. Older approved summaries may be outdated; check their recordings before relying on decisions.
+
+## Suggested thread links (explicit approval only)
+
+Press **Suggest thread links** to compare meaningful keywords between approved meeting titles and summaries. This checks only already-reviewed meetings, uses existing thread links as examples, and suggests a matching thread/project for an unlinked approved meeting when at least two distinct substantive terms overlap. Each suggestion shows the reviewed source title and matching terms. Results are heuristic suggestions, not verified connections.
+
+Choose **Review in link form** to populate the existing thread-link editor. **Nothing is saved yet.** Review the suggested source, correct or discard the proposed link and separately press **Save reviewed link**. Dismissing the suggestion changes nothing. This endpoint is owner-only, performs no AI call, and cannot view unapproved transcripts or create tasks/memories.
