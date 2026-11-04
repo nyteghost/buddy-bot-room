@@ -23,13 +23,13 @@ async function load():Promise<Handoff[]> {
   if(!parsed.every((x:unknown)=>{
    if(!x||typeof x!=="object")return false;
    const r=x as Record<string,unknown>;
-   return typeof r.id==="string"&&/^[A-Za-z0-9_-]{8,100}$/.test(r.id)
-    &&(r.kind==="task"||r.kind==="note")
-    &&["draft","approved","delivered","cancelled"].includes(String(r.status))
-    &&r.payload&&typeof r.payload==="object"&&!Array.isArray(r.payload)
-    &&typeof (r.payload as {title?:unknown}).title==="string"
-    &&typeof r.createdAt==="string"&&typeof r.updatedAt==="string"
-    &&Number.isSafeInteger(r.attempts)&&Number(r.attempts)>=0;
+   return typeof r["id"]==="string"&&/^[A-Za-z0-9_-]{8,100}$/.test(r["id"])
+    &&(r["kind"]==="task"||r["kind"]==="note")
+    &&["draft","approved","delivered","cancelled"].includes(String(r["status"]))
+    &&r["payload"]&&typeof r["payload"]==="object"&&!Array.isArray(r["payload"])
+    &&typeof (r["payload"] as {title?:unknown}).title==="string"
+    &&typeof r["createdAt"]==="string"&&typeof r["updatedAt"]==="string"
+    &&Number.isSafeInteger(r["attempts"])&&Number(r["attempts"])>=0;
   }))throw Error("Invalid ADHD bridge records");
   return parsed as Handoff[];
  }catch(e){if((e as {code?:string}).code==="ENOENT")return [];throw e;}
@@ -71,7 +71,7 @@ export async function handleAdhdBridge(request:Request):Promise<Response>{
   if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Error();
   body=parsed as Record<string,unknown>;
  }catch{return reply({error:"Invalid JSON"},400);}
- const action=body.action;
+ const action=body["action"];
  if(action!=="draft"&&action!=="approve"&&action!=="cancel"&&action!=="send")return reply({error:"Unknown action"},400);
  if(action==="send"&&(!enabled()||!endpoint()||token().length<24))return reply({error:"Bridge is not configured and enabled."},503);
  try{
@@ -80,11 +80,11 @@ export async function handleAdhdBridge(request:Request):Promise<Response>{
    const now=new Date().toISOString();
    if(action==="draft"){
     if(rows.length>=200)throw Error("Handoff outbox is full; archive old records first");
-    const draft=draftHandoff(body.handoff,randomUUID(),now);
+    const draft=draftHandoff(body["handoff"],randomUUID(),now);
     rows.unshift(draft);await save(rows);
     return reply({item:draft},201);
    }
-   const id=body.id;
+   const id=body["id"];
    if(typeof id!=="string")throw Error("Handoff ID required");
    const i=rows.findIndex(x=>x.id===id);
    if(i<0)throw Error("Unknown handoff ID");
