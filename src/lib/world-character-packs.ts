@@ -117,3 +117,28 @@ export function enqueueWorldEvent(queue:readonly WorldEvent[],event:WorldEvent,p
   if(policy.reducedMotion||queue.some(item=>item.id===event.id))return [...queue].slice(-cap);
   return [...queue,event].slice(-cap);
 }
+
+/** A local-only animation cue derived from an approved cosmetic event. */
+export type WorldReaction = Readonly<{eventId:string;action:"wave"|"celebrate"|"look"|"talk";frame:number;remainingMs:number}>;
+const WORLD_REACTION_DURATION_MS=1600;
+/**
+ * Resolve a deterministic four-frame reaction without timers, AI calls or side effects.
+ * The newest eligible event wins; expired, future and disabled-actor events are ignored.
+ * The caller renders the returned action using the existing worldAnimatedFrame atlas.
+ */
+export function worldReactionAt(
+ queue:readonly WorldEvent[],actorId:string,now:number,policy:WorldActorPolicy
+):WorldReaction|null {
+ if(policy.reducedMotion||!Number.isSafeInteger(now)||now<0||
+    !policy.knownIds.includes(actorId)||!policy.enabledIds.includes(actorId))return null;
+ for(let i=queue.length-1;i>=0;i--){
+  const event=acceptWorldEvent(queue[i],policy);
+  if(!event||event.actorId!==actorId||event.at>now)continue;
+  const age=now-event.at;
+  if(age>=WORLD_REACTION_DURATION_MS)continue;
+  const action:WorldReaction["action"]=event.kind==="celebrate"?"celebrate":
+   event.kind==="inspect-prop"?"look":event.kind==="greet"?"talk":"wave";
+  return {eventId:event.id,action,frame:Math.min(3,Math.floor(age/400)),remainingMs:WORLD_REACTION_DURATION_MS-age};
+ }
+ return null;
+}
