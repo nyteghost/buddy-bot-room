@@ -912,3 +912,7 @@ Working Pals now supports separately approved recurring read-only summaries and 
 ### GitHub → Obsidian Journal (beta)
 
 Repo Watch includes an opt-in daily (03:00 Eastern by default) project change monitor, default/beta branch checkpointing, **create-only** Markdown notes in the configured vault, and optional explicit local-only Ollama summaries. It requires the Pixel Pals container to mount the Obsidian vault and set `OBSIDIAN_VAULT_DIR`; private repositories need a read-only `GITHUB_TOKEN`. Disabled by default. See [setup and privacy notes](docs/GITHUB_JOURNAL_BETA.md).
+
+### Living World 2 beta
+
+Pal Room defaults to animated **Living World** with all existing themes. Switch to **Classic** in Pal Room activities to restore the previous room presentation. On desktop, the default Home workspace opens **Today left / Pal Room right**; on phones it opens Today as a full-screen tab. Choose **Home · Today + Pal Room** under Window layouts to restore the split manually. This first release uses synthesized directional pixel art and animated ambience, with bespoke character sheets and dynamic furniture still on the roadmap. See [Living World 2](docs/LIVING_WORLD_2_BETA.md).

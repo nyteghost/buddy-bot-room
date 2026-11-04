@@ -35,7 +35,7 @@ export function mimicChestSprite(): string[] {
 // Every entry is a native pixel on a 32×32 canvas. No source-grid scaling.
 export function characterSprite(id: AgentId, mode: CharacterMode): string[] {
   if (id === "mimic") return mimicChestSprite();
-  if (mode === "matrix" || mode === "finalfantasy" || mode === "devteam" || mode === "cyberpunk" || mode === "linux" || mode === "assistant") return themedSprite(id, mode === "assistant" ? "linux" : mode);
+  if (mode === "matrix" || mode === "finalfantasy" || mode === "devteam" || mode === "cyberpunk" || mode === "linux" || mode === "assistant" || mode === "dcc") return themedSprite(id, mode === "assistant" ? "linux" : mode);
   const grid = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
   const dot = (x: number, y: number, c: string) => {
     if (grid[y] && x >= 0 && x < 32) grid[y][x] = c;

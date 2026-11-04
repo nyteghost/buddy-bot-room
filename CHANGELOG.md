@@ -1,3 +1,12 @@
+## Beta — Living World 2 first increment
+
+- Default existing Pal themes to animated Living World, preserving a device-local Classic switch.
+- Reuse the established walker for eight generated native-pixel compass directions and four walking phases.
+- Add non-static themed room lighting, ambient specks, reflections and shadows, honoring reduced-motion/low-power behavior.
+- Open desktop Home with Today on the left and Pal Room on the right; preserve explicitly saved custom layouts and mobile tab behavior.
+- Add native Dungeon Crawler Carl fantasy sprite treatment instead of the unrelated Hellraiser fallback.
+- Add focused regression tests and document remaining sprite-art/character-library work. No new AI backend permissions or Unraid deployment.
+
 ## Beta 1.0.948 — Approved recurrence and review controls
 
 - Working Pals: separately approved recurrence, retained receipts, Pause all, foreground-chat priority and stale-result protection.

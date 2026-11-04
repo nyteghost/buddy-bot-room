@@ -94,3 +94,7 @@ Validation for this increment: TypeScript passed; 1,388 tests across 148 files p
 ## GitHub → Obsidian Project Journal (beta)
 
 Added an opt-in, owner-only daily GitHub scan at 03:00 America/New_York (editable) through the existing Repo Watch and self-hosted scheduler. It tracks default and beta branch HEADs with per-branch persistent checkpoints in BUDDY_DATA_DIR; creates new dated project notes in the configured Obsidian vault without overwriting older notes. Initial runs create bounded baselines; later runs include source-linked commit comparisons. Optional local-only Ollama explanations require explicit opt-in and are labelled unverified. It does not promote notes to personal memory, send data to cloud AI, push to GitHub, or change work tasks. Deployment, vault mount, token permissions and hardware AI need real Unraid verification. See [GitHub Journal](GITHUB_JOURNAL_BETA.md).
+
+## Living World 2 — initial animated room implementation
+
+Implemented in beta: default Living World for all existing themes, Classic toggle, generated 32px eight-heading and four-phase walking models, animated ambient scenes, Dungeon Crawler Carl native fantasy sprites, and Today-left / Pal-Room-right desktop Home. Original themes, chat/agent identities, recordings, memories, external integrations and volumes are unchanged. Pending: unique hand-authored sprites and gestures, room-specific pathfinding around furniture, dynamic props, time/weather-driven scene art, new custom characters and a Character Library. See [Living World 2 beta](LIVING_WORLD_2_BETA.md).

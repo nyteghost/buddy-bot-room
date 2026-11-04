@@ -1,0 +1,9 @@
+# Living World 2 — theme-wide animated rooms (first implementation)
+
+Living World now opens by default for all existing theme families and nine existing Pals. The original Classic room remains selectable via a device-local toggle. The existing OfficePal walker, reduced-motion settings, hidden-tab/low-power pauses and focus/task cues remain the foundation. Existing native 32×32 sprite models are used for generated eight-direction 32px fallback views and four stepping phases. These are not bespoke hand-drawn eight-angle sprite sheets; Saiyan's original directional art is preserved in Classic mode. Dungeon Crawler Carl has dedicated fantasy pixel art instead of the unrelated Hellraiser fallback.
+
+Each room keeps its original backdrop but now layers ambient light, floating pixel specks, moving reflections and shadows, with separate lighting colors for themes. These effects are decorative, not live weather or animated furniture. They do not call AI or request extra permissions.
+
+Desktop Home defaults to Today on the left and Pal Room on the right. Existing explicitly saved custom layouts are respected; mobile remains single-window with Today as its opening tab. The layout preset can also be selected manually.
+
+Outstanding milestones: independently hand-illustrated 8-direction sprite sheets for all existing characters and themes; pathfinding/collisions that fit each room's floorplan; animated interactive props and real-time day/night/weather; Character Library with activation and original character packs (including the green-jacket Pal); deep mobile and Unraid performance QA. There is no change to the AI provider/model catalog, Discord connections, memory stores, Obsidian data, secrets, recordings or Docker volumes. Nothing is deployed to production here.

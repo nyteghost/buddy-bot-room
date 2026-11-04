@@ -1,7 +1,7 @@
 import type { AgentId } from "./agents";
 
 /** Hand-drawn silhouettes rasterized directly onto a native 32×32 canvas. */
-export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam" | "cyberpunk" | "linux"): string[] {
+export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "devteam" | "cyberpunk" | "linux" | "dcc"): string[] {
   const grid = Array.from({ length: 32 }, () => Array<string>(32).fill("."));
   const dot = (x: number, y: number, c: string) => {
     if (grid[y] && x >= 0 && x < 32) grid[y][x] = c;
@@ -74,6 +74,17 @@ export function themedSprite(id: AgentId, mode: "matrix" | "finalfantasy" | "dev
   }
   if (mode === "linux") mode = "devteam";
   legs();
+  if (mode === "dcc") {
+    // Native fantasy sprite instead of falling through to the Cenobite fallback.
+    const robes = ["N","H","Q","B","r","G","F","I","Q"] as const;
+    const shade = robes[["nova","byte","sage","pip","echo","rune","claude","saiyan","mimic"].indexOf(id)] ?? "N";
+    head("E","T"); eyes(); hair("H","J"); torso(shade,"B");
+    box(14,16,4,7,"G"); box(15,17,2,5,"Q");
+    if (id === "saiyan" || id === "pip") { box(25,11,2,17,"Q"); dot(26,10,"Y"); }
+    if (id === "sage" || id === "echo") { box(10,2,13,3,"Q"); box(11,1,11,2,"H"); }
+    if (id === "rune" || id === "byte") { box(13,19,7,4,"I"); dot(16,20,"C"); }
+    return grid.map(row => row.join(""));
+  }
   if (mode === "cyberpunk") {
     // jacket, jacket shade, neon hair, neon accent, skin
     const look: Record<AgentId, [string, string, string, string, string]> = {
