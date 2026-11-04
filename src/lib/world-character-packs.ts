@@ -147,7 +147,11 @@ export function worldReactionAt(
 }
 
 /** Existing Pal Room emotes forwarded to rendered visual guests, never to AI tools. */
-export type WorldRoomCue = Readonly<{action:"wave"|"celebrate";at:number}>;
+export const WORLD_INTERACTIVE_PROPS = ["today","mail","calendar","tasks","setup"] as const;
+export type WorldInteractiveProp = (typeof WORLD_INTERACTIVE_PROPS)[number];
+export type WorldRoomCue =
+ Readonly<{action:"wave"|"celebrate";at:number}> |
+ Readonly<{action:"inspect-prop";at:number;targetId:WorldInteractiveProp}>;
 /**
  * Resolve a room-wide emote for a guest that is already enabled and mounted.
  * Invalid cues and reduced-motion requests are ignored; no state is persisted.
@@ -157,10 +161,11 @@ export function worldCueReaction(
 ):WorldReaction|null {
  if(!cue||typeof actorId!=="string"||actorId.length<1||actorId.length>64)return null;
  const policy:WorldActorPolicy={
-  knownIds:[actorId],enabledIds:[actorId],interactiveProps:[],reducedMotion
+  knownIds:[actorId],enabledIds:[actorId],interactiveProps:WORLD_INTERACTIVE_PROPS,reducedMotion
  };
  const event=acceptWorldEvent({
-  id:"world-"+String(cue.at),actorId,kind:cue.action,at:cue.at
+  id:"world-"+String(cue.at),actorId,kind:cue.action,at:cue.at,
+  ...(cue.action==="inspect-prop"?{targetId:cue.targetId}:{})
  },policy);
  return event?worldReactionAt([event],actorId,now,policy):null;
 }
