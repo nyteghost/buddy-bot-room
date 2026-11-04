@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { PalArtRig } from "./pal-art-rig";
 import type { PalMotion } from "@/lib/pal-motion";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,17 @@ export function PixelCharacter({
   const directional = hasFacingArt(id) ? facingArt(id, facing ?? "s") : undefined;
   const art = pixelWorld ? undefined : directional ?? (back ? undefined : palArt(id, mode));
   const pose = walking ? "walk" : animated ? "talk" : motion;
+  // Preserve the original portrait path while caching the much smaller native
+  // 32px walking art. No 128px grid regeneration on every movement tick.
+  const runs = useMemo(() => {
+    if (art) return [];
+    const front = characterSprite(id, mode);
+    const source = pixelWorld ? worldFacingSprite(front, facing ?? (back ? "n" : "s"), walking ? walkFrame : 0, id === "mimic") : back ? backView(front) : front;
+    const grid = pixelWorld ? source : to128(source);
+    const feetY = pixelWorld ? 24 : 96;
+    const middleX = pixelWorld ? 16 : 64;
+    return spriteRuns(grid, (x, y) => y < feetY ? "body" : x < middleX ? "left-leg" : "right-leg");
+  }, [art, id, mode, pixelWorld, facing, back, walking, walkFrame]);
   if (art && pose) return <PalArtRig id={id} art={art} motion={pose} className={cn("pixel-character native-sprite pal-art", directional && "pal-directional", `agent-${id}`, className)} />;
   if (art) {
     return (
@@ -51,16 +63,15 @@ export function PixelCharacter({
       />
     );
   }
-  const front = characterSprite(id, mode);
-  const grid = to128(pixelWorld ? worldFacingSprite(front, facing ?? (back ? "n" : "s"), walking ? walkFrame : 0, id === "mimic") : back ? backView(front) : front);
-  const runs = spriteRuns(grid, (x, y) => (y < 96 ? "body" : x < 64 ? "left-leg" : "right-leg"));
   return (
     <svg
-      viewBox="0 0 128 128"
+      viewBox={pixelWorld ? "0 0 32 32" : "0 0 128 128"}
       role="img"
+      data-world-motion={pixelWorld ? pose ?? "idle" : undefined}
       aria-label={`${id} pixel character`}
       className={cn(
         "pixel-character native-sprite",
+        pixelWorld && "world-native-sprite",
         `agent-${id}`,
         animated && "character-bounce",
         mode === "hellraiser" && "cenobite",

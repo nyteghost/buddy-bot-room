@@ -7,3 +7,7 @@ Each room keeps its original backdrop but now layers ambient light, floating pix
 Desktop Home defaults to Today on the left and Pal Room on the right. Existing explicitly saved custom layouts are respected; mobile remains single-window with Today as its opening tab. The layout preset can also be selected manually.
 
 Outstanding milestones: independently hand-illustrated 8-direction sprite sheets for all existing characters and themes; pathfinding/collisions that fit each room's floorplan; animated interactive props and real-time day/night/weather; Character Library with activation and original character packs (including the green-jacket Pal); deep mobile and Unraid performance QA. There is no change to the AI provider/model catalog, Discord connections, memory stores, Obsidian data, secrets, recordings or Docker volumes. Nothing is deployed to production here.
+
+## Second increment: native character and scene performance
+
+World characters now render directly at 32×32, with cached SVG runs, preserving recognizable jagged pixels at any screen scale. Theme-sensitive pixel props and idle gestures keep the room animated without AI calls; reduced motion and low power pause them. Animated furniture interactions, actual obstacle maps and authored sprite sheets remain outstanding.

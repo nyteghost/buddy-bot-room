@@ -63,7 +63,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={Math.floor(elapsed / 140) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={walking ? Math.floor(elapsed / 140) % 4 : 0} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{displayLabel}</span>
     </div>
   );

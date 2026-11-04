@@ -2578,3 +2578,44 @@ html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosph
 @media(max-width:700px){
   .modular-workspace .focus-companion-minimized{width:148px;right:8px;bottom:calc(65px + env(safe-area-inset-bottom));}
 }
+
+/* Living World 2: native 32px pixel-model animations (the portrait art stays unchanged). */
+.room-scene.living-world .world-native-sprite{image-rendering:pixelated;transform-origin:50% 86%;}
+.room-scene.living-world .world-native-sprite[data-world-motion="idle"],
+.room-scene.living-world .world-native-sprite[data-world-motion="rest"]{animation:world-pal-breathe 3.8s steps(4) infinite;}
+.room-scene.living-world .world-native-sprite[data-world-motion="look"]{animation:world-pal-look 5.2s steps(6) infinite;}
+.room-scene.living-world .world-native-sprite[data-world-motion="wave"]{animation:world-pal-wave 2.5s steps(5) infinite;}
+.room-scene.living-world .world-native-sprite[data-world-motion="stretch"]{animation:world-pal-stretch 4s steps(6) infinite;}
+@keyframes world-pal-breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
+@keyframes world-pal-look{0%,100%{transform:rotate(0)}50%{transform:rotate(3deg)}}
+@keyframes world-pal-wave{0%,100%{transform:rotate(0)}45%{transform:rotate(-5deg) translateY(-2px)}}
+@keyframes world-pal-stretch{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.055)}}
+/* Tiny chunky props are intentionally lightweight; they never consume AI calls.
+   Consoles blink, cyber signs pulse, fantasy crystals hover, torches flicker. */
+.world-atmosphere{--world-prop-color:rgba(255,236,156,.72);}
+.world-atmosphere[data-world-prop="console"]{--world-prop-color:rgba(100,255,180,.68);}
+.world-atmosphere[data-world-prop="neon"]{--world-prop-color:rgba(70,225,255,.77);}
+.world-atmosphere[data-world-prop="torch"]{--world-prop-color:rgba(255,130,50,.78);}
+.world-atmosphere[data-world-prop="crystal"],.world-atmosphere[data-world-prop="portal"]{--world-prop-color:rgba(188,148,255,.78);}
+.world-atmosphere .world-prop-a,.world-atmosphere .world-prop-b,.world-atmosphere .world-prop-c{
+ width:6px;height:6px;background:var(--world-prop-color);image-rendering:pixelated;opacity:.72;
+ box-shadow:6px 0 0 var(--world-prop-color),-6px 0 0 var(--world-prop-color),0 -6px 0 var(--world-prop-color);
+}
+.world-atmosphere .world-prop-a{left:22%;top:20%;animation:world-prop-a 4s steps(4) infinite;}
+.world-atmosphere .world-prop-b{left:73%;top:25%;animation:world-prop-b 7s steps(7) infinite;}
+.world-atmosphere .world-prop-c{left:55%;top:62%;animation:world-prop-c 9s steps(9) infinite;}
+.world-atmosphere[data-world-prop="console"] .world-prop-a,
+.world-atmosphere[data-world-prop="console"] .world-prop-b{
+ width:8px;height:5px;box-shadow:8px 0 0 var(--world-prop-color),16px 0 0 var(--world-prop-color);
+}
+.world-atmosphere[data-world-prop="portal"] .world-prop-a{
+ border-radius:50%;width:18px;height:18px;background:transparent;border:4px dashed var(--world-prop-color);box-shadow:none;
+}
+@keyframes world-prop-a{0%,100%{opacity:.15;transform:translateY(0)}50%{opacity:.95;transform:translateY(-8px)}}
+@keyframes world-prop-b{0%,100%{opacity:.9;transform:translateX(0)}50%{opacity:.2;transform:translateX(8px)}}
+@keyframes world-prop-c{0%,100%{opacity:.35;transform:translateY(0)}50%{opacity:.85;transform:translateY(-12px)}}
+html[data-hidden="1"] .world-native-sprite,html[data-lowpower="1"] .world-native-sprite,
+html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosphere *{animation-play-state:paused!important;}
+@media(prefers-reduced-motion:reduce){
+ .room-scene.living-world .world-native-sprite,.world-atmosphere *{animation:none!important;transition:none!important;}
+}

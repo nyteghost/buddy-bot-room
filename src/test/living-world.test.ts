@@ -29,3 +29,27 @@ describe("Living World",()=>{
   expect(JSON.stringify(original)).toBe(before);
  });
 });
+
+import { createElement } from "react";
+import { render } from "@testing-library/react";
+import { PixelCharacter } from "@/components/pixel-character";
+import { spriteRuns } from "@/lib/sprite-upscale";
+import { worldPropForTheme } from "@/components/world-atmosphere";
+describe("native pixel rendering and dynamic props",()=>{
+ it("renders 32px step art without thousands of unnecessary upscaled rectangles",()=>{
+  const view=render(createElement(PixelCharacter,{id:"byte",mode:"cyberpunk",pixelWorld:true,walking:true,facing:"se",walkFrame:1}));
+  const sprite=view.container.querySelector("svg.world-native-sprite");
+  expect(sprite?.getAttribute("viewBox")).toBe("0 0 32 32");
+  expect(view.container.querySelectorAll("svg rect").length).toBeLessThan(700);
+  view.unmount();
+ });
+ it("preserves the native pixels and original character models",()=>{
+  const grid=worldFacingSprite(characterSprite("sage","normal"),"ne",2);
+  expect(spriteRuns(grid,(x,y)=>y<24?"body":x<16?"left-leg":"right-leg").length).toBeLessThan(700);
+ });
+ it("assigns a decorative prop to every theme",()=>{
+  for(const theme of characterModes)expect(worldPropForTheme(theme)).toMatch(/^(console|firefly|crystal|torch|neon|lantern|portal)$/);
+  expect(worldPropForTheme("matrix")).toBe("console");
+  expect(worldPropForTheme("finalfantasy")).toBe("crystal");
+ });
+});

@@ -1,3 +1,10 @@
+## Beta — Living World native sprite performance and animated props
+
+- Render walking Pals at native 32×32 resolution with memoized SVG runs instead of re-upscaling 128×128 geometry on every animation tick.
+- Add CSS step-based idle/look/wave/stretch animations, preserving the original Classic sprite rendering.
+- Animate small decorative pixel props per theme (console glow, cyber neon, fantasy crystals, torch light and portals), honoring reduced-motion and low-power settings.
+- Extend the renderer and scene-profile regression tests.
+
 ## Beta — Focus Assist nonmodal dock correction
 
 - Auto-minimize the optional floating Focus Assist companion when switching workspace windows; it can be reopened without losing the current step, model selection, or saved checkpoint.
