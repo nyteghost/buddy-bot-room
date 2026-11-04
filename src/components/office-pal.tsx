@@ -21,7 +21,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   const wasActive = useRef(active);
   const reduced = useReducedMotion();
   const low = lowPower.use();
-  const wandering = visible && enabled && !active && playful && !reduced && !low;
+  const wandering = visible && enabled && (playful || (world && active)) && !reduced && !low;
   // The walk is redrawn 10 times a second; it pauses in hidden windows, hidden tabs, low-power mode, or reduced motion.
   useEffect(() => { lastTick.current = performance.now(); }, [wandering]);
   useCalmInterval(() => {
@@ -66,7 +66,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && "action" in pose && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={walking ? Math.floor(elapsed / 140) % 4 : 0} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && "action" in pose && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{displayLabel}</span>
     </div>
   );

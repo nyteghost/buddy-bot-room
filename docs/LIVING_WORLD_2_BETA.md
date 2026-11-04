@@ -23,3 +23,7 @@ Ambient room lighting now uses the viewer's browser-local hour to shift gently f
 ## Character Universe movement milestone
 
 Dedicated walkable floor plans and collision zones now exist for each theme. Pal foot paths use bounded, deterministic eight-direction A* routes around furniture with per-character timing and idle/wave moments; existing office choreography is retained in Linux/Assistant/Dev Team. This is authored collision geometry for the room decor but has not been visually calibrated against every backdrop on a physical display. Paths avoid fixed objects, not real-time collisions with moving user-created furniture or other Pals.
+
+## Animated character atlas
+
+All nine established AI Pal identities now have complete generated per-theme animation atlases: eight directions, nine gestures and four frame phases, rendered at native 32×32. The base models are distinct authored pixel silhouettes; gesture and direction frames are synthesized by original pixel-geometry rules (not 2,880 independently hand-painted PNG images). Classic portrait assets remain unchanged. More elaborate hand-painted/cinematic animation packs may be offered later without replacing this feature.

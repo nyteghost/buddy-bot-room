@@ -1,3 +1,9 @@
+## Beta — Character Universe four-frame action atlas
+
+- Generate native 32px action frames for every current Pal in every theme: eight headings, four phases, and nine action types (walk, idle, look, wave, stretch, talk, work, rest, celebration).
+- Use authored gesture pixel geometry without replacing each theme's original character silhouette and palette. Work directly with small SVG pixel runs rather than large GIFs.
+- Keep original Classic static portraits unchanged; verify frame dimensions, deterministic output and source immutability.
+
 ## Beta — Character Universe: obstacle-aware themed movement
 
 - Add hand-defined walkable floor zones and solid furniture for every existing room theme.

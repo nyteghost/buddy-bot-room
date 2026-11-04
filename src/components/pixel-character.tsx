@@ -7,7 +7,7 @@ import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
 import { spriteRuns, to128 } from "@/lib/sprite-upscale";
 import { facingArt, hasFacingArt, palArt, type Facing } from "@/lib/pal-art";
-import { worldFacingSprite } from "@/lib/world-facing-sprites";
+import { worldAnimatedFrame } from "@/lib/world-animation";
 
 export function PixelCharacter({
   id,
@@ -44,12 +44,12 @@ export function PixelCharacter({
   const runs = useMemo(() => {
     if (art) return [];
     const front = characterSprite(id, mode);
-    const source = pixelWorld ? worldFacingSprite(front, facing ?? (back ? "n" : "s"), walking ? walkFrame : 0, id === "mimic") : back ? backView(front) : front;
+    const source = pixelWorld ? worldAnimatedFrame(front, facing ?? (back ? "n" : "s"), pose ?? "idle", walkFrame, id === "mimic") : back ? backView(front) : front;
     const grid = pixelWorld ? source : to128(source);
     const feetY = pixelWorld ? 24 : 96;
     const middleX = pixelWorld ? 16 : 64;
     return spriteRuns(grid, (x, y) => y < feetY ? "body" : x < middleX ? "left-leg" : "right-leg");
-  }, [art, id, mode, pixelWorld, facing, back, walking, walkFrame]);
+  }, [art, id, mode, pixelWorld, facing, back, pose, walkFrame]);
   if (art && pose) return <PalArtRig id={id} art={art} motion={pose} className={cn("pixel-character native-sprite pal-art", directional && "pal-directional", `agent-${id}`, className)} />;
   if (art) {
     return (
