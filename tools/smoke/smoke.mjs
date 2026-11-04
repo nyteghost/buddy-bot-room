@@ -1157,7 +1157,7 @@ await step("Character Universe custom art, guest roster and interaction controls
    throw Error("Character Universe did not return a versioned library");
   await page.goto(URL_+"/?workspace=1");
   await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
-  const roomEntry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\\s*Pal Room\\s*$/i});
+  const roomEntry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
   if(await roomEntry.getAttribute("aria-pressed")!=="true")await roomEntry.click();
   const room=page.locator('[data-window-id="room"]');
   const activities=room.getByRole("region",{name:"Pal Room activities"});
