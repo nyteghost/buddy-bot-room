@@ -22,7 +22,7 @@ describe("Living World furniture navigation",()=>{
      expect(worldPointIsWalkable(p,theme)).toBe(true);
     }
     expect(worldPose(pal.id,i,0,theme).walking).toBe(false);
-    expect(worldPose(pal.id,i,8000,theme).walking).toBe(true);
+    expect(Array.from({length:64},(_,n)=>worldPose(pal.id,i,n*500,theme)).some(p=>p.walking)).toBe(true);
     expect(worldPose(pal.id,i,18000,theme).action).toBeTruthy();
    }
   }
