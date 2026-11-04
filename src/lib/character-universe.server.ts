@@ -17,10 +17,10 @@ async function load():Promise<Store>{
   const data:unknown=JSON.parse(await (await fs()).readFile(file(),"utf8"));
   if(!data||typeof data!=="object"||Array.isArray(data))return empty();
   const source=data as Record<string,unknown>;
-  const characters=cleanCustomCharacters(source.characters);
-  if(!Array.isArray(source.characters)||source.characters.length!==characters.length)return empty();
+  const characters=cleanCustomCharacters(source['characters']);
+  if(!Array.isArray(source['characters'])||source['characters'].length!==characters.length)return empty();
   const allowed=[...worldCharacterPacks.map(x=>x.id),...characters.map(x=>x.id)];
-  return {revision:Number.isSafeInteger(source.revision)&&Number(source.revision)>=0?Number(source.revision):0,characters,enabled:cleanEnabledWorldIds(source.enabled,allowed)};
+  return {revision:Number.isSafeInteger(source['revision'])&&Number(source['revision'])>=0?Number(source['revision']):0,characters,enabled:cleanEnabledWorldIds(source['enabled'],allowed)};
  }catch(e){if((e as {code?:string}).code==="ENOENT")return empty();throw e;}
 }
 async function save(value:Store){
@@ -49,21 +49,21 @@ export async function handleCharacterUniverse(request:Request):Promise<Response>
  try{const value:unknown=JSON.parse(bodyText);if(!value||typeof value!=="object"||Array.isArray(value))throw Error("bad");payload=value as Record<string,unknown>;}catch{return Response.json({error:"Invalid request."},{status:400});}
  return locked(async()=>{
   const current=await load();
-  if(!Number.isSafeInteger(payload.expectedRevision)||Number(payload.expectedRevision)!==current.revision)
+  if(!Number.isSafeInteger(payload['expectedRevision'])||Number(payload['expectedRevision'])!==current.revision)
    return Response.json({error:"Character Universe changed on another device. Reload before editing.",...current},{status:409});
-  if(payload.op==="save"){
-   const character=validateCustomCharacter(payload.character);
+  if(payload['op']==="save"){
+   const character=validateCustomCharacter(payload['character']);
    if(!character)return Response.json({error:"Character must contain safe 32x32 pixel data and a hex palette."},{status:400});
    const others=current.characters.filter(x=>x.id!==character.id);
    if(others.length>=CUSTOM_WORLD_LIMIT)return Response.json({error:"Character Library is full."},{status:400});
    current.characters=[...others,character];
-  }else if(payload.op==="delete"){
-   const id=payload.id;
+  }else if(payload['op']==="delete"){
+   const id=payload['id'];
    if(typeof id!=="string"||!current.characters.some(x=>x.id===id))return Response.json({error:"Character was not found."},{status:404});
    current.characters=current.characters.filter(x=>x.id!==id);
    current.enabled=current.enabled.filter(x=>x!==id);
-  }else if(payload.op==="setEnabled"){
-   const ids=payload.ids;
+  }else if(payload['op']==="setEnabled"){
+   const ids=payload['ids'];
    if(!Array.isArray(ids)||ids.length>30)return Response.json({error:"Invalid guest selection."},{status:400});
    const allowed=[...worldCharacterPacks.map(x=>x.id),...current.characters.map(x=>x.id)];
    const cleaned=cleanEnabledWorldIds(ids,allowed);

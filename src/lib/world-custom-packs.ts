@@ -25,17 +25,17 @@ export function starterCustomCharacter():WorldCustomCharacter{
 export function validateCustomCharacter(value:unknown):WorldCustomCharacter|null{
  if(!value||typeof value!=="object"||Array.isArray(value))return null;
  const v=value as Record<string,unknown>;
- if(typeof v.id!=="string"||!/^user-[a-z0-9]{8,40}$/.test(v.id))return null;
- if(typeof v.name!=="string"||v.name.trim().length<2||v.name.trim().length>40||/[\x00-\x1f<>]/.test(v.name))return null;
- if(!Array.isArray(v.pixels)||v.pixels.length!==32||v.pixels.some(row=>typeof row!=="string"||!/^[.a-p]{32}$/.test(row)))return null;
- if(!v.palette||typeof v.palette!=="object"||Array.isArray(v.palette))return null;
- const values=Object.entries(v.palette as Record<string,unknown>);
+ if(typeof v['id']!=="string"||!/^user-[a-z0-9]{8,40}$/.test(v['id']))return null;
+ if(typeof v['name']!=="string"||v['name'].trim().length<2||v['name'].trim().length>40||/[\x00-\x1f<>]/.test(v['name']))return null;
+ if(!Array.isArray(v['pixels'])||v['pixels'].length!==32||v['pixels'].some(row=>typeof row!=="string"||!/^[.a-p]{32}$/.test(row)))return null;
+ if(!v['palette']||typeof v['palette']!=="object"||Array.isArray(v['palette']))return null;
+ const values=Object.entries(v['palette'] as Record<string,unknown>);
  if(!values.length||values.length>16||values.some(([k,c])=>!CUSTOM_WORLD_COLOR_KEYS.includes(k)||k.length!==1||typeof c!=="string"||!/^#[a-fA-F0-9]{6}$/.test(c)))return null;
  const palette=Object.fromEntries(values.map(([k,c])=>[k,(c as string).toLowerCase()])) as Record<string,string>;
- const colors=new Set((v.pixels as string[]).join("").replace(/\./g,""));
+ const colors=new Set((v['pixels'] as string[]).join("").replace(/\./g,""));
  if(colors.size===0||[...colors].some(c=>!(c in palette)))return null;
- if((v.pixels as string[]).join("").replace(/\./g,"").length<15)return null;
- return {id:v.id,name:v.name.trim(),pixels:[...(v.pixels as string[])],palette};
+ if((v['pixels'] as string[]).join("").replace(/\./g,"").length<15)return null;
+ return {id:v['id'],name:v['name'].trim(),pixels:[...(v['pixels'] as string[])],palette};
 }
 export function cleanCustomCharacters(value:unknown):WorldCustomCharacter[]{
  if(!Array.isArray(value)||value.length>CUSTOM_WORLD_LIMIT)return [];
@@ -56,9 +56,9 @@ export function importCustomCharacters(raw:string):WorldCustomCharacter[]|null{
   const data:unknown=JSON.parse(raw);
   if(!data||typeof data!=="object")return null;
   const item=data as Record<string,unknown>;
-  if(item.format!=="pixel-pals-character-universe"||item.version!==1||!Array.isArray(item.characters)||item.characters.length>CUSTOM_WORLD_LIMIT)return null;
-  const parsed=cleanCustomCharacters(item.characters);
-  return parsed.length===item.characters.length?parsed:null;
+  if(item['format']!=="pixel-pals-character-universe"||item['version']!==1||!Array.isArray(item['characters'])||item['characters'].length>CUSTOM_WORLD_LIMIT)return null;
+  const parsed=cleanCustomCharacters(item['characters']);
+  return parsed.length===item['characters'].length?parsed:null;
  }catch{return null;}
 }
 /** Enforce a reasonable cap on visible guests, especially on mobile devices. */

@@ -22,6 +22,7 @@ import { Route as ApiBriefRouteImport } from './routes/api.brief'
 import { Route as ApiCalendarRouteImport } from './routes/api.calendar'
 import { Route as ApiCaptureRouteImport } from './routes/api.capture'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
+import { Route as ApiCharacterUniverseRouteImport } from './routes/api.character-universe'
 import { Route as ApiDebuglogRouteImport } from './routes/api.debuglog'
 import { Route as ApiEmbedRouteImport } from './routes/api.embed'
 import { Route as ApiFocusFoodRouteImport } from './routes/api.focus-food'
@@ -141,6 +142,11 @@ const ApiCaptureRoute = ApiCaptureRouteImport.update({
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCharacterUniverseRoute = ApiCharacterUniverseRouteImport.update({
+  id: '/api/character-universe',
+  path: '/api/character-universe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDebuglogRoute = ApiDebuglogRouteImport.update({
@@ -433,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/api/calendar': typeof ApiCalendarRoute
   '/api/capture': typeof ApiCaptureRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/character-universe': typeof ApiCharacterUniverseRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/focus-food': typeof ApiFocusFoodRoute
@@ -503,6 +510,7 @@ export interface FileRoutesByTo {
   '/api/calendar': typeof ApiCalendarRoute
   '/api/capture': typeof ApiCaptureRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/character-universe': typeof ApiCharacterUniverseRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/focus-food': typeof ApiFocusFoodRoute
@@ -574,6 +582,7 @@ export interface FileRoutesById {
   '/api/calendar': typeof ApiCalendarRoute
   '/api/capture': typeof ApiCaptureRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/character-universe': typeof ApiCharacterUniverseRoute
   '/api/debuglog': typeof ApiDebuglogRoute
   '/api/embed': typeof ApiEmbedRoute
   '/api/focus-food': typeof ApiFocusFoodRoute
@@ -646,6 +655,7 @@ export interface FileRouteTypes {
     | '/api/calendar'
     | '/api/capture'
     | '/api/chat'
+    | '/api/character-universe'
     | '/api/debuglog'
     | '/api/embed'
     | '/api/focus-food'
@@ -716,6 +726,7 @@ export interface FileRouteTypes {
     | '/api/calendar'
     | '/api/capture'
     | '/api/chat'
+    | '/api/character-universe'
     | '/api/debuglog'
     | '/api/embed'
     | '/api/focus-food'
@@ -786,6 +797,7 @@ export interface FileRouteTypes {
     | '/api/calendar'
     | '/api/capture'
     | '/api/chat'
+    | '/api/character-universe'
     | '/api/debuglog'
     | '/api/embed'
     | '/api/focus-food'
@@ -857,6 +869,7 @@ export interface RootRouteChildren {
   ApiCalendarRoute: typeof ApiCalendarRoute
   ApiCaptureRoute: typeof ApiCaptureRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiCharacterUniverseRoute: typeof ApiCharacterUniverseRoute
   ApiDebuglogRoute: typeof ApiDebuglogRoute
   ApiEmbedRoute: typeof ApiEmbedRoute
   ApiFocusFoodRoute: typeof ApiFocusFoodRoute
@@ -1003,6 +1016,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/character-universe': {
+      id: '/api/character-universe'
+      path: '/api/character-universe'
+      fullPath: '/api/character-universe'
+      preLoaderRoute: typeof ApiCharacterUniverseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/debuglog': {
@@ -1421,6 +1441,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCalendarRoute: ApiCalendarRoute,
   ApiCaptureRoute: ApiCaptureRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiCharacterUniverseRoute: ApiCharacterUniverseRoute,
   ApiDebuglogRoute: ApiDebuglogRoute,
   ApiEmbedRoute: ApiEmbedRoute,
   ApiFocusFoodRoute: ApiFocusFoodRoute,
