@@ -36,3 +36,28 @@ describe("Character Universe visual visitor roster",()=>{
   }
  });
 });
+
+
+describe("Living World cosmetic event framework",()=>{
+ it("allows only explicitly enabled actors and known interaction targets",async()=>{
+  const {acceptWorldEvent}=await import("@/lib/world-character-packs");
+  const policy={enabledIds:["green-jacket"],knownIds:["green-jacket","goku"],interactiveProps:["arcade"],reducedMotion:false};
+  const event={id:"world-wave-1",actorId:"green-jacket",kind:"inspect-prop",targetId:"arcade",at:123};
+  expect(acceptWorldEvent(event,policy)).toEqual(event);
+  expect(acceptWorldEvent({...event,actorId:"goku"},policy)).toBeNull();
+  expect(acceptWorldEvent({...event,targetId:"secret"},policy)).toBeNull();
+  expect(acceptWorldEvent({...event,kind:"execute-tool"},policy)).toBeNull();
+  expect(acceptWorldEvent({...event,at:Infinity},policy)).toBeNull();
+ });
+ it("deduplicates, bounds, and honors reduced motion",async()=>{
+  const {acceptWorldEvent,enqueueWorldEvent}=await import("@/lib/world-character-packs");
+  const policy={enabledIds:["green-jacket"],knownIds:["green-jacket"],interactiveProps:[],reducedMotion:false,maxEvents:2};
+  const event=acceptWorldEvent({id:"world-1",actorId:"green-jacket",kind:"wave",at:1},policy)!;
+  let q=enqueueWorldEvent([],event,policy);
+  q=enqueueWorldEvent(q,event,policy);
+  expect(q).toHaveLength(1);
+  for(let i=2;i<5;i++)q=enqueueWorldEvent(q,{...event,id:"world-"+i,at:i},policy);
+  expect(q.map(x=>x.id)).toEqual(["world-3","world-4"]);
+  expect(enqueueWorldEvent(q,{...event,id:"world-5"},{...policy,reducedMotion:true})).toEqual(q);
+ });
+});
