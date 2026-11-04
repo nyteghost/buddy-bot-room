@@ -1,3 +1,9 @@
+## Beta — environmental weather and direct Pal interactions
+
+- Drive animated window rain, snow, clouds, fog and storms from the weather data RoomLive already fetches; no second weather request or new network permissions.
+- Tap a Pal in Living World to wave; add accessible Wave to Everyone and Celebrate Together room controls. These are cosmetic emotes only, not AI prompts or automated actions.
+- Suspend weather and gesture animation under reduced-motion and hidden/low-power conditions.
+
 ## Beta — complete Character Universe editor and Unraid-backed library
 
 - Integrate a 32×32 pixel Character Creator with eraser, named palette colors, preview, edit, save, delete and safe JSON import/export.

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCalmInterval } from "@/lib/power";
 import type { CharacterMode } from "@/lib/hellraiser";
+import type { Sky } from "@/lib/live-room";
 
 export type WorldTime = "morning" | "day" | "evening" | "night";
 /** Browser-local scene lighting; no tracking, geolocation or external request. */
@@ -30,17 +31,19 @@ export function worldPropForTheme(theme: CharacterMode): WorldProp {
   }
 }
 /** Decorative environment animation; safe with low power and reduced motion. */
-export function WorldAtmosphere({ theme, active = true }: { theme: CharacterMode; active?: boolean }) {
+export function WorldAtmosphere({ theme, active = true, sky = "clear" }: { theme: CharacterMode; active?: boolean; sky?: Sky }) {
   const prop = worldPropForTheme(theme);
   const [time,setTime]=useState<WorldTime>(()=>worldTimeForHour(new Date().getHours()));
   useCalmInterval(()=>setTime(worldTimeForHour(new Date().getHours())),60_000,active);
-  return <div aria-hidden="true" className={`world-atmosphere world-atmosphere-${theme}`} data-world-prop={prop} data-world-time={time}>
+  return <div aria-hidden="true" className={`world-atmosphere world-atmosphere-${theme}`} data-world-prop={prop} data-world-time={time} data-world-weather={sky}>
     <span className="world-light"/>
     <span className="world-specks"/>
     <span className="world-glimmer"/>
     <span className="world-shadow"/>
     <span className="world-timewash"/>
     <span className="world-night-stars"/>
+    <span className="world-weather-window"/>
+    <span className="world-weather-front"/>
     <span className="world-prop-a"/>
     <span className="world-prop-b"/>
     <span className="world-prop-c"/>

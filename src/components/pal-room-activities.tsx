@@ -11,7 +11,7 @@ import { WorldCharacterLibrary } from "./world-character-library";
 import type { WorldCustomCharacter } from "@/lib/world-custom-packs";
 import "./pal-room-activities.css";
 
-export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange, enabledWorldPacks, onWorldPackChange, customCharacters, syncStatus, onCustomSave, onCustomDelete }: {
+export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange, enabledWorldPacks, onWorldPackChange, customCharacters, syncStatus, onCustomSave, onCustomDelete, onWaveAll, onCelebrateWorld }: {
   session: FocusSession | null;
   onStart: () => void;
   onPauseChange: (value: boolean) => void;
@@ -27,6 +27,8 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
   syncStatus: string;
   onCustomSave: (character:WorldCustomCharacter)=>Promise<boolean>;
   onCustomDelete: (id:string)=>Promise<boolean>;
+  onWaveAll: ()=>void;
+  onCelebrateWorld: ()=>void;
 }) {
   const theme = useCharacterMode();
   const [celebrationToken, setCelebrationToken] = useState(0);
@@ -91,6 +93,10 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
             {playful ? "Calm" : "Playful"}
           </Button>
         </div>
+        {livingWorld && <div className="mb-2 flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" aria-label="Wave to all Pals" onClick={onWaveAll}><Sparkles className="size-3.5"/>Wave to everyone</Button>
+          <Button type="button" size="sm" variant="outline" aria-label="Celebrate with Pals" onClick={onCelebrateWorld}><PartyPopper className="size-3.5"/>Celebrate together</Button>
+        </div>}
         {livingWorld && <WorldCharacterLibrary enabledIds={enabledWorldPacks} customCharacters={customCharacters} syncStatus={syncStatus} onToggle={onWorldPackChange} onSave={onCustomSave} onDelete={onCustomDelete} />}
         {playful && (
           <div className="pal-room-life-list" role="group" aria-label="What the Pals are doing">

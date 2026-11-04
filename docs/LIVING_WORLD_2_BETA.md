@@ -35,3 +35,7 @@ The optional visual roster now includes two **unofficial, original pixel-art fan
 ## Custom Character Creator and cross-device Library
 
 The Character Universe now provides a 32×32 pixel editor, color palette, live preview, editable names, save/delete, and safe data-only JSON import/export. A built-in catalog of nine visual guests can be enabled/disabled with a six-visitor limit. A signed-in **owner** can save custom characters and enabled selection to BUDDY_DATA_DIR/character-universe.json through an authenticated, revision-checked API. Local browser copies remain usable as offline backups; if sync fails the UI clearly reports browser-local-only status. Files never execute scripts or load external assets. Character packs remain decorative and cannot add AI providers, memory or tool access. Existing nine AI Pal identities and Classic mode are preserved.
+
+## Weather and responsive scene interactions
+
+Live weather from the already configured RoomLive weather API now drives decorative rain/snow/cloud/fog/storm effects around the scene window. Missing weather remains clear and makes no extra request. Each visible original Pal can be selected or keyboard-activated to wave; the Pal Room includes Wave to Everyone and Celebrate Together visual emotes. These actions never call an AI endpoint, send messages, change memory, or perform unattended work.

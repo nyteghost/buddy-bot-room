@@ -70,6 +70,7 @@ import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
 import { LIVING_WORLD_KEY, HOME_LAYOUT_KEY, livingWorldFromValue } from "@/lib/living-world";
 import { WORKSPACE_LAYOUT_EVENT, presetWindowRects } from "@/lib/workspace";
 import { WorldAtmosphere } from "./world-atmosphere";
+import type { Sky } from "@/lib/live-room";
 import { GreenJacketVisitor } from "./world-visitor";
 import { WorldGuest } from "./world-guest";
 import { guestIds } from "@/lib/world-guest-packs";
@@ -383,6 +384,10 @@ export function Room() {
   const [roomOpen, setRoomOpen] = useState(true);
   const [palRoomPlayful, setPalRoomPlayful] = useState(true);
   const [livingWorld, setLivingWorld] = useState(true);
+  const [worldSky,setWorldSky]=useState<Sky>("clear");
+  const [worldCue,setWorldCue]=useState<{action:"wave"|"celebrate";id?:AgentId;at:number}|null>(null);
+  const cue=(action:"wave"|"celebrate",id?:AgentId)=>setWorldCue({action,id,at:Date.now()});
+  useEffect(()=>{if(!worldCue)return;const timer=window.setTimeout(()=>setWorldCue(null),2600);return()=>window.clearTimeout(timer);},[worldCue]);
   const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor}=useWorldCharacterUniverse();
   const enabledWorldPacks=worldUniverse.enabled;
   const changeWorldPack=(id:string,on:boolean)=>{void toggleWorldVisitor(id,on);};
@@ -2079,11 +2084,11 @@ export function Room() {
               }
             />
             {hell && <div className="hell-glow" aria-hidden />}
-            {livingWorld && <WorldAtmosphere theme={characterMode} active={roomOpen} />}
+            {livingWorld && <WorldAtmosphere theme={characterMode} active={roomOpen} sky={worldSky}/>}
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}
-            <RoomLive active={roomOpen} running={running} theme={characterMode} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
+            <RoomLive active={roomOpen} running={running} theme={characterMode} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} />}
             {livingWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} active={roomOpen&&palRoomPlayful} theme={characterMode}/>)}
             {livingWorld && worldUniverse.characters.filter(c=>enabledWorldPacks.includes(c.id)).map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} active={roomOpen&&palRoomPlayful} theme={characterMode}/>)}
@@ -2097,7 +2102,7 @@ export function Room() {
               </span>
             </div>
             {agents.map((a, i) => (livingWorld || assistantOn) ? (
-              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} world={livingWorld} />
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} world={livingWorld} cue={worldCue && (!worldCue.id || worldCue.id===a.id) ? worldCue.action : undefined} onInteract={()=>cue("wave",a.id)}/>
             ) : (
               <div
                 key={a.id}
@@ -2137,7 +2142,7 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomDelete={removeCustomWorldVisitor} />
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomDelete={removeCustomWorldVisitor} />
           <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
           <QuestCorner session={focusCompanion} />
           <div className="section-heading">

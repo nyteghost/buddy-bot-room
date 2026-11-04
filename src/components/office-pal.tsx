@@ -6,14 +6,15 @@ import { officePose, officeStations, headingOf, type Heading } from "@/lib/offic
 import { worldPose, worldRoomPlan } from "@/lib/world-navigation";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
-import { ambientMotion, advanceMotionClock } from "@/lib/pal-motion";
+import { ambientMotion, advanceMotionClock, type PalMotion } from "@/lib/pal-motion";
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { useCalmInterval, lowPower } from "@/lib/power";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
 
-export function OfficePal({ id, index, mode, active, enabled, playful = false, visible = true, world = false }: {
+export function OfficePal({ id, index, mode, active, enabled, playful = false, visible = true, world = false, cue, onInteract }: {
   id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean; playful?: boolean; visible?: boolean; world?: boolean;
+  cue?: PalMotion | undefined; onInteract?: ()=>void;
 }) {
   const [elapsed, setElapsed] = useState(0);
   const [arrived, setArrived] = useState(false);
@@ -63,10 +64,15 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       style={position}
       className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !directional && `office-dir-${heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !directional && (walking ? heading.includes("w") : !active && pose.facingLeft) && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
-      aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}`}
+      role={world && enabled ? "button" : undefined}
+      tabIndex={world && enabled ? 0 : undefined}
+      onClick={world && enabled ? onInteract : undefined}
+      onKeyDown={world && enabled ? e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onInteract?.();}}:undefined}
+      data-world-cue={cue ?? undefined}
+      aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}${world&&enabled?". Activate to wave.":""}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && "action" in pose && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && "action" in pose && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{displayLabel}</span>
     </div>
   );

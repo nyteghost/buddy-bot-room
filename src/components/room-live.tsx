@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { startPolling } from "@/lib/poll";
 import { useCalmInterval } from "@/lib/power";
 import { agentName, type AgentId } from "@/lib/agents";
-import { ambientLines, needsAttention, phaseOf, skyOf, whenText, type LiveData } from "@/lib/live-room";
+import { ambientLines, needsAttention, phaseOf, skyOf, whenText, type LiveData, type Sky } from "@/lib/live-room";
 import { levelFraction, levelOf, seasonal, unlocked } from "@/lib/progress";
 import { syncDoneTasks, useProgress } from "@/lib/progress-store";
 import { useWorkbench } from "@/lib/workbench";
@@ -52,7 +52,7 @@ function useLiveData(active: boolean): LiveData {
 }
 
 /** The living room: sky and weather over the scene, clickable objects that show real data, ambient pal chatter, and XP. */
-export function RoomLive({ active, running, theme, onOpen, onChatter }: { active: boolean; running: boolean; theme: CharacterMode; onOpen: (t: RoomTarget) => void; onChatter?: (id: AgentId | null) => void }) {
+export function RoomLive({ active, running, theme, onOpen, onChatter, onSkyChange }: { active: boolean; running: boolean; theme: CharacterMode; onOpen: (t: RoomTarget) => void; onChatter?: (id: AgentId | null) => void; onSkyChange?: (sky:Sky)=>void }) {
   const data = useLiveData(active);
   const progress = useProgress();
   const { todos } = useWorkbench();
@@ -62,6 +62,7 @@ export function RoomLive({ active, running, theme, onOpen, onChatter }: { active
   useCalmInterval(() => setHour(new Date().getHours()), 60_000);
   const phase = phaseOf(hour);
   const sky = data.weather?.sky ?? "clear";
+  useEffect(()=>{onSkyChange?.(sky);},[sky,onSkyChange]);
   const lines = useMemo(() => ambientLines(data), [data]);
   const [i, setI] = useState(0);
   useCalmInterval(() => setI((n) => n + 1), 9000, lines.length >= 2);
