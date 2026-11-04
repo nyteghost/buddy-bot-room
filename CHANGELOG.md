@@ -1,3 +1,9 @@
+## Beta — deterministic local Living World event reactions (integration foundation)
+
+- Add a pure event-to-sprite reaction resolver mapping approved wave, celebrate, inspect-prop and greet events onto existing four-frame wave, celebrate, look and talk animations.
+- Bound each reaction to 1.6 seconds, ignore expired/future/disabled actors, and honor reduced-motion preferences. No new AI or tool permissions.
+- Add focused timing and policy tests. **The resolver is not yet connected to Pal Room rendering or event producers**; this is a reusable integration foundation pending CI and UI smoke testing.
+
 ## Beta — environmental weather and direct Pal interactions
 
 - Drive animated window rain, snow, clouds, fog and storms from the weather data RoomLive already fetches; no second weather request or new network permissions.
