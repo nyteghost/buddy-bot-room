@@ -130,3 +130,24 @@ describe("Living World Pal Room group emote bridge",()=>{
   expect(worldCueReaction(cue,"",3100,false)).toBeNull();
  });
 });
+
+describe("Living World room prop inspection",()=>{
+ it("maps each approved room object to a short local look animation",async()=>{
+  const {worldCueReaction,WORLD_INTERACTIVE_PROPS}=await import("@/lib/world-character-packs");
+  expect(WORLD_INTERACTIVE_PROPS).toEqual(["today","mail","calendar","tasks","setup"]);
+  for(const targetId of WORLD_INTERACTIVE_PROPS){
+   const cue={action:"inspect-prop" as const,targetId,at:3000};
+   expect(worldCueReaction(cue,"green-jacket",3200,false)?.action).toBe("look");
+   expect(worldCueReaction(cue,"moon-mage",4599,false)?.frame).toBe(3);
+   expect(worldCueReaction(cue,"moon-mage",4600,false)).toBeNull();
+  }
+ });
+ it("rejects unapproved room targets and reduced-motion reactions",async()=>{
+  const {worldCueReaction}=await import("@/lib/world-character-packs");
+  const cue={action:"inspect-prop" as const,targetId:"calendar" as const,at:3000};
+  expect(worldCueReaction(cue,"moon-mage",3200,true)).toBeNull();
+  expect(worldCueReaction({...cue,targetId:"private-token" as "calendar"},"moon-mage",3200,false)).toBeNull();
+  expect(worldCueReaction({...cue,at:Infinity},"moon-mage",3200,false)).toBeNull();
+  expect(worldCueReaction(cue,"moon-mage",2999,false)).toBeNull();
+ });
+});
