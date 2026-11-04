@@ -15,10 +15,10 @@ function locked<T>(fn:()=>Promise<T>):Promise<T>{
 async function load():Promise<Store>{
  try{
   const data:unknown=JSON.parse(await (await fs()).readFile(file(),"utf8"));
-  if(!data||typeof data!=="object"||Array.isArray(data))return empty();
+  if(!data||typeof data!=="object"||Array.isArray(data))throw Error("Invalid Character Universe data");
   const source=data as Record<string,unknown>;
   const characters=cleanCustomCharacters(source['characters']);
-  if(!Array.isArray(source['characters'])||source['characters'].length!==characters.length)return empty();
+  if(!Array.isArray(source['characters'])||source['characters'].length!==characters.length)throw Error("Invalid saved characters; refusing to overwrite");
   const allowed=[...worldCharacterPacks.map(x=>x.id),...characters.map(x=>x.id)];
   return {revision:Number.isSafeInteger(source['revision'])&&Number(source['revision'])>=0?Number(source['revision']):0,characters,enabled:cleanEnabledWorldIds(source['enabled'],allowed)};
  }catch(e){if((e as {code?:string}).code==="ENOENT")return empty();throw e;}
@@ -57,6 +57,17 @@ export async function handleCharacterUniverse(request:Request):Promise<Response>
    const others=current.characters.filter(x=>x.id!==character.id);
    if(others.length>=CUSTOM_WORLD_LIMIT)return Response.json({error:"Character Library is full."},{status:400});
    current.characters=[...others,character];
+  }else if(payload['op']==="installPack"){
+   const input=payload['characters'];
+   if(!Array.isArray(input)||input.length<1||input.length>CUSTOM_WORLD_LIMIT)
+    return Response.json({error:"Select between 1 and 12 characters to import."},{status:400});
+   const entries=cleanCustomCharacters(input);
+   if(entries.length!==input.length)return Response.json({error:"Invalid or duplicate characters in ZIP."},{status:400});
+   if(current.characters.length+entries.length>CUSTOM_WORLD_LIMIT)
+    return Response.json({error:"Character Library is full."},{status:400});
+   if(entries.some(c=>current.characters.some(saved=>saved.id===c.id)))
+    return Response.json({error:"A character from this ZIP is already installed. Existing art was not overwritten."},{status:409});
+   current.characters=[...current.characters,...entries];
   }else if(payload['op']==="delete"){
    const id=payload['id'];
    if(typeof id!=="string"||!current.characters.some(x=>x.id===id))return Response.json({error:"Character was not found."},{status:404});
