@@ -7,9 +7,10 @@ import { agentName, type AgentId } from "@/lib/agents";
 import { palActivity } from "@/lib/pal-room-life";
 import { companionActivity, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
+import { worldCharacterPacks, type WorldPackId } from "@/lib/world-character-packs";
 import "./pal-room-activities.css";
 
-export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange }: {
+export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange, enabledWorldPacks, onWorldPackChange }: {
   session: FocusSession | null;
   onStart: () => void;
   onPauseChange: (value: boolean) => void;
@@ -19,6 +20,8 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
   phase: number;
   livingWorld: boolean;
   onLivingWorldChange: (value:boolean)=>void;
+  enabledWorldPacks: readonly WorldPackId[];
+  onWorldPackChange: (id:WorldPackId,enabled:boolean)=>void;
 }) {
   const theme = useCharacterMode();
   const [celebrationToken, setCelebrationToken] = useState(0);
@@ -83,6 +86,14 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
             {playful ? "Calm" : "Playful"}
           </Button>
         </div>
+        {livingWorld && <div className="mt-3 rounded-md border p-2" role="group" aria-label="Living World character packs">
+          <p className="text-xs font-semibold">Character Library · Visual visitors</p>
+          {worldCharacterPacks.map(pack=><div key={pack.id} className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0 flex-1"><p className="text-xs font-semibold">{pack.name}</p><p className="text-xs text-muted-foreground">{pack.description}</p></div>
+            <Button type="button" size="sm" variant="outline" aria-pressed={enabledWorldPacks.includes(pack.id)} aria-label={(enabledWorldPacks.includes(pack.id)?"Disable ":"Enable ")+pack.name} onClick={()=>onWorldPackChange(pack.id,!enabledWorldPacks.includes(pack.id))}>{enabledWorldPacks.includes(pack.id)?"Enabled":"Enable"}</Button>
+          </div>)}
+          <p className="mt-2 text-xs text-muted-foreground">Cosmetic character packs never use an AI model or access tools.</p>
+        </div>}
         {playful && (
           <div className="pal-room-life-list" role="group" aria-label="What the Pals are doing">
             {ambientPals.map((pal) => {

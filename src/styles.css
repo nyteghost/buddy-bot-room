@@ -2619,3 +2619,20 @@ html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosph
 @media(prefers-reduced-motion:reduce){
  .room-scene.living-world .world-native-sprite,.world-atmosphere *{animation:none!important;transition:none!important;}
 }
+
+/* Original green-jacket visitor: walks, waves, retreats and returns. */
+.world-visitor{position:absolute;left:var(--world-visitor-x);top:var(--world-visitor-y);z-index:5;transform:translate(-50%,-50%) scale(var(--world-visitor-scale,1));transform-origin:50% 95%;width:72px;height:100px;display:flex;flex-direction:column;align-items:center;pointer-events:none;transition:left .12s linear,top .12s linear,opacity .12s linear,transform .12s linear;}
+.world-visitor-sprite{width:54px;height:77px;overflow:visible;image-rendering:pixelated;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45));}
+.world-visitor-label{font:8px "Silkscreen",monospace;color:#e5fadb;white-space:nowrap;background:rgba(17,31,28,.88);border:1px solid #b9f332;padding:2px 4px;margin-top:2px;}
+.world-visitor-wave{position:absolute;top:1px;right:4px;font-size:17px;color:#f3df6c;animation:world-visitor-wave .8s steps(3) infinite alternate;}
+@keyframes world-visitor-wave{from{transform:rotate(-20deg) translateY(3px);}to{transform:rotate(22deg) translateY(-4px);}}
+.world-visitor-hideout{position:absolute;left:88%;top:68%;width:58px;height:62px;z-index:6;transform:translate(-50%,-35%);pointer-events:none;image-rendering:pixelated;}
+.world-hideout-hedge{background:linear-gradient(90deg,#1c5b35 0 15%,#368443 15% 40%,#62a951 40% 65%,#215d33 65%);border:5px solid #194a27;clip-path:polygon(4% 30%,15% 12%,42% 17%,65% 0,91% 24%,100% 42%,94% 100%,0 100%);}
+.world-hideout-server{width:62px;height:83px;top:66%;border:6px solid #0b1c2b;background:repeating-linear-gradient(0deg,#273742 0 7px,#12242c 7px 12px);box-shadow:inset 4px 0 #487477,inset -4px 0 #1b4054;}
+.world-hideout-server::after{content:"";position:absolute;left:9px;top:9px;width:4px;height:4px;background:#55f6b1;box-shadow:0 13px #55f6b1,0 25px #4db9ee,0 39px #55f6b1;animation:world-server-blink 2s steps(2) infinite;}
+.world-hideout-portal{width:55px;height:74px;top:65%;border:7px dotted #b779e3;border-radius:50%;background:radial-gradient(ellipse,#1d1736 30%,#523c82 72%,transparent 75%);box-shadow:0 0 12px rgba(192,117,255,.35);animation:world-portal-pulse 4s steps(5) infinite;}
+@keyframes world-server-blink{50%{opacity:.2;}}
+@keyframes world-portal-pulse{50%{filter:brightness(1.35);}}
+@media(max-width:700px){.world-visitor{width:50px;height:73px;}.world-visitor-sprite{width:38px;height:50px;}.world-visitor-label{font-size:6px;}.world-visitor-hideout{transform:translate(-50%,-35%) scale(.7);}}
+html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{animation-play-state:paused!important;}
+@media(prefers-reduced-motion:reduce){.world-visitor,.world-visitor *,.world-visitor-hideout,.world-visitor-hideout *{animation:none!important;transition:none!important;}}

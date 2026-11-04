@@ -11,3 +11,7 @@ Outstanding milestones: independently hand-illustrated 8-direction sprite sheets
 ## Second increment: native character and scene performance
 
 World characters now render directly at 32×32, with cached SVG runs, preserving recognizable jagged pixels at any screen scale. Theme-sensitive pixel props and idle gestures keep the room animated without AI calls; reduced motion and low power pause them. Animated furniture interactions, actual obstacle maps and authored sprite sheets remain outstanding.
+
+## Original Green Jacket character pack
+
+The first Character Library entry is a native 32px original design referencing the user's green/blue jacket character: bald crown, grey beard, red lanyard, lime upper jacket, cobalt blue lower jacket. It walks, waves and hides in a theme-matched hedge, rack or portal. The user can disable the visual-only pack from Pal Room. This is not a new AI agent or an imported animated GIF; expanding the library to user-supplied character asset packs and permissioned AI personalities remains a separate roadmap milestone.

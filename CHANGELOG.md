@@ -1,3 +1,10 @@
+## Beta — Green Jacket Living World character pack
+
+- Add a native 32px Green Jacket Guy original visual visitor inspired by the supplied reference: eight generated directional views, walking, waving and a bush-retreat signature loop.
+- Use a hedge, server rack or pixel portal as an animated hideout based on the active theme; add a Character Library enable/disable control.
+- Cosmetic-only by design: no new AI agent identity, permissions, model provider, chat history or server-side action.
+- Add pack and animation regression tests.
+
 ## Beta — Living World native sprite performance and animated props
 
 - Render walking Pals at native 32×32 resolution with memoized SVG runs instead of re-upscaling 128×128 geometry on every animation tick.
