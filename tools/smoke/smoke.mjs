@@ -301,11 +301,16 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
     throw Error("Living Task Board did not preload the selected task");
   }
   await dialog.getByRole("button", { name: "Close" }).click();
-  // Living World defaults to Playful; exercise both states before verifying animation.
-  if (await mood.getByRole("button", { name: "Switch Pal Room to Calm" }).count()) {
-    await mood.getByRole("button", { name: "Switch Pal Room to Calm" }).click();
+  // The control has a dynamic accessible label. Hold onto the same role-based
+  // locator across toggles instead of relying on the old default or label.
+  const moodToggle = mood.getByRole("button", { name: /^Switch Pal Room to (Calm|Playful)$/ });
+  await moodToggle.waitFor();
+  if (await moodToggle.getAttribute("aria-pressed") === "true") {
+    await moodToggle.click();
+    if (await moodToggle.getAttribute("aria-pressed") !== "false") throw Error("Room mood did not switch to Calm");
   }
-  await mood.getByRole("button", { name: "Switch Pal Room to Playful" }).click();
+  await moodToggle.click();
+  if (await moodToggle.getAttribute("aria-pressed") !== "true") throw Error("Room mood did not switch back to Playful");
   await mood.getByRole("group", { name: "What the Pals are doing" }).getByText(/Tinkering with a computer/).waitFor();
   if (await page.evaluate(() => localStorage.getItem("pixel-pals-room-playful-v1")) !== "1") throw Error("Playful preference wasn't saved");
   const rig = page.locator('.room-scene .world-native-sprite').first();
