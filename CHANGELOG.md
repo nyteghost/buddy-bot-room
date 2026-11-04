@@ -1,3 +1,8 @@
+## Beta — Living World reaction sprite adapter
+
+- Add a pure adapter from approved cosmetic reactions to the existing directional, four-frame sprite atlas, preserving normal walk/idle fallback and source sprite data.
+- Add regression coverage for wave rendering and fallback. This is **not yet wired to Pal Room event delivery**; CI and browser verification are still required before beta deployment.
+
 ## Beta — deterministic local Living World event reactions (integration foundation)
 
 - Add a pure event-to-sprite reaction resolver mapping approved wave, celebrate, inspect-prop and greet events onto existing four-frame wave, celebrate, look and talk animations.
