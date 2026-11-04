@@ -75,7 +75,7 @@ describe("Living World Home workspace",()=>{
  }));
  it("keeps mobile windows as single full-sized destinations",()=>{
   const r=presetWindowRects("home",{width:390,height:740});
-  expect(r.today).toEqual({x:0,y:0,w:390,h:740});
-  expect(r.room).toEqual(r.today);
+  expect(r['today']).toEqual({x:0,y:0,w:390,h:740});
+  expect(r['room']).toEqual(r['today']);
  });
 });
