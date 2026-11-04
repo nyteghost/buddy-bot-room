@@ -5,6 +5,8 @@ import { worldCharacterPacks,greenJacketSprite,greenJacketPalette,type WorldPack
 import { guestSprite,guestPalette,type GuestId } from "@/lib/world-guest-packs";
 import { starterCustomCharacter,validateCustomCharacter,exportCustomCharacters,importCustomCharacters,MAX_ACTIVE_VISITORS,CUSTOM_WORLD_LIMIT,CUSTOM_WORLD_COLOR_KEYS,type WorldCustomCharacter } from "@/lib/world-custom-packs";
 import { spriteRuns } from "@/lib/sprite-upscale";
+import { parseCharacterZip,CHARACTER_ZIP_MAX_BYTES,type ImportedCharacterZip } from "@/lib/character-zip";
+import { planCharacterAddonInstall } from "@/lib/character-addon";
 import "./world-character-library.css";
 
 export function WorldPixelPreview({pixels,palette,name}:{pixels:readonly string[];palette:Record<string,string>;name:string}){
@@ -20,6 +22,7 @@ type Props={
  syncStatus:string;
  onToggle:(id:string,on:boolean)=>void;
  onSave:(character:WorldCustomCharacter)=>Promise<boolean>;
+ onInstallPack:(characters:WorldCustomCharacter[])=>Promise<boolean>;
  onDelete:(id:string)=>Promise<boolean>;
 };
 function CharacterEditor({initial,onSave,onCancel}:{initial:WorldCustomCharacter;onSave:Props["onSave"];onCancel:()=>void}){
@@ -85,9 +88,12 @@ function CharacterEditor({initial,onSave,onCancel}:{initial:WorldCustomCharacter
   {!valid&&<p className="text-xs text-muted-foreground">Paint at least 15 pixels, give the character a name, and use safe palette colors to save.</p>}
  </section>;
 }
-export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,onToggle,onSave,onDelete}:Props){
+export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,onToggle,onSave,onInstallPack,onDelete}:Props){
  const [editor,setEditor]=useState<WorldCustomCharacter|null>(null);
  const [message,setMessage]=useState("");
+ const [zipPack,setZipPack]=useState<ImportedCharacterZip|null>(null);
+ const [selected,setSelected]=useState<string[]>([]);
+ const [installing,setInstalling]=useState(false);
  const active=enabledIds.length;
  const builtins=worldCharacterPacks.map(pack=>{
   const pixels=pack.id==="green-jacket"?greenJacketSprite():guestSprite(pack.id as GuestId);
@@ -119,6 +125,32 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
   }
   setMessage(saved+" custom character(s) imported. No scripts, images or external links were executed.");
  };
+ const handleZip=async(event:ChangeEvent<HTMLInputElement>)=>{
+  const file=event.target.files?.[0];event.target.value="";
+  if(!file)return;
+  setZipPack(null);setSelected([]);setMessage("Checking 256x256 character ZIP...");
+  if(file.size>CHARACTER_ZIP_MAX_BYTES){setMessage("ZIP must be smaller than 8 MB.");return;}
+  try{
+   const pack=await parseCharacterZip(file);
+   setZipPack(pack);
+   setSelected(pack.characters.filter(c=>!customCharacters.some(existing=>existing.id===c.id)).map(c=>c.id));
+   setMessage("Preview the characters, then approve the import. Your existing characters will not be replaced.");
+  }catch(e){setMessage(e instanceof Error?e.message:"Could not read character ZIP.");}
+ };
+ const installZip=async()=>{
+  if(!zipPack||installing)return;
+  setInstalling(true);
+  try{
+   const entries=planCharacterAddonInstall(
+    {format:"pixel-pals-character-addon",version:1,name:zipPack.name,characters:zipPack.characters},
+    customCharacters,selected);
+   const ok=await onInstallPack(entries);
+   if(!ok)throw Error("Could not install the selected characters. Check Library storage status.");
+   setMessage(entries.length+" character(s) installed! Use Add to place them in the Living World.");
+   setZipPack(null);setSelected([]);
+  }catch(e){setMessage(e instanceof Error?e.message:"Character import failed.");}
+  finally{setInstalling(false);}
+ };
  return <details className="world-character-library">
   <summary>Character Universe · {worldCharacterPacks.length} built-in visitors · {customCharacters.length} creations · {active} active</summary>
   <div className="world-library-body">
@@ -127,9 +159,27 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
    <div className="world-library-controls">
     <Button type="button" variant="outline" size="sm" disabled={customCharacters.length>=CUSTOM_WORLD_LIMIT} onClick={()=>setEditor(starterCustomCharacter())}><Plus className="size-3.5"/>Create character</Button>
     <Button type="button" variant="outline" size="sm" onClick={exportBackup}><Download className="size-3.5"/>Export JSON</Button>
+    <label className="world-import-label world-import-zip"><Upload className="size-3.5"/>Import character ZIP <input aria-label="Choose character ZIP file" type="file" accept=".zip,application/zip,application/x-zip-compressed" onChange={e=>void handleZip(e)}/></label>
     <label className="world-import-label"><Upload className="size-3.5"/>Import JSON <input aria-label="Import character pack JSON" type="file" accept=".json,application/json" onChange={e=>void handleImport(e)}/></label>
    </div>
    {message&&<p role="status" className="text-xs">{message}</p>}
+   {zipPack&&<section className="world-character-zip-review" aria-label="Review character ZIP">
+    <strong className="text-sm">{zipPack.name} · 256×256 character preview</strong>
+    <p className="text-xs text-muted-foreground">Select characters to install. All artwork is local PNG data; no scripts or permissions are imported.</p>
+    <div className="world-library-grid">
+     {zipPack.characters.map(c=><label className="world-library-card" key={c.id}>
+      <input type="checkbox" aria-label={"Select "+c.name} checked={selected.includes(c.id)} disabled={installing||customCharacters.some(saved=>saved.id===c.id)}
+       onChange={e=>setSelected(list=>e.target.checked?[...list,c.id]:list.filter(id=>id!==c.id))}/>
+      {c.hd?<img className="world-library-preview world-library-hd" src={c.hd.idle[0]} width={256} height={256} alt={c.name+" 256 by 256 PNG preview"}/>:
+       <WorldPixelPreview pixels={c.pixels} palette={c.palette} name={c.name}/>}
+      <span className="text-xs"><strong>{c.name}</strong><span className="block text-muted-foreground">{customCharacters.some(saved=>saved.id===c.id)?"Already installed":"Ready to install"}</span></span>
+     </label>)}
+    </div>
+    <div className="flex flex-wrap gap-2">
+     <Button type="button" size="sm" disabled={installing||selected.length===0} onClick={()=>void installZip()}>{installing?"Installing...":"Approve & install "+selected.length+" character(s)"}</Button>
+     <Button type="button" size="sm" variant="outline" disabled={installing} onClick={()=>{setZipPack(null);setSelected([]);setMessage("Import cancelled.");}}>Cancel</Button>
+    </div>
+   </section>}
    {editor&&<CharacterEditor key={editor.id} initial={editor} onSave={onSave} onCancel={()=>setEditor(null)}/>}
    <div className="world-library-grid">
     {builtins.map(({pack,pixels,palette})=>{
@@ -144,10 +194,10 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
      const on=enabledIds.includes(c.id);
      return <article className="world-library-card" key={c.id}>
       <WorldPixelPreview pixels={c.pixels} palette={c.palette} name={c.name}/>
-      <div className="min-w-0 flex-1"><strong className="text-xs">{c.name}</strong><p className="text-xs text-muted-foreground">Your original pixel character</p></div>
+      <div className="min-w-0 flex-1"><strong className="text-xs">{c.name}</strong><p className="text-xs text-muted-foreground">{c.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p></div>
       <div className="world-library-card-controls">
        <Button size="sm" variant={on?"default":"outline"} aria-pressed={on} aria-label={(on?"Disable ":"Enable ")+c.name} onClick={()=>toggle(c.id)}>{on?"In room":"Add"}</Button>
-       <Button size="sm" variant="ghost" aria-label={"Edit "+c.name} onClick={()=>setEditor(c)}><Pencil className="size-3.5"/></Button>
+       {!c.hd&&<Button size="sm" variant="ghost" aria-label={"Edit "+c.name} onClick={()=>setEditor(c)}><Pencil className="size-3.5"/></Button>}
        <Button size="sm" variant="ghost" aria-label={"Delete "+c.name} onClick={async()=>{
         if(window.confirm("Delete "+c.name+"? This removes its saved pixel art from your Character Library.")){
          const ok=await onDelete(c.id);setMessage(ok?"Character deleted.":"Could not delete character.");
