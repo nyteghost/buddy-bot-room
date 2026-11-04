@@ -388,7 +388,7 @@ export function Room() {
   const [worldCue,setWorldCue]=useState<({action:"wave"|"celebrate";id?:AgentId;at:number}|{action:"inspect-prop";targetId:RoomTarget;id?:AgentId;at:number})|null>(null);
   const cue=(action:"wave"|"celebrate",id?:AgentId)=>setWorldCue({action,...(id?{id}:{}),at:Date.now()});
   useEffect(()=>{if(!worldCue)return;const timer=window.setTimeout(()=>setWorldCue(null),2600);return()=>window.clearTimeout(timer);},[worldCue]);
-  const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor}=useWorldCharacterUniverse();
+  const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor,installPack:installCustomWorldPack}=useWorldCharacterUniverse();
   const enabledWorldPacks=worldUniverse.enabled;
   const changeWorldPack=(id:string,on:boolean)=>{void toggleWorldVisitor(id,on);};
   const [palRoomPhase, setPalRoomPhase] = useState(0);
@@ -2142,7 +2142,7 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomDelete={removeCustomWorldVisitor} />
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} />
           <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
           <QuestCorner session={focusCompanion} />
           <div className="section-heading">
