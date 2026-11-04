@@ -107,3 +107,26 @@ describe("Living World reaction sprite integration",()=>{
   expect(sprite.join("\\n")).toBe(original);
  });
 });
+
+describe("Living World Pal Room group emote bridge",()=>{
+ it("adapts room-wide wave and celebration to enabled visual actors",async()=>{
+  const {worldCueReaction}=await import("@/lib/world-character-packs");
+  for(const action of ["wave","celebrate"] as const){
+   const cue={action,at:3000};
+   expect(worldCueReaction(cue,"green-jacket",3000,false)?.action).toBe(action);
+   expect(worldCueReaction(cue,"moon-mage",3799,false)?.frame).toBe(1);
+   expect(worldCueReaction(cue,"custom-visitor",4599,false)?.frame).toBe(3);
+   expect(worldCueReaction(cue,"moon-mage",4600,false)).toBeNull();
+  }
+ });
+ it("rejects invalid cues and respects motion preferences",async()=>{
+  const {worldCueReaction}=await import("@/lib/world-character-packs");
+  const cue={action:"wave" as const,at:3000};
+  expect(worldCueReaction(cue,"moon-mage",2999,false)).toBeNull();
+  expect(worldCueReaction(cue,"moon-mage",3100,true)).toBeNull();
+  expect(worldCueReaction(null,"moon-mage",3100,false)).toBeNull();
+  expect(worldCueReaction({...cue,action:"execute-tool" as "wave"},"moon-mage",3100,false)).toBeNull();
+  expect(worldCueReaction({...cue,at:Infinity},"moon-mage",3100,false)).toBeNull();
+  expect(worldCueReaction(cue,"",3100,false)).toBeNull();
+ });
+});
