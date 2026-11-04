@@ -21,3 +21,10 @@
 .world-color-swatch,.world-color-eraser{width:27px;height:27px;border-radius:5px;border:2px solid var(--border);}
 .world-color-swatch[aria-pressed="true"],.world-color-eraser[aria-pressed="true"]{outline:2px solid var(--primary);outline-offset:2px;}
 @media(max-width:700px){.world-library-grid{grid-template-columns:minmax(0,1fr)}.world-library-card .world-library-preview{width:42px;height:42px}.world-editor-main{gap:8px}.world-pixel-grid{margin:auto}}
+
+/* HD import flow: the file chooser opens when the owner clicks the button. */
+.world-import-zip{position:relative;font-weight:650;}
+.world-import-zip input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+.world-library-hd{object-fit:contain;image-rendering:pixelated;}
+.world-character-zip-review{display:grid;gap:10px;padding:12px;border:1px solid var(--primary);border-radius:10px;background:var(--background);}
+.world-character-zip-review .world-library-card{cursor:pointer;}
