@@ -27,7 +27,7 @@ export function AdhdHandoffPanel(){
    const response=await fetch("/api/adhd-bridge",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
    const data=await response.json() as {item?:Handoff;error?:string;delivered?:boolean};
    if(!response.ok)throw Error(data.error??data.item?.lastError??"The handoff was not delivered");
-   setMessage(data.delivered?"Delivered for ADHD Assistant approval. It is not yet a scheduled task.":"Saved. Review before approving and sending.");
+   setMessage(body["action"]==="check-status"?"Receiver approval status checked. This is not task-completion status.":data.delivered?"Delivered for ADHD Assistant approval. It is not yet a scheduled task.":"Saved. Review before approving and sending.");
    if(body["action"]==="draft"){setTitle("");setNotes("");setDue("");}
   }catch(e){setMessage(e instanceof Error?e.message:"Something went wrong");}
   finally{await refresh().catch(()=>undefined);setBusy(false);}
@@ -51,10 +51,11 @@ export function AdhdHandoffPanel(){
     <div className="mt-2 flex flex-wrap gap-2">
      {item.status==="draft"&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>void action({action:"approve",id:item.id})}>Approve this task</Button>}
      {item.status==="approved"&&<Button size="sm" variant="outline" disabled={busy||!state.enabled||!state.configured} onClick={()=>void action({action:"send",id:item.id})}>{item.attempts>0?"Retry delivery":"Send to ADHD Assistant"}</Button>}
+     {item.status==="delivered"&&<Button size="sm" variant="outline" disabled={busy||!state.enabled||!state.configured} onClick={()=>void action({action:"check-status",id:item.id})}>Check ADHD approval</Button>}
      {(item.status==="draft"||item.status==="approved")&&<Button size="sm" variant="ghost" disabled={busy} onClick={()=>void action({action:"cancel",id:item.id})}>Cancel</Button>}
     </div>
     {item.lastError&&<p className="mt-1 text-xs text-destructive">{item.lastError}</p>}
-    {item.status==="delivered"&&<p className="mt-1 text-xs text-muted-foreground">Receiver acknowledged the message; approval in ADHD Assistant is separate.</p>}
+    {item.status==="delivered"&&<p className="mt-1 text-xs text-muted-foreground">Receiver acknowledged delivery, not task completion. {item.receiverState==="approved"?"ADHD Assistant approved this handoff.":item.receiverState==="rejected"?"ADHD Assistant rejected this handoff.":item.receiverState==="pending"?"Still waiting for ADHD Assistant approval.":"Click Check ADHD approval to ask for its latest review status."}</p>}
    </article>)}
   </div>
  </details>;
