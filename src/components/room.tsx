@@ -67,6 +67,8 @@ import { QuestCorner } from "./quest-corner";
 import { renderMemoryContext, type BrainNote } from "@/lib/second-brain";
 import { MEMORY_SUGGEST_ENABLED, MEMORY_SUGGEST_KEY, queueSuggestedMemory, suggestMemoryLocally, type SuggestedMemory } from "@/lib/memory-suggestions";
 import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
+import { LIVING_WORLD_KEY, livingWorldFromValue } from "@/lib/living-world";
+import { WorldAtmosphere } from "./world-atmosphere";
 import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
 import matrixRoomImage from "@/assets/matrix-room.jpg";
@@ -373,12 +375,14 @@ export function Room() {
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(true);
-  const [palRoomPlayful, setPalRoomPlayful] = useState(false);
+  const [palRoomPlayful, setPalRoomPlayful] = useState(true);
+  const [livingWorld, setLivingWorld] = useState(true);
   const [palRoomPhase, setPalRoomPhase] = useState(0);
   useEffect(() => {
-    try { setPalRoomPlayful(localStorage.getItem(PAL_ROOM_MOOD_KEY) === "1"); } catch { /* Private browsing: calm default */ }
+    try { const mood=localStorage.getItem(PAL_ROOM_MOOD_KEY); setPalRoomPlayful(mood===null || mood==="1"); setLivingWorld(livingWorldFromValue(localStorage.getItem(LIVING_WORLD_KEY))); } catch { /* optional local settings */ }
   }, []);
   useCalmInterval(() => setPalRoomPhase(n => (n + 1) % 300), 8000, roomOpen && palRoomPlayful);
+  const changeLivingWorld = (next:boolean) => {setLivingWorld(next);try{localStorage.setItem(LIVING_WORLD_KEY,next?"living":"classic");}catch{/* optional */}};
   const changePalRoomMood = (next: boolean) => {
     setPalRoomPlayful(next);
     try { localStorage.setItem(PAL_ROOM_MOOD_KEY, next ? "1" : "0"); } catch { /* optional setting */ }
@@ -2032,7 +2036,7 @@ export function Room() {
               {generalSeen && <Suspense fallback={<p className="p-4" role="status">Loading General Chat…</p>}><GeneralChat open={generalOpen} /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => setRoomOpen(false)} resetVersion={resetVersion}>
-              <div className="room-column">          <div className="room-scene">
+              <div className="room-column">          <div className={cn("room-scene",livingWorld && "living-world")}>
             <img
               src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
               className={cn("pixel-room-image", hell && "hell-room-image")}
@@ -2045,6 +2049,7 @@ export function Room() {
               }
             />
             {hell && <div className="hell-glow" aria-hidden />}
+            {livingWorld && <WorldAtmosphere theme={characterMode} />}
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}
@@ -2058,8 +2063,8 @@ export function Room() {
                 {enabled.length} PALS IN ROOM
               </span>
             </div>
-            {agents.map((a, i) => assistantOn ? (
-              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} />
+            {agents.map((a, i) => (livingWorld || assistantOn) ? (
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} world={livingWorld} />
             ) : (
               <div
                 key={a.id}
@@ -2099,7 +2104,7 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} />
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} />
           <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
           <QuestCorner session={focusCompanion} />
           <div className="section-heading">

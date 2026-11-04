@@ -2534,3 +2534,24 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
 .window-capture-inbox input,.window-capture-inbox select,.window-capture-inbox textarea {max-width:100%;font-size:16px;}
 .window-capture-inbox p {overflow-wrap:anywhere;}
 @media(min-width:701px){.window-capture-inbox{left:var(--window-x,8%);top:var(--window-y,24px);width:min(680px,90%);height:min(760px,calc(100% - 24px));}}
+
+/* Living World 2 — original backdrops with animated environmental overlays. */
+.room-scene.living-world .office-pal{left:var(--office-x);top:var(--office-y);width:84px;z-index:3;transition:left .12s linear,top .12s linear,opacity .2s;}
+.room-scene.living-world .office-pal.office-assigned{z-index:6;transition:left 1s ease-in-out,top 1s ease-in-out;}
+.world-atmosphere{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden;--world-glow:rgba(255,215,135,.16);--world-fleck:rgba(255,234,181,.7);}
+.world-atmosphere-matrix{--world-glow:rgba(25,255,109,.17);--world-fleck:rgba(90,255,133,.7);}
+.world-atmosphere-cyberpunk{--world-glow:rgba(15,221,255,.18);--world-fleck:rgba(236,80,250,.7);}
+.world-atmosphere-hellraiser,.world-atmosphere-horror{--world-glow:rgba(224,57,55,.2);--world-fleck:rgba(238,118,50,.7);}
+.world-atmosphere-finalfantasy,.world-atmosphere-dcc{--world-glow:rgba(125,139,255,.2);--world-fleck:rgba(181,205,255,.7);}
+.world-atmosphere-linux,.world-atmosphere-devteam,.world-atmosphere-assistant{--world-glow:rgba(123,211,255,.15);--world-fleck:rgba(156,214,255,.7);}
+.world-atmosphere>span{display:block;position:absolute;pointer-events:none;}
+.world-light{inset:-30%;background:radial-gradient(circle at 26% 35%,var(--world-glow),transparent 45%);animation:world-light 17s ease-in-out infinite alternate;}
+.world-specks{left:21%;top:56%;width:3px;height:3px;background:var(--world-fleck);box-shadow:45px -25px var(--world-fleck),130px 18px var(--world-fleck),220px -36px var(--world-fleck),330px 12px var(--world-fleck);opacity:.4;animation:world-specks 14s steps(16) infinite alternate;}
+.world-glimmer{inset:0;background:linear-gradient(116deg,transparent 20%,var(--world-glow) 48%,transparent 73%);opacity:.15;animation:world-glimmer 21s ease-in-out infinite alternate;}
+.world-shadow{left:-10%;bottom:0;width:75%;height:30%;background:radial-gradient(ellipse,rgba(0,0,0,.16),transparent 75%);animation:world-shadow 25s ease-in-out infinite alternate;}
+@keyframes world-light{from{transform:translate(-4%,-3%);opacity:.5;}to{transform:translate(7%,4%);opacity:1;}}
+@keyframes world-specks{from{transform:translate(0,15px);opacity:.15;}to{transform:translate(30px,-27px);opacity:.6;}}
+@keyframes world-glimmer{from{transform:translateX(-40%);opacity:0;}to{transform:translateX(40%);opacity:.38;}}
+@keyframes world-shadow{from{transform:translateX(-4%);}to{transform:translateX(30%);}}
+html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosphere *,.workspace-window[hidden] .world-atmosphere *{animation-play-state:paused!important;}
+@media(prefers-reduced-motion:reduce){.world-atmosphere *,.room-scene.living-world .office-pal{animation:none!important;transition:none!important;}}

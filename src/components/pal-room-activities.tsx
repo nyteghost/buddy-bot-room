@@ -9,7 +9,7 @@ import { companionActivity, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
 import "./pal-room-activities.css";
 
-export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase }: {
+export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange }: {
   session: FocusSession | null;
   onStart: () => void;
   onPauseChange: (value: boolean) => void;
@@ -17,6 +17,8 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
   playful: boolean;
   onPlayfulChange: (value: boolean) => void;
   phase: number;
+  livingWorld: boolean;
+  onLivingWorldChange: (value:boolean)=>void;
 }) {
   const theme = useCharacterMode();
   const [celebrationToken, setCelebrationToken] = useState(0);
@@ -65,6 +67,10 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
         </div>
       </div>
       <div className="pal-room-mood">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div><p className="text-xs font-semibold">World mode</p><p className="text-xs text-muted-foreground">{livingWorld ? "Animated Pals and living environments" : "Original Classic Pal Room"}</p></div>
+          <Button size="sm" type="button" variant="outline" aria-label={livingWorld ? "Switch to Classic Pal Room" : "Switch to Living World"} aria-pressed={livingWorld} onClick={()=>onLivingWorldChange(!livingWorld)}>{livingWorld ? "Living World" : "Classic"}</Button>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-xs font-semibold">Room mood</p>

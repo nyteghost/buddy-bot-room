@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { AgentId } from "@/lib/agents";
+import { agentName, type AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
 import { hasFacingArt } from "@/lib/pal-art";
@@ -11,8 +11,8 @@ import { useCalmInterval, lowPower } from "@/lib/power";
 import { PixelCharacter } from "./pixel-character";
 import { ThinkingProp } from "./thinking-prop";
 
-export function OfficePal({ id, index, mode, active, enabled, playful = false, visible = true }: {
-  id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean; playful?: boolean; visible?: boolean;
+export function OfficePal({ id, index, mode, active, enabled, playful = false, visible = true, world = false }: {
+  id: AgentId; index: number; mode: CharacterMode; active: boolean; enabled: boolean; playful?: boolean; visible?: boolean; world?: boolean;
 }) {
   const [elapsed, setElapsed] = useState(0);
   const [arrived, setArrived] = useState(false);
@@ -41,7 +41,8 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   }, [active]);
   const station = officeStations[id];
   const pose = officePose(id, index, elapsed);
-  const directional = hasFacingArt(id);
+  const directional = world || hasFacingArt(id);
+  const displayLabel=world && mode!=="linux" && mode!=="assistant" && mode!=="devteam" ? agentName(id,mode==="hellraiser",mode==="horror",mode) : station.label;
   const atDesk = Math.hypot(pose.x - station.home[0], pose.y - station.home[1]) < .2;
   const working = active && (arrived || reduced || atDesk);
   const x = active ? station.home[0] : playful ? pose.x : station.home[0];
@@ -59,11 +60,11 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       style={position}
       className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !directional && `office-dir-${heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !directional && (walking ? heading.includes("w") : !active && pose.facingLeft) && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
-      aria-label={`${station.label}: ${working ? station.activity : walking ? "walking to a station" : "at a station"}`}
+      aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
-      <span>{station.label}</span>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={Math.floor(elapsed / 140) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <span>{displayLabel}</span>
     </div>
   );
 }

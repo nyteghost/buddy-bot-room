@@ -6,6 +6,7 @@ import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
 import { spriteRuns, to128 } from "@/lib/sprite-upscale";
 import { facingArt, hasFacingArt, palArt, type Facing } from "@/lib/pal-art";
+import { worldFacingSprite } from "@/lib/world-facing-sprites";
 
 export function PixelCharacter({
   id,
@@ -16,6 +17,8 @@ export function PixelCharacter({
   facing,
   mode: explicitMode,
   motion,
+  pixelWorld = false,
+  walkFrame = 0,
 }: {
   id: AgentId;
   className?: string;
@@ -27,11 +30,13 @@ export function PixelCharacter({
   facing?: Facing | undefined;
   mode?: CharacterMode;
   motion?: PalMotion | undefined;
+  pixelWorld?: boolean;
+  walkFrame?: number;
 }) {
   const currentMode = useCharacterMode();
   const mode = explicitMode ?? currentMode;
   const directional = hasFacingArt(id) ? facingArt(id, facing ?? "s") : undefined;
-  const art = directional ?? (back ? undefined : palArt(id, mode));
+  const art = pixelWorld ? undefined : directional ?? (back ? undefined : palArt(id, mode));
   const pose = walking ? "walk" : animated ? "talk" : motion;
   if (art && pose) return <PalArtRig id={id} art={art} motion={pose} className={cn("pixel-character native-sprite pal-art", directional && "pal-directional", `agent-${id}`, className)} />;
   if (art) {
@@ -47,7 +52,7 @@ export function PixelCharacter({
     );
   }
   const front = characterSprite(id, mode);
-  const grid = to128(back ? backView(front) : front);
+  const grid = to128(pixelWorld ? worldFacingSprite(front, facing ?? (back ? "n" : "s"), walking ? walkFrame : 0, id === "mimic") : back ? backView(front) : front);
   const runs = spriteRuns(grid, (x, y) => (y < 96 ? "body" : x < 64 ? "left-leg" : "right-leg"));
   return (
     <svg
