@@ -7,7 +7,7 @@ export type HandoffPayload = Readonly<{title:string;notes?:string;due_at?:string
 export type Handoff = Readonly<{
  id:string;kind:HandoffKind;payload:HandoffPayload;sourcePal?:string;
  status:HandoffStatus;createdAt:string;updatedAt:string;attempts:number;
- lastError?:string;receipt?:string
+ lastError?:string;receipt?:string;receiverState?:"pending"|"approved"|"rejected";receiverCheckedAt?:string
 }>;
 
 const asText=(v:unknown,max:number):string=>{
@@ -63,4 +63,12 @@ export function safeBridgeEndpoint(raw:string|undefined,allowDockerHost=false):s
     ||(allowDockerHost&&url.hostname==="host.docker.internal");
   return allowed?url.origin:null;
  }catch{return null;}
+}
+
+/** Strictly validate the receiver status: a delivery receipt is not approval or task completion. */
+export function parseReceiverStatus(raw:unknown,id:string):"pending"|"approved"|"rejected"|null {
+ if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
+ const item=raw as Record<string,unknown>;
+ if(item["id"]!==id)return null;
+ return item["state"]==="pending"||item["state"]==="approved"||item["state"]==="rejected"?item["state"]:null;
 }
