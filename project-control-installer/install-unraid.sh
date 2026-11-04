@@ -29,14 +29,30 @@ tar -xJf "$TMP/package.tar.xz" -C "$TMP/app" --no-same-owner --no-same-permissio
 for f in app/pcc.py static/index.html config/projects.json scripts/start-unraid.sh scripts/setup-local.sh Dockerfile; do
   [[ -f "$TMP/app/$f" ]] || { echo "Invalid package: missing $f" >&2; exit 1; }
 done
-printf '\n%s\n' 'For private repositories, create a fine-grained GitHub token at:'
-printf '%s\n' 'https://github.com/settings/personal-access-tokens/new'
-printf '%s\n' 'Restrict it to your project repositories and set Contents, Actions, Issues and Pull requests to READ-ONLY.'
-printf '%s\n' 'A token with broader permissions is not recommended.'
-read -r -s -p 'Paste your read-only GitHub token (hidden input): ' GH_TOKEN </dev/tty || {
-  echo 'Interactive terminal required.' >&2; exit 1;
-}
-echo
+GH_TOKEN=''
+if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
+  printf '\n%s\n' 'An existing GitHub CLI login was detected on Unraid.'
+  printf '%s\n' 'Its token may grant broader access than a dedicated read-only token.'
+  read -r -p 'Reuse that GitHub CLI token for Project Control? [y/N]: ' REUSE_GH </dev/tty || {
+    echo 'Interactive terminal required.' >&2; exit 1;
+  }
+  if [[ "$REUSE_GH" == [Yy] || "$REUSE_GH" == [Yy][Ee][Ss] ]]; then
+    GH_TOKEN=$(gh auth token --hostname github.com) || {
+      echo 'Unable to obtain GitHub CLI token.' >&2; exit 1;
+    }
+    printf '%s\n' 'Using saved GitHub CLI authentication without displaying the token.'
+  fi
+fi
+if [[ -z "$GH_TOKEN" ]]; then
+  printf '\n%s\n' 'For private repositories, create a fine-grained GitHub token at:'
+  printf '%s\n' 'https://github.com/settings/personal-access-tokens/new'
+  printf '%s\n' 'Restrict it to your project repositories and set Contents, Actions, Issues and Pull requests to READ-ONLY.'
+  printf '%s\n' 'A dedicated token with narrow permissions is recommended.'
+  read -r -s -p 'Paste your read-only GitHub token (hidden input): ' GH_TOKEN </dev/tty || {
+    echo 'Interactive terminal required.' >&2; exit 1;
+  }
+  echo
+fi
 [[ -n "$GH_TOKEN" ]] || { echo 'Token is required; install canceled.' >&2; exit 1; }
 IP="${PCC_BIND_IP:-}"
 if [[ -z "$IP" ]] && command -v tailscale >/dev/null; then
