@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import { currentUser } from "./accounts.server";
 import {
- draftHandoff,receivedReceipt,safeBridgeEndpoint,transitionHandoff,
+ draftHandoff,receivedReceipt,parseReceiverStatus,safeBridgeEndpoint,transitionHandoff,
  type Handoff,type HandoffStatus,
 } from "./adhd-bridge";
 
@@ -72,8 +72,8 @@ export async function handleAdhdBridge(request:Request):Promise<Response>{
   body=parsed as Record<string,unknown>;
  }catch{return reply({error:"Invalid JSON"},400);}
  const action=body["action"];
- if(action!=="draft"&&action!=="approve"&&action!=="cancel"&&action!=="send")return reply({error:"Unknown action"},400);
- if(action==="send"&&(!enabled()||!endpoint()||token().length<24))return reply({error:"Bridge is not configured and enabled."},503);
+ if(action!=="draft"&&action!=="approve"&&action!=="cancel"&&action!=="send"&&action!=="check-status")return reply({error:"Unknown action"},400);
+ if((action==="send"||action==="check-status")&&(!enabled()||!endpoint()||token().length<24))return reply({error:"Bridge is not configured and enabled."},503);
  try{
   return await locked(async()=>{
    const rows=await load();
@@ -93,6 +93,29 @@ export async function handleAdhdBridge(request:Request):Promise<Response>{
     const updated=transitionHandoff(item,action,now);
     rows[i]=updated;await save(rows);
     return reply({item:updated});
+   }
+   if(action==="check-status"){
+    if(item.status!=="delivered")throw Error("Only delivered handoffs can be checked");
+    let state:"pending"|"approved"|"rejected"|null=null;
+    let problem="Peer unavailable or status could not be verified";
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),4500);
+    try{
+     const resp=await fetch(endpoint()!+"/bridge/v1/handoffs/"+encodeURIComponent(item.id),{
+      method:"GET",redirect:"manual",signal:controller.signal,
+      headers:{"Authorization":"Bearer "+token(),"Accept":"application/json"}
+     });
+     if(resp.status===200){
+      const body:unknown=await resp.json();
+      state=parseReceiverStatus(body,item.id);
+      if(!state)problem="Receiver returned an invalid status";
+     }else problem="Receiver could not confirm the status ("+resp.status+")";
+    }catch{problem="Peer unavailable or status request timed out";}
+    finally{clearTimeout(timeout);}
+    if(!state)return reply({error:problem,item},503);
+    const updated:Handoff={...item,receiverState:state,receiverCheckedAt:now,updatedAt:now};
+    rows[i]=updated;await save(rows);
+    return reply({item:updated,verified:true});
    }
    if(item.status!=="approved")throw Error("Only explicitly approved handoffs may be sent");
    let ok=false;let error="Delivery unavailable";
