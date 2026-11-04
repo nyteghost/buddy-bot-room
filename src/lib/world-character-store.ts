@@ -56,17 +56,17 @@ export function useWorldCharacterUniverse(){
    const current=ref.current;
    let next:WorldState={...current,characters:[...current.characters],enabled:[...current.enabled]};
    if(op==="setEnabled"){
-    const ids=payload.ids;
+    const ids=payload['ids'];
     const allowed=[...builtinIds,...next.characters.map(c=>c.id)];
     if(!Array.isArray(ids)||ids.length>MAX_ACTIVE_VISITORS){setStatus("Only six visual visitors can be active at once.");return false;}
     next.enabled=cleanEnabledWorldIds(ids,allowed);
    }else if(op==="save"){
-    const char=validateCustomCharacter(payload.character);
+    const char=validateCustomCharacter(payload['character']);
     if(!char){setStatus("Character art or palette is invalid.");return false;}
     next.characters=[...next.characters.filter(x=>x.id!==char.id),char];
     if(next.characters.length>12){setStatus("The Character Library can contain twelve custom characters.");return false;}
    }else{
-    const id=payload.id;
+    const id=payload['id'];
     if(typeof id!=="string")return false;
     next.characters=next.characters.filter(c=>c.id!==id);
     next.enabled=next.enabled.filter(c=>c!==id);
