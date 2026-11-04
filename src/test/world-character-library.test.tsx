@@ -42,3 +42,18 @@ describe("room-wide guest emotes in rendered sprites",()=>{
   jacket.unmount();
  });
 });
+
+describe("room object reactions in the character library",()=>{
+ it("looks toward room objects without opening AI tools",()=>{
+  const cue={action:"inspect-prop" as const,targetId:"calendar" as const,at:Date.now()};
+  const builtIn=render(<WorldGuest id="moon-mage" theme="normal" active={false} cue={cue}/>);
+  expect(builtIn.container.querySelector(".world-guest")?.getAttribute("data-action")).toBe("look");
+  builtIn.unmount();
+  const custom=render(<WorldCustomGuest character={starterCustomCharacter()} index={0} theme="normal" active={false} cue={cue}/>);
+  expect(custom.container.querySelector(".world-custom-guest")?.getAttribute("data-action")).toBe("look");
+  custom.unmount();
+  const jacket=render(<GreenJacketVisitor theme="normal" active={false} cue={cue}/>);
+  expect(jacket.container.querySelector(".world-visitor")?.getAttribute("data-action")).toBe("look");
+  jacket.unmount();
+ });
+});
