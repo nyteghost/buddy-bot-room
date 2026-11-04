@@ -386,7 +386,7 @@ export function Room() {
   const [livingWorld, setLivingWorld] = useState(true);
   const [worldSky,setWorldSky]=useState<Sky>("clear");
   const [worldCue,setWorldCue]=useState<{action:"wave"|"celebrate";id?:AgentId;at:number}|null>(null);
-  const cue=(action:"wave"|"celebrate",id?:AgentId)=>setWorldCue({action,id,at:Date.now()});
+  const cue=(action:"wave"|"celebrate",id?:AgentId)=>setWorldCue({action,...(id?{id}:{}),at:Date.now()});
   useEffect(()=>{if(!worldCue)return;const timer=window.setTimeout(()=>setWorldCue(null),2600);return()=>window.clearTimeout(timer);},[worldCue]);
   const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor}=useWorldCharacterUniverse();
   const enabledWorldPacks=worldUniverse.enabled;
