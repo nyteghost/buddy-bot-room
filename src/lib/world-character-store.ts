@@ -1,6 +1,6 @@
 import { useEffect,useRef,useState } from "react";
 import { worldCharacterPacks,readWorldPacks,WORLD_PACKS_KEY } from "./world-character-packs";
-import { CUSTOM_WORLD_KEY,MAX_ACTIVE_VISITORS,readCustomCharacters,cleanEnabledWorldIds,type WorldCustomCharacter,validateCustomCharacter } from "./world-custom-packs";
+import { CUSTOM_WORLD_KEY,MAX_ACTIVE_VISITORS,readCustomCharacters,cleanEnabledWorldIds,cleanCustomCharacters,CUSTOM_WORLD_LIMIT,type WorldCustomCharacter,validateCustomCharacter } from "./world-custom-packs";
 
 type WorldState={revision:number;enabled:string[];characters:WorldCustomCharacter[];server:boolean};
 type ResponsePayload={revision?:unknown;enabled?:unknown;characters?:unknown;error?:string};
@@ -51,7 +51,7 @@ export function useWorldCharacterUniverse(){
   }).catch(()=>{if(!cancelled)setStatus("Stored in this browser · export a backup to use on another device");});
   return()=>{cancelled=true;};
  },[]);
- const modify=(op:"setEnabled"|"save"|"delete",payload:Record<string,unknown>):Promise<boolean>=>{
+ const modify=(op:"setEnabled"|"save"|"delete"|"installPack",payload:Record<string,unknown>):Promise<boolean>=>{
   const work=async()=>{
    const current=ref.current;
    let next:WorldState={...current,characters:[...current.characters],enabled:[...current.enabled]};
@@ -60,6 +60,14 @@ export function useWorldCharacterUniverse(){
     const allowed=[...builtinIds,...next.characters.map(c=>c.id)];
     if(!Array.isArray(ids)||ids.length>MAX_ACTIVE_VISITORS){setStatus("Only six visual visitors can be active at once.");return false;}
     next.enabled=cleanEnabledWorldIds(ids,allowed);
+   }else if(op==="installPack"){
+    const input=payload['characters'];
+    if(!Array.isArray(input)||input.length<1||input.length>CUSTOM_WORLD_LIMIT){setStatus("Choose up to twelve characters.");return false;}
+    const entries=cleanCustomCharacters(input);
+    if(entries.length!==input.length){setStatus("Invalid characters in ZIP.");return false;}
+    if(next.characters.length+entries.length>CUSTOM_WORLD_LIMIT){setStatus("Character Library is full.");return false;}
+    if(entries.some(c=>next.characters.some(existing=>existing.id===c.id))){setStatus("A character is already installed. Existing art was not overwritten.");return false;}
+    next.characters=[...next.characters,...entries];
    }else if(op==="save"){
     const char=validateCustomCharacter(payload['character']);
     if(!char){setStatus("Character art or palette is invalid.");return false;}
@@ -99,5 +107,6 @@ export function useWorldCharacterUniverse(){
  };
  const save=(character:WorldCustomCharacter)=>modify("save",{character});
  const remove=(id:string)=>modify("delete",{id});
- return {state,status,toggle,save,remove};
+ const installPack=(characters:WorldCustomCharacter[])=>modify("installPack",{characters});
+ return {state,status,toggle,save,remove,installPack};
 }
