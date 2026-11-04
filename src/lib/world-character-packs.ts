@@ -114,8 +114,11 @@ export function acceptWorldEvent(value:unknown,policy:WorldActorPolicy):WorldEve
 /** Bounded, stable, duplicate-free queue; decorative effects can be skipped in reduced motion. */
 export function enqueueWorldEvent(queue:readonly WorldEvent[],event:WorldEvent,policy:WorldActorPolicy):WorldEvent[] {
   const cap=Math.max(1,Math.min(64,Math.trunc(policy.maxEvents??24)||24));
-  if(policy.reducedMotion||queue.some(item=>item.id===event.id))return [...queue].slice(-cap);
-  return [...queue,event].slice(-cap);
+  const safeQueue=queue.flatMap(item=>{const accepted=acceptWorldEvent(item,policy);return accepted?[accepted]:[];}).slice(-cap);
+  if(policy.reducedMotion)return safeQueue;
+  const accepted=acceptWorldEvent(event,policy);
+  if(!accepted||safeQueue.some(item=>item.id===accepted.id))return safeQueue;
+  return [...safeQueue,accepted].slice(-cap);
 }
 
 /** A local-only animation cue derived from an approved cosmetic event. */
