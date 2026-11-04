@@ -72,7 +72,7 @@ describe("256x256 character ZIP importer",()=>{
   const noManifest=zip([{name:"sprites/idle.png",bytes:png()}]);
   await expect(parseCharacterZip(noManifest)).rejects.toThrow("manifest");
   const blob=sample(),bytes=new Uint8Array(await blob.arrayBuffer());
-  bytes[60]^=0x01;
+  bytes[60]=(bytes[60]??0)^0x01;
   await expect(parseCharacterZip(new Blob([bytes.buffer as ArrayBuffer]))).rejects.toThrow();
  });
 });
