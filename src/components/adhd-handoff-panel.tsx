@@ -28,7 +28,7 @@ export function AdhdHandoffPanel(){
    const data=await response.json() as {item?:Handoff;error?:string;delivered?:boolean};
    if(!response.ok)throw Error(data.error??data.item?.lastError??"The handoff was not delivered");
    setMessage(data.delivered?"Delivered for ADHD Assistant approval. It is not yet a scheduled task.":"Saved. Review before approving and sending.");
-   if(body.action==="draft"){setTitle("");setNotes("");setDue("");}
+   if(body["action"]==="draft"){setTitle("");setNotes("");setDue("");}
   }catch(e){setMessage(e instanceof Error?e.message:"Something went wrong");}
   finally{await refresh().catch(()=>undefined);setBusy(false);}
  }
