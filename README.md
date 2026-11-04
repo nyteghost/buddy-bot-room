@@ -908,3 +908,7 @@ Adaptive Today development: [usage and recovery](docs/ADAPTIVE_TODAY.md), [maste
 ### Beta 1.0.948 roadmap increment
 
 Working Pals now supports separately approved recurring read-only summaries and retained run receipts. Calendar supports named/color-coded retained ICS imports. Meeting review adds estimated segment timestamps and manual speaker correction; Discord `/ask` offers Pal selection (excluding Mimic until its separate privacy boundaries are supported). See [the master audit](docs/MASTER_ROADMAP_AUDIT.md) for remaining work and validation limits.
+
+### GitHub → Obsidian Journal (beta)
+
+Repo Watch includes an opt-in daily (03:00 Eastern by default) project change monitor, default/beta branch checkpointing, **create-only** Markdown notes in the configured vault, and optional explicit local-only Ollama summaries. It requires the Pixel Pals container to mount the Obsidian vault and set `OBSIDIAN_VAULT_DIR`; private repositories need a read-only `GITHUB_TOKEN`. Disabled by default. See [setup and privacy notes](docs/GITHUB_JOURNAL_BETA.md).

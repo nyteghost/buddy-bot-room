@@ -62,7 +62,7 @@ export function safeSegment(s: string): string {
 
 export function commitLine(c: { sha: string; message: string }, repo: string): string {
   const first = c.message.split("\n")[0] ?? "";
-  const clean = first.replace(/[\r\n\x00-\x1f\x7f[\]<>]/g, " ").slice(0, 180);
+  const clean = first.replace(/[\r\n\x00-\x1f\x7f[\]()<>]/g, " ").slice(0, 180);
   return "- [" + c.sha.slice(0, 8) + "](https://github.com/" + repo + "/commit/" + c.sha + ") " + clean;
 }
 

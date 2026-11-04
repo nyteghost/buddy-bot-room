@@ -1,3 +1,4 @@
+import { GitHubJournalPanel } from "@/components/github-journal-panel";
 import { useCallback, useEffect, useState } from "react";
 import { CircleAlert, CircleCheck, CircleDashed, GitCommit, GitPullRequest, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function RepoWatch() {
   const failing = (items ?? []).filter((i) => i.ci.state === "failing").length;
   return (
     <div className="space-y-3 pt-2">
+      <GitHubJournalPanel />
       <div className="flex flex-wrap gap-2">
         <Input className="min-w-48 flex-1" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="owner/name or a GitHub link" aria-label="Repo to watch"
           onKeyDown={(e) => { if (e.key === "Enter" && repo.trim() && !busy) void run({ op: "add", repo }).then((ok) => ok && setRepo("")); }} />

@@ -1,3 +1,4 @@
+import { tickGitHubJournal } from "./github-journal.server";
 import { tickWorkingPals } from "./working-pals.server";
 import { scheduleKeeper } from "./memory-keeper.server";
 import { backupAgeMs, backupConfig, runBackup } from "./backup.server";
@@ -86,5 +87,6 @@ async function tick(s: S): Promise<void> {
     j.run("playtests", () => tickPlaytests(ms), quick),
     j.run("mail-alerts", () => tickMailAlerts(ms), quick),
     j.run("addons", () => tickAddons(ms), quick),
+    j.run("github-journal-due", () => tickGitHubJournal(now), quick),
   ]);
 }
