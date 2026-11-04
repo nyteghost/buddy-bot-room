@@ -67,7 +67,8 @@ import { QuestCorner } from "./quest-corner";
 import { renderMemoryContext, type BrainNote } from "@/lib/second-brain";
 import { MEMORY_SUGGEST_ENABLED, MEMORY_SUGGEST_KEY, queueSuggestedMemory, suggestMemoryLocally, type SuggestedMemory } from "@/lib/memory-suggestions";
 import { palActivity, PAL_ROOM_MOOD_KEY } from "@/lib/pal-room-life";
-import { LIVING_WORLD_KEY, livingWorldFromValue } from "@/lib/living-world";
+import { LIVING_WORLD_KEY, HOME_LAYOUT_KEY, livingWorldFromValue } from "@/lib/living-world";
+import { WORKSPACE_LAYOUT_EVENT, presetWindowRects } from "@/lib/workspace";
 import { WorldAtmosphere } from "./world-atmosphere";
 import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
@@ -559,18 +560,26 @@ export function Room() {
         if (saved.todayOpen !== undefined) setTodayOpen(saved.todayOpen === true);
         if (appEntry(location.search) === "workspace") setGeneralOpen(saved.generalOpen === true);
       } else {
-        // First visit: Today and My Pals are the front page.
+        // The new Home workspace begins with Today and Living World.
         setTodayOpen(true);
-        setRoomOpen(false);
-        setOpenModes(defaultOpenModes);
+        setRoomOpen(true);
+        setOpenModes(perMode(() => false));
         setMode("smart");
         localStorage.setItem("pixel-pals-two-chat-rooms-v1", "1");
-        if (localStorage.getItem("pixel-pals-compact-v1") === "1") setRoomOpen(false);
+        if (localStorage.getItem("pixel-pals-compact-v1") === "1" && window.matchMedia("(max-width: 700px)").matches) setRoomOpen(false);
+      }
+      if (appEntry(location.search) === "today" && !window.matchMedia("(max-width: 700px)").matches
+        && !localStorage.getItem("pixel-pals-custom-window-layout-v1") && localStorage.getItem(HOME_LAYOUT_KEY) !== "1") {
+        // Migrate the stock layout once. User-saved custom arrangements win.
+        setTodayOpen(true);
+        setRoomOpen(true);
+        setOpenModes(perMode(() => false));
+        localStorage.setItem(HOME_LAYOUT_KEY, "pending");
       }
     } catch { /* optional layout preferences */ }
     // Home opens the existing Today window after restoring preferences. Explicit
     // workspace/chat links retain their original saved-window behavior.
-    if (appEntry(location.search) === "today") mobileTab("today");
+    if (appEntry(location.search) === "today" && window.matchMedia("(max-width: 700px)").matches) mobileTab("today");
     else if (appEntry(location.search) === "chat") openGeneral();
     // Bootstrap once: selecting another tab later must not reopen Today.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -579,6 +588,19 @@ export function Room() {
     if (!ready) return;
     try { localStorage.setItem("pixel-pals-workspace-v1", JSON.stringify({ roomOpen, openModes, sidebarCompact, todayOpen, generalOpen })); } catch { /* optional storage */ }
   }, [roomOpen, openModes, sidebarCompact, todayOpen, generalOpen, ready]);
+  useEffect(() => {
+    if (!ready) return;
+    const raf = window.requestAnimationFrame(() => {
+      try {
+        if (localStorage.getItem(HOME_LAYOUT_KEY) !== "pending") return;
+        const canvas = document.querySelector<HTMLElement>(".window-canvas");
+        if (!canvas || canvas.clientWidth < 1 || canvas.clientHeight < 1) return;
+        window.dispatchEvent(new CustomEvent(WORKSPACE_LAYOUT_EVENT, { detail: { windows: presetWindowRects("home", { width: canvas.clientWidth, height: canvas.clientHeight }) } }));
+        localStorage.setItem(HOME_LAYOUT_KEY, "1");
+      } catch { /* Browser storage is optional. */ }
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [ready]);
   const abortRef = useRef<AbortController | null>(null);
   const replayRef = useRef<AbortController | null>(null);
   const [replayId, setReplayId] = useState<string | null>(null);
@@ -1484,7 +1506,7 @@ export function Room() {
     { id: "win-mail", group: "Windows", label: "Open Mail (unread)", keywords: "email inbox imap gmail outlook", run: () => setMailOpen(true) },
     { id: "win-docs", group: "Windows", label: "Open Documents (PDF and Excel viewer)", keywords: "pdf excel xlsx csv viewer file spreadsheet", run: () => setDocsOpen(true) },
     { id: "win-fun", group: "Windows", label: "Open Fun (Dungeon Master campaign)", keywords: "dnd rpg adventure dice dungeon master games", run: () => setFunOpen(true) },
-    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setCaptureOpen(false); setGeneralOpen(false); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
+    { id: "win-reset", group: "Windows", label: "Reset layout", run: () => { setResetVersion((v) => v + 1); setCaptureOpen(false); setGeneralOpen(false); setRoomOpen(true); setOpenModes(perMode(() => false)); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(true); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); } },
     { id: "chat-new", group: "Chat", label: "New chat", hint: "Ctrl+Shift+O", run: newChat },
     { id: "chat-saved", group: "Chat", label: "Saved chats", keywords: "history search pin rename", run: () => { setConversationOpen(true); setHistoryRequest((v) => v + 1); } },
     { id: "chat-regen", group: "Chat", label: "Regenerate the last answer", run: () => regenerate(mode) },
@@ -1937,7 +1959,7 @@ export function Room() {
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => window.location.assign("/work")}><Wrench className="size-4" /> Legacy work tools</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => setLogOpen(true)}><Bug className="size-4" /> Debug log</Button>
           <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setCompareQuestion(""); setCompareOpen(true); }}><Scale className="size-4" /> Compare models</Button>
-          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
+          <Button variant="ghost" size="sm" className="engine-trigger mobile-only" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setOpenModes(perMode(() => false)); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(true); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid className="size-4" /> Reset layout</Button>
         </div>
       </header>
       <button type="button" className="mobile-strip" onClick={() => setRoomOpen((v) => !v)}>
@@ -2013,7 +2035,7 @@ export function Room() {
             setMoreOpen(show("tools") || show("setup"));
             setSidebarCompact(false);
           }} />
-          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); resetModes(); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(false); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
+          <Button variant="ghost" className="sidebar-item" title="Reset layout" onClick={() => { setResetVersion((value) => value + 1); setRoomOpen(true); setOpenModes(perMode(() => false)); setToolsOpen(false); setNotesOpen(false); setFunOpen(false); setCalendarOpen(false); setMailOpen(false); setTodayOpen(true); setFoodOpen(false); setTasksOpen(false); setSetupOpen(false); setSearchOpen(false); }}><LayoutGrid /><span>Reset layout</span></Button>
           <div className="sidebar-bottom">          {(engine.kind === "local" || engine.kind === "auto") && <><AutoModelDownload /><WebGpuUsageBox active /></>}
           <OllamaMascot active={running && (engine.kind === "ollama" || engine.kind === "auto-ollama")} />
           <UpdatePopup />

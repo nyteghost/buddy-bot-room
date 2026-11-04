@@ -2555,3 +2555,9 @@ html[data-lowpower="1"] .scene-pal.is-listening .pixel-character { animation-pla
 @keyframes world-shadow{from{transform:translateX(-4%);}to{transform:translateX(30%);}}
 html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosphere *,.workspace-window[hidden] .world-atmosphere *{animation-play-state:paused!important;}
 @media(prefers-reduced-motion:reduce){.world-atmosphere *,.room-scene.living-world .office-pal{animation:none!important;transition:none!important;}}
+
+/* Default desktop Home placement. User-resized and user-moved windows always win. */
+@media(min-width:701px){
+ .workspace-window.window-today:not(.window-sized):not(.window-expanded){left:var(--window-x,0px);top:var(--window-y,0px);width:50%;height:100%;}
+ .workspace-window.window-room:not(.window-sized):not(.window-expanded){left:var(--window-x,50%);top:var(--window-y,0px);width:50%;height:100%;}
+}

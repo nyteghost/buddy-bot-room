@@ -67,6 +67,7 @@ export function WorkspaceLayoutMenu({ onShow }: { onShow: (visibleIds: string[])
     <label htmlFor={labelId}>Window layouts</label>
     <select id={labelId} aria-label="Workspace layout" value={choice} onChange={(e) => select(e.target.value as Choice)}>
       <option value="">Choose a layout…</option>
+      <option value="home">Home · Today + Pal Room</option>
       <option value="chat">Chat · Pal Room + My Pals</option>
       <option value="mail">Mail · full workspace</option>
       <option value="work">Work · tools + documents</option>

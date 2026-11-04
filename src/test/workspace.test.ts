@@ -68,3 +68,14 @@ describe("two-room layout migration", () => {
     expect(normalizeChatLayoutRects({ "mode-smart": a, "chat-my-pals": b })["chat-my-pals"]).toEqual(b);
   });
 });
+
+describe("Living World Home workspace",()=>{
+ it("places Today left and Pal Room right on desktop",()=>expect(presetWindowRects("home",{width:1200,height:700})).toEqual({
+  today:{x:0,y:0,w:600,h:700},room:{x:600,y:0,w:600,h:700}
+ }));
+ it("keeps mobile windows as single full-sized destinations",()=>{
+  const r=presetWindowRects("home",{width:390,height:740});
+  expect(r.today).toEqual({x:0,y:0,w:390,h:740});
+  expect(r.room).toEqual(r.today);
+ });
+});

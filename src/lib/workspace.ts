@@ -64,7 +64,7 @@ export function resizeWindowRect(
 export type WindowSnap = "left" | "right" | "top";
 export const WORKSPACE_LAYOUT_EVENT = "pixel-pals:apply-layout-v1";
 export type WorkspaceLayout = { windows: Record<string, WindowRect>; canvas: { width: number; height: number } };
-export type WorkspacePreset = "chat" | "mail" | "work" | "server";
+export type WorkspacePreset = "home" | "chat" | "mail" | "work" | "server";
 
 export function snapZone(pointer: { x: number; y: number }, bounds: { width: number; height: number }, threshold = 28): WindowSnap | null {
   if (bounds.width <= 0 || bounds.height <= 0 || pointer.x < 0 || pointer.y < 0 || pointer.x > bounds.width || pointer.y > bounds.height) return null;
@@ -101,6 +101,7 @@ export function presetWindowRects(preset: WorkspacePreset, bounds: { width: numb
   const first = { x: 0, y: 0, w: half, h };
   const second = { x: half, y: 0, w: w - half, h };
   const full = { x: 0, y: 0, w, h };
+  if (preset === "home") return w >= 700 ? { today: first, room: second } : { today: full, room: full };
   if (preset === "chat") return w >= 700 ? { room: first, "chat-my-pals": second } : { room: full, "chat-my-pals": full };
   if (preset === "mail") return { mail: full };
   if (preset === "work") return w >= 700 ? { tools: first, documents: second } : { tools: full, documents: full };
