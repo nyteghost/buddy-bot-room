@@ -39,3 +39,11 @@ The Character Universe now provides a 32×32 pixel editor, color palette, live p
 ## Weather and responsive scene interactions
 
 Live weather from the already configured RoomLive weather API now drives decorative rain/snow/cloud/fog/storm effects around the scene window. Missing weather remains clear and makes no extra request. Each visible original Pal can be selected or keyboard-activated to wave; the Pal Room includes Wave to Everyone and Celebrate Together visual emotes. These actions never call an AI endpoint, send messages, change memory, or perform unattended work.
+
+## Beta: room-wide visual-visitor reactions
+
+In Pal Room activities, **Wave to everyone** and **Celebrate together** keep their existing effect on the original Pals and now also animate **enabled** Green Jacket, built-in guest packs and custom 32×32 visitors. An individual Pal's tap-to-wave stays targeted to that Pal; clicking a guest still waves only that guest.
+
+These reactions reuse the existing local four-frame sprite atlas. They expire after 1.6 seconds, accept only validated cosmetic cues, and are suppressed by reduced-motion or low-power preferences. No new chat messages, Ollama calls, Discord events, Obsidian notes, memories, tasks, external requests or AI permissions are created.
+
+This integration adds unit and React rendering tests, but it **is not a claim of a fully completed Living Universe**. TypeScript, CI, production-equivalent build, browser smoke and iPhone/desktop appearance must pass before deploying a new beta image. The extended inspect-prop/greet event kinds and separate AI-identity permissions are not connected to user actions yet.
