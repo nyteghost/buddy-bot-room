@@ -1148,6 +1148,32 @@ await step("Named ICS import is consented, persistent, and can be hidden without
   }
 
 });
+await step("Character Universe custom art, guest roster and interaction controls",async()=>{
+  await page.setViewportSize({width:1500,height:900});
+  const state=await page.request.get(URL_+"/api/character-universe");
+  if(!state.ok())throw Error("Owner Character Universe endpoint is not available: "+state.status());
+  const snapshot=await state.json();
+  if(!Array.isArray(snapshot.characters)||!Array.isArray(snapshot.enabled)||!Number.isInteger(snapshot.revision))
+   throw Error("Character Universe did not return a versioned library");
+  await page.goto(URL_+"/?workspace=1");
+  await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
+  const roomEntry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\\s*Pal Room\\s*$/i});
+  if(await roomEntry.getAttribute("aria-pressed")!=="true")await roomEntry.click();
+  const room=page.locator('[data-window-id="room"]');
+  const activities=room.getByRole("region",{name:"Pal Room activities"});
+  await activities.getByRole("button",{name:"Wave to all Pals"}).waitFor();
+  await activities.getByRole("button",{name:"Wave to all Pals"}).click();
+  await page.locator('.room-scene .office-pal[data-world-cue="wave"]').first().waitFor({state:"visible"});
+  const library=room.locator("details.world-character-library");
+  await library.locator("summary").click();
+  await library.getByText("Goku · Fan Tribute",{exact:true}).waitFor();
+  await library.getByText("Homer · Fan Tribute",{exact:true}).waitFor();
+  await library.getByRole("button",{name:"Create character"}).click();
+  const editor=library.getByRole("region",{name:"Pixel character creator"});
+  if(await editor.getByRole("group",{name:"32 by 32 pixel drawing grid"}).locator("button").count()!==1024)
+   throw Error("Character Creator lost its 32x32 pixel grid");
+  await editor.getByRole("button",{name:"Close editor"}).click();
+});
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
