@@ -46,6 +46,19 @@ describe("Unraid-backed Character Universe privacy and revisions",()=>{
   const final=await (await get()).json() as {characters:unknown[];enabled:string[]};
   expect(final.characters).toEqual([]);expect(final.enabled).not.toContain(character.id);
  });
+ it("installs ZIP selections atomically and never replaces existing art",async()=>{
+  const first=starterCustomCharacter(),second=starterCustomCharacter(),third=starterCustomCharacter();
+  const accepted=await post({op:"installPack",expectedRevision:0,characters:[first,second]});
+  expect(accepted.status).toBe(200);
+  const installed=await (await get()).json() as {revision:number;characters:{id:string}[]};
+  expect(installed.revision).toBe(1);
+  expect(installed.characters.map(c=>c.id)).toEqual([first.id,second.id]);
+  const duplicate=await post({op:"installPack",expectedRevision:1,characters:[first,third]});
+  expect(duplicate.status).toBe(409);
+  const after=await (await get()).json() as {revision:number;characters:{id:string}[]};
+  expect(after.revision).toBe(1);
+  expect(after.characters.map(c=>c.id)).toEqual([first.id,second.id]);
+ });
  it("rejects executable artwork, foreign paths, huge requests and unauthorized guest IDs",async()=>{
   const c=starterCustomCharacter();
   expect((await post({op:"save",expectedRevision:0,character:{...c,name:"<script>bad</script>"}})).status).toBe(400);
