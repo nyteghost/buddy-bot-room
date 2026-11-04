@@ -1,3 +1,9 @@
+## Beta — local room-object inspection reactions
+
+- Existing Pal Room window, mailbox, calendar, task board, and server controls now also trigger a short visual-only **look** animation in the original Pals and enabled guest characters, while continuing to open the selected tool normally.
+- Reuse the validated inspect-prop event and directional four-frame animation system. Unknown targets are rejected; reduced-motion and low-power preferences suppress guest motion. No new AI calls, permissions, data stores, or external requests.
+- Add cue validation and rendering tests for Green Jacket, built-in guests and custom visitors. Pending fresh beta CI, browser smoke, Docker publication, and physical device appearance checks.
+
 ## Beta — Pal Room group emotes reach all enabled visual visitors
 
 - Reuse the existing **Wave to everyone** and **Celebrate together** controls. Enabled Green Jacket, built-in visual guests and owner-created pixel guests now receive bounded, validated cosmetic reactions through the existing directional sprite atlas.
