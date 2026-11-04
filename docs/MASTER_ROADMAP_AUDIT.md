@@ -112,3 +112,6 @@ Implemented in commits acc2ac3 and e8a3d0e: a pure deterministic selector maps v
 ### Next Character Universe integration increment
 
 Added a pure sprite adapter in commits 236a4ed and fae80cd, with tests for event reaction and ordinary animation fallback. Next: locate the actual Pal Room renderer, connect validated local event delivery to its animation loop, then verify mobile/reduced-motion behavior and GitHub Actions. This adapter alone does not make room characters react automatically.
+
+### Cosmetic event queue hardening (beta)
+Commits a329f02 and c864344: validate both existing and incoming events against the current actor policy before queueing, discard malformed entries and actors that have since been disabled, and retain bounded duplicate suppression. No UI wiring or AI permissions were added. Await TypeScript/test/build/browser CI confirmation before any release.
