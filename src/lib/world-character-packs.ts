@@ -79,3 +79,41 @@ export function worldHideoutForTheme(theme:string):"hedge"|"server"|"portal" {
   if(["hellraiser","horror","finalfantasy","dcc"].includes(theme))return "portal";
   return "hedge";
 }
+
+/**
+ * Living World 2.0 integration contract. This is a deterministic, cosmetic-only
+ * event layer; AI/tool access must be implemented separately behind owner approval.
+ * No imported character pack can supply executable callbacks or permissions.
+ */
+export const WORLD_EVENT_KINDS = ["wave","celebrate","inspect-prop","greet"] as const;
+export type WorldEventKind = (typeof WORLD_EVENT_KINDS)[number];
+export type WorldEvent = Readonly<{
+  id:string; actorId:string; kind:WorldEventKind; targetId?:string; at:number;
+}>;
+export type WorldActorPolicy = Readonly<{
+  enabledIds:readonly string[];
+  knownIds:readonly string[];
+  interactiveProps:readonly string[];
+  reducedMotion:boolean;
+  maxEvents?:number;
+}>;
+/** Reject untrusted, malformed and disabled actors without ever invoking tools. */
+export function acceptWorldEvent(value:unknown,policy:WorldActorPolicy):WorldEvent|null {
+  if(!value||typeof value!=="object"||Array.isArray(value))return null;
+  const v=value as Record<string,unknown>;
+  if(typeof v["id"]!=="string"||!/^world-[a-zA-Z0-9_-]{1,64}$/.test(v["id"]))return null;
+  if(typeof v["actorId"]!=="string"||!policy.knownIds.includes(v["actorId"])||!policy.enabledIds.includes(v["actorId"]))return null;
+  if(typeof v["kind"]!=="string"||!(WORLD_EVENT_KINDS as readonly string[]).includes(v["kind"]))return null;
+  if(typeof v["at"]!=="number"||!Number.isSafeInteger(v["at"])||v["at"]<0)return null;
+  if(v["targetId"]!==undefined&&(typeof v["targetId"]!=="string"||v["targetId"].length>64))return null;
+  const kind=v["kind"] as WorldEventKind;
+  if(kind==="inspect-prop"&&(!v["targetId"]||!policy.interactiveProps.includes(v["targetId"] as string)))return null;
+  if(kind==="greet"&&(!v["targetId"]||!policy.knownIds.includes(v["targetId"] as string)))return null;
+  return {id:v["id"],actorId:v["actorId"],kind,at:v["at"],...(v["targetId"]?{targetId:v["targetId"] as string}:{})};
+}
+/** Bounded, stable, duplicate-free queue; decorative effects can be skipped in reduced motion. */
+export function enqueueWorldEvent(queue:readonly WorldEvent[],event:WorldEvent,policy:WorldActorPolicy):WorldEvent[] {
+  const cap=Math.max(1,Math.min(64,Math.trunc(policy.maxEvents??24)||24));
+  if(policy.reducedMotion||queue.some(item=>item.id===event.id))return [...queue].slice(-cap);
+  return [...queue,event].slice(-cap);
+}
