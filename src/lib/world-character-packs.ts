@@ -145,3 +145,22 @@ export function worldReactionAt(
  }
  return null;
 }
+
+/** Existing Pal Room emotes forwarded to rendered visual guests, never to AI tools. */
+export type WorldRoomCue = Readonly<{action:"wave"|"celebrate";at:number}>;
+/**
+ * Resolve a room-wide emote for a guest that is already enabled and mounted.
+ * Invalid cues and reduced-motion requests are ignored; no state is persisted.
+ */
+export function worldCueReaction(
+ cue:WorldRoomCue|null|undefined,actorId:string,now:number,reducedMotion:boolean
+):WorldReaction|null {
+ if(!cue||typeof actorId!=="string"||actorId.length<1||actorId.length>64)return null;
+ const policy:WorldActorPolicy={
+  knownIds:[actorId],enabledIds:[actorId],interactiveProps:[],reducedMotion
+ };
+ const event=acceptWorldEvent({
+  id:"world-"+String(cue.at),actorId,kind:cue.action,at:cue.at
+ },policy);
+ return event?worldReactionAt([event],actorId,now,policy):null;
+}
