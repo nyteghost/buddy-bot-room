@@ -28,7 +28,7 @@ async function deflate(input:Uint8Array,limit:number):Promise<Uint8Array>{
  if(typeof DecompressionStream==="undefined")throw Error("This browser cannot unpack compressed ZIP files.");
  const inputBuffer=input.buffer.slice(input.byteOffset,input.byteOffset+input.byteLength) as ArrayBuffer;
  const inputStream=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new Uint8Array(inputBuffer));controller.close();}});
- const stream=inputStream.pipeThrough(new DecompressionStream("deflate-raw"));
+ const stream=inputStream.pipeThrough(new DecompressionStream("deflate-raw") as unknown as ReadableWritablePair<Uint8Array,Uint8Array>);
  const reader=stream.getReader();const parts:Uint8Array[]=[];let size=0;
  try{
   while(true){
