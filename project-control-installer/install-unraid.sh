@@ -26,6 +26,10 @@ base64 -d "$TMP/payload.b64" > "$TMP/package.tar.xz"
 echo "$SHA256  $TMP/package.tar.xz" | sha256sum -c -
 mkdir "$TMP/app"
 tar -xJf "$TMP/package.tar.xz" -C "$TMP/app" --no-same-owner --no-same-permissions
+# This installer uses umask 077 for secrets, but those restrictive permissions
+# must not be carried into the Docker image running as an unprivileged user.
+# Only bundled application code and non-secret config/assets become readable.
+chmod -R a+rX "$TMP/app/app" "$TMP/app/static" "$TMP/app/config"
 for f in app/pcc.py static/index.html config/projects.json scripts/start-unraid.sh scripts/setup-local.sh Dockerfile; do
   [[ -f "$TMP/app/$f" ]] || { echo "Invalid package: missing $f" >&2; exit 1; }
 done
