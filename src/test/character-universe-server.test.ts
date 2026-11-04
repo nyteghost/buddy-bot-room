@@ -4,7 +4,7 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {currentUser} from "@/lib/accounts.server";
 import {handleCharacterUniverse} from "@/lib/character-universe.server";
-import {starterCustomCharacter} from "@/lib/world-custom-packs";
+import {starterCustomCharacter,CUSTOM_WORLD_FILE_LIMIT} from "@/lib/world-custom-packs";
 
 vi.mock("@/lib/accounts.server",()=>({currentUser:vi.fn()}));
 let root="";
@@ -53,7 +53,7 @@ describe("Unraid-backed Character Universe privacy and revisions",()=>{
   expect((await post({op:"setEnabled",expectedRevision:0,ids:["homer","bogus"]})).status).toBe(400);
   expect((await post({op:"setEnabled",expectedRevision:0,ids:["green-jacket","goku","homer","space-ranger","pixel-robot","arcade-ghost","moon-mage"]})).status).toBe(400);
   const tooBig=await handleCharacterUniverse(new Request(url,{
-   method:"POST",headers:{"content-type":"application/json"},body:"x".repeat(120001)
+   method:"POST",headers:{"content-type":"application/json"},body:"x".repeat(CUSTOM_WORLD_FILE_LIMIT+1)
   }));
   expect(tooBig.status).toBe(413);
  });
