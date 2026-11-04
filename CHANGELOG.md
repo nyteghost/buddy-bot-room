@@ -1,3 +1,9 @@
+## Beta — Pal Room group emotes reach all enabled visual visitors
+
+- Reuse the existing **Wave to everyone** and **Celebrate together** controls. Enabled Green Jacket, built-in visual guests and owner-created pixel guests now receive bounded, validated cosmetic reactions through the existing directional sprite atlas.
+- Preserve existing individual click-to-wave, character movement, reduced-motion and low-power behavior. Targeted original-Pal waves remain targeted and do not trigger guests. No AI tools, messages, memories, credentials or storage changes.
+- Add event-policy timing tests and React render checks for built-in, custom and Green Jacket visitors. Release remains gated on TypeScript, unit tests, build, browser smoke and beta Docker publication.
+
 ## Beta — Living World reaction sprite adapter
 
 - Add a pure adapter from approved cosmetic reactions to the existing directional, four-frame sprite atlas, preserving normal walk/idle fallback and source sprite data.
