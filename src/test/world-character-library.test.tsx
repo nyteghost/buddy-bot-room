@@ -1,6 +1,9 @@
 import { render,fireEvent,screen } from "@testing-library/react";
 import {describe,expect,it,vi} from "vitest";
 import {WorldCharacterLibrary} from "@/components/world-character-library";
+import {WorldGuest} from "@/components/world-guest";
+import {WorldCustomGuest} from "@/components/world-custom-guest";
+import {GreenJacketVisitor} from "@/components/world-visitor";
 import {starterCustomCharacter} from "@/lib/world-custom-packs";
 describe("Character Universe in-app Library",()=>{
  it("lists Goku, Homer, originals and can add an optional visual visitor",()=>{
@@ -22,5 +25,20 @@ describe("Character Universe in-app Library",()=>{
   fireEvent.click(screen.getByRole("button",{name:"Paint pixel 1, 1"}));
   expect(screen.getByRole("button",{name:"Save character"})).toBeTruthy();
   view.unmount();
+ });
+});
+
+describe("room-wide guest emotes in rendered sprites",()=>{
+ it("celebrates with builtin, custom and Green Jacket visitors",()=>{
+  const cue={action:"celebrate" as const,at:Date.now()};
+  const builtIn=render(<WorldGuest id="moon-mage" theme="normal" active={false} cue={cue}/>);
+  expect(builtIn.container.querySelector(".world-guest")?.getAttribute("data-action")).toBe("celebrate");
+  builtIn.unmount();
+  const custom=render(<WorldCustomGuest character={starterCustomCharacter()} index={0} theme="normal" active={false} cue={cue}/>);
+  expect(custom.container.querySelector(".world-custom-guest")?.getAttribute("data-action")).toBe("celebrate");
+  custom.unmount();
+  const jacket=render(<GreenJacketVisitor theme="normal" active={false} cue={cue}/>);
+  expect(jacket.container.querySelector(".world-visitor")?.getAttribute("data-action")).toBe("celebrate");
+  jacket.unmount();
  });
 });
