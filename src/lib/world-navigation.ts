@@ -60,7 +60,7 @@ export function worldPath(from:WorldPoint,to:WorldPoint,theme:CharacterMode):Wor
  const steps=[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
  for(let iter=0;iter<size*5&&open.size;iter++){
   let curr=-1,min=Infinity;
-  for(const n of open)if(f[n]<min){curr=n;min=f[n]!;}
+  for(const n of open)if(f[n]!<min){curr=n;min=f[n]!;}
   if(curr<0)break;
   if(curr===end){
    const found:number[]=[];let last=curr;
