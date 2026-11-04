@@ -108,3 +108,7 @@ Implemented: nine existing AI Pals rendered with 8 headings × 9 actions × 4 32
 Implemented in commits acc2ac3 and e8a3d0e: a pure deterministic selector maps validated, enabled local events to the existing four-frame animation atlas. Wave, celebrate, inspect-prop and greet select wave, celebrate, look and talk respectively. Events expire after 1.6 seconds; disabled actors and reduced-motion settings suppress reactions. No AI identity, external action or new permission is granted.
 
 **Not yet complete:** connect this selector to actual Pal Room rendering and event producers, verify theme/mobile appearance, implement separately approved AI identities, and run beta CI/build/browser smoke and image publication before recommending an update. Existing Pal animations, guest art, pathfinding, settings, storage and services remain unchanged.
+
+### Next Character Universe integration increment
+
+Added a pure sprite adapter in commits 236a4ed and fae80cd, with tests for event reaction and ordinary animation fallback. Next: locate the actual Pal Room renderer, connect validated local event delivery to its animation loop, then verify mobile/reduced-motion behavior and GitHub Actions. This adapter alone does not make room characters react automatically.
