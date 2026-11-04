@@ -2,6 +2,7 @@
 // any uncaught page error or console error. CI runs it against a fresh production build (see .github/workflows/ci.yml).
 // Run it yourself:  PW_PATH=/path/to/node_modules/playwright SMOKE_URL=http://localhost:8090 node tools/smoke/smoke.mjs
 import { createRequire } from "node:module";
+import { hdCharacterSmokeZip } from "./hd-character-zip.mjs";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PW_PATH || "playwright");
 
@@ -1196,6 +1197,40 @@ await step("Character Universe custom art, guest roster and interaction controls
    throw Error("Character Creator lost its 32x32 pixel grid");
   await editor.getByRole("button",{name:"Close editor"}).click();
 });
+await step("import a compressed 256x256 ZIP, preview, approve, render, and clean up",async()=>{
+  const library=page.locator('[data-window-id="room"] details.world-character-library');
+  await library.waitFor({state:"visible"});
+  if(await library.getAttribute("open")===null)await library.locator("summary").click();
+  const pack=hdCharacterSmokeZip();
+  const input=library.getByLabel("Choose character ZIP file");
+  await input.setInputFiles({name:"smoke-hd-character.zip",mimeType:"application/zip",buffer:pack});
+  await library.getByText("Smoke HD Pack · 256×256 character preview",{exact:true}).waitFor({timeout:12000});
+  const preview=library.locator('img[alt="Smoke HD Bot 256 by 256 PNG preview"]');
+  await preview.waitFor({state:"visible"});
+  const previewDimensions=await preview.evaluate(img=>({width:img.naturalWidth,height:img.naturalHeight}));
+  if(previewDimensions.width!==256||previewDimensions.height!==256)
+   throw Error("The ZIP importer failed to decode and preview 256px PNG art: "+JSON.stringify(previewDimensions));
+  const before=await (await page.request.get(URL_+"/api/character-universe")).json();
+  if(before.characters?.some(c=>c.id==="user-smokebot2026"))throw Error("Synthetic smoke character already existed");
+  const approve=library.getByRole("button",{name:"Approve & install 1 character(s)"});
+  await approve.click();
+  await library.getByText(/1 character\(s\) installed!/).waitFor({timeout:15000});
+  const after=await (await page.request.get(URL_+"/api/character-universe")).json();
+  if(!after.characters?.some(c=>c.id==="user-smokebot2026")||after.revision!==before.revision+1)
+   throw Error("Owner-approved ZIP install was not saved to the Character Universe");
+  await library.getByRole("button",{name:"Enable Smoke HD Bot"}).click();
+  const guest=page.locator('.room-scene .world-custom-guest img[alt="Smoke HD Bot 256 pixel character"]');
+  await guest.waitFor({state:"visible",timeout:15000});
+  const rendered=await guest.evaluate(img=>({w:img.naturalWidth,h:img.naturalHeight}));
+  if(rendered.w!==256||rendered.h!==256)throw Error("Imported HD art is not rendered in the Living World");
+  page.once("dialog",dialog=>dialog.accept());
+  await library.getByRole("button",{name:"Delete Smoke HD Bot"}).click();
+  await page.waitForFunction(async()=>{
+    const r=await fetch("/api/character-universe",{credentials:"same-origin"});
+    return r.ok()&&!((await r.json()).characters??[]).some(c=>c.id==="user-smokebot2026");
+  },undefined,{timeout:15000});
+});
+
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
