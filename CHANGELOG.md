@@ -1,3 +1,10 @@
+## Beta — Character Universe: obstacle-aware themed movement
+
+- Add hand-defined walkable floor zones and solid furniture for every existing room theme.
+- Use deterministic eight-direction A* paths for all nine existing Pals, prevent diagonal corner-cutting, and keep the Linux/Assistant office routes intact.
+- Support social wave pauses and per-character pacing without turning on additional AI behaviors.
+- Add route, furniture-clearance and pause/loop regression tests.
+
 ## Beta — Living World clock-driven ambience
 
 - Add browser-local morning/day/evening/night ambient lighting and unobtrusive pixel stars at night, without extra network requests or personal location access.

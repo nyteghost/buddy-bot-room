@@ -19,3 +19,7 @@ The first Character Library entry is a native 32px original design referencing t
 ## Scene time of day
 
 Ambient room lighting now uses the viewer's browser-local hour to shift gently from morning through night; nighttime introduces small pixel stars. It runs at most once per minute while the room is active, with existing low-power and hidden-tab handling. It does not use location, remote weather, AI, or credentials. Weather-linked effects and true furniture interaction remain roadmap work.
+
+## Character Universe movement milestone
+
+Dedicated walkable floor plans and collision zones now exist for each theme. Pal foot paths use bounded, deterministic eight-direction A* routes around furniture with per-character timing and idle/wave moments; existing office choreography is retained in Linux/Assistant/Dev Team. This is authored collision geometry for the room decor but has not been visually calibrated against every backdrop on a physical display. Paths avoid fixed objects, not real-time collisions with moving user-created furniture or other Pals.

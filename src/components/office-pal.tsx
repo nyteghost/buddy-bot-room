@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { agentName, type AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
+import { worldPose, worldRoomPlan } from "@/lib/world-navigation";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
 import { ambientMotion, advanceMotionClock } from "@/lib/pal-motion";
@@ -40,17 +41,19 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
     return () => window.clearTimeout(timer);
   }, [active]);
   const station = officeStations[id];
-  const pose = officePose(id, index, elapsed);
+  const themeWorld=world && mode!=="linux" && mode!=="assistant" && mode!=="devteam";
+  const sceneHome=themeWorld ? worldRoomPlan(mode).homes[index]! : {x:station.home[0],y:station.home[1]};
+  const pose = themeWorld ? worldPose(id,index,elapsed,mode) : officePose(id,index,elapsed);
   const directional = world || hasFacingArt(id);
   const displayLabel=world && mode!=="linux" && mode!=="assistant" && mode!=="devteam" ? agentName(id,mode==="hellraiser",mode==="horror",mode) : station.label;
-  const atDesk = Math.hypot(pose.x - station.home[0], pose.y - station.home[1]) < .2;
+  const atDesk = Math.hypot(pose.x - sceneHome.x, pose.y - sceneHome.y) < .2;
   const working = active && (arrived || reduced || atDesk);
-  const x = active ? station.home[0] : playful ? pose.x : station.home[0];
-  const y = active ? station.home[1] : playful ? pose.y : station.home[1];
+  const x = active ? sceneHome.x : playful ? pose.x : sceneHome.x;
+  const y = active ? sceneHome.y : playful ? pose.y : sceneHome.y;
   const walking = enabled && (active ? !working : wandering && pose.walking);
-  const heading = active && walking ? headingOf(station.home[0] - pose.x, station.home[1] - pose.y) : pose.heading;
+  const heading = active && walking ? headingOf(sceneHome.x - pose.x, sceneHome.y - pose.y) : pose.heading;
   // Seated whenever the pal is parked at its own desk chair.
-  const seated = active ? working : !walking && x === station.home[0] && y === station.home[1];
+  const seated = !themeWorld && (active ? working : !walking && x === sceneHome.x && y === sceneHome.y);
   const position = {
     "--office-x": `${x}%`,
     "--office-y": `${y}%`,
@@ -63,7 +66,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={walking ? Math.floor(elapsed / 140) % 4 : 0} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined} pixelWorld={world} walkFrame={walking ? Math.floor(elapsed / 140) % 4 : 0} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{displayLabel}</span>
     </div>
   );
