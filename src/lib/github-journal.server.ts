@@ -46,7 +46,11 @@ async function loadState(): Promise<JournalState> {
       errors: Array.isArray(r.errors) ? r.errors.filter(x => typeof x === "string").slice(0, 30) : [],
     };
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return defaultJournalState();
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      const fresh = defaultJournalState();
+      fresh.config.enabled = process.env["GITHUB_JOURNAL_ENABLED"] === "1";
+      return fresh;
+    }
     throw e; // Never overwrite damaged state.
   }
 }

@@ -13,6 +13,8 @@ services:
       BUDDY_TZ: America/New_York
       BUDDY_BACKUP_DIR: /backups
       OBSIDIAN_VAULT_DIR: /vault
+      GITHUB_JOURNAL_ENABLED: "1"  # user-approved initial enable; subsequent UI settings take precedence
+      GITHUB_TOKEN: ${BETA_GITHUB_TOKEN:-}  # optional read-only token for selected private repos
       OBSIDIAN_NEW_FOLDER: PixelPals
       OLLAMA_URL: ${BETA_OLLAMA_URL:-}
       NVIDIA_VISIBLE_DEVICES: none

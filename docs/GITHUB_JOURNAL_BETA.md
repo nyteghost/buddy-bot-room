@@ -4,7 +4,7 @@ The **Repo Watch** screen gains an opt-in GitHub-to-Obsidian journal. This is an
 
 ## What it does
 
-- By default it is **off**. The owner enables it explicitly under Repo Watch and can click **Scan Now**.
+- By default it is **off**. This owner's `docker-compose.unraid-beta.yml` explicitly opts in with `GITHUB_JOURNAL_ENABLED=1`, applying only when no prior saved configuration exists. The owner may also enable or disable it under Repo Watch and click **Scan Now**.
 - It runs once daily at **03:00 America/New_York** (editable). If Unraid restarts after that time, it catches up on the next scheduler tick. No missed-day burst.
 - It reads each selected repo's default branch and beta branches, up to 12 per repo. The first scan saves a **baseline of up to 10 recent commits** per branch, not a complete backfill. Later scans compare persisted per-branch commit SHAs.
 - It writes a separate Markdown note for each changed branch, with source commit links and a GitHub comparison link. Example: `Projects/GitHub/nyteghost--showpilot/Updates/2026-11-03-beta-<sha>.md`.
@@ -23,7 +23,7 @@ The Pixel Pals container needs a **read/write bind mount** to that specific vaul
 
     /mnt/user/appdata/obsidian/vaults/Homelab:/obsidian-vault:rw
 
-Then add `OBSIDIAN_VAULT_DIR=/obsidian-vault` to the Pixel Pals container environment. Restart/recreate the Pixel Pals container using the normal deployment procedure after updating the beta image. Do not replace your existing BUDDY_DATA_DIR mapping or Obsidian container. The directory must be writable by the Pixel Pals container's UID; inspect permissions before changing them. Do not `chmod -R 777` or change ownership blindly.
+Then add `OBSIDIAN_VAULT_DIR=/obsidian-vault` to the Pixel Pals container environment. The supplied Unraid beta compose already mounts this vault at `/vault` and sets `OBSIDIAN_VAULT_DIR=/vault`, so you needn't add a second mount if using that stack. Restart/recreate the Pixel Pals container using the normal deployment procedure after updating the beta image. Do not replace your existing BUDDY_DATA_DIR mapping or Obsidian container. The directory must be writable by the Pixel Pals container's UID; inspect permissions before changing them. Do not `chmod -R 777` or change ownership blindly.
 
 GitHub private repos require `GITHUB_TOKEN` in the Pixel Pals server environment. Prefer a token with read-only Metadata and Contents permissions for only the repositories you approve. GitHub's branch/compare APIs may need additional read-only access depending on your organization's policy. Do not put private code or company secrets in a public repository.
 
@@ -43,3 +43,5 @@ Disable the journal in Repo Watch to stop new scheduled scans. Disabling doesn't
 - Branch discovery reads up to the first 100 branches and limits selected beta/default branches to 12. A compare result can be truncated by GitHub; the note says so.
 - If an older baseline commit has been deleted by a force push, GitHub compare can fail: error is shown and the previous checkpoint is preserved for manual resolution.
 - Automated validation of this implementation does not prove the Unraid bind mount, token permissions, or live local Ollama operation. Confirm these on the host.
+
+For the supplied `docker-compose.unraid-beta.yml` the journal is approved and enabled on first startup through `GITHUB_JOURNAL_ENABLED=1`. Existing saved preferences win (a previous manual disable stays disabled). This beta compose uses `BETA_GITHUB_TOKEN` for private repos. The normal `docker-compose.unraid.yml` remains opt-in using `GITHUB_JOURNAL_ENABLED=1` in its env file. Live GitHub access and vault permissions are not validated by CI.

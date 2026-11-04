@@ -51,6 +51,7 @@ import { Route as ApiPlexRouteImport } from './routes/api.plex'
 import { Route as ApiProvidersRouteImport } from './routes/api.providers'
 import { Route as ApiRemindersRouteImport } from './routes/api.reminders'
 import { Route as ApiReposRouteImport } from './routes/api.repos'
+import { Route as ApiGithubJournalRouteImport } from './routes/api.github-journal'
 import { Route as ApiSchedulesRouteImport } from './routes/api.schedules'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as ApiSecondBrainRouteImport } from './routes/api.second-brain'
@@ -287,6 +288,11 @@ const ApiReposRoute = ApiReposRouteImport.update({
   path: '/api/repos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGithubJournalRoute = ApiGithubJournalRouteImport.update({
+  id: '/api/github-journal',
+  path: '/api/github-journal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSchedulesRoute = ApiSchedulesRouteImport.update({
   id: '/api/schedules',
   path: '/api/schedules',
@@ -456,6 +462,7 @@ export interface FileRoutesByFullPath {
   '/api/providers': typeof ApiProvidersRoute
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
+  '/api/github-journal': typeof ApiGithubJournalRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -525,6 +532,7 @@ export interface FileRoutesByTo {
   '/api/providers': typeof ApiProvidersRoute
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
+  '/api/github-journal': typeof ApiGithubJournalRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -595,6 +603,7 @@ export interface FileRoutesById {
   '/api/providers': typeof ApiProvidersRoute
   '/api/reminders': typeof ApiRemindersRoute
   '/api/repos': typeof ApiReposRoute
+  '/api/github-journal': typeof ApiGithubJournalRoute
   '/api/schedules': typeof ApiSchedulesRoute
   '/api/search': typeof ApiSearchRoute
   '/api/second-brain': typeof ApiSecondBrainRoute
@@ -666,6 +675,7 @@ export interface FileRouteTypes {
     | '/api/providers'
     | '/api/reminders'
     | '/api/repos'
+    | '/api/github-journal'
     | '/api/schedules'
     | '/api/search'
     | '/api/second-brain'
@@ -735,6 +745,7 @@ export interface FileRouteTypes {
     | '/api/providers'
     | '/api/reminders'
     | '/api/repos'
+    | '/api/github-journal'
     | '/api/schedules'
     | '/api/search'
     | '/api/second-brain'
@@ -804,6 +815,7 @@ export interface FileRouteTypes {
     | '/api/providers'
     | '/api/reminders'
     | '/api/repos'
+    | '/api/github-journal'
     | '/api/schedules'
     | '/api/search'
     | '/api/second-brain'
@@ -874,6 +886,7 @@ export interface RootRouteChildren {
   ApiProvidersRoute: typeof ApiProvidersRoute
   ApiRemindersRoute: typeof ApiRemindersRoute
   ApiReposRoute: typeof ApiReposRoute
+  ApiGithubJournalRoute: typeof ApiGithubJournalRoute
   ApiSchedulesRoute: typeof ApiSchedulesRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSecondBrainRoute: typeof ApiSecondBrainRoute
@@ -1195,6 +1208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReposRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/github-journal': {
+      id: '/api/github-journal'
+      path: '/api/github-journal'
+      fullPath: '/api/github-journal'
+      preLoaderRoute: typeof ApiGithubJournalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/schedules': {
       id: '/api/schedules'
       path: '/api/schedules'
@@ -1430,6 +1450,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProvidersRoute: ApiProvidersRoute,
   ApiRemindersRoute: ApiRemindersRoute,
   ApiReposRoute: ApiReposRoute,
+  ApiGithubJournalRoute: ApiGithubJournalRoute,
   ApiSchedulesRoute: ApiSchedulesRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSecondBrainRoute: ApiSecondBrainRoute,
