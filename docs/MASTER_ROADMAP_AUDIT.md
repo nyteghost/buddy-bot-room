@@ -115,3 +115,9 @@ Added a pure sprite adapter in commits 236a4ed and fae80cd, with tests for event
 
 ### Cosmetic event queue hardening (beta)
 Commits a329f02 and c864344: validate both existing and incoming events against the current actor policy before queueing, discard malformed entries and actors that have since been disabled, and retain bounded duplicate suppression. No UI wiring or AI permissions were added. Await TypeScript/test/build/browser CI confirmation before any release.
+
+### Character Universe — existing Pal Room group-emote integration (beta)
+
+Implemented after event-queue hardening: the existing room-wide **Wave to everyone** and **Celebrate together** cues now reach enabled built-in guests, owner-created data-only visitors, and Green Jacket through the validated 1.6-second reaction resolver and existing four-frame pixel sprite engine. Targeted waves still affect only the selected original Pal. Reduced-motion and low-power users skip decorative reactions; click-to-wave and roaming behavior remain intact. No additional memory, agent identity, user data, AI capability, network, Docker, Obsidian or permission changes.
+
+Tests added for cue safety/expiry and for guest-component celebration rendering. **Not yet verified**: latest TypeScript, unit test, full build, browser smoke and beta image publication, as well as physical desktop/iPhone visual quality. Still outstanding: broader event sources (prop interactions, character greetings), explicitly owner-approved separate AI identities, furniture editor, and richer signature animation. Do not deploy to Unraid without successful beta validation.
