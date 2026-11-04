@@ -1,10 +1,13 @@
 /** Data-only, 32×32 custom cosmetic characters. No external JS, SVG or URL fields. */
 export const CUSTOM_WORLD_KEY="pixel-pals-custom-world-characters-v1";
 export const CUSTOM_WORLD_LIMIT=12;
-export const CUSTOM_WORLD_FILE_LIMIT=120_000;
+export const CUSTOM_WORLD_FILE_LIMIT=32*1024*1024;
+export const CUSTOM_WORLD_PNG_URL_LIMIT=700_000;
+export const CUSTOM_WORLD_HD_CHAR_LIMIT=4_000_000;
 export const CUSTOM_WORLD_COLOR_KEYS="abcdefghijklmnop";
+export type WorldHdSpriteSet={resolution:256;idle:string[];walk?:string[];wave?:string[];celebrate?:string[]};
 export type WorldCustomCharacter={
- id:string;name:string;pixels:string[];palette:Record<string,string>;
+ id:string;name:string;pixels:string[];palette:Record<string,string>;hd?:WorldHdSpriteSet;
 };
 export const STARTER_PALETTE:Record<string,string>={
  a:"#202335",b:"#fac19a",c:"#82543c",d:"#4e7dcf",e:"#c3ed6b",f:"#f6ebdc",
@@ -22,6 +25,40 @@ export function starterCustomCharacter():WorldCustomCharacter{
  rect(12,9,3,2,"a");rect(19,9,3,2,"a");rect(15,13,4,1,"g");
  return {id:customCharacterId(),name:"My Pixel Pal",pixels:g.map(row=>row.join("")),palette:{...STARTER_PALETTE}};
 }
+/** Never accept a remote image URL, SVG, script or images other than a bounded 256x256 PNG. */
+export function validHdPngUrl(value:unknown):value is string{
+ if(typeof value!=="string"||value.length>CUSTOM_WORLD_PNG_URL_LIMIT||!value.startsWith("data:image/png;base64,"))return false;
+ const raw=value.slice(22);
+ if(raw.length<44||raw.length%4!==0||!/^[A-Za-z0-9+/]+={0,2}$/.test(raw))return false;
+ try{
+  const head=atob(raw.slice(0,44));
+  const byte=(n:number)=>head.charCodeAt(n);
+  const u32=(at:number)=>((byte(at)*16777216)+(byte(at+1)<<16)+(byte(at+2)<<8)+byte(at+3))>>>0;
+  return [137,80,78,71,13,10,26,10].every((n,i)=>byte(i)===n)
+   &&u32(8)===13&&head.slice(12,16)==="IHDR"
+   &&u32(16)===256&&u32(20)===256&&byte(24)===8
+   &&[2,3,6].includes(byte(25))&&byte(26)===0&&byte(27)===0;
+ }catch{return false;}
+}
+export function validateHdSprites(raw:unknown):WorldHdSpriteSet|null{
+ if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
+ const source=raw as Record<string,unknown>;
+ if(Object.keys(source).some(k=>!["resolution","idle","walk","wave","celebrate"].includes(k))||source["resolution"]!==256)return null;
+ let bytes=0;
+ const values:Record<string,string[]>={};
+ for(const action of ["idle","walk","wave","celebrate"]){
+  const input=source[action];
+  if(input===undefined){if(action==="idle")return null;continue;}
+  if(!Array.isArray(input)||input.length<1||input.length>(action==="idle"?1:8)||!input.every(validHdPngUrl))return null;
+  bytes+=input.reduce((sum:number,url:string)=>sum+url.length,0);
+  if(bytes>CUSTOM_WORLD_HD_CHAR_LIMIT)return null;
+  values[action]=[...input];
+ }
+ if(!values["idle"])return null;
+ return {resolution:256,idle:values["idle"],...(values["walk"]?{walk:values["walk"]}:{}),
+  ...(values["wave"]?{wave:values["wave"]}:{}),...(values["celebrate"]?{celebrate:values["celebrate"]}:{})};
+}
+
 export function validateCustomCharacter(value:unknown):WorldCustomCharacter|null{
  if(!value||typeof value!=="object"||Array.isArray(value))return null;
  const v=value as Record<string,unknown>;
@@ -35,7 +72,9 @@ export function validateCustomCharacter(value:unknown):WorldCustomCharacter|null
  const colors=new Set((v['pixels'] as string[]).join("").replace(/\./g,""));
  if(colors.size===0||[...colors].some(c=>!(c in palette)))return null;
  if((v['pixels'] as string[]).join("").replace(/\./g,"").length<15)return null;
- return {id:v['id'],name:v['name'].trim(),pixels:[...(v['pixels'] as string[])],palette};
+ const hd=v["hd"]===undefined?undefined:validateHdSprites(v["hd"]);
+ if(v["hd"]!==undefined&&!hd)return null;
+ return {id:v['id'],name:v['name'].trim(),pixels:[...(v['pixels'] as string[])],palette,...(hd?{hd}:{})};
 }
 export function cleanCustomCharacters(value:unknown):WorldCustomCharacter[]{
  if(!Array.isArray(value)||value.length>CUSTOM_WORLD_LIMIT)return [];
