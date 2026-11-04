@@ -52,7 +52,7 @@ function useLiveData(active: boolean): LiveData {
 }
 
 /** The living room: sky and weather over the scene, clickable objects that show real data, ambient pal chatter, and XP. */
-export function RoomLive({ active, running, theme, onOpen, onChatter, onSkyChange }: { active: boolean; running: boolean; theme: CharacterMode; onOpen: (t: RoomTarget) => void; onChatter?: (id: AgentId | null) => void; onSkyChange?: (sky:Sky)=>void }) {
+export function RoomLive({ active, running, theme, onOpen, onInspect, onChatter, onSkyChange }: { active: boolean; running: boolean; theme: CharacterMode; onOpen: (t: RoomTarget) => void; onInspect?: (t: RoomTarget) => void; onChatter?: (id: AgentId | null) => void; onSkyChange?: (sky:Sky)=>void }) {
   const data = useLiveData(active);
   const progress = useProgress();
   const { todos } = useWorkbench();
@@ -74,7 +74,7 @@ export function RoomLive({ active, running, theme, onOpen, onChatter, onSkyChang
   const decor = [...unlocked(level).map((x) => x.icon), ...seasonal(new Date().getMonth())];
   const label = (id: AgentId) => agentName(id, theme === "hellraiser", theme === "horror", theme);
   const obj = (t: RoomTarget, icon: string, name: string, value: string, hint: string, dot = false) => (
-    <button type="button" className="live-obj" title={hint} onClick={() => onOpen(t)}>
+    <button type="button" className="live-obj" title={hint} onClick={() => { onInspect?.(t); onOpen(t); }}>
       <span className="live-icon" aria-hidden>{icon}</span>
       <span className="live-name">{name}</span>
       <span className="live-value">{value}</span>
