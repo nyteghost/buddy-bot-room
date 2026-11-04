@@ -1227,7 +1227,7 @@ await step("import a compressed 256x256 ZIP, preview, approve, render, and clean
   await library.getByRole("button",{name:"Delete Smoke HD Bot"}).click();
   await page.waitForFunction(async()=>{
     const r=await fetch("/api/character-universe",{credentials:"same-origin"});
-    return r.ok()&&!((await r.json()).characters??[]).some(c=>c.id==="user-smokebot2026");
+    return r.ok&&!((await r.json()).characters??[]).some(c=>c.id==="user-smokebot2026");
   },undefined,{timeout:15000});
 });
 
