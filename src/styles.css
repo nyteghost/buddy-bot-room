@@ -2666,7 +2666,7 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
 .world-guest-name{display:block;max-width:106px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
  font:8px "Silkscreen",monospace;background:rgba(19,26,36,.84);color:#fff;padding:2px 4px;border-radius:2px;}
 .world-guest-spark{position:absolute;right:2px;top:3px;color:#ffed69;font-size:17px;animation:world-visitor-wave .7s steps(3) infinite alternate;}
-@media(max-width:700px){.world-guest{width:50px;min-height:59px}.world-guest-pixels{width:37px;height:47px}.world-guest-name{font-size:6px;max-width:70px;}}
+@media(max-width:700px){.world-guest{width:50px;min-height:59px}.world-guest-pixels{width:37px;height:47px}.world-guest-hd-pixels{width:47px;height:47px}.world-guest-name{font-size:6px;max-width:70px;}}
 @media(prefers-reduced-motion:reduce){.world-guest,.world-guest *{transition:none!important;animation:none!important;}}
 
 /* Real configured sky drives visual weather at windows (existing RoomLive API only). */
