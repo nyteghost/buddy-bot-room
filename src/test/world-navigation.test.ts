@@ -21,7 +21,7 @@ describe("Living World furniture navigation",()=>{
      const p=worldPose(pal.id,i,ms,theme);
      expect(worldPointIsWalkable(p,theme)).toBe(true);
     }
-    expect(worldPose(pal.id,i,0,theme).walking).toBe(false);
+    expect(worldPose(pal.id,0,0,theme).walking).toBe(false); // unshifted route starts at rest
     expect(Array.from({length:64},(_,n)=>worldPose(pal.id,i,n*500,theme)).some(p=>p.walking)).toBe(true);
     expect(worldPose(pal.id,i,18000,theme).action).toBeTruthy();
    }
