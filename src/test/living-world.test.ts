@@ -53,3 +53,20 @@ describe("native pixel rendering and dynamic props",()=>{
   expect(worldPropForTheme("finalfantasy")).toBe("crystal");
  });
 });
+
+import { worldTimeForHour } from "@/components/world-atmosphere";
+describe("browser-local living room lighting",()=>{
+ it("selects morning, daytime, evening, and night with stable boundaries",()=>{
+  expect(worldTimeForHour(0)).toBe("night");
+  expect(worldTimeForHour(4)).toBe("night");
+  expect(worldTimeForHour(5)).toBe("morning");
+  expect(worldTimeForHour(9)).toBe("morning");
+  expect(worldTimeForHour(10)).toBe("day");
+  expect(worldTimeForHour(17)).toBe("day");
+  expect(worldTimeForHour(18)).toBe("evening");
+  expect(worldTimeForHour(21)).toBe("evening");
+  expect(worldTimeForHour(22)).toBe("night");
+  expect(worldTimeForHour(NaN)).toBe("day");
+  expect(worldTimeForHour(25)).toBe("night");
+ });
+});

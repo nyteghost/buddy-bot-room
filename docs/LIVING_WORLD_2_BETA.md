@@ -15,3 +15,7 @@ World characters now render directly at 32×32, with cached SVG runs, preserving
 ## Original Green Jacket character pack
 
 The first Character Library entry is a native 32px original design referencing the user's green/blue jacket character: bald crown, grey beard, red lanyard, lime upper jacket, cobalt blue lower jacket. It walks, waves and hides in a theme-matched hedge, rack or portal. The user can disable the visual-only pack from Pal Room. This is not a new AI agent or an imported animated GIF; expanding the library to user-supplied character asset packs and permissioned AI personalities remains a separate roadmap milestone.
+
+## Scene time of day
+
+Ambient room lighting now uses the viewer's browser-local hour to shift gently from morning through night; nighttime introduces small pixel stars. It runs at most once per minute while the room is active, with existing low-power and hidden-tab handling. It does not use location, remote weather, AI, or credentials. Weather-linked effects and true furniture interaction remain roadmap work.

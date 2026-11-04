@@ -2080,7 +2080,7 @@ export function Room() {
               }
             />
             {hell && <div className="hell-glow" aria-hidden />}
-            {livingWorld && <WorldAtmosphere theme={characterMode} />}
+            {livingWorld && <WorldAtmosphere theme={characterMode} active={roomOpen} />}
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}

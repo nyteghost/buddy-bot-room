@@ -2636,3 +2636,19 @@ html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosph
 @media(max-width:700px){.world-visitor{width:50px;height:73px;}.world-visitor-sprite{width:38px;height:50px;}.world-visitor-label{font-size:6px;}.world-visitor-hideout{transform:translate(-50%,-35%) scale(.7);}}
 html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{animation-play-state:paused!important;}
 @media(prefers-reduced-motion:reduce){.world-visitor,.world-visitor *,.world-visitor-hideout,.world-visitor-hideout *{animation:none!important;transition:none!important;}}
+
+/* Scene ambience changes with the viewer's local clock; no weather/geolocation requests. */
+.world-atmosphere{--world-timewash:transparent;}
+.world-atmosphere[data-world-time="morning"]{--world-timewash:rgba(255,199,98,.12);}
+.world-atmosphere[data-world-time="evening"]{--world-timewash:rgba(235,107,86,.16);}
+.world-atmosphere[data-world-time="night"]{--world-timewash:rgba(15,22,67,.24);}
+.world-atmosphere .world-timewash{inset:0;background:var(--world-timewash);transition:background-color 15s ease;opacity:1;}
+.world-atmosphere .world-night-stars{display:none;left:10%;top:13%;height:2px;width:2px;background:rgba(240,244,255,.55);box-shadow:70px 21px rgba(240,244,255,.65),153px 7px rgba(240,244,255,.48),232px 32px rgba(240,244,255,.60),310px 12px rgba(240,244,255,.5);animation:world-stars 7s steps(3) infinite alternate;}
+.world-atmosphere[data-world-time="night"] .world-night-stars{display:block;}
+@keyframes world-stars{from{opacity:.22;transform:translateY(0);}to{opacity:.9;transform:translateY(2px);}}
+/* Our original green jacket visitor waves his entire sprite as well as the spark. */
+.world-visitor[data-action="wave"] .world-visitor-sprite{transform-origin:50% 92%;animation:world-jacket-wave .65s steps(3) infinite alternate;}
+.world-visitor[data-action="idle"] .world-visitor-sprite{animation:world-jacket-idle 3s steps(4) infinite;}
+@keyframes world-jacket-wave{from{transform:rotate(-5deg) translateY(0);}to{transform:rotate(6deg) translateY(-2px);}}
+@keyframes world-jacket-idle{50%{transform:translateY(-2px);}}
+@media(prefers-reduced-motion:reduce){.world-atmosphere .world-night-stars,.world-visitor .world-visitor-sprite{animation:none!important;transition:none!important;}}

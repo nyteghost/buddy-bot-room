@@ -1,3 +1,9 @@
+## Beta — Living World clock-driven ambience
+
+- Add browser-local morning/day/evening/night ambient lighting and unobtrusive pixel stars at night, without extra network requests or personal location access.
+- Add a stepped full-body wave and idle breathing to the Green Jacket visitor, keeping low-power and reduced-motion controls.
+- Cover time-phase boundaries in unit tests.
+
 ## Beta — Green Jacket Living World character pack
 
 - Add a native 32px Green Jacket Guy original visual visitor inspired by the supplied reference: eight generated directional views, walking, waving and a bush-retreat signature loop.
