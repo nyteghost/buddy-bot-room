@@ -3,7 +3,7 @@ import { Download,Upload,Plus,Pencil,Trash2,Undo2,Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { worldCharacterPacks,greenJacketSprite,greenJacketPalette,type WorldPackId } from "@/lib/world-character-packs";
 import { guestSprite,guestPalette,type GuestId } from "@/lib/world-guest-packs";
-import { starterCustomCharacter,validateCustomCharacter,exportCustomCharacters,importCustomCharacters,MAX_ACTIVE_VISITORS,CUSTOM_WORLD_LIMIT,CUSTOM_WORLD_COLOR_KEYS,type WorldCustomCharacter } from "@/lib/world-custom-packs";
+import { starterCustomCharacter,validateCustomCharacter,exportCustomCharacters,importCustomCharacters,MAX_ACTIVE_VISITORS,CUSTOM_WORLD_LIMIT,CUSTOM_WORLD_FILE_LIMIT,CUSTOM_WORLD_COLOR_KEYS,type WorldCustomCharacter } from "@/lib/world-custom-packs";
 import { spriteRuns } from "@/lib/sprite-upscale";
 import { parseCharacterZip,CHARACTER_ZIP_MAX_BYTES,type ImportedCharacterZip } from "@/lib/character-zip";
 import { planCharacterAddonInstall } from "@/lib/character-addon";
@@ -116,7 +116,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
   const file=event.target.files?.[0];
   event.target.value="";
   if(!file)return;
-  if(file.size>120000){setMessage("The import is too large. Maximum 120 KB.");return;}
+  if(file.size>CUSTOM_WORLD_FILE_LIMIT){setMessage("The import exceeds the character library backup limit.");return;}
   const imported=importCustomCharacters(await file.text());
   if(!imported){setMessage("Invalid Character Universe JSON file. Only safe 32×32 data is accepted.");return;}
   let saved=0;
@@ -193,7 +193,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
     {customCharacters.map(c=>{
      const on=enabledIds.includes(c.id);
      return <article className="world-library-card" key={c.id}>
-      <WorldPixelPreview pixels={c.pixels} palette={c.palette} name={c.name}/>
+      {c.hd?<img className="world-library-preview world-library-hd" src={c.hd.idle[0]} width={256} height={256} alt={c.name+" high resolution pixel art"}/>:<WorldPixelPreview pixels={c.pixels} palette={c.palette} name={c.name}/>}
       <div className="min-w-0 flex-1"><strong className="text-xs">{c.name}</strong><p className="text-xs text-muted-foreground">{c.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p></div>
       <div className="world-library-card-controls">
        <Button size="sm" variant={on?"default":"outline"} aria-pressed={on} aria-label={(on?"Disable ":"Enable ")+c.name} onClick={()=>toggle(c.id)}>{on?"In room":"Add"}</Button>
