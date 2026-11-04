@@ -68,18 +68,28 @@ await step("create the first account", async () => {
   await page.locator('.modular-workspace[aria-busy="false"]').waitFor({ timeout: 45000 });
 });
 await step("Today is the opening window on desktop and mobile", async () => {
-  for(const width of [1500,390]) {
-    await page.setViewportSize({width,height:844});
-    await page.goto(URL_);
-    await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
-    const today=page.locator('[data-window-id="today"]');
-    await today.waitFor({state:'visible'});
-    if(await page.locator('.general-assistant').isVisible()) throw Error('General Chat replaced Today on startup');
-    if(width===390 && await page.locator('.mobile-tabbar button', {hasText:'Home'}).getAttribute('aria-pressed') !== 'true') throw Error('Home tab was not selected');
-    if(width===390) await page.screenshot({path:process.env.SMOKE_TODAY_SHOT || '/tmp/pixel-today-home.png'});
-    await page.locator('.workspace-sidebar .sidebar-item', {hasText:/^\s*Today\s*$/}).evaluate(button=>button.click());
+  // A failed mobile assertion must not strand the rest of the desktop suite at phone width.
+  try {
+    for(const width of [1500,390]) {
+      await page.setViewportSize({width,height:844});
+      await page.goto(URL_);
+      await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
+      const today=page.locator('[data-window-id="today"]');
+      await today.waitFor({state:'visible'});
+      if(await page.locator('.general-assistant').isVisible()) throw Error('General Chat replaced Today on startup');
+      if(width===390) {
+        // The mobile tab state is restored by a React effect after the workspace mounts.
+        const home = page.locator('.mobile-tabbar button', {hasText:'Home'});
+        await home.waitFor({state:'visible'});
+        const selected = await page.waitForFunction(() => document.querySelector('.mobile-tabbar button:first-child')?.getAttribute('aria-pressed') === 'true',undefined,{timeout:12000}).catch(()=>null);
+        if(!selected) throw Error('Home tab was not selected');
+        await page.screenshot({path:process.env.SMOKE_TODAY_SHOT || '/tmp/pixel-today-home.png'});
+      }
+      // Do not toggle Today closed while verifying it starts open; that mutates saved UI state.
+    }
+  } finally {
+    await page.setViewportSize({width:1500,height:900});
   }
-  await page.setViewportSize({width:1500,height:900});
 });
 await step("Adaptive Today launch, parking and cross-device persistence",async()=>{
   page.setDefaultTimeout(20000);
