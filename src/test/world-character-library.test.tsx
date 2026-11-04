@@ -1,10 +1,12 @@
-import { render,fireEvent,screen } from "@testing-library/react";
+import { render,fireEvent,screen,act } from "@testing-library/react";
 import {describe,expect,it,vi} from "vitest";
 import {WorldCharacterLibrary} from "@/components/world-character-library";
 import {WorldGuest} from "@/components/world-guest";
 import {WorldCustomGuest} from "@/components/world-custom-guest";
 import {GreenJacketVisitor} from "@/components/world-visitor";
 import {starterCustomCharacter} from "@/lib/world-custom-packs";
+import {parseCharacterZip} from "@/lib/character-zip";
+vi.mock("@/lib/character-zip",()=>({CHARACTER_ZIP_MAX_BYTES:8*1024*1024,parseCharacterZip:vi.fn()}));
 describe("Character Universe in-app Library",()=>{
  it("lists Goku, Homer, originals and can add an optional visual visitor",()=>{
   const toggle=vi.fn(),save=vi.fn().mockResolvedValue(true),remove=vi.fn().mockResolvedValue(true);
@@ -14,6 +16,20 @@ describe("Character Universe in-app Library",()=>{
   expect(screen.getByText("Homer · Fan Tribute")).toBeTruthy();
   fireEvent.click(screen.getByRole("button",{name:"Enable Goku · Fan Tribute"}));
   expect(toggle).toHaveBeenCalledWith("goku",true);
+  view.unmount();
+ });
+ it("chooses a ZIP, previews a character and only installs after approval",async()=>{
+  const character=starterCustomCharacter(),install=vi.fn().mockResolvedValue(true);
+  vi.mocked(parseCharacterZip).mockResolvedValueOnce({name:"Test ZIP",characters:[character]});
+  const view=render(<WorldCharacterLibrary enabledIds={[]} customCharacters={[]} syncStatus="Saved on Unraid"
+   onToggle={()=>{}} onSave={async()=>true} onInstallPack={install} onDelete={async()=>true}/>);
+  fireEvent.click(view.container.querySelector("details > summary")!);
+  const file=new File(["ZIP"],"test.zip",{type:"application/zip"});
+  await act(async()=>{fireEvent.change(screen.getByLabelText("Choose character ZIP file"),{target:{files:[file]}});});
+  expect(screen.getByText("Test ZIP · 256×256 character preview")).toBeTruthy();
+  expect(install).not.toHaveBeenCalled();
+  await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Approve & install 1 character(s)"}));});
+  expect(install).toHaveBeenCalledWith([character]);
   view.unmount();
  });
  it("opens the editor for original safe 32px art",()=>{
