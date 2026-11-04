@@ -301,13 +301,18 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
     throw Error("Living Task Board did not preload the selected task");
   }
   await dialog.getByRole("button", { name: "Close" }).click();
+  // Living World defaults to Playful; exercise both states before verifying animation.
+  if (await mood.getByRole("button", { name: "Switch Pal Room to Calm" }).count()) {
+    await mood.getByRole("button", { name: "Switch Pal Room to Calm" }).click();
+  }
   await mood.getByRole("button", { name: "Switch Pal Room to Playful" }).click();
   await mood.getByRole("group", { name: "What the Pals are doing" }).getByText(/Tinkering with a computer/).waitFor();
   if (await page.evaluate(() => localStorage.getItem("pixel-pals-room-playful-v1")) !== "1") throw Error("Playful preference wasn't saved");
-  const rig = page.locator('.room-scene .pal-rig').first();
+  const rig = page.locator('.room-scene .world-native-sprite').first();
   await rig.waitFor({ state: "visible" });
+  if (await rig.getAttribute("viewBox") !== "0 0 32 32") throw Error("Living World lost native 32px pixel models");
   const animated = await rig.evaluate(e => e.getAnimations({ subtree: true }).some(animation => animation.playState === "running"));
-  if (!animated) throw Error("Playful Pal poses are not animating");
+  if (!animated) throw Error("Playful Living World poses are not animating");
   await page.emulateMedia({ reducedMotion: "reduce" });
   if (await rig.evaluate(e => e.getAnimations({ subtree: true }).some(animation => animation.playState === "running"))) throw Error("Reduced motion kept a decorative pose running");
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -315,7 +320,7 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   await page.screenshot({ path: "/tmp/pixel-pals-playful.png" });
   await page.getByRole("combobox", { name: "Theme", exact: true }).click();
   await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
-  await page.locator(".office-walking:not(.pal-away) .pal-rig").first().waitFor();
+  await page.locator(".office-walking:not(.pal-away) .world-native-sprite").first().waitFor();
   const walkingPal = page.locator(".office-walking:not(.pal-away)").first();
   const beforeWalk = await walkingPal.getAttribute("style");
   await page.waitForTimeout(500);
