@@ -59,6 +59,10 @@ describe("Living World cosmetic event framework",()=>{
   for(let i=2;i<5;i++)q=enqueueWorldEvent(q,{...event,id:"world-"+i,at:i},policy);
   expect(q.map(x=>x.id)).toEqual(["world-3","world-4"]);
   expect(enqueueWorldEvent(q,{...event,id:"world-5"},{...policy,reducedMotion:true})).toEqual(q);
+  expect(enqueueWorldEvent(q,{...event,id:"world-5",kind:"execute-tool" as "wave"},policy)).toEqual(q);
+  expect(enqueueWorldEvent(q,{...event,id:"world-6",actorId:"unknown"},policy)).toEqual(q);
+  expect(enqueueWorldEvent(q,event,{...policy,enabledIds:[]})).toEqual([]);
+  expect(enqueueWorldEvent([{...event,id:"world-unsafe",kind:"execute-tool" as "wave"}],event,policy)).toEqual([event]);
  });
 });
 
