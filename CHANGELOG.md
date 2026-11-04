@@ -1,3 +1,10 @@
+## Beta — Character Universe guest roster
+
+- Add eight optional, original native-32px visual guest sprites: fan-created Goku and Homer tributes, Moon Mage, Arcade Ghost, Space Ranger, Pixel Robot, Tiny Dragon and Dungeon Knight.
+- Visitors roam independently using collision-aware scene routes, wave on click and animate four-frame directional gestures; none invoke AI providers or external commands.
+- Keep Green Jacket Guy as the default visitor; all new guests are opt-in via Character Library, minimizing clutter on mobile.
+- Add artwork, palette, animation and furniture collision tests.
+
 ## Beta — Character Universe four-frame action atlas
 
 - Generate native 32px action frames for every current Pal in every theme: eight headings, four phases, and nine action types (walk, idle, look, wave, stretch, talk, work, rest, celebration).

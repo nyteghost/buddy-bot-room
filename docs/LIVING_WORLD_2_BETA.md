@@ -27,3 +27,7 @@ Dedicated walkable floor plans and collision zones now exist for each theme. Pal
 ## Animated character atlas
 
 All nine established AI Pal identities now have complete generated per-theme animation atlases: eight directions, nine gestures and four frame phases, rendered at native 32×32. The base models are distinct authored pixel silhouettes; gesture and direction frames are synthesized by original pixel-geometry rules (not 2,880 independently hand-painted PNG images). Classic portrait assets remain unchanged. More elaborate hand-painted/cinematic animation packs may be offered later without replacing this feature.
+
+## Expanded fan and original character roster
+
+The optional visual roster now includes two **unofficial, original pixel-art fan tributes** (Goku and Homer), plus six original theme-flexible guest designs (Moon Mage, Arcade Ghost, Space Ranger, Pixel Robot, Tiny Dragon and Dungeon Knight). They travel obstacle-aware routes, wave when clicked, and contain no AI model, tool permission or external assets. Green Jacket remains the only enabled-by-default guest; additional guests are opt-in in Character Library.

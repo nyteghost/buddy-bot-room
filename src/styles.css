@@ -2652,3 +2652,17 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
 @keyframes world-jacket-wave{from{transform:rotate(-5deg) translateY(0);}to{transform:rotate(6deg) translateY(-2px);}}
 @keyframes world-jacket-idle{50%{transform:translateY(-2px);}}
 @media(prefers-reduced-motion:reduce){.world-atmosphere .world-night-stars,.world-visitor .world-visitor-sprite{animation:none!important;transition:none!important;}}
+
+/* Character Universe: independent visual-only guest sprite packs. */
+.world-guest{
+ position:absolute;left:var(--world-guest-x);top:var(--world-guest-y);z-index:5;transform:translate(-50%,-50%);
+ width:70px;min-height:83px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+ border:0;background:transparent;padding:0;cursor:pointer;transition:left .12s linear,top .12s linear;
+}
+.world-guest:focus-visible{outline:2px dashed var(--primary);outline-offset:3px;border-radius:8px;}
+.world-guest-pixels{height:64px;width:52px;image-rendering:pixelated;filter:drop-shadow(0 2px 0 rgba(0,0,0,.35));}
+.world-guest-name{display:block;max-width:106px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ font:8px "Silkscreen",monospace;background:rgba(19,26,36,.84);color:#fff;padding:2px 4px;border-radius:2px;}
+.world-guest-spark{position:absolute;right:2px;top:3px;color:#ffed69;font-size:17px;animation:world-visitor-wave .7s steps(3) infinite alternate;}
+@media(max-width:700px){.world-guest{width:50px;min-height:59px}.world-guest-pixels{width:37px;height:47px}.world-guest-name{font-size:6px;max-width:70px;}}
+@media(prefers-reduced-motion:reduce){.world-guest,.world-guest *{transition:none!important;animation:none!important;}}

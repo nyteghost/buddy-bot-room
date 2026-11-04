@@ -71,6 +71,8 @@ import { LIVING_WORLD_KEY, HOME_LAYOUT_KEY, livingWorldFromValue } from "@/lib/l
 import { WORKSPACE_LAYOUT_EVENT, presetWindowRects } from "@/lib/workspace";
 import { WorldAtmosphere } from "./world-atmosphere";
 import { GreenJacketVisitor } from "./world-visitor";
+import { WorldGuest } from "./world-guest";
+import { guestIds } from "@/lib/world-guest-packs";
 import { WORLD_PACKS_KEY, DEFAULT_WORLD_PACKS, readWorldPacks, type WorldPackId } from "@/lib/world-character-packs";
 import "./pal-room-cues.css";
 import type { FocusSession } from "@/lib/focus-companion";
@@ -2086,6 +2088,7 @@ export function Room() {
             )}
             <RoomLive active={roomOpen} running={running} theme={characterMode} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} />}
+            {livingWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} active={roomOpen&&palRoomPlayful} theme={characterMode}/>)}
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />

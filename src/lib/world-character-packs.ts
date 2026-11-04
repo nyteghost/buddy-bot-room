@@ -5,6 +5,14 @@ import { easeWalk } from "./pal-motion";
 export const WORLD_PACKS_KEY = "pixel-pals-world-character-packs-v1";
 export const worldCharacterPacks = [
   { id: "green-jacket", name: "Green Jacket Guy", description: "Walks, waves, and occasionally disappears into the scenery." },
+  { id: "goku", name: "Goku · Fan Tribute", description: "Orange-gi anime fighter who trains, waves and celebrates. Unofficial original pixel art." },
+  { id: "homer", name: "Homer · Fan Tribute", description: "A donut-loving yellow cartoon dad. Unofficial original pixel art." },
+  { id: "moon-mage", name: "Moon Mage", description: "A hooded celestial wizard with glowing spells." },
+  { id: "arcade-ghost", name: "Arcade Ghost", description: "A mischievous neon ghost from the retro arcade." },
+  { id: "space-ranger", name: "Space Ranger", description: "A sci-fi explorer with a helmet and visor." },
+  { id: "pixel-robot", name: "Pixel Robot", description: "A friendly mechanical walker with blinking displays." },
+  { id: "tiny-dragon", name: "Tiny Dragon", description: "A small dragon that likes to greet the other Pals." },
+  { id: "dungeon-knight", name: "Dungeon Knight", description: "A heroic armored adventurer with a tiny shield." },
 ] as const;
 export type WorldPackId = (typeof worldCharacterPacks)[number]["id"];
 export const DEFAULT_WORLD_PACKS: WorldPackId[] = ["green-jacket"];
