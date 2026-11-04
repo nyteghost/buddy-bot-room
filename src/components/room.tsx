@@ -168,7 +168,7 @@ import { setVoiceSettings, speakItems, stopSpeaking, useSpeakingId, useVoice, vo
 import { plexMarkdown, watchTopic, type PlexItem } from "@/lib/plex";
 import { parseSeerr, type SeerrQuery } from "@/lib/seerr";
 import { hitsMarkdown, researchTopic, type SearchHit } from "@/lib/search";
-import { RoomLive } from "@/components/room-live";
+import { RoomLive, type RoomTarget } from "@/components/room-live";
 import { awardXp } from "@/lib/progress-store";
 import { UsageMeter } from "@/components/usage-panel";
 import { calendarText, dayWant, mailText, tasksText, wantsAny } from "@/lib/day-context";
@@ -385,7 +385,7 @@ export function Room() {
   const [palRoomPlayful, setPalRoomPlayful] = useState(true);
   const [livingWorld, setLivingWorld] = useState(true);
   const [worldSky,setWorldSky]=useState<Sky>("clear");
-  const [worldCue,setWorldCue]=useState<{action:"wave"|"celebrate";id?:AgentId;at:number}|null>(null);
+  const [worldCue,setWorldCue]=useState<({action:"wave"|"celebrate";id?:AgentId;at:number}|{action:"inspect-prop";targetId:RoomTarget;id?:AgentId;at:number})|null>(null);
   const cue=(action:"wave"|"celebrate",id?:AgentId)=>setWorldCue({action,...(id?{id}:{}),at:Date.now()});
   useEffect(()=>{if(!worldCue)return;const timer=window.setTimeout(()=>setWorldCue(null),2600);return()=>window.clearTimeout(timer);},[worldCue]);
   const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor}=useWorldCharacterUniverse();
@@ -2088,7 +2088,7 @@ export function Room() {
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}
-            <RoomLive active={roomOpen} running={running} theme={characterMode} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
+            <RoomLive active={roomOpen} running={running} theme={characterMode} onInspect={(target)=>{if(livingWorld && roomOpen)setWorldCue({action:"inspect-prop",targetId:target,at:Date.now()});}} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})} />}
             {livingWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
             {livingWorld && worldUniverse.characters.filter(c=>enabledWorldPacks.includes(c.id)).map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
@@ -2102,7 +2102,7 @@ export function Room() {
               </span>
             </div>
             {agents.map((a, i) => (livingWorld || assistantOn) ? (
-              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} world={livingWorld} cue={worldCue && (!worldCue.id || worldCue.id===a.id) ? worldCue.action : undefined} onInteract={()=>cue("wave",a.id)}/>
+              <OfficePal key={a.id} id={a.id} index={i} mode={characterMode} active={(running && speaking === a.id) || (!!focusCompanion && !focusBreak && focusCompanion.pal === a.id)} enabled={enabled.includes(a.id) || focusCompanion?.pal === a.id} playful={palRoomPlayful} visible={roomOpen} world={livingWorld} cue={worldCue && (!worldCue.id || worldCue.id===a.id) ? worldCue.action==="inspect-prop" ? "look" : worldCue.action : undefined} onInteract={()=>cue("wave",a.id)}/>
             ) : (
               <div
                 key={a.id}
