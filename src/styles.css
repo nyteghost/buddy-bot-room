@@ -2561,3 +2561,20 @@ html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosph
  .workspace-window.window-today:not(.window-sized):not(.window-expanded){left:var(--window-x,0px);top:var(--window-y,0px);width:50%;height:100%;}
  .workspace-window.window-room:not(.window-sized):not(.window-expanded){left:var(--window-x,50%);top:var(--window-y,0px);width:50%;height:100%;}
 }
+
+/* Focus Assist stays accessible while moving through other windows; its small
+   dock avoids covering workspace controls on both desktop and phones. */
+.focus-companion.focus-companion-minimized{
+  width:min(184px,calc(100vw - 24px));
+  max-height:none;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:6px;
+  padding:8px;
+  box-shadow:0 4px 20px rgb(0 0 0 / 20%);
+}
+.focus-companion-minimized > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@media(max-width:700px){
+  .modular-workspace .focus-companion-minimized{width:148px;right:8px;bottom:calc(65px + env(safe-area-inset-bottom));}
+}

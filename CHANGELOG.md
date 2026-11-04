@@ -1,3 +1,8 @@
+## Beta — Focus Assist nonmodal dock correction
+
+- Auto-minimize the optional floating Focus Assist companion when switching workspace windows; it can be reopened without losing the current step, model selection, or saved checkpoint.
+- Prevent an expanded companion from blocking Pal Room quests, Focus Food and other windows. Extend browser regression to test the dock transition.
+
 ## Beta — Living World 2 first increment
 
 - Default existing Pal themes to animated Living World, preserving a device-local Classic switch.

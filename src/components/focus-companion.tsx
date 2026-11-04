@@ -26,6 +26,19 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   const {adaptive}=useAdaptiveToday();
   const checkpointId=useRef("");
   const [syncNote,setSyncNote]=useState("");
+  const [minimized,setMinimized]=useState(false);
+  useEffect(()=>{
+    if(!session){setMinimized(false);return;}
+    // The companion is nonmodal: navigating to a workspace must never leave
+    // a tall floating panel covering the destination controls.
+    const onNavigate=(event:PointerEvent)=>{
+      const target=event.target;
+      if(!(target instanceof Element)||target.closest(".focus-companion"))return;
+      if(target.closest(".workspace-window, .workspace-sidebar, .mobile-tabbar, .mobile-more-menu"))setMinimized(true);
+    };
+    document.addEventListener("pointerdown",onNavigate,true);
+    return()=>document.removeEventListener("pointerdown",onNavigate,true);
+  },[session]);
   useEffect(()=>{checkpointId.current="";},[session?.task]);
   useEffect(()=>{
     if(!session)return;
@@ -148,6 +161,10 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
   if (!session) return null;
   const pal = agents.find((a) => a.id === session.pal);
   const name = agentName(session.pal, false, false, theme);
+  if(minimized)return <aside className="focus-companion focus-companion-minimized" aria-label="Focus Assist work companion">
+    <span className="text-xs font-semibold">{name} · Step {session.stepNumber}</span>
+    <Button size="sm" variant="outline" aria-label="Expand Focus Assist" onClick={()=>setMinimized(false)}>Open companion</Button>
+  </aside>;
   return (
     <aside className="focus-companion" aria-label="Focus Assist work companion">
       <div className="flex items-start gap-2">
@@ -157,6 +174,7 @@ export function FocusCompanion({ session, onChange, paused = false, onPauseChang
           <p className="text-xs text-muted-foreground">{pal?.role} · Illustrated body double</p>
           <div className="focus-companion-activity"><span className="focus-companion-pulse" /> {paused ? "Taking a break with you" : companionActivity(session.task)}</div>
         </div>
+        <Button variant="ghost" size="sm" aria-label="Minimize Focus Assist" title="Minimize Focus Assist" onClick={() => setMinimized(true)}>Minimize</Button>
         <Button variant="ghost" size="sm" aria-label="Pause companion" title="Pause companion" onClick={() => { pending.current?.abort(); onChange(null); }}><X className="size-4" /></Button>
       </div>
       <p className="text-xs font-semibold text-muted-foreground">{paused ? "On a break from" : "Working alongside you on"}</p>

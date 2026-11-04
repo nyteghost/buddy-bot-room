@@ -252,12 +252,15 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await quest.getByText(/decorating a cozy corner/).waitFor();
   await activity.getByRole("button", { name: "Break together" }).click();
   await activity.getByRole("button", { name: "I'm back" }).waitFor();
+  await companion.getByRole("button", { name: "Expand Focus Assist" }).click();
   if (await companion.getByRole("button", { name: "Done with step" }).isEnabled()) throw Error("Work step wasn't paused during a break");
   await activity.getByRole("button", { name: "I'm back" }).click();
   await activity.getByText(/Byte is working beside you/).waitFor();
+  await companion.getByRole("button", { name: "Expand Focus Assist" }).click();
   await companion.getByRole("button", { name: "Done with step" }).click();
   await activity.getByRole("region", { name: "Tiny wins" }).getByText(/You showed up/).waitFor();
   await roomEntry.click();
+  await companion.getByRole("button", { name: "Expand Focus Assist" }).click();
   await companion.getByText("Check the next event.").waitFor();
   await companion.getByText(/Step 3 · Your next tiny step/).waitFor();
   await companion.getByRole("button", { name: "Save my place" }).click();
