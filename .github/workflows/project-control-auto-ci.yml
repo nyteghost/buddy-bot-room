@@ -1,0 +1,56 @@
+name: Project Control Auto CI
+on:
+  push:
+    branches:
+      - project-control-auto-v1
+    paths:
+      - 'project-control/**'
+      - '.github/workflows/project-control-auto-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-package-and-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the published installer payload and syntax
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat project-control/payload/part0*.b64 | base64 --decode > package.tar.xz
+          echo '1d5f96f0f96f1128bd144dcebcb045e8a084b88e375472257b4c3778689fa11c  package.tar.xz' | sha256sum -c -
+          mkdir source
+          tar -xJf package.tar.xz -C source
+          python3 -m compileall -q source/app
+          bash -n project-control/install-unraid.sh source/scripts/setup-local.sh source/scripts/start-unraid.sh
+      - name: Build image and verify authenticated HTTP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd source
+          docker build -t project-control-auto:ci .
+          mkdir -p data
+          chmod 777 data
+          docker run --detach --name pcc-ci --read-only --user 1000:1000 \
+            --tmpfs /tmp:size=16m,mode=1777 --cap-drop ALL \
+            --security-opt no-new-privileges \
+            -p 127.0.0.1:18788:8788 \
+            --volume "$PWD/data:/app/data:rw" \
+            --env PCC_DASHBOARD_PASSWORD='ci-only-test-password' \
+            project-control-auto:ci
+          ready=0
+          for attempt in {1..25}; do
+            if curl --fail --silent --show-error -u admin:ci-only-test-password http://127.0.0.1:18788/api/health | grep -q '"service": "ready"'; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != 1 ]]; then docker logs pcc-ci; exit 1; fi
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18788/api/status)
+          [[ "$code" == 401 ]] || { echo "Expected HTTP 401 without credentials, got $code"; exit 1; }
+          docker rm --force pcc-ci
