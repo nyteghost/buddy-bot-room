@@ -61,3 +61,29 @@ describe("Living World cosmetic event framework",()=>{
   expect(enqueueWorldEvent(q,{...event,id:"world-5"},{...policy,reducedMotion:true})).toEqual(q);
  });
 });
+
+describe("Living World event-to-sprite reaction resolver",()=>{
+ it("maps each cosmetic event to existing four-frame actions deterministically",async()=>{
+  const {worldReactionAt}=await import("@/lib/world-character-packs");
+  const policy={enabledIds:["green-jacket"],knownIds:["green-jacket","moon-mage"],interactiveProps:["arcade"],reducedMotion:false};
+  const kinds=[["wave","wave"],["celebrate","celebrate"],["inspect-prop","look"],["greet","talk"]] as const;
+  for(const [kind,action] of kinds){
+   const event={id:"world-reaction",actorId:"green-jacket",kind,at:1000,...(kind==="inspect-prop"?{targetId:"arcade"}:kind==="greet"?{targetId:"moon-mage"}:{})};
+   expect(worldReactionAt([event],"green-jacket",1000,policy)?.action).toBe(action);
+   expect(worldReactionAt([event],"green-jacket",2199,policy)?.frame).toBe(2);
+   expect(worldReactionAt([event],"green-jacket",2599,policy)?.frame).toBe(3);
+   expect(worldReactionAt([event],"green-jacket",2600,policy)).toBeNull();
+   expect(worldReactionAt([event],"green-jacket",999,policy)).toBeNull();
+  }
+ });
+ it("ignores disabled, malformed, future, expired and reduced-motion reactions",async()=>{
+  const {worldReactionAt}=await import("@/lib/world-character-packs");
+  const policy={enabledIds:["green-jacket"],knownIds:["green-jacket"],interactiveProps:[],reducedMotion:false};
+  const valid={id:"world-wave",actorId:"green-jacket",kind:"wave" as const,at:1000};
+  expect(worldReactionAt([valid],"green-jacket",1100,policy)?.eventId).toBe(valid.id);
+  expect(worldReactionAt([{...valid,kind:"execute-tool" as "wave"}],"green-jacket",1100,policy)).toBeNull();
+  expect(worldReactionAt([valid],"green-jacket",1100,{...policy,enabledIds:[]})).toBeNull();
+  expect(worldReactionAt([valid],"green-jacket",1100,{...policy,reducedMotion:true})).toBeNull();
+  expect(worldReactionAt([valid],"green-jacket",Infinity,policy)).toBeNull();
+ });
+});
