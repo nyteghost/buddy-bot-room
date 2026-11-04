@@ -85,3 +85,18 @@ export function worldSpriteAtlas(front:readonly string[],chest=false):Record<str
   atlas[dir+":"+action+":"+frame]=worldAnimatedFrame(front,dir,action,frame,chest);
  return atlas;
 }
+
+/**
+ * Render a validated local cosmetic reaction through the existing animation atlas.
+ * No event producer, network access, permission escalation or persistent state.
+ * Callers may pass null to preserve their normal idle/walk animation.
+ */
+export function worldReactionFrame(
+ front:readonly string[],facing:Facing,
+ reaction:import("./world-character-packs").WorldReaction|null,
+ fallbackAction:PalMotion="idle",fallbackFrame=0,chest=false
+):string[] {
+ const action=reaction?.action??fallbackAction;
+ const frame=reaction?.frame??fallbackFrame;
+ return worldAnimatedFrame(front,facing,action,frame,chest);
+}
