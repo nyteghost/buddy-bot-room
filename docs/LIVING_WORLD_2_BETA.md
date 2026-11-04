@@ -47,3 +47,9 @@ In Pal Room activities, **Wave to everyone** and **Celebrate together** keep the
 These reactions reuse the existing local four-frame sprite atlas. They expire after 1.6 seconds, accept only validated cosmetic cues, and are suppressed by reduced-motion or low-power preferences. No new chat messages, Ollama calls, Discord events, Obsidian notes, memories, tasks, external requests or AI permissions are created.
 
 This integration adds unit and React rendering tests, but it **is not a claim of a fully completed Living Universe**. TypeScript, CI, production-equivalent build, browser smoke and iPhone/desktop appearance must pass before deploying a new beta image. The extended inspect-prop/greet event kinds and separate AI-identity permissions are not connected to user actions yet.
+
+## Beta: reacting to existing room objects
+
+Click or keyboard-activate the window, mailbox, calendar, task board, or server inside Pal Room to open that tool as before. In **Living World** mode, the click also sends a brief, purely decorative inspect cue: original Pals look toward the object, and enabled visual visitors use their four-frame look animation. The cues do not carry mail, calendar, server data, credentials, or AI requests to the characters.
+
+Only the five built-in room targets are allowed; unrecognized object names are rejected. Reduced-motion and low-power preferences suppress guest effects. No additional permissions or automatic tasks/memories are created. This increment requires successful beta CI, build, browser smoke and Docker publication, followed by visual QA on desktop and iPhone before production deployment.
