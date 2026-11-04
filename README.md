@@ -916,3 +916,7 @@ Repo Watch includes an opt-in daily (03:00 Eastern by default) project change mo
 ### Living World 2 beta
 
 Pal Room defaults to animated **Living World** with all existing themes. Switch to **Classic** in Pal Room activities to restore the previous room presentation. On desktop, the default Home workspace opens **Today left / Pal Room right**; on phones it opens Today as a full-screen tab. Choose **Home · Today + Pal Room** under Window layouts to restore the split manually. This first release uses synthesized directional pixel art and animated ambience, with bespoke character sheets and dynamic furniture still on the roadmap. See [Living World 2](docs/LIVING_WORLD_2_BETA.md).
+
+### Character Universe (beta)
+
+Living World has a Character Universe menu inside Pal Room activities. It includes the original AI Pals plus optional animated visitor packs (Green Jacket Guy, original Goku/Homer fan tributes and six other original guests), 32×32 Character Creator, palette editor and JSON import/export. The owner account can sync guest selections and custom artwork through the persistent /data volume without exposing secrets or granting characters AI permissions. No extra Docker services or volumes are needed. The older Classic Pal Room is available via the World mode toggle. [Full guide](docs/LIVING_WORLD_2_BETA.md).

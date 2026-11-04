@@ -1,3 +1,10 @@
+## Beta — complete Character Universe editor and Unraid-backed library
+
+- Integrate a 32×32 pixel Character Creator with eraser, named palette colors, preview, edit, save, delete and safe JSON import/export.
+- Add owner-only, revision-checked Character Universe API to persist original custom characters and selected visitors on the existing BUDDY_DATA_DIR volume. Validate every glyph/palette and restrict custom art to data only; no executable SVG/JS, fetches, or AI permissions.
+- Show created characters as native animated residents with collision-aware paths, responsive guest controls and a six-at-once cap. Browser-local backup remains available if Unraid sync fails.
+- Preserve existing chat/AI agent roster, recordings, Obsidian vault and Discord settings. New guests are purely cosmetic.
+
 ## Beta — Character Universe guest roster
 
 - Add eight optional, original native-32px visual guest sprites: fan-created Goku and Homer tributes, Moon Mage, Arcade Ghost, Space Ranger, Pixel Robot, Tiny Dragon and Dungeon Knight.

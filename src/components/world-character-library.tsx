@@ -122,7 +122,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
  return <details className="world-character-library">
   <summary>Character Universe · {worldCharacterPacks.length} built-in visitors · {customCharacters.length} creations · {active} active</summary>
   <div className="world-library-body">
-   <p className="text-xs text-muted-foreground">Choose who walks around your Living World. All guests are **visual only**; your existing AI Pals stay unchanged. Tap a guest in the room to wave.</p>
+   <p className="text-xs text-muted-foreground">Choose who walks around your Living World. All guests are visual only; your existing AI Pals stay unchanged. Tap a guest in the room to wave.</p>
    <p role="status" className="text-xs text-muted-foreground">{syncStatus}</p>
    <div className="world-library-controls">
     <Button type="button" variant="outline" size="sm" disabled={customCharacters.length>=CUSTOM_WORLD_LIMIT} onClick={()=>setEditor(starterCustomCharacter())}><Plus className="size-3.5"/>Create character</Button>

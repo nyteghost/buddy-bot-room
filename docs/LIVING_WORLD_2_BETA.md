@@ -31,3 +31,7 @@ All nine established AI Pal identities now have complete generated per-theme ani
 ## Expanded fan and original character roster
 
 The optional visual roster now includes two **unofficial, original pixel-art fan tributes** (Goku and Homer), plus six original theme-flexible guest designs (Moon Mage, Arcade Ghost, Space Ranger, Pixel Robot, Tiny Dragon and Dungeon Knight). They travel obstacle-aware routes, wave when clicked, and contain no AI model, tool permission or external assets. Green Jacket remains the only enabled-by-default guest; additional guests are opt-in in Character Library.
+
+## Custom Character Creator and cross-device Library
+
+The Character Universe now provides a 32×32 pixel editor, color palette, live preview, editable names, save/delete, and safe data-only JSON import/export. A built-in catalog of nine visual guests can be enabled/disabled with a six-visitor limit. A signed-in **owner** can save custom characters and enabled selection to BUDDY_DATA_DIR/character-universe.json through an authenticated, revision-checked API. Local browser copies remain usable as offline backups; if sync fails the UI clearly reports browser-local-only status. Files never execute scripts or load external assets. Character packs remain decorative and cannot add AI providers, memory or tool access. Existing nine AI Pal identities and Classic mode are preserved.
