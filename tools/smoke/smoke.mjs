@@ -253,8 +253,15 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   await companion.getByRole("textbox", { name: "Pal draft to review and copy" }).waitFor();
   if (!(await companion.getByRole("textbox", { name: "Pal draft to review and copy" }).inputValue()).includes("Review the first shift")) throw Error("Pal didn't prepare sample work");
   await page.unroute("**/api/pal-work");
+  // Focus Assist and the open chat can cover room controls. Navigate using the
+  // actual visible UI, and minimize the companion before interacting with the room.
+  const myPalsEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*My Pals\s*$/i });
+  if (await myPalsEntry.getAttribute("aria-pressed") === "true") await myPalsEntry.click();
   const roomEntry = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomEntry.getAttribute("aria-pressed") !== "true") await roomEntry.click();
+  const minimizeCompanion = companion.getByRole("button", { name: "Minimize Focus Assist" });
+  if (await minimizeCompanion.count()) await minimizeCompanion.click();
+  await companion.getByRole("button", { name: "Expand Focus Assist" }).waitFor();
   const activity = page.getByRole("region", { name: "Pal Room activities" });
   await activity.getByText(/Byte is working beside you/).waitFor();
   const quest = page.getByRole("region", { name: "Tiny Quest Corner" });
@@ -1087,7 +1094,9 @@ await step("General Chat shows an early reply on desktop/mobile and Stop keeps p
   for (const width of [1500,390]) {
     await page.setViewportSize({width,height:844});
     await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).fill('Streaming fixture verification '+width);
-    const finished=page.waitForRequest(r=>r.url().endsWith('/api/assistant')&&r.postDataJSON()?.op==='ask');
+    // Attach a rejection handler immediately: a preceding UI assertion can fail
+    // before this watcher is awaited, and must not crash the entire smoke process.
+    const finished=page.waitForRequest(r=>r.url().endsWith('/api/assistant')&&r.postDataJSON()?.op==='ask').catch(()=>null);
     await chat.getByRole('button',{name:'Send question',exact:true}).click();
     const preview=chat.getByTestId('assistant-stream-preview');
     await preview.getByText('Early streaming fixture reply.',{exact:true}).waitFor();
@@ -1097,6 +1106,7 @@ await step("General Chat shows an early reply on desktop/mobile and Stop keeps p
       await preview.waitFor({state:'hidden'});
       await chat.getByText('Answer stopped. Your draft is kept; completed history is unchanged.',{exact:true}).waitFor();
       const stopped=await finished;
+      if(!stopped)throw Error('General Chat did not send the expected request before Stop');
       const id=stopped.postDataJSON().id;
       const saved=await (await page.request.get(URL_+'/api/assistant?id='+id)).json();
       if(saved.conversation.messages.some(m=>m.role==='assistant'&&m.parts.some(p=>p.text?.includes('Early streaming fixture')))) throw Error('Stopped preview was persisted');
@@ -1105,7 +1115,9 @@ await step("General Chat shows an early reply on desktop/mobile and Stop keeps p
       await page.locator('[data-window-id="general-chat"]').getByRole('button',{name:'Hide General Chat',exact:true}).click();
       await page.evaluate(() => window.dispatchEvent(new Event('pixelpals:general-chat')));
       await preview.waitFor();
-      const result=await assistantResult(await finished);
+      const completed=await finished;
+      if(!completed)throw Error('General Chat did not send the expected streaming request');
+      const result=await assistantResult(completed);
       if(!result.conversation.messages.at(-1).parts[0].text.includes('Complete streaming fixture reply.')) throw Error('Stream completion was not saved');
       await preview.waitFor({state:'hidden'});
       if(await chat.getByRole('textbox',{name:'Ask Anything',exact:true}).inputValue()!=='Next question drafted while streaming') throw Error('Stream completion discarded a follow-up draft');
