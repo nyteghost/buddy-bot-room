@@ -8,7 +8,7 @@ import {starterCustomCharacter} from "@/lib/world-custom-packs";
 describe("Character Universe in-app Library",()=>{
  it("lists Goku, Homer, originals and can add an optional visual visitor",()=>{
   const toggle=vi.fn(),save=vi.fn().mockResolvedValue(true),remove=vi.fn().mockResolvedValue(true);
-  const view=render(<WorldCharacterLibrary enabledIds={["green-jacket"]} customCharacters={[]} syncStatus="Saved on Unraid" onToggle={toggle} onSave={save} onDelete={remove}/>);
+  const view=render(<WorldCharacterLibrary enabledIds={["green-jacket"]} customCharacters={[]} syncStatus="Saved on Unraid" onToggle={toggle} onSave={save} onInstallPack={async()=>true} onDelete={remove}/>);
   fireEvent.click(view.container.querySelector("details > summary")!);
   expect(screen.getByText("Goku · Fan Tribute")).toBeTruthy();
   expect(screen.getByText("Homer · Fan Tribute")).toBeTruthy();
@@ -18,7 +18,7 @@ describe("Character Universe in-app Library",()=>{
  });
  it("opens the editor for original safe 32px art",()=>{
   const existing=starterCustomCharacter();
-  const view=render(<WorldCharacterLibrary enabledIds={[]} customCharacters={[existing]} syncStatus="Local backup" onToggle={()=>{}} onSave={async()=>true} onDelete={async()=>true}/>);
+  const view=render(<WorldCharacterLibrary enabledIds={[]} customCharacters={[existing]} syncStatus="Local backup" onToggle={()=>{}} onSave={async()=>true} onInstallPack={async()=>true} onDelete={async()=>true}/>);
   fireEvent.click(view.container.querySelector("details > summary")!);
   fireEvent.click(screen.getByRole("button",{name:"Create character"}));
   expect(screen.getByRole("group",{name:"32 by 32 pixel drawing grid"}).querySelectorAll("button").length).toBe(1024);
