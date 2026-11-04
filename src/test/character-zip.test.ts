@@ -1,5 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {deflateSync,deflateRawSync} from "node:zlib";
+import {Blob as NodeBlob} from "node:buffer";
 import {parseCharacterZip} from "@/lib/character-zip";
 import {validateCustomCharacter} from "@/lib/world-custom-packs";
 
@@ -40,7 +41,7 @@ function zip(entries:Entry[]):Blob{
  end.writeUInt32LE(0x06054b50);end.writeUInt16LE(entries.length,8);
  end.writeUInt16LE(entries.length,10);end.writeUInt32LE(entriesSize,12);end.writeUInt32LE(offset,16);
  const binary=Buffer.concat([...locals,...central,end]);
- return new Blob([Uint8Array.from(binary).buffer as ArrayBuffer]);
+ return new NodeBlob([Uint8Array.from(binary).buffer as ArrayBuffer]) as unknown as Blob;
 }
 const manifest=(filename="sprites/idle.png")=>Buffer.from(JSON.stringify({
  format:"pixel-pals-character-addon",version:2,name:"Test HD pack",
@@ -66,13 +67,13 @@ describe("256x256 character ZIP importer",()=>{
   const invalid=zip([{name:"character-pack.json",bytes:manifest()},{name:"sprites/idle.png",bytes:png(32,32)},{name:"sprites/walk.png",bytes:png()}]);
   await expect(parseCharacterZip(invalid)).rejects.toThrow("256x256");
   await expect(parseCharacterZip(zip([{name:"../outside.png",bytes:png()}]))).rejects.toThrow("unsafe file path");
-  await expect(parseCharacterZip(new Blob([new Uint8Array([1,2,3]).buffer]))).rejects.toThrow("ZIP");
+  await expect(parseCharacterZip(new NodeBlob([new Uint8Array([1,2,3]).buffer]) as unknown as Blob)).rejects.toThrow("ZIP");
  });
  it("requires the manifest and checks the ZIP entry integrity",async()=>{
   const noManifest=zip([{name:"sprites/idle.png",bytes:png()}]);
   await expect(parseCharacterZip(noManifest)).rejects.toThrow("manifest");
   const blob=sample(),bytes=new Uint8Array(await blob.arrayBuffer());
   bytes[60]=(bytes[60]??0)^0x01;
-  await expect(parseCharacterZip(new Blob([bytes.buffer as ArrayBuffer]))).rejects.toThrow();
+  await expect(parseCharacterZip(new NodeBlob([bytes.buffer as ArrayBuffer]) as unknown as Blob)).rejects.toThrow();
  });
 });
