@@ -87,3 +87,19 @@ describe("Living World event-to-sprite reaction resolver",()=>{
   expect(worldReactionAt([valid],"green-jacket",Infinity,policy)).toBeNull();
  });
 });
+
+describe("Living World reaction sprite integration",()=>{
+ it("renders a resolved reaction using the existing atlas without changing source art",async()=>{
+  const {worldReactionAt}=await import("@/lib/world-character-packs");
+  const {worldReactionFrame,worldAnimatedFrame}=await import("@/lib/world-animation");
+  const {greenJacketSprite}=await import("@/lib/world-character-packs");
+  const sprite=greenJacketSprite(),original=sprite.join("\\n");
+  const policy={enabledIds:["green-jacket"],knownIds:["green-jacket"],interactiveProps:[],reducedMotion:false};
+  const event={id:"world-wave-test",actorId:"green-jacket",kind:"wave" as const,at:1000};
+  const reaction=worldReactionAt([event],"green-jacket",1800,policy);
+  expect(reaction?.frame).toBe(2);
+  expect(worldReactionFrame(sprite,"s",reaction)).toEqual(worldAnimatedFrame(sprite,"s","wave",2));
+  expect(worldReactionFrame(sprite,"s",null,"walk",1)).toEqual(worldAnimatedFrame(sprite,"s","walk",1));
+  expect(sprite.join("\\n")).toBe(original);
+ });
+});
