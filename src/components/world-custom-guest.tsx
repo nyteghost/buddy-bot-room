@@ -24,12 +24,18 @@ export function WorldCustomGuest({character,index,theme,active,cue}:{character:W
  const fallbackAction=wave?"wave":pose.action;
  const action=reaction?.action??fallbackAction;
  const frame=reaction?.frame??Math.floor(elapsed/175)%4;
- const runs=useMemo(()=>spriteRuns(worldReactionFrame(character.pixels,pose.facing,reaction,fallbackAction,Math.floor(elapsed/175)%4),(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[character.pixels,pose.facing,action,frame]);
+ const runs=useMemo(()=>character.hd?[]:spriteRuns(worldReactionFrame(character.pixels,pose.facing,reaction,fallbackAction,Math.floor(elapsed/175)%4),(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[character.pixels,character.hd,pose.facing,action,frame]);
+ const art=character.hd;
+ const kind=action==="wave"?"wave":action==="celebrate"?"celebrate"
+  :["walking","return","retreat"].includes(action)?"walk":"idle";
+ const frames=art?(kind==="wave"?art.wave:kind==="celebrate"?art.celebrate:kind==="walk"?art.walk:art.idle)??art.idle:undefined;
+ const image=frames?.[Math.floor(elapsed/175)%frames.length];
  const style={"--world-guest-x":pose.x+"%","--world-guest-y":pose.y+"%"} as CSSProperties;
  return <button type="button" className="world-guest world-custom-guest" aria-label={"Wave to "+character.name} style={style} data-action={action} onClick={()=>setWave(true)}>
-  <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name+" custom pixel character"}>
-   {runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={character.palette[r.c]??"transparent"}/>)}
-  </svg>
+  {image?<img className="world-guest-pixels world-guest-hd-pixels" src={image} width={256} height={256} draggable={false} alt={character.name+" 256 pixel character"}/>:
+   <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name+" custom pixel character"}>
+    {runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={character.palette[r.c]??"transparent"}/>)}
+   </svg>}
   <span className="world-guest-name">{character.name}</span>
   {(wave||action==="wave"||action==="celebrate")&&<span className="world-guest-spark" aria-hidden="true">✦</span>}
  </button>;
