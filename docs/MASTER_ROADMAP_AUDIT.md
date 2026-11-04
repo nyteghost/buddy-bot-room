@@ -102,3 +102,9 @@ Implemented in beta: default Living World for all existing themes, Classic toggl
 ## Character Universe — beta feature-completeness milestone
 
 Implemented: nine existing AI Pals rendered with 8 headings × 9 actions × 4 32px frames, theme-specific pixel art, authored obstacle zones and A* eight-direction routes, nine selectable original/fan visual guests, theme ambient props and browser-local lighting, reversible Classic mode, default Today/Pal Room desktop layout, and a custom character creator with safe JSON import/export and Unraid owner-only persistent storage. No visual-only guest obtains AI tools or permissions. Pending release quality gates: full latest CI smoke + beta image publish and physical Unraid/phone visual QA. Explicitly not complete: premium hand-illustrated PNG frames for every pose, fully editable furniture/collision world builder, verified real-world GPU/mobile performance, or legal distribution of official franchise assets. See [Character Universe](LIVING_WORLD_2_BETA.md).
+
+## Living World 2.0 — cosmetic event reaction foundation (beta)
+
+Implemented in commits acc2ac3 and e8a3d0e: a pure deterministic selector maps validated, enabled local events to the existing four-frame animation atlas. Wave, celebrate, inspect-prop and greet select wave, celebrate, look and talk respectively. Events expire after 1.6 seconds; disabled actors and reduced-motion settings suppress reactions. No AI identity, external action or new permission is granted.
+
+**Not yet complete:** connect this selector to actual Pal Room rendering and event producers, verify theme/mobile appearance, implement separately approved AI identities, and run beta CI/build/browser smoke and image publication before recommending an update. Existing Pal animations, guest art, pathfinding, settings, storage and services remain unchanged.
