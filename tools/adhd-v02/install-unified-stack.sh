@@ -209,7 +209,7 @@ fi
 # The temporary server sees the same read-only code and secret, but cannot
 # write to the ADHD database. Only an unauthenticated capabilities GET is made.
 say 'Checking Pixel Pals -> bridge networking before restarting either application.'
-PROBE_NAME="adhd-bridge-preflight-$"
+PROBE_NAME="adhd-bridge-preflight-${BASHPID}"
 docker run -d --rm --name "$PROBE_NAME" --network host --user 99:100 --read-only \
   --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=8m \
   -e ADHD_DATA_DIR=/data \
