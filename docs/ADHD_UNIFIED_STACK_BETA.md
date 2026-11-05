@@ -1,7 +1,7 @@
 # Pixel Pals + ADHD Assistant — unified Unraid beta Compose stack
 
 This is an **opt-in upgrade** for the specific running installation previously verified on Unraid:
-- Pixel Pals container `buddy-bot-room`, image `ghcr.io/nyteghost/buddy-bot-room:beta`, Compose project `pixelpals` (or `pixelpals-beta`).
+- Pixel Pals container `buddy-bot-room`, image `ghcr.io/nyteghost/buddy-bot-room:beta`, Compose project `pixelpals` with Docker network `pixelpals_default`.
 - ADHD Assistant `adhd-assistant` on `python:3.12-alpine`, host network, owner `99:100`, application bind mount `/mnt/user/appdata/adhd-assistant/code:/opt/adhd`, and data bind mount `/mnt/user/appdata/adhd-assistant/data:/data`.
 - A separate `adhd-assistant-lan` Caddy container (left untouched).
 
