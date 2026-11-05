@@ -38,6 +38,9 @@ describe("ADHD Assistant owner-approved bridge",()=>{
   expect(safeBridgeEndpoint("http://127.0.0.1:8765")).toBe("http://127.0.0.1:8765");
   expect(safeBridgeEndpoint("http://host.docker.internal:8766")).toBeNull();
   expect(safeBridgeEndpoint("http://host.docker.internal:8766",true)).toBe("http://host.docker.internal:8766");
+  expect(safeBridgeEndpoint("http://adhd-bridge:18766")).toBeNull();
+  expect(safeBridgeEndpoint("http://adhd-bridge:18766",true)).toBe("http://adhd-bridge:18766");
+  expect(safeBridgeEndpoint("http://other-service:18766",true)).toBeNull();
   for(const raw of ["https://example.org","http://10.0.0.1:8765","http://localhost:8765/credentials","http://foo@localhost:8765","javascript:alert(1)"]){
    expect(safeBridgeEndpoint(raw,true)).toBeNull();
   }
