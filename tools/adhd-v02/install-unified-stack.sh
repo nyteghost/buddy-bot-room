@@ -32,19 +32,51 @@ PROJECT="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project
 BUDDY_SERVICE="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$PIXEL_CONTAINER")"
 FILES="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$PIXEL_CONTAINER")"
 [[ "$PROJECT" =~ ^[a-zA-Z0-9_-]+$ && "$BUDDY_SERVICE" =~ ^[a-zA-Z0-9_-]+$ ]] || fail 'Cannot identify the running Pixel Pals Compose project safely.'
-if [[ "$FILES" == *','* || "$FILES" == '<no value>' || "$FILES" == *$'\n'* ]]; then
-  fail 'Pixel Pals has a multi-file or unknown Compose configuration. Refusing automatic modification.'
-fi
-COMPOSE_FILE="$FILES"
-if [ ! -f "$COMPOSE_FILE" ]; then
-  FALLBACK="/boot/config/plugins/compose.manager/projects/$PROJECT/docker-compose.yml"
-  [ -f "$FALLBACK" ] || fail 'Cannot find the active Compose Manager file.'
-  COMPOSE_FILE="$FALLBACK"
-fi
-[[ "$COMPOSE_FILE" == /boot/config/plugins/compose.manager/projects/*/docker-compose.y*ml ]] || fail 'Unexpected Compose path outside Unraid Compose Manager; refusing automatic modification.'
-[ ! -L "$COMPOSE_FILE" ] || fail 'Compose file is a symbolic link; refusing unsafe edit.'
+# Compose Manager may launch Pixel Pals with multiple ordered Compose files.
+# Keep that complete list; NEVER flatten or silently discard overrides.
 [[ "$PROJECT" == pixelpals ]] || fail 'Only the verified pixelpals Compose project is supported; no changes made.'
-COMPOSE_DIR="$(dirname "$COMPOSE_FILE")"
+if [[ -z "$FILES" || "$FILES" == '<no value>' || "$FILES" == *$'\n'* ]]; then
+  fail 'The running Pixel Pals container has no usable Compose-file label. No changes made; collect the sanitized layout report.'
+fi
+IFS=',' read -r -a COMPOSE_FILES <<< "$FILES"
+(( ${#COMPOSE_FILES[@]} >= 1 && ${#COMPOSE_FILES[@]} <= 8 )) || fail 'Unexpected number of Compose source files; no changes made.'
+if (( ${#COMPOSE_FILES[@]} == 1 )) && [ ! -f "${COMPOSE_FILES[0]}" ]; then
+  FALLBACK="/boot/config/plugins/compose.manager/projects/$PROJECT/docker-compose.yml"
+  [ -f "$FALLBACK" ] || fail 'Active Compose source does not exist and no known Compose Manager fallback is present.'
+  COMPOSE_FILES=("$FALLBACK")
+fi
+COMPOSE_FLAGS=()
+COMPOSE_DIR="/boot/config/plugins/compose.manager/projects/$PROJECT"
+for config_path in "${COMPOSE_FILES[@]}"; do
+  [[ "$config_path" == "$COMPOSE_DIR/"* ]] ||
+    fail 'At least one Compose file is outside the known Unraid Compose Manager project. No changes made.'
+  [[ "$config_path" == *.yml || "$config_path" == *.yaml ]] ||
+    fail 'Unexpected Compose file extension; no changes made.'
+  [[ -f "$config_path" && ! -L "$config_path" ]] ||
+    fail 'A Compose source file is missing or a symbolic link; no changes made.'
+  COMPOSE_FLAGS+=(-f "$config_path")
+done
+
+# Select only the single source file that actually owns the running buddy service's
+# mapping-style environment and list-style volumes; other overlay files are left intact.
+COMPOSE_FILE=""
+OWNERS=0
+for config_path in "${COMPOSE_FILES[@]}"; do
+  if awk -v target="$BUDDY_SERVICE" '
+  /^  [a-zA-Z0-9_-]+:[[:space:]]*(#.*)?$/ {
+    name=$0; sub(/^  /,"",name); sub(/:.*/,"",name);
+    inside=(name==target); if(inside) found++;
+  }
+  inside && /^    environment:[[:space:]]*(#.*)?$/ { env++ }
+  inside && /^    volumes:[[:space:]]*(#.*)?$/ { vols++ }
+  END { exit !(found==1 && env==1 && vols==1) }
+  ' "$config_path"; then
+    COMPOSE_FILE="$config_path"
+    OWNERS=$((OWNERS+1))
+  fi
+done
+(( OWNERS == 1 )) ||
+  fail 'Cannot identify one safe Pixel Pals service definition containing environment and volumes. No changes made.'
 cd "$COMPOSE_DIR"
 [[ "$(docker inspect -f '{{.Config.Image}}' "$PIXEL_CONTAINER")" == "$IMAGE" ]] || fail 'Pixel Pals is not using the beta image expected for this installation.'
 ORIGINAL_PIXEL_IMAGE_ID="$(docker inspect -f '{{.Image}}' "$PIXEL_CONTAINER")"
@@ -63,24 +95,28 @@ read -r CIDR GATEWAY <<< "$NETINFO"
 [[ "$CIDR" =~ ^(10\.|172\.|192\.168\.)[0-9.]+/[0-9]+$ && "$GATEWAY" =~ ^[0-9.]+$ ]] || fail 'Cannot find the expected private Pixel Pals gateway.'
 docker inspect -f '{{range .HostConfig.ExtraHosts}}{{println .}}{{end}}' "$PIXEL_CONTAINER" | grep -q '^host.docker.internal:' || fail 'Pixel Pals has no host.docker.internal mapping.'
 
-docker compose -p "$PROJECT" -f "$COMPOSE_FILE" config --quiet || fail 'Existing Compose file failed validation.'
-docker compose -p "$PROJECT" -f "$COMPOSE_FILE" config --images | grep -Fxq "$IMAGE" || fail 'The active Compose configuration does not reference the expected Pixel Pals beta image.'
-if docker compose -p "$PROJECT" -f "$COMPOSE_FILE" config --services | grep -qx "$CONTAINER"; then
+docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" config --quiet || fail 'Existing full Compose configuration failed validation.'
+docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" config --images | grep -Fxq "$IMAGE" || fail 'The active Compose configuration does not reference the expected Pixel Pals beta image.'
+if docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" config --services | grep -qx "$CONTAINER"; then
   say 'ADHD-A already appears in this Compose project. No changes made.'
-  docker compose -p "$PROJECT" -f "$COMPOSE_FILE" ps "$CONTAINER" || true
+  docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" ps "$CONTAINER" || true
   exit 0
 fi
 [[ "$(grep -Ec '^services:[[:space:]]*$' "$COMPOSE_FILE")" == 1 ]] || fail 'Expected one top-level services: block.'
 [[ "$(grep -Ec "^  ${BUDDY_SERVICE}:[[:space:]]*(#.*)?$" "$COMPOSE_FILE")" == 1 ]] || fail 'Cannot uniquely locate the active Pixel Pals service in YAML.'
-if grep -Eq 'ADHD_BRIDGE_(ENABLED|PEER_TOKEN|PEER_URL|ALLOW_DOCKER_HOST)' "$COMPOSE_FILE"; then
-  fail 'Existing bridge settings found. Merge requires manual review; nothing changed.'
-fi
+for config_path in "${COMPOSE_FILES[@]}"; do
+  if grep -Eq 'ADHD_BRIDGE_(ENABLED|PEER_TOKEN|PEER_URL|ALLOW_DOCKER_HOST)' "$config_path"; then
+    fail 'Existing bridge settings found in a Compose source. Merge requires manual review; nothing changed.'
+  fi
+done
 if [ ! -f "$APP/adhd_assistant/bridge_v02.py" ] && ! grep -Eq '^version[[:space:]]*=[[:space:]]*"0\.1\.0"' "$APP/pyproject.toml"; then
   fail 'ADHD-A is not a recognized v0.1 install and has no v0.2 bridge. Nothing changed.'
 fi
 
 say "Compose project: $PROJECT; Pixel Pals service: $BUDDY_SERVICE"
-say "Compose file: $COMPOSE_FILE"
+say "Compose files: ${#COMPOSE_FILES[@]} (original order preserved)"
+for config_path in "${COMPOSE_FILES[@]}"; do say "  source: $config_path"; done
+say "Patch target: $COMPOSE_FILE"
 say "Docker network: $NETWORK ($CIDR; gateway $GATEWAY)"
 say "ADHD-A source: $APP; data: $DATA"
 say 'The existing Caddy container will stay outside this stack and remain untouched.'
@@ -134,7 +170,7 @@ rollback(){
   if [ "$BUDDY_CHANGED" = 1 ]; then
     # Restore the exact image that was running before the beta pull/recreate.
     docker image tag "$ORIGINAL_PIXEL_IMAGE_ID" "$IMAGE" || true
-    docker compose -p "$PROJECT" -f "$COMPOSE_FILE" up -d --no-deps --pull never "$BUDDY_SERVICE" || true
+    docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$BUDDY_SERVICE" || true
   fi
   if [ "$NEW_CREATED" = 1 ]; then
     if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$CONTAINER" 2>/dev/null || true)" = "$CONTAINER" ]; then
@@ -206,10 +242,18 @@ service && /^    volumes:[[:space:]]*(#.*)?$/ {
 END {if (services != 1 || env != 1 || vol != 1) exit 44}
 ' "$COMPOSE_FILE" > "$STAGED" || { rm -f -- "$STAGED"; fail 'Could not safely insert the ADHD-A service and bridge mounts.'; }
 
-docker compose -p "$PROJECT" -f "$STAGED" config --quiet || { rm -f -- "$STAGED"; fail 'Unified Compose file failed validation. No container was changed.'; }
-# Make sure Compose sees exactly the two intended services after validation.
-docker compose -p "$PROJECT" -f "$STAGED" config --services | grep -qx "$CONTAINER" || { rm -f "$STAGED"; fail 'ADHD service missing from staged Compose.'; }
-docker compose -p "$PROJECT" -f "$STAGED" config --services | grep -qx "$BUDDY_SERVICE" || { rm -f "$STAGED"; fail 'Pixel Pals service missing from staged Compose.'; }
+# Validate the staged file in the original full multi-file order; never drop overlays.
+STAGED_FLAGS=()
+for config_path in "${COMPOSE_FILES[@]}"; do
+  if [ "$config_path" = "$COMPOSE_FILE" ]; then
+    STAGED_FLAGS+=(-f "$STAGED")
+  else
+    STAGED_FLAGS+=(-f "$config_path")
+  fi
+done
+docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --quiet || { rm -f -- "$STAGED"; fail 'Unified full Compose configuration failed validation. No container was changed.'; }
+docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --services | grep -qx "$CONTAINER" || { rm -f "$STAGED"; fail 'ADHD service missing from staged Compose.'; }
+docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --services | grep -qx "$BUDDY_SERVICE" || { rm -f "$STAGED"; fail 'Pixel Pals service missing from staged Compose.'; }
 
 # Preserve the original container as a stopped rollback checkpoint.
 say 'Moving existing ADHD-A under a rollback name and adopting it into Compose.'
@@ -222,7 +266,7 @@ chown --reference="$COMPOSE_FILE" "$STAGED"
 mv -- "$STAGED" "$COMPOSE_FILE"; COMPOSE_WRITTEN=1
 
 NEW_CREATED=1
-docker compose -p "$PROJECT" -f "$COMPOSE_FILE" up -d --no-deps --pull never "$CONTAINER"
+docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$CONTAINER"
 for i in $(seq 1 25); do
   status="$(curl -sS --max-time 2 --noproxy '*' -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/health 2>/dev/null || true)"
   [ "$status" = 200 ] && break
@@ -233,7 +277,7 @@ done
 # Only Pixel Pals is recreated for its new read-only secret mount and environment.
 say 'Enabling the private bridge in Pixel Pals (no image change outside beta).'
 BUDDY_CHANGED=1
-docker compose -p "$PROJECT" -f "$COMPOSE_FILE" up -d --no-deps --pull never "$BUDDY_SERVICE"
+docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$BUDDY_SERVICE"
 for i in $(seq 1 30); do
   health="$(docker inspect -f '{{.State.Health.Status}}' "$PIXEL_CONTAINER" 2>/dev/null || true)"
   [ "$health" = healthy ] && break
