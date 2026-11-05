@@ -5,8 +5,8 @@
 set -Eeuo pipefail
 
 REPO='nyteghost/buddy-bot-room'
-OVERLAY_COMMIT='a52d21d3b39d50521aed0290eb9fbfb680fa6efe'
-OVERLAY_URL="https://raw.githubusercontent.com/$REPO/$OVERLAY_COMMIT/tools/adhd-v02/install-bridge-overlay.sh"
+BRIDGE_COMMIT='7feb35b13acfda6eb4e3eccad078ba3922181701'
+BRIDGE_URL="https://raw.githubusercontent.com/$REPO/$BRIDGE_COMMIT/tools/adhd-v02/bridge_v02.py"
 BASE='/mnt/user/appdata/adhd-assistant'
 APP="$BASE/code"
 DATA="$BASE/data"
@@ -109,8 +109,14 @@ for config_path in "${COMPOSE_FILES[@]}"; do
     fail 'Existing bridge settings found in a Compose source. Merge requires manual review; nothing changed.'
   fi
 done
-if [ ! -f "$APP/adhd_assistant/bridge_v02.py" ] && ! grep -Eq '^version[[:space:]]*=[[:space:]]*"0\.1\.0"' "$APP/pyproject.toml"; then
-  fail 'ADHD-A is not a recognized v0.1 install and has no v0.2 bridge. Nothing changed.'
+grep -Eq '^version[[:space:]]*=[[:space:]]*"0\.1\.0"' "$APP/pyproject.toml" ||
+  fail 'This separate bridge migration expects the installed ADHD dashboard v0.1; no files were changed.'
+[ ! -e "$BASE/bridge/bridge_v02.py" ] ||
+  fail 'An existing bridge source is present; refusing to overwrite it automatically.'
+docker inspect adhd-assistant-bridge >/dev/null 2>&1 &&
+  fail 'A bridge container already exists; no changes made.'
+if command -v ss >/dev/null 2>&1 && ss -H -lnt | awk '{print $4}' | grep -Eq ":${PORT}$"; then
+  fail 'Bridge port 18766 is already listening; no changes made.'
 fi
 
 say "Compose project: $PROJECT; Pixel Pals service: $BUDDY_SERVICE"
@@ -121,7 +127,7 @@ say "Docker network: $NETWORK ($CIDR; gateway $GATEWAY)"
 say "ADHD-A source: $APP; data: $DATA"
 say 'The existing Caddy container will stay outside this stack and remain untouched.'
 if [ "$MODE" = '--plan' ]; then
-  say 'PLAN ONLY: install v0.2 receiver if required, adopt ADHD-A into this Compose project, add private bridge secret mount and configuration to Pixel Pals. No changes made.'
+  say 'PLAN ONLY: add isolated v0.2 bridge sidecar, adopt existing ADHD-A dashboard without patching launch.py, and configure authenticated Pixel Pals connection. No changes made.'
   exit 0
 fi
 
@@ -130,21 +136,22 @@ say 'Downloading current beta image and checking token-file bridge support.'
 docker pull "$IMAGE" >/dev/null || fail 'Cannot pull the Pixel Pals beta image.'
 docker run --rm --network none --entrypoint sh "$IMAGE" -c 'grep -q ADHD_BRIDGE_PEER_TOKEN_FILE /app/src/lib/adhd-bridge.server.ts' || fail 'The published beta image lacks the new token-file bridge support. Nothing has been migrated.'
 
-# Upgrade the known v0.1 ADHD receiver. This preserves /data and the existing container;
-# it uses its own safe source rollback if receiver startup fails.
-if ! grep -Fq '# ADHD_BRIDGE_V02_START' "$APP/launch.py"; then
-  say 'Upgrading ADHD-A v0.1 to the v0.2 bridge-enabled runtime.'
-  TEMP_OVERLAY="$(mktemp)"
-  trap 'rm -f -- "${TEMP_OVERLAY:-}"' EXIT
-  curl -fsSL --retry 2 --proto '=https' --tlsv1.2 "$OVERLAY_URL" -o "$TEMP_OVERLAY" || fail 'Could not fetch the pinned v0.2 upgrade script.'
-  bash -n "$TEMP_OVERLAY" || fail 'Upgrade script failed shell validation.'
-  bash "$TEMP_OVERLAY" || fail 'v0.2 upgrade failed, original Compose project unchanged.'
-  rm -f -- "$TEMP_OVERLAY"; TEMP_OVERLAY=''
-  trap - EXIT
+# Verify standalone bridge code before any running container is modified.
+say 'Downloading and syntax-checking isolated bridge service (no launch.py patch).'
+BRIDGE_STAGE="$(mktemp "$BASE/.bridge-v02-stage.XXXXXXXX")"
+curl -fsSL --retry 2 --proto '=https' --tlsv1.2 "$BRIDGE_URL" -o "$BRIDGE_STAGE" ||
+  { rm -f -- "$BRIDGE_STAGE"; fail 'Cannot download pinned standalone bridge code.'; }
+grep -q 'arguments.action == "serve"' "$BRIDGE_STAGE" ||
+  { rm -f -- "$BRIDGE_STAGE"; fail 'Downloaded bridge does not support standalone server mode.'; }
+docker run --rm --network none --entrypoint python -v "$BRIDGE_STAGE:/bridge.py:ro" python:3.12-alpine \
+  -B -c 'from pathlib import Path; compile(Path("/bridge.py").read_text(), "/bridge.py", "exec")' ||
+  { rm -f -- "$BRIDGE_STAGE"; fail 'Standalone bridge Python failed syntax verification.'; }
+[ ! -L "$DATA/bridge-v02-token" ] && [ ! -L "$DATA/bridge-v02.json" ] ||
+  { rm -f -- "$BRIDGE_STAGE"; fail 'Bridge secret/configuration cannot be symlinks.'; }
+if [ -e "$DATA/bridge-v02.json" ]; then
+  rm -f -- "$BRIDGE_STAGE"
+  fail 'Existing bridge configuration detected; manual review required.'
 fi
-[ -f "$DATA/bridge-v02-token" ] && [ -f "$DATA/bridge-v02.json" ] || fail 'v0.2 receiver secret and configuration were not created.'
-[ "$(curl -sS --max-time 4 --noproxy '*' -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/health || true)" = 200 ] || fail 'ADHD-A dashboard is not responding.'
-[ "$(curl -sS --max-time 4 --noproxy '*' -o /dev/null -w '%{http_code}' "http://$GATEWAY:$PORT/bridge/v1/capabilities" || true)" = 401 ] || fail 'Authenticated-only v0.2 bridge is not listening on the private gateway.'
 
 # All preflights have passed. Keep a timestamped copy of the current Compose source;
 # this migration never uses docker compose down or --remove-orphans.
@@ -152,10 +159,25 @@ BACKUP_DIR="$BASE/unified-stack-backup-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 cp -p -- "$COMPOSE_FILE" "$BACKUP_DIR/docker-compose.yml.before-unify"
+# The regular ADHD web dashboard is left unpatched. The bridge is its own Compose service.
+BRIDGE_DIR="$BASE/bridge"
+mkdir -p "$BRIDGE_DIR"
+[ ! -L "$BRIDGE_DIR" ] || fail 'Bridge directory is unexpectedly a symlink.'
+install -m 0644 "$BRIDGE_STAGE" "$BRIDGE_DIR/bridge_v02.py"
+rm -f -- "$BRIDGE_STAGE"
+if [ ! -f "$DATA/bridge-v02-token" ]; then
+  ( umask 077; head -c 48 /dev/urandom | base64 | tr -d '\n' > "$DATA/bridge-v02-token"; printf '\n' >> "$DATA/bridge-v02-token" )
+fi
+chown 99:100 "$DATA/bridge-v02-token" || true
+chmod 600 "$DATA/bridge-v02-token"
+printf '{"bind":"%s","port":%s,"allow":["%s"]}\n' "$GATEWAY" "$PORT" "$CIDR" > "$DATA/bridge-v02.json"
+chown 99:100 "$DATA/bridge-v02.json" || true
+chmod 600 "$DATA/bridge-v02.json"
 LEGACY_NAME="adhd-assistant-preunified-$(date -u +%Y%m%d%H%M%S)"
 COMPOSE_WRITTEN=0
 LEGACY_RENAMED=0
 NEW_CREATED=0
+NEW_BRIDGE_CREATED=0
 ROLLED_BACK=0
 BUDDY_CHANGED=0
 COMMITTED=0
@@ -171,6 +193,12 @@ rollback(){
     # Restore the exact image that was running before the beta pull/recreate.
     docker image tag "$ORIGINAL_PIXEL_IMAGE_ID" "$IMAGE" || true
     docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$BUDDY_SERVICE" || true
+  fi
+  if [ "$NEW_BRIDGE_CREATED" = 1 ]; then
+    if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' adhd-assistant-bridge 2>/dev/null || true)" = adhd-bridge ]; then
+      docker stop adhd-assistant-bridge >/dev/null 2>&1 || true
+      docker rm adhd-assistant-bridge >/dev/null 2>&1 || true
+    fi
   fi
   if [ "$NEW_CREATED" = 1 ]; then
     if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$CONTAINER" 2>/dev/null || true)" = "$CONTAINER" ]; then
@@ -190,10 +218,37 @@ trap 'rollback; exit 130' INT TERM
 # Insert a service adjacent to the original Pixel Pals service in the same Compose file,
 # and inject a read-only token mount plus its path into the running Pixel Pals service.
 STAGED="$(mktemp "$COMPOSE_DIR/.unified-adhd-XXXXXX.yml")"
-awk -v buddy="$BUDDY_SERVICE" -v data="$DATA" -v app="$APP" '
+awk -v buddy="$BUDDY_SERVICE" -v data="$DATA" -v app="$APP" -v gateway="$GATEWAY" '
 BEGIN { service=0; env=0; vol=0; services=0 }
 /^services:[[:space:]]*$/ {
  print
+ print "  adhd-bridge:"
+ print "    image: python:3.12-alpine"
+ print "    container_name: adhd-assistant-bridge"
+ print "    restart: unless-stopped"
+ print "    network_mode: host"
+ print "    read_only: true"
+ print "    tmpfs:"
+ print "      - /tmp:rw,nosuid,nodev,size=32m"
+ print "    cap_drop: [ALL]"
+ print "    security_opt: [no-new-privileges:true]"
+ print "    pids_limit: 128"
+ print "    mem_limit: 128m"
+ print "    cpus: 0.5"
+ print "    user: \"99:100\""
+ print "    environment:"
+ print "      PYTHONDONTWRITEBYTECODE: \"1\""
+ print "      ADHD_DATA_DIR: /data"
+ print "    volumes:"
+ print "      - "app"/../bridge/bridge_v02.py:/opt/bridge/bridge_v02.py:ro"
+ print "      - "data":/data:rw"
+ print "    command: [python, -B, /opt/bridge/bridge_v02.py, serve]"
+ print "    healthcheck:"
+ print "      test: [CMD, python, -B, -c, \"import socket; s=socket.create_connection((\\047"gateway"\\047,18766),timeout=3); s.close()\"]"
+ print "      interval: 30s"
+ print "      timeout: 6s"
+ print "      retries: 3"
+ print "      start_period: 15s"
  print "  adhd-assistant:"
  print "    image: python:3.12-alpine"
  print "    container_name: adhd-assistant"
@@ -253,6 +308,7 @@ for config_path in "${COMPOSE_FILES[@]}"; do
 done
 docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --quiet || { rm -f -- "$STAGED"; fail 'Unified full Compose configuration failed validation. No container was changed.'; }
 docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --services | grep -qx "$CONTAINER" || { rm -f "$STAGED"; fail 'ADHD service missing from staged Compose.'; }
+docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --services | grep -qx adhd-bridge || { rm -f "$STAGED"; fail 'Private bridge sidecar missing from staged Compose.'; }
 docker compose -p "$PROJECT" "${STAGED_FLAGS[@]}" config --services | grep -qx "$BUDDY_SERVICE" || { rm -f "$STAGED"; fail 'Pixel Pals service missing from staged Compose.'; }
 
 # Preserve the original container as a stopped rollback checkpoint.
@@ -266,16 +322,24 @@ chown --reference="$COMPOSE_FILE" "$STAGED"
 mv -- "$STAGED" "$COMPOSE_FILE"; COMPOSE_WRITTEN=1
 
 NEW_CREATED=1
-docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$CONTAINER"
+NEW_BRIDGE_CREATED=1
+docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$CONTAINER" adhd-bridge
 for i in $(seq 1 25); do
   status="$(curl -sS --max-time 2 --noproxy '*' -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/health 2>/dev/null || true)"
   [ "$status" = 200 ] && break
   sleep 1
 done
 [ "$status" = 200 ] || { rollback; fail 'Compose-managed ADHD-A failed health check.'; }
+bridge_status=""
+for i in $(seq 1 30); do
+  bridge_status="$(curl -sS --max-time 3 --noproxy '*' -o /dev/null -w '%{http_code}' "http://$GATEWAY:$PORT/bridge/v1/capabilities" 2>/dev/null || true)"
+  [ "$bridge_status" = 401 ] && break
+  sleep 2
+done
+[ "$bridge_status" = 401 ] || { rollback; fail 'Standalone bridge did not start with authentication.'; }
 
 # Only Pixel Pals is recreated for its new read-only secret mount and environment.
-say 'Enabling the private bridge in Pixel Pals (no image change outside beta).'
+say 'Enabling the private bridge in Pixel Pals (beta only).'
 BUDDY_CHANGED=1
 docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" up -d --no-deps --pull never "$BUDDY_SERVICE"
 for i in $(seq 1 30); do
@@ -290,9 +354,9 @@ docker exec "$PIXEL_CONTAINER" bun -e 'fetch("http://host.docker.internal:18766/
 
 COMMITTED=1
 trap - ERR INT TERM
-say 'SUCCESS: Pixel Pals and ADHD-A v0.2 are now managed by the same Compose stack.'
+say 'SUCCESS: Pixel Pals, existing ADHD dashboard, and v0.2 bridge are managed by one Compose stack.'
 say "Stack project: $PROJECT; Compose file: $COMPOSE_FILE"
 say 'Caddy LAN proxy was not touched. Neither database was reset.'
 say "ADHD-A old stopped container: $LEGACY_NAME (rollback checkpoint; do not remove until satisfied)."
 say 'No approved task or private memory was automatically transferred.'
-say 'Review ADHD-A inbox: docker exec adhd-assistant python -m adhd_assistant.bridge_v02 list'
+say 'Review ADHD-A inbox: docker exec adhd-assistant-bridge python -B /opt/bridge/bridge_v02.py list'
