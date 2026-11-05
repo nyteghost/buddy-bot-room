@@ -5,8 +5,10 @@
 set -Eeuo pipefail
 
 REPO='nyteghost/buddy-bot-room'
-BRIDGE_COMMIT='7feb35b13acfda6eb4e3eccad078ba3922181701'
+BRIDGE_COMMIT='545651684e13c5b8e44b02acec7a71ec74c27ead'
 BRIDGE_URL="https://raw.githubusercontent.com/$REPO/$BRIDGE_COMMIT/tools/adhd-v02/bridge_v02.py"
+OLD_BRIDGE_COMMIT='7feb35b13acfda6eb4e3eccad078ba3922181701'
+OLD_BRIDGE_URL="https://raw.githubusercontent.com/$REPO/$OLD_BRIDGE_COMMIT/tools/adhd-v02/bridge_v02.py"
 BASE='/mnt/user/appdata/adhd-assistant'
 APP="$BASE/code"
 DATA="$BASE/data"
@@ -93,7 +95,7 @@ NETWORK="${PROJECT}_default"
 NETINFO="$(docker network inspect "$NETWORK" --format '{{range .IPAM.Config}}{{println .Subnet " " .Gateway}}{{end}}' 2>/dev/null | head -n 1 || true)"
 read -r CIDR GATEWAY <<< "$NETINFO"
 [[ "$CIDR" =~ ^(10\.|172\.|192\.168\.)[0-9.]+/[0-9]+$ && "$GATEWAY" =~ ^[0-9.]+$ ]] || fail 'Cannot find the expected private Pixel Pals gateway.'
-docker inspect -f '{{range .HostConfig.ExtraHosts}}{{println .}}{{end}}' "$PIXEL_CONTAINER" | grep -q '^host.docker.internal:' || fail 'Pixel Pals has no host.docker.internal mapping.'
+# Bridge service will use private Docker DNS; existing host aliases remain untouched.
 
 docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" config --quiet || fail 'Existing full Compose configuration failed validation.'
 docker compose -p "$PROJECT" "${COMPOSE_FLAGS[@]}" config --images | grep -Fxq "$IMAGE" || fail 'The active Compose configuration does not reference the expected Pixel Pals beta image.'
@@ -115,9 +117,7 @@ grep -Eq '^version[[:space:]]*=[[:space:]]*"0\.1\.0"' "$APP/pyproject.toml" ||
   fail 'Bridge source must not be a symbolic link.'
 docker inspect adhd-assistant-bridge >/dev/null 2>&1 &&
   fail 'A bridge container already exists; no changes made.'
-if command -v ss >/dev/null 2>&1 && ss -H -lnt | awk '{print $4}' | grep -Eq ":${PORT}$"; then
-  fail 'Bridge port 18766 is already listening; no changes made.'
-fi
+# The private service does not publish port 18766 on the Unraid host.
 
 say "Compose project: $PROJECT; Pixel Pals service: $BUDDY_SERVICE"
 say "Compose files: ${#COMPOSE_FILES[@]} (original order preserved)"
@@ -158,16 +158,26 @@ docker run --rm --network none --entrypoint python -v "$BRIDGE_STAGE:/bridge.py:
   { rm -f -- "$BRIDGE_STAGE"; fail 'Standalone bridge Python failed syntax verification.'; }
 [ ! -L "$DATA/bridge-v02-token" ] && [ ! -L "$DATA/bridge-v02.json" ] ||
   { rm -f -- "$BRIDGE_STAGE"; fail 'Bridge secret/configuration cannot be symlinks.'; }
-EXPECTED_BRIDGE_CONFIG="$(printf '{"bind":"%s","port":%s,"allow":["%s"]}' "$GATEWAY" "$PORT" "$CIDR")"
-if [ -f "$DATA/bridge-v02.json" ] &&
-   [ "$(cat "$DATA/bridge-v02.json")" != "$EXPECTED_BRIDGE_CONFIG" ]; then
-  rm -f -- "$BRIDGE_STAGE"
-  fail 'Existing bridge configuration differs from the intended private gateway. No changes made.'
+EXPECTED_BRIDGE_CONFIG="$(printf '{"bind":"0.0.0.0","port":%s,"allow":["%s"],"scope":"compose_private"}' "$PORT" "$CIDR")"
+OLD_BRIDGE_CONFIG="$(printf '{"bind":"%s","port":%s,"allow":["%s"]}' "$GATEWAY" "$PORT" "$CIDR")"
+if [ -f "$DATA/bridge-v02.json" ]; then
+  EXISTING_BRIDGE_CONFIG="$(cat "$DATA/bridge-v02.json")"
+  if [ "$EXISTING_BRIDGE_CONFIG" != "$EXPECTED_BRIDGE_CONFIG" ] &&
+     [ "$EXISTING_BRIDGE_CONFIG" != "$OLD_BRIDGE_CONFIG" ]; then
+    rm -f -- "$BRIDGE_STAGE"
+    fail 'Unexpected bridge configuration; refusing to overwrite private network settings.'
+  fi
 fi
-if [ -e "$BASE/bridge/bridge_v02.py" ] &&
+if [ -f "$BASE/bridge/bridge_v02.py" ] &&
    ! cmp -s "$BRIDGE_STAGE" "$BASE/bridge/bridge_v02.py"; then
-  rm -f -- "$BRIDGE_STAGE"
-  fail 'Existing standalone bridge code differs from this pinned release. No changes made.'
+  OLD_STAGE="$(mktemp "$BASE/.bridge-v02-old.XXXXXXXX")"
+  curl -fsSL --retry 2 --proto '=https' --tlsv1.2 "$OLD_BRIDGE_URL" -o "$OLD_STAGE" ||
+    fail 'Could not verify previous pinned bridge source. Existing apps unchanged.'
+  if ! cmp -s "$OLD_STAGE" "$BASE/bridge/bridge_v02.py"; then
+    rm -f -- "$OLD_STAGE" "$BRIDGE_STAGE"
+    fail 'Existing bridge code is neither the previous nor the current reviewed version.'
+  fi
+  rm -f -- "$OLD_STAGE"
 fi
 
 # All preflights have passed. Keep a timestamped copy of the current Compose source;
@@ -176,22 +186,20 @@ BACKUP_DIR="$BASE/unified-stack-backup-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 cp -p -- "$COMPOSE_FILE" "$BACKUP_DIR/docker-compose.yml.before-unify"
+[ ! -f "$DATA/bridge-v02.json" ] || cp -p -- "$DATA/bridge-v02.json" "$BACKUP_DIR/bridge-v02.json.before-unify"
+[ ! -f "$BASE/bridge/bridge_v02.py" ] || cp -p -- "$BASE/bridge/bridge_v02.py" "$BACKUP_DIR/bridge_v02.py.before-unify"
 # The regular ADHD web dashboard is left unpatched. The bridge is its own Compose service.
 BRIDGE_DIR="$BASE/bridge"
 mkdir -p "$BRIDGE_DIR"
 [ ! -L "$BRIDGE_DIR" ] || fail 'Bridge directory is unexpectedly a symlink.'
-if [ ! -f "$BRIDGE_DIR/bridge_v02.py" ]; then
-  install -m 0644 "$BRIDGE_STAGE" "$BRIDGE_DIR/bridge_v02.py"
-fi
+install -m 0644 "$BRIDGE_STAGE" "$BRIDGE_DIR/bridge_v02.py"
 rm -f -- "$BRIDGE_STAGE"
 if [ ! -f "$DATA/bridge-v02-token" ]; then
   ( umask 077; head -c 48 /dev/urandom | base64 | tr -d '\n' > "$DATA/bridge-v02-token"; printf '\n' >> "$DATA/bridge-v02-token" )
 fi
 chown 99:100 "$DATA/bridge-v02-token" || true
 chmod 600 "$DATA/bridge-v02-token"
-if [ ! -f "$DATA/bridge-v02.json" ]; then
-  printf '%s\n' "$EXPECTED_BRIDGE_CONFIG" > "$DATA/bridge-v02.json"
-fi
+printf '%s\n' "$EXPECTED_BRIDGE_CONFIG" > "$DATA/bridge-v02.json"
 chown 99:100 "$DATA/bridge-v02.json" || true
 chmod 600 "$DATA/bridge-v02.json"
 # Preflight against the *actual* private host gateway before stopping any app.
@@ -287,6 +295,12 @@ rollback(){
     fi
   else
     say 'WARNING: The original Pixel Pals container name is unavailable after rollback.'
+  fi
+  if [ -f "$BACKUP_DIR/bridge-v02.json.before-unify" ]; then
+    cp -p -- "$BACKUP_DIR/bridge-v02.json.before-unify" "$DATA/bridge-v02.json" || true
+  fi
+  if [ -f "$BACKUP_DIR/bridge_v02.py.before-unify" ]; then
+    cp -p -- "$BACKUP_DIR/bridge_v02.py.before-unify" "$BASE/bridge/bridge_v02.py" || true
   fi
   say "Rollback finished. The original source Compose backup remains at $BACKUP_DIR"
 }
