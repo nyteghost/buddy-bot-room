@@ -20,7 +20,7 @@ say(){ printf '\n[Pixel Pals + ADHD-A] %s\n' "$*"; }
 fail(){ printf '\n[Pixel Pals + ADHD-A] ERROR: %s\n' "$*" >&2; exit 1; }
 [ "$MODE" = '--plan' ] || [ "$MODE" = '--install' ] || fail 'Usage: bash install-unified-stack.sh --plan|--install'
 [ "$(id -u)" -eq 0 ] || fail 'Run in an Unraid root terminal.'
-for bin in docker awk grep curl mktemp sed cp; do command -v "$bin" >/dev/null 2>&1 || fail "Missing $bin"; done
+for bin in docker awk grep curl mktemp sed cp install cmp base64 head chown chmod; do command -v "$bin" >/dev/null 2>&1 || fail "Missing $bin"; done
 docker compose version >/dev/null 2>&1 || fail 'Docker Compose v2 is required.'
 docker inspect "$PIXEL_CONTAINER" >/dev/null 2>&1 || fail 'Pixel Pals container not found.'
 docker inspect "$CONTAINER" >/dev/null 2>&1 || fail 'ADHD-A container not found.'
@@ -111,8 +111,8 @@ for config_path in "${COMPOSE_FILES[@]}"; do
 done
 grep -Eq '^version[[:space:]]*=[[:space:]]*"0\.1\.0"' "$APP/pyproject.toml" ||
   fail 'This separate bridge migration expects the installed ADHD dashboard v0.1; no files were changed.'
-[ ! -e "$BASE/bridge/bridge_v02.py" ] ||
-  fail 'An existing bridge source is present; refusing to overwrite it automatically.'
+[ ! -L "$BASE/bridge/bridge_v02.py" ] ||
+  fail 'Bridge source must not be a symbolic link.'
 docker inspect adhd-assistant-bridge >/dev/null 2>&1 &&
   fail 'A bridge container already exists; no changes made.'
 if command -v ss >/dev/null 2>&1 && ss -H -lnt | awk '{print $4}' | grep -Eq ":${PORT}$"; then
@@ -148,9 +148,16 @@ docker run --rm --network none --entrypoint python -v "$BRIDGE_STAGE:/bridge.py:
   { rm -f -- "$BRIDGE_STAGE"; fail 'Standalone bridge Python failed syntax verification.'; }
 [ ! -L "$DATA/bridge-v02-token" ] && [ ! -L "$DATA/bridge-v02.json" ] ||
   { rm -f -- "$BRIDGE_STAGE"; fail 'Bridge secret/configuration cannot be symlinks.'; }
-if [ -e "$DATA/bridge-v02.json" ]; then
+EXPECTED_BRIDGE_CONFIG="$(printf '{"bind":"%s","port":%s,"allow":["%s"]}' "$GATEWAY" "$PORT" "$CIDR")"
+if [ -f "$DATA/bridge-v02.json" ] &&
+   [ "$(cat "$DATA/bridge-v02.json")" != "$EXPECTED_BRIDGE_CONFIG" ]; then
   rm -f -- "$BRIDGE_STAGE"
-  fail 'Existing bridge configuration detected; manual review required.'
+  fail 'Existing bridge configuration differs from the intended private gateway. No changes made.'
+fi
+if [ -e "$BASE/bridge/bridge_v02.py" ] &&
+   ! cmp -s "$BRIDGE_STAGE" "$BASE/bridge/bridge_v02.py"; then
+  rm -f -- "$BRIDGE_STAGE"
+  fail 'Existing standalone bridge code differs from this pinned release. No changes made.'
 fi
 
 # All preflights have passed. Keep a timestamped copy of the current Compose source;
@@ -163,14 +170,18 @@ cp -p -- "$COMPOSE_FILE" "$BACKUP_DIR/docker-compose.yml.before-unify"
 BRIDGE_DIR="$BASE/bridge"
 mkdir -p "$BRIDGE_DIR"
 [ ! -L "$BRIDGE_DIR" ] || fail 'Bridge directory is unexpectedly a symlink.'
-install -m 0644 "$BRIDGE_STAGE" "$BRIDGE_DIR/bridge_v02.py"
+if [ ! -f "$BRIDGE_DIR/bridge_v02.py" ]; then
+  install -m 0644 "$BRIDGE_STAGE" "$BRIDGE_DIR/bridge_v02.py"
+fi
 rm -f -- "$BRIDGE_STAGE"
 if [ ! -f "$DATA/bridge-v02-token" ]; then
   ( umask 077; head -c 48 /dev/urandom | base64 | tr -d '\n' > "$DATA/bridge-v02-token"; printf '\n' >> "$DATA/bridge-v02-token" )
 fi
 chown 99:100 "$DATA/bridge-v02-token" || true
 chmod 600 "$DATA/bridge-v02-token"
-printf '{"bind":"%s","port":%s,"allow":["%s"]}\n' "$GATEWAY" "$PORT" "$CIDR" > "$DATA/bridge-v02.json"
+if [ ! -f "$DATA/bridge-v02.json" ]; then
+  printf '%s\n' "$EXPECTED_BRIDGE_CONFIG" > "$DATA/bridge-v02.json"
+fi
 chown 99:100 "$DATA/bridge-v02.json" || true
 chmod 600 "$DATA/bridge-v02.json"
 LEGACY_NAME="adhd-assistant-preunified-$(date -u +%Y%m%d%H%M%S)"
