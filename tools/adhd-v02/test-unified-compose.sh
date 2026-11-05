@@ -37,6 +37,8 @@ set -Eeuo pipefail
 BUDDY_SERVICE=buddy-bot
 DATA=/mnt/user/appdata/adhd-assistant/data
 APP=/mnt/user/appdata/adhd-assistant/code
+BRIDGE_DIR=/mnt/user/appdata/adhd-assistant/bridge
+GATEWAY=172.26.0.1
 COMPOSE_FILE="$1"
 STAGED="$2"
 '''
