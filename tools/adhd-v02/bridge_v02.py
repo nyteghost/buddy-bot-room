@@ -172,8 +172,17 @@ class BridgeServer(ThreadingHTTPServer):
 
 def make_server(config, token):
     bind = ipaddress.ip_address(config["bind"])
-    if not isinstance(bind, ipaddress.IPv4Address) or not bind.is_private or bind.is_unspecified or bind.is_loopback:
-        raise ValueError("Bridge must bind to a specific private IPv4 Docker gateway")
+    # Within a private, un-published Docker Compose service, wildcard binding
+    # is required because Docker assigns the container IP dynamically.
+    # Keep explicit scoped authorization and a strict private peer allowlist.
+    scope = config.get("scope")
+    if not isinstance(bind, ipaddress.IPv4Address):
+        raise ValueError("Bridge requires IPv4")
+    if bind.is_unspecified:
+        if scope != "compose_private":
+            raise ValueError("Wildcard binding requires private Compose mode")
+    elif not bind.is_private or bind.is_loopback or scope not in (None, "host_gateway"):
+        raise ValueError("Bridge must bind to an approved private Docker interface")
     cidrs = config.get("allow", [])
     if not isinstance(cidrs, list) or not cidrs or len(cidrs) > 8:
         raise ValueError("At least one private network allowlist is required")
