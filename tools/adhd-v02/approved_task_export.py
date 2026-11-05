@@ -17,7 +17,7 @@ import sqlite3
 import sys
 from urllib.parse import quote
 
-ID = re.compile(r"[A-Za-z0-9_-]{8,100}\\Z")
+ID = re.compile(r"[A-Za-z0-9_-]{8,100}\Z")
 MAX_EXPORT = 500
 FORMAT = "adhd-assistant-approved-task-intake"
 
@@ -52,7 +52,7 @@ def _normalize_task(ident: object, raw: object, approved_at: object) -> dict[str
     due = _safe_text(payload.get("due_at"), "due_at", 50)
     project = _safe_text(payload.get("project"), "project", 120)
     if due:
-        if not re.match(r"^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d", due):
+        if not re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d", due):
             raise ValueError("Invalid approved task due date")
         try:
             datetime.fromisoformat(due.replace("Z", "+00:00"))
