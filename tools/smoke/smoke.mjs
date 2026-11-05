@@ -129,7 +129,18 @@ await step("Adaptive Today launch, parking and cross-device persistence",async()
   await page.evaluate(()=>localStorage.removeItem('pixel-pals-focus-checkpoint-v1'));
   await page.goto(URL_);await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
 });
-await page.goto(URL_ + "/?workspace=1");
+// A previous adaptive-Today action can still finish its client-side navigation.
+// Playwright reports ERR_ABORTED when that navigation supersedes a goto; retry
+// only that transient case and require the real workspace-ready assertion.
+for (let attempt = 0; attempt < 3; attempt++) {
+  try {
+    await page.goto(URL_ + "/?workspace=1", { waitUntil: "domcontentloaded" });
+    break;
+  } catch (error) {
+    if (!String(error).includes("net::ERR_ABORTED") || attempt === 2) throw error;
+    await page.waitForTimeout(350);
+  }
+}
 await page.locator('.modular-workspace[aria-busy="false"]').waitFor({ timeout: 45000 });
 await page.waitForTimeout(3000);
 // Some entries live under the sidebar's "More" group.
