@@ -60,7 +60,7 @@ export function safeBridgeEndpoint(raw:string|undefined,allowDockerHost=false):s
   if(url.protocol!=="http:"||url.username||url.password||url.search||url.hash
     ||(url.pathname!=="/"&&url.pathname!==""))return null;
   const allowed=url.hostname==="127.0.0.1"||url.hostname==="localhost"
-    ||(allowDockerHost&&url.hostname==="host.docker.internal");
+    ||(allowDockerHost&&(url.hostname==="host.docker.internal"||url.hostname==="adhd-bridge"));
   return allowed?url.origin:null;
  }catch{return null;}
 }
