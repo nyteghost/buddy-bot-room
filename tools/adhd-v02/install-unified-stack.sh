@@ -43,7 +43,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 [[ "$COMPOSE_FILE" == /boot/config/plugins/compose.manager/projects/*/docker-compose.y*ml ]] || fail 'Unexpected Compose path outside Unraid Compose Manager; refusing automatic modification.'
 [ ! -L "$COMPOSE_FILE" ] || fail 'Compose file is a symbolic link; refusing unsafe edit.'
-[[ "$PROJECT" == pixelpals || "$PROJECT" == pixelpals-beta ]] || fail 'Unrecognized project name. Refusing to touch unrelated Compose projects.'
+[[ "$PROJECT" == pixelpals ]] || fail 'Only the verified pixelpals Compose project is supported; no changes made.'
 COMPOSE_DIR="$(dirname "$COMPOSE_FILE")"
 cd "$COMPOSE_DIR"
 [[ "$(docker inspect -f '{{.Config.Image}}' "$PIXEL_CONTAINER")" == "$IMAGE" ]] || fail 'Pixel Pals is not using the beta image expected for this installation.'
