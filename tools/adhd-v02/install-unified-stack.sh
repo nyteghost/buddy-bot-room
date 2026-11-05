@@ -47,6 +47,7 @@ fi
 COMPOSE_DIR="$(dirname "$COMPOSE_FILE")"
 cd "$COMPOSE_DIR"
 [[ "$(docker inspect -f '{{.Config.Image}}' "$PIXEL_CONTAINER")" == "$IMAGE" ]] || fail 'Pixel Pals is not using the beta image expected for this installation.'
+ORIGINAL_PIXEL_IMAGE_ID="$(docker inspect -f '{{.Image}}' "$PIXEL_CONTAINER")"
 
 [ -f "$APP/launch.py" ] && [ -f "$APP/pyproject.toml" ] && [ -f "$APP/adhd_assistant/server.py" ] || fail 'Expected ADHD-A source files are missing.'
 [ -d "$DATA" ] || fail 'ADHD-A persistent data folder is missing.'
@@ -131,6 +132,8 @@ rollback(){
     cp -p -- "$BACKUP_DIR/docker-compose.yml.before-unify" "$COMPOSE_FILE" || true
   fi
   if [ "$BUDDY_CHANGED" = 1 ]; then
+    # Restore the exact image that was running before the beta pull/recreate.
+    docker image tag "$ORIGINAL_PIXEL_IMAGE_ID" "$IMAGE" || true
     docker compose -p "$PROJECT" -f "$COMPOSE_FILE" up -d --no-deps --pull never "$BUDDY_SERVICE" || true
   fi
   if [ "$NEW_CREATED" = 1 ]; then
