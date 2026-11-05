@@ -64,7 +64,9 @@ a=c["adhd-assistant"]
 assert a["network_mode"]=="host"
 assert a["read_only"] is True
 bridge=c["adhd-bridge"]
-assert bridge["network_mode"]=="host"
+assert not bridge.get("network_mode")
+assert not bridge.get("ports")
+assert any("default" in name for name in bridge.get("networks",{}))
 assert bridge["read_only"] is True
 assert bridge["user"]=="99:100"
 assert bridge["command"]==["python","-B","/opt/bridge/bridge_v02.py","serve"]
@@ -74,7 +76,7 @@ assert any(v["target"]=="/data" for v in a["volumes"])
 b=c["buddy-bot"]
 assert b["environment"]["ADHD_BRIDGE_ENABLED"]=="1"
 assert b["environment"]["OTHER_SETTING_FROM_OVERRIDE"]=="untouched"
-assert b["environment"]["ADHD_BRIDGE_PEER_URL"]=="http://host.docker.internal:18766"
+assert b["environment"]["ADHD_BRIDGE_PEER_URL"]=="http://adhd-bridge:18766"
 assert any(v["target"]=="/run/secrets/adhd_bridge_token" and v["read_only"] for v in b["volumes"])
 assert any(v["target"]=="/data" for v in b["volumes"])
 print("PASS: unified multi-file Compose retains overrides, services, mounts and secrets")
@@ -114,6 +116,13 @@ with tempfile.TemporaryDirectory() as directory:
         raise AssertionError("loopback must not be a valid production bridge bind")
     except ValueError:
         pass
+    try:
+        bridge.make_server({"bind":"0.0.0.0","allow":["172.26.0.0/16"],"port":18766},"x"*48)
+        raise AssertionError("wildcard bind requires explicit Compose-only scope")
+    except ValueError:
+        pass
+    internal=bridge.make_server({"bind":"0.0.0.0","allow":["172.26.0.0/16"],"port":18766,"scope":"compose_private"},"x"*48)
+    internal.server_close()
     srv=bridge.BridgeServer(("127.0.0.1",0),bridge.Receiver)
     srv.allowed_networks=[ipaddress.ip_network("127.0.0.0/8")]
     srv.bridge_token="x"*48
