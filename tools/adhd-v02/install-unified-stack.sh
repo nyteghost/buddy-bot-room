@@ -205,7 +205,7 @@ chmod 600 "$DATA/bridge-v02.json"
 # Preflight against the *actual* private host gateway before stopping any app.
 # Use the exact same account, security settings, mounts and Python runtime as the bridge sidecar.
 say 'Preflighting bridge socket bind and file permissions as UID 99 (no app restarted).'
-if ! docker run --rm --network host --user 99:100 --read-only \
+if ! docker run --rm --network "$NETWORK" --user 99:100 --read-only \
   --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=8m \
   -e ADHD_DATA_DIR=/data \
   -v "$BRIDGE_DIR/bridge_v02.py:/opt/bridge/bridge_v02.py:ro" -v "$DATA:/data:ro" \
@@ -218,7 +218,8 @@ fi
 # write to the ADHD database. Only an unauthenticated capabilities GET is made.
 say 'Checking Pixel Pals -> bridge networking before restarting either application.'
 PROBE_NAME="adhd-bridge-preflight-${BASHPID}"
-docker run -d --rm --name "$PROBE_NAME" --network host --user 99:100 --read-only \
+trap 'docker stop "$PROBE_NAME" >/dev/null 2>&1 || true' EXIT
+docker run -d --rm --name "$PROBE_NAME" --network "$NETWORK" --network-alias adhd-bridge-preflight --user 99:100 --read-only \
   --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=8m \
   -e ADHD_DATA_DIR=/data \
   -v "$BRIDGE_DIR/bridge_v02.py:/opt/bridge/bridge_v02.py:ro" -v "$DATA:/data:ro" \
@@ -228,7 +229,7 @@ docker run -d --rm --name "$PROBE_NAME" --network host --user 99:100 --read-only
 PROBE_REACHABLE=0
 for i in $(seq 1 12); do
   if docker exec "$PIXEL_CONTAINER" bun -e \
-    'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
+    'fetch("http://adhd-bridge-preflight:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
     PROBE_REACHABLE=1
     break
   fi
@@ -242,7 +243,8 @@ if [ "$PROBE_REACHABLE" != 1 ]; then
 fi
 docker stop "$PROBE_NAME" >/dev/null ||
   fail 'Could not stop temporary bridge preflight; no application container was restarted.'
-say 'PASS: Pixel Pals can reach the authenticated bridge on its private Docker gateway.'
+trap - EXIT
+say 'PASS: Pixel Pals can reach the authenticated bridge on its private Compose network.'
 LEGACY_NAME="adhd-assistant-preunified-$(date -u +%Y%m%d%H%M%S)"
 COMPOSE_WRITTEN=0
 LEGACY_RENAMED=0
@@ -318,7 +320,6 @@ BEGIN { service=0; env=0; vol=0; services=0 }
  print "    image: python:3.12-alpine"
  print "    container_name: adhd-assistant-bridge"
  print "    restart: unless-stopped"
- print "    network_mode: host"
  print "    read_only: true"
  print "    tmpfs:"
  print "      - /tmp:rw,nosuid,nodev,size=32m"
@@ -336,7 +337,7 @@ BEGIN { service=0; env=0; vol=0; services=0 }
  print "      - "data":/data:rw"
  print "    command: [python, -B, /opt/bridge/bridge_v02.py, serve]"
  print "    healthcheck:"
- print "      test: [CMD, python, -B, -c, \"import socket; s=socket.create_connection((\047"gateway"\047,18766),timeout=3); s.close()\"]"
+ print "      test: [CMD, python, -B, -c, \"import socket; s=socket.create_connection((\047127.0.0.1\047,18766),timeout=3); s.close()\"]"
  print "      interval: 30s"
  print "      timeout: 6s"
  print "      retries: 3"
@@ -375,7 +376,7 @@ BEGIN { service=0; env=0; vol=0; services=0 }
 service && /^    environment:[[:space:]]*(#.*)?$/ {
  print
  print "      ADHD_BRIDGE_ENABLED: \"1\""
- print "      ADHD_BRIDGE_PEER_URL: http://host.docker.internal:18766"
+ print "      ADHD_BRIDGE_PEER_URL: http://adhd-bridge:18766"
  print "      ADHD_BRIDGE_ALLOW_DOCKER_HOST: \"1\""
  print "      ADHD_BRIDGE_PEER_TOKEN_FILE: /run/secrets/adhd_bridge_token"
  env++;next
@@ -422,13 +423,13 @@ for i in $(seq 1 25); do
   sleep 1
 done
 [ "$status" = 200 ] || { rollback; fail 'Compose-managed ADHD-A failed health check.'; }
-# Probe from the REAL Pixel Pals Docker network. Probing from the Unraid host
-# can legitimately return HTTP 403 because the bridge denies non-allowlisted clients.
+# Probe from the real Pixel Pals container using Docker's private service name.
+# The bridge has no published LAN ports and no host-gateway dependency.
 say 'Checking authenticated-only bridge from the Pixel Pals Docker network.'
 BRIDGE_REACHABLE=0
 for i in $(seq 1 30); do
   if docker exec "$PIXEL_CONTAINER" bun -e \
-    'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
+    'fetch("http://adhd-bridge:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
     BRIDGE_REACHABLE=1
     break
   fi
@@ -438,8 +439,7 @@ if [ "$BRIDGE_REACHABLE" != 1 ]; then
   say 'Bridge did not return HTTP 401 to Pixel Pals. Capturing safe diagnostics before rollback.'
   docker inspect --format 'bridge state={{.State.Status}} exit={{.State.ExitCode}}' adhd-assistant-bridge 2>/dev/null || true
   docker logs --tail 35 adhd-assistant-bridge 2>&1 | sed -E 's/(Bearer[[:space:]]+|token=)[A-Za-z0-9_+\/=.-]+/\\1[redacted]/g' || true
-  HOST_CODE="$(curl -sS --noproxy '*' --max-time 3 -o /dev/null -w '%{http_code}' "http://$GATEWAY:$PORT/bridge/v1/capabilities" 2>/dev/null || true)"
-  say "Unauthenticated host probe returned HTTP ${HOST_CODE:-000}. Host-only HTTP 403 may be normal."
+  say 'Bridge is accessible only by its private Docker service address.'
   rollback
   fail 'Standalone bridge connectivity failed; original containers restored.'
 fi
@@ -456,7 +456,7 @@ done
 [ "$health" = healthy ] || { rollback; fail 'Pixel Pals did not recover healthy after bridge activation.'; }
 docker exec "$PIXEL_CONTAINER" sh -c 'test -r /run/secrets/adhd_bridge_token' || { rollback; fail 'Pixel Pals cannot read the private bridge secret mount.'; }
 # Bridge must be reachable from Pixel Pals; never print or transmit the bearer token in logs.
-docker exec "$PIXEL_CONTAINER" bun -e 'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' || { rollback; fail 'Bridge is not reachable through the private Docker gateway.'; }
+docker exec "$PIXEL_CONTAINER" bun -e 'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' || { rollback; fail 'Bridge is not reachable through private Docker service DNS.'; }
 
 COMMITTED=1
 trap - ERR INT TERM
