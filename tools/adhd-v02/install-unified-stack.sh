@@ -202,6 +202,36 @@ if ! docker run --rm --network host --user 99:100 --read-only \
   'import json,runpy,pathlib; m=runpy.run_path("/opt/bridge/bridge_v02.py",run_name="preflight"); data=pathlib.Path("/data"); c=json.loads((data/"bridge-v02.json").read_text()); t=(data/"bridge-v02-token").read_text().strip(); s=m["make_server"](c,t); s.server_close(); print("PASS: bridge can bind private gateway with its real credentials")'; then
   fail 'Bridge runtime preflight failed before container migration; existing apps are still running.'
 fi
+# Verify the exact Docker-to-Docker path without touching the existing apps.
+# The temporary server sees the same read-only code and secret, but cannot
+# write to the ADHD database. Only an unauthenticated capabilities GET is made.
+say 'Checking Pixel Pals -> bridge networking before restarting either application.'
+PROBE_NAME="adhd-bridge-preflight-$"
+docker run -d --rm --name "$PROBE_NAME" --network host --user 99:100 --read-only \
+  --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=8m \
+  -e ADHD_DATA_DIR=/data \
+  -v "$BRIDGE_DIR/bridge_v02.py:/opt/bridge/bridge_v02.py:ro" -v "$DATA:/data:ro" \
+  --entrypoint python python:3.12-alpine \
+  -B /opt/bridge/bridge_v02.py serve >/dev/null ||
+    fail 'Could not start temporary bridge preflight container. Existing apps untouched.'
+PROBE_REACHABLE=0
+for i in $(seq 1 12); do
+  if docker exec "$PIXEL_CONTAINER" bun -e \
+    'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
+    PROBE_REACHABLE=1
+    break
+  fi
+  sleep 1
+done
+if [ "$PROBE_REACHABLE" != 1 ]; then
+  say 'Private network preflight failed; bridge diagnostics (no bearer tokens) follow.'
+  docker logs --tail 25 "$PROBE_NAME" 2>&1 || true
+  docker stop "$PROBE_NAME" >/dev/null 2>&1 || true
+  fail 'Pixel Pals cannot reach authenticated bridge. No application container was restarted.'
+fi
+docker stop "$PROBE_NAME" >/dev/null ||
+  fail 'Could not stop temporary bridge preflight; no application container was restarted.'
+say 'PASS: Pixel Pals can reach the authenticated bridge on its private Docker gateway.'
 LEGACY_NAME="adhd-assistant-preunified-$(date -u +%Y%m%d%H%M%S)"
 COMPOSE_WRITTEN=0
 LEGACY_RENAMED=0
