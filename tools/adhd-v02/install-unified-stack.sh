@@ -126,6 +126,13 @@ say "Patch target: $COMPOSE_FILE"
 say "Docker network: $NETWORK ($CIDR; gateway $GATEWAY)"
 say "ADHD-A source: $APP; data: $DATA"
 say 'The existing Caddy container will stay outside this stack and remain untouched.'
+# Compose may leave a second created-but-never-started buddy service after a
+# failed recreation. Report it rather than deleting or renaming any container.
+SHADOWS="$(docker ps -a --filter "label=com.docker.compose.project=$PROJECT" --filter "label=com.docker.compose.service=$BUDDY_SERVICE" --format '{{.Names}}|{{.State}}' | grep -v "^$PIXEL_CONTAINER|" || true)"
+if [ -n "$SHADOWS" ]; then
+  say 'NOTE: Extra Compose-managed Pixel Pals containers were detected; no container will be deleted:'
+  while IFS= read -r shadow; do say "  extra: $shadow"; done <<< "$SHADOWS"
+fi
 if [ "$MODE" = '--plan' ]; then
   say 'PLAN ONLY: add isolated v0.2 bridge sidecar, adopt existing ADHD-A dashboard without patching launch.py, and configure authenticated Pixel Pals connection. No changes made.'
   exit 0
@@ -231,6 +238,22 @@ rollback(){
   if [ "$LEGACY_RENAMED" = 1 ]; then
     docker rename "$LEGACY_NAME" "$CONTAINER" || true
     docker start "$CONTAINER" >/dev/null 2>&1 || true
+  fi
+  # A failed Compose recreation can leave the original Pixel Pals container stopped
+  # even after its YAML and image have been restored. Explicitly start by its
+  # original name instead of relying on Compose to finish recreating it.
+  if docker inspect "$PIXEL_CONTAINER" >/dev/null 2>&1; then
+    if [ "$(docker inspect -f '{{.State.Running}}' "$PIXEL_CONTAINER" 2>/dev/null || true)" != true ]; then
+      say 'Pixel Pals was stopped during rollback; attempting to restart the existing container.'
+      docker start "$PIXEL_CONTAINER" >/dev/null 2>&1 || true
+    fi
+    RESTORED_RUNNING="$(docker inspect -f '{{.State.Running}}' "$PIXEL_CONTAINER" 2>/dev/null || true)"
+    if [ "$RESTORED_RUNNING" != true ]; then
+      say 'WARNING: Pixel Pals is still stopped. Review Docker logs before trying another installation.'
+      docker inspect -f 'Pixel Pals: status={{.State.Status}} exit={{.State.ExitCode}} OOM={{.State.OOMKilled}}' "$PIXEL_CONTAINER" 2>/dev/null || true
+    fi
+  else
+    say 'WARNING: The original Pixel Pals container name is unavailable after rollback.'
   fi
   say "Rollback finished. The original source Compose backup remains at $BACKUP_DIR"
 }
