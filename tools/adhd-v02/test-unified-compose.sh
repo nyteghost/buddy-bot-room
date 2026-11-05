@@ -152,3 +152,17 @@ with tempfile.TemporaryDirectory() as directory:
     srv.server_close()
 print("PASS: authenticated standalone bridge serves, queues and deduplicates handoffs")
 PY
+
+# Regression: a preflight may succeed while the final Pixel Pals check still
+# targets an obsolete host-gateway address. Both checks must use private DNS.
+python3 - "$SELF/install-unified-stack.sh" <<'PY'
+from pathlib import Path
+import sys
+script=Path(sys.argv[1]).read_text()
+assert 'http://host.docker.internal:18766' not in script, "Old host-gateway endpoint remains"
+assert 'http://adhd-bridge-preflight:18766/bridge/v1/capabilities' in script, "Private preflight probe missing"
+final='docker exec "$PIXEL_CONTAINER" bun -e \'fetch("http://adhd-bridge:18766/bridge/v1/capabilities")'
+assert final in script, "Final post-recreation check must use Docker service DNS"
+assert "fail 'Bridge is not reachable through private Docker service DNS.'" in script
+print("PASS: final private bridge check uses same Docker service DNS as installed Compose")
+PY
