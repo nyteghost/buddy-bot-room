@@ -166,3 +166,6 @@ assert final in script, "Final post-recreation check must use Docker service DNS
 assert "fail 'Bridge is not reachable through private Docker service DNS.'" in script
 print("PASS: final private bridge check uses same Docker service DNS as installed Compose")
 PY
+
+# Read-only task intake preparation: future importer receives only owner-approved tasks.
+python3 -B "$SELF/test_approved_task_export.py"
