@@ -218,7 +218,7 @@ trap 'rollback; exit 130' INT TERM
 # Insert a service adjacent to the original Pixel Pals service in the same Compose file,
 # and inject a read-only token mount plus its path into the running Pixel Pals service.
 STAGED="$(mktemp "$COMPOSE_DIR/.unified-adhd-XXXXXX.yml")"
-awk -v buddy="$BUDDY_SERVICE" -v data="$DATA" -v app="$APP" -v gateway="$GATEWAY" '
+awk -v buddy="$BUDDY_SERVICE" -v data="$DATA" -v app="$APP" -v bridge_dir="$BRIDGE_DIR" -v gateway="$GATEWAY" '
 BEGIN { service=0; env=0; vol=0; services=0 }
 /^services:[[:space:]]*$/ {
  print
@@ -240,11 +240,11 @@ BEGIN { service=0; env=0; vol=0; services=0 }
  print "      PYTHONDONTWRITEBYTECODE: \"1\""
  print "      ADHD_DATA_DIR: /data"
  print "    volumes:"
- print "      - "app"/../bridge/bridge_v02.py:/opt/bridge/bridge_v02.py:ro"
+ print "      - "bridge_dir"/bridge_v02.py:/opt/bridge/bridge_v02.py:ro"
  print "      - "data":/data:rw"
  print "    command: [python, -B, /opt/bridge/bridge_v02.py, serve]"
  print "    healthcheck:"
- print "      test: [CMD, python, -B, -c, \"import socket; s=socket.create_connection((\\047"gateway"\\047,18766),timeout=3); s.close()\"]"
+ print "      test: [CMD, python, -B, -c, \"import socket; s=socket.create_connection((\047"gateway"\047,18766),timeout=3); s.close()\"]"
  print "      interval: 30s"
  print "      timeout: 6s"
  print "      retries: 3"
