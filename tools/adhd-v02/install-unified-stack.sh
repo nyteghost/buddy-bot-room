@@ -457,7 +457,7 @@ done
 [ "$health" = healthy ] || { rollback; fail 'Pixel Pals did not recover healthy after bridge activation.'; }
 docker exec "$PIXEL_CONTAINER" sh -c 'test -r /run/secrets/adhd_bridge_token' || { rollback; fail 'Pixel Pals cannot read the private bridge secret mount.'; }
 # Bridge must be reachable from Pixel Pals; never print or transmit the bearer token in logs.
-docker exec "$PIXEL_CONTAINER" bun -e 'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' || { rollback; fail 'Bridge is not reachable through private Docker service DNS.'; }
+docker exec "$PIXEL_CONTAINER" bun -e 'fetch("http://adhd-bridge:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' || { rollback; fail 'Bridge is not reachable through private Docker service DNS.'; }
 
 COMMITTED=1
 trap - ERR INT TERM
