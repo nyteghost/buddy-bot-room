@@ -19,6 +19,9 @@ jobs:
             bash -n scripts/install-unraid-beta.sh
             docker compose -f docker-compose.unraid-beta.yml config --quiet
           fi
+          bash -n tools/adhd-v02/install-bridge-overlay.sh
+          bash -n tools/adhd-v02/install-unified-stack.sh
+          bash tools/adhd-v02/test-unified-compose.sh
       - name: High and critical dependency security gate
         run: bun audit --audit-level high
       - name: TypeScript
