@@ -57,10 +57,17 @@ docker compose -p pixelpals -f "$TEMPDIR/unified.yml" -f "$TEMPDIR/docker-compos
 docker compose -p pixelpals -f "$TEMPDIR/unified.yml" -f "$TEMPDIR/docker-compose.override.yml" config --format json | python3 -c '
 import json,sys
 c=json.load(sys.stdin)["services"]
-assert {"buddy-bot","whisper","adhd-assistant","auxiliary-service"} <= set(c)
+assert {"buddy-bot","whisper","adhd-assistant","adhd-bridge","auxiliary-service"} <= set(c)
 a=c["adhd-assistant"]
 assert a["network_mode"]=="host"
 assert a["read_only"] is True
+bridge=c["adhd-bridge"]
+assert bridge["network_mode"]=="host"
+assert bridge["read_only"] is True
+assert bridge["user"]=="99:100"
+assert bridge["command"]==["python","-B","/opt/bridge/bridge_v02.py","serve"]
+assert any(v["target"]=="/opt/bridge/bridge_v02.py" and v["read_only"] for v in bridge["volumes"])
+assert any(v["target"]=="/data" for v in bridge["volumes"])
 assert any(v["target"]=="/data" for v in a["volumes"])
 b=c["buddy-bot"]
 assert b["environment"]["ADHD_BRIDGE_ENABLED"]=="1"
@@ -88,3 +95,49 @@ PY
 selected="$(bash "$TEMPDIR/select.sh" "$TEMPDIR/docker-compose.yml" "$TEMPDIR/docker-compose.override.yml")"
 [ "$selected" = "$TEMPDIR/docker-compose.yml" ] || { echo 'Unsafe multi-file edit target' >&2; exit 1; }
 echo 'PASS: multi-file selection edits only the owning Compose source'
+
+# The bridge must run without editing launch.py or loading the ordinary dashboard.
+python3 -m py_compile "$SELF/bridge_v02.py"
+python3 - "$SELF/bridge_v02.py" <<'PY'
+import importlib.util, ipaddress, json, pathlib, sys, tempfile, threading
+from urllib import request, error
+source=pathlib.Path(sys.argv[1])
+spec=importlib.util.spec_from_file_location("bridge",source)
+bridge=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bridge)
+with tempfile.TemporaryDirectory() as directory:
+    bridge.DB=pathlib.Path(directory)/"bridge.sqlite3"
+    try:
+        bridge.make_server({"bind":"127.0.0.1","allow":["127.0.0.0/8"],"port":18766},"x"*48)
+        raise AssertionError("loopback must not be a valid production bridge bind")
+    except ValueError:
+        pass
+    srv=bridge.BridgeServer(("127.0.0.1",0),bridge.Receiver)
+    srv.allowed_networks=[ipaddress.ip_network("127.0.0.0/8")]
+    srv.bridge_token="x"*48
+    runner=threading.Thread(target=srv.serve_forever,daemon=True)
+    runner.start()
+    base="http://127.0.0.1:"+str(srv.server_port)
+    def send(path,payload=None,secret=None):
+        data=None if payload is None else json.dumps(payload).encode()
+        headers={"Content-Type":"application/json"}
+        if secret: headers["Authorization"]="Bearer "+secret
+        req=request.Request(base+path,data=data,headers=headers)
+        try:
+            with request.urlopen(req,timeout=3) as response:
+                return response.status,json.loads(response.read())
+        except error.HTTPError as problem:
+            return problem.code,json.loads(problem.read())
+    assert send("/bridge/v1/capabilities")[0]==401
+    assert send("/bridge/v1/capabilities",secret="x"*48)[0]==200
+    msg={"id":"bridgeSmoke123","kind":"task","payload":{"title":"Beta smoke task"}}
+    status,body=send("/bridge/v1/messages",msg,"x"*48)
+    assert status==202 and body["status"]=="received_pending_approval"
+    status,body=send("/bridge/v1/messages",msg,"x"*48)
+    assert status==202 and body["duplicate"] is True
+    status,body=send("/bridge/v1/handoffs/bridgeSmoke123",secret="x"*48)
+    assert status==200 and body["state"]=="pending"
+    srv.shutdown()
+    srv.server_close()
+print("PASS: authenticated standalone bridge serves, queues and deduplicates handoffs")
+PY
