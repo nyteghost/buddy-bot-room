@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { currentUser } from "./accounts.server";
 import {
  draftHandoff,receivedReceipt,parseReceiverStatus,safeBridgeEndpoint,transitionHandoff,
@@ -10,7 +11,16 @@ const directory=()=>process.env["BUDDY_DATA_DIR"]?.trim().replace(/\/+$/,"")||""
 const file=()=>directory()+"/adhd-bridge-outbox.json";
 const enabled=()=>process.env["ADHD_BRIDGE_ENABLED"]==="1";
 const endpoint=()=>safeBridgeEndpoint(process.env["ADHD_BRIDGE_PEER_URL"],process.env["ADHD_BRIDGE_ALLOW_DOCKER_HOST"]==="1");
-const token=()=>process.env["ADHD_BRIDGE_PEER_TOKEN"]||"";
+const token=()=>{
+ const file=process.env["ADHD_BRIDGE_PEER_TOKEN_FILE"]?.trim();
+ if(file){
+  // The secret is supplied as a read-only Docker bind mount, not a Compose variable.
+  // A missing/inaccessible secret disables the bridge rather than exposing a token.
+  if(!file.startsWith("/run/secrets/")||file.includes("..")||file.length>160)return "";
+  try{return readFileSync(file,"utf8").trim().slice(0,256);}catch{return "";}
+ }
+ return process.env["ADHD_BRIDGE_PEER_TOKEN"]||"";
+};
 let chain:Promise<unknown>=Promise.resolve();
 const locked=<T,>(task:()=>Promise<T>):Promise<T>=>{
  const next=chain.then(task,task);chain=next.catch(()=>undefined);return next;
