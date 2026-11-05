@@ -132,6 +132,9 @@ SHADOWS="$(docker ps -a --filter "label=com.docker.compose.project=$PROJECT" --f
 if [ -n "$SHADOWS" ]; then
   say 'NOTE: Extra Compose-managed Pixel Pals containers were detected; no container will be deleted:'
   while IFS= read -r shadow; do say "  extra: $shadow"; done <<< "$SHADOWS"
+  if [ "$MODE" = '--install' ]; then
+    fail 'Duplicate Pixel Pals service containers exist. Resolve the created-only shadow container explicitly before recreating Pixel Pals; no data or containers changed.'
+  fi
 fi
 if [ "$MODE" = '--plan' ]; then
   say 'PLAN ONLY: add isolated v0.2 bridge sidecar, adopt existing ADHD-A dashboard without patching launch.py, and configure authenticated Pixel Pals connection. No changes made.'
