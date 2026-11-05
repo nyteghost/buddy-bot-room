@@ -144,7 +144,8 @@ fi
 # Preflight a beta image with support for read-only token-file credentials, before touching running containers.
 say 'Downloading current beta image and checking token-file bridge support.'
 docker pull "$IMAGE" >/dev/null || fail 'Cannot pull the Pixel Pals beta image.'
-docker run --rm --network none --entrypoint sh "$IMAGE" -c 'grep -q ADHD_BRIDGE_PEER_TOKEN_FILE /app/src/lib/adhd-bridge.server.ts' || fail 'The published beta image lacks the new token-file bridge support. Nothing has been migrated.'
+docker run --rm --network none --entrypoint sh "$IMAGE" -c 'grep -q ADHD_BRIDGE_PEER_TOKEN_FILE /app/src/lib/adhd-bridge.server.ts && grep -Fq '\''url.hostname==="adhd-bridge"'\'' /app/src/lib/adhd-bridge.ts' ||
+  fail 'The published beta image lacks private Docker-service bridge support. No running containers were modified.'
 
 # Verify standalone bridge code before any running container is modified.
 say 'Downloading and syntax-checking isolated bridge service (no launch.py patch).'
