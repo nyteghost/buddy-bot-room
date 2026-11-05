@@ -184,6 +184,17 @@ if [ ! -f "$DATA/bridge-v02.json" ]; then
 fi
 chown 99:100 "$DATA/bridge-v02.json" || true
 chmod 600 "$DATA/bridge-v02.json"
+# Preflight against the *actual* private host gateway before stopping any app.
+# Use the exact same account, security settings, mounts and Python runtime as the bridge sidecar.
+say 'Preflighting bridge socket bind and file permissions as UID 99 (no app restarted).'
+if ! docker run --rm --network host --user 99:100 --read-only \
+  --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:rw,nosuid,nodev,size=8m \
+  -e ADHD_DATA_DIR=/data \
+  -v "$BRIDGE_DIR/bridge_v02.py:/opt/bridge/bridge_v02.py:ro" -v "$DATA:/data:ro" \
+  --entrypoint python python:3.12-alpine -B -c \
+  'import json,runpy,pathlib; m=runpy.run_path("/opt/bridge/bridge_v02.py",run_name="preflight"); data=pathlib.Path("/data"); c=json.loads((data/"bridge-v02.json").read_text()); t=(data/"bridge-v02-token").read_text().strip(); s=m["make_server"](c,t); s.server_close(); print("PASS: bridge can bind private gateway with its real credentials")'; then
+  fail 'Bridge runtime preflight failed before container migration; existing apps are still running.'
+fi
 LEGACY_NAME="adhd-assistant-preunified-$(date -u +%Y%m%d%H%M%S)"
 COMPOSE_WRITTEN=0
 LEGACY_RENAMED=0
@@ -341,13 +352,27 @@ for i in $(seq 1 25); do
   sleep 1
 done
 [ "$status" = 200 ] || { rollback; fail 'Compose-managed ADHD-A failed health check.'; }
-bridge_status=""
+# Probe from the REAL Pixel Pals Docker network. Probing from the Unraid host
+# can legitimately return HTTP 403 because the bridge denies non-allowlisted clients.
+say 'Checking authenticated-only bridge from the Pixel Pals Docker network.'
+BRIDGE_REACHABLE=0
 for i in $(seq 1 30); do
-  bridge_status="$(curl -sS --max-time 3 --noproxy '*' -o /dev/null -w '%{http_code}' "http://$GATEWAY:$PORT/bridge/v1/capabilities" 2>/dev/null || true)"
-  [ "$bridge_status" = 401 ] && break
+  if docker exec "$PIXEL_CONTAINER" bun -e \
+    'fetch("http://host.docker.internal:18766/bridge/v1/capabilities").then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))' >/dev/null 2>&1; then
+    BRIDGE_REACHABLE=1
+    break
+  fi
   sleep 2
 done
-[ "$bridge_status" = 401 ] || { rollback; fail 'Standalone bridge did not start with authentication.'; }
+if [ "$BRIDGE_REACHABLE" != 1 ]; then
+  say 'Bridge did not return HTTP 401 to Pixel Pals. Capturing safe diagnostics before rollback.'
+  docker inspect --format 'bridge state={{.State.Status}} exit={{.State.ExitCode}}' adhd-assistant-bridge 2>/dev/null || true
+  docker logs --tail 35 adhd-assistant-bridge 2>&1 | sed -E 's/(Bearer[[:space:]]+|token=)[A-Za-z0-9_+\/=.-]+/\\1[redacted]/g' || true
+  HOST_CODE="$(curl -sS --noproxy '*' --max-time 3 -o /dev/null -w '%{http_code}' "http://$GATEWAY:$PORT/bridge/v1/capabilities" 2>/dev/null || true)"
+  say "Unauthenticated host probe returned HTTP ${HOST_CODE:-000}. Host-only HTTP 403 may be normal."
+  rollback
+  fail 'Standalone bridge connectivity failed; original containers restored.'
+fi
 
 # Only Pixel Pals is recreated for its new read-only secret mount and environment.
 say 'Enabling the private bridge in Pixel Pals (beta only).'
