@@ -152,3 +152,41 @@ The new regression file `tools/adhd-v02/test_native_handoff_reconcile.py` exerci
 3. Add a native handoff review/approval UI inside ADHD Assistant rather than relying on terminal approval.
 4. Provide an owner-reviewed, backup-first Unraid upgrade path. Only after explicit approval, enable task creation and test one harmless handoff.
 5. Keep the private Docker bridge and Pixel Pals independent if ADHD Assistant is stopped.
+
+
+## Native pairing readiness — read-only diagnostics (November 6, 2026)
+
+The owner inspected their installed native ADHD Assistant v0.1 server **without displaying peer secrets**:
+
+- Native Store includes `__init__`, `connect`, `add_peer`, `update_peer`, `setting`, and `backup`.
+- Native `bridge_enabled` setting: **unset** (equivalent to off for our integration).
+- Native enabled peer count: **0**.
+- The separate `adhd-assistant-bridge` sidecar already works; it is not the same as the native Store's peer registration and approval queue.
+
+No native peer was added and no setting was modified.
+
+`tools/adhd-v02/native_pairing_preflight.py` now provides a **read-only** readiness diagnostic. It parses method signatures using Python's AST without importing or executing the installed application source, queries only schema and aggregate peer metadata, and opens the native SQLite database with `mode=ro` and `query_only=ON`. It never reads peer tokens, task titles or private memories and does not log peer IDs or endpoints.
+
+Developer-only example for an environment where code and data are already accessible:
+
+```bash
+python3 -B tools/adhd-v02/native_pairing_preflight.py \
+  --source-root /path/to/source \
+  --database /path/to/existing/adhd.sqlite3
+```
+
+The JSON report includes `native_schema_matches`, `native_store_methods_present`, `native_bridge_enabled`, `enabled_native_peer_count`, `ready_for_staging` and named readiness blockers. **Even when all readiness checks pass**, `live_task_creation_authorized` is always false; explicit owner authorization and separate staging tests are still required.
+
+Automated fixture tests: `python3 -B tools/adhd-v02/test_native_pairing_preflight.py` (included in CI). The actual Unraid installation has **not** been modified or inspected by this new script.
+
+### Pairing and delivery design still to finish
+
+Do not enable the native `bridge_enabled` setting or register peers just to satisfy a test; doing so could activate unrelated outgoing-sharing capabilities in the native application. Before pairing:
+
+1. Inspect native `Store.__init__`, `Store.add_peer`, `Store.setting`, and `Store.backup` bodies and `server._local` authorization (source only, no secrets).
+2. Decide whether to use a distinct, narrowly scoped `Pixel Pals task intake` permission instead of enabling the wider native bridge feature.
+3. Rehearse the native adapter against the **real** ADHD Assistant source using disposable databases and a private backup directory; fixture-only tests do not prove live compatibility.
+4. Verify opt-in creation of the native peer record and a secure way to store its bearer token, without exposing a dashboard/admin endpoint on the Docker network.
+5. Only with explicit approval, stage the change in a backup-preserving environment, inspect the single test handoff, and then consider an in-app review UI.
+
+This diagnostic does not authorize or schedule an installation.
