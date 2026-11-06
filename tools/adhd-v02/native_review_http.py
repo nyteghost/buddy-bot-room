@@ -96,7 +96,7 @@ def _read_action(handler, fields: set[str]) -> dict:
     return body
 
 
-def handle_get(handler, *, bridge_db: Path, page_dir: Path) -> bool:
+def handle_get(handler, *, bridge_db: Path, page_dir: Path, store) -> bool:
     route = urlsplit(handler.path)
     if route.path not in (PAGE, API):
         return False
@@ -108,7 +108,7 @@ def handle_get(handler, *, bridge_db: Path, page_dir: Path) -> bool:
     else:
         if handler.headers.get("X-ADHD-Review") != "1":
             raise PermissionError("Review inbox requires a same-origin header")
-        _json(handler, 200, list_inbox(bridge_db))
+        _json(handler, 200, list_inbox(bridge_db, native_store=store))
     return True
 
 
