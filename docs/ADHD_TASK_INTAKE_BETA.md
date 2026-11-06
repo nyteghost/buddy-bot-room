@@ -51,3 +51,38 @@ If needed in a separately approved developer environment, `approved_task_export.
 5. Only after staging tests and owner permission, install the new importer on Unraid. Existing Caddy, the bridge sidecar and Pixel Pals should remain independently functional.
 
 Work on Pixel Pals HD character art is separate and must not modify this bridge contract or ADHD runtime.
+
+
+## Read-only preview against the verified ADHD-A v0.1 schema
+
+The owner provided a read-only schema inspection on November 5, 2026. The installed `adhd.sqlite3` has `tasks` with these columns:
+
+`id, title, notes, due_at, status, project_id, source, created_at, updated_at`.
+
+The installed `projects` table has:
+
+`id, title, next_action, notes, status, created_at, updated_at`.
+
+No task or memory rows were exposed by that inspection. It **did not establish task status conventions, uniqueness on `source`, defaults, or the dashboard's normal task-creation API**.
+
+`tools/adhd-v02/approved_task_plan.py` is a second **read-only development step**:
+
+- Opens the bridge and ADHD task databases using SQLite `mode=ro` with `query_only=ON`.
+- Uses the approved handoff snapshot as the only candidate input.
+- Checks the installed task table shape against the verified v0.1 columns.
+- Looks only at `tasks.source` values to identify already-present `pixel-pals:<handoff-id>` records.
+- Holds tasks specifying a project name for manual foreign-key mapping: a project name is **not** a safe `project_id`.
+- Detects duplicate existing source identifiers instead of guessing which task is correct.
+- Prints aggregate counts only; never prints private titles, notes, project names, source IDs, or existing task contents.
+- Does not create/update tasks, mark handoffs consumed, change indexes, or restart services.
+
+Developer-only example, against a **disposable copy** of both SQLite databases:
+
+```bash
+python3 -B tools/adhd-v02/test_approved_task_plan.py
+python3 -B tools/adhd-v02/approved_task_plan.py --bridge-data-dir /path/to/safe-fixture --adhd-data-dir /path/to/safe-fixture
+```
+
+This preview helper is committed to GitHub beta but **has not been mounted or deployed** into the user's live Unraid containers. Existing data remains untouched.
+
+Before implementing any actual import writes, inspect the original ADHD Assistant task API, task status values, indexes/constraints, and recovery semantics. A source ID alone provides a stable matching key, but does **not** automatically enforce a unique source constraint: an approved importer needs transaction-safe deduplication and should preferably use the app's normal task API/storage layer, not bypass it with unreviewed SQL.
