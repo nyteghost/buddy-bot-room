@@ -193,12 +193,11 @@ def main(argv: list[str] | None = None) -> int:
         bridge_db = args.bridge_data_dir / "bridge-v02.sqlite3"
         tasks_db = args.adhd_data_dir / "adhd.sqlite3"
         if args.apply:
-            if args.backup_dir is None:
-                raise ValueError("Private backup directory required for import")
-            result = apply_explicitly_approved(bridge_db, tasks_db,
-                task_status=args.status, confirm=args.confirm, backup_dir=args.backup_dir)
-        else:
-            result = preview(bridge_db, tasks_db)
+            # Raw SQL bypasses ADHD-A's native handoff and audit workflow.
+            # Keep this legacy writer fixture-test-only. Never permit CLI use
+            # against real Unraid data; integration must use native Store APIs.
+            raise ValueError("Direct SQLite task creation is disabled; use native handoff review")
+        result = preview(bridge_db, tasks_db)
         print(json.dumps(result, sort_keys=True))
         return 0
     except (OSError, sqlite3.Error, ValueError, TypeError) as error:
