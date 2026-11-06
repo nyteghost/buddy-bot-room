@@ -48,6 +48,31 @@ class InboxTests(LocalIntakeTests):
         self.assertEqual(self.native_count("peers"), 0)
         self.assertFalse(self.store.native_bridge_enabled)
 
+    def test_linked_task_badge_uses_only_native_id_and_source(self):
+        self.handoff("pending000001",approved=False,event=False)
+        review(self.bridge,handoff_id="pending000001",
+               decision="approve",owner_confirmation=APPROVE_CONFIRM)
+        before=list_inbox(self.bridge,native_store=self.store)["items"][0]
+        self.assertEqual(before["native_state"],"unlinked")
+        import_task(self.bridge,self.store,handoff_id="pending000001",
+                    owner_confirmation=IMPORT_CONFIRM)
+        after=list_inbox(self.bridge,native_store=self.store)["items"][0]
+        self.assertEqual(after["native_state"],"linked")
+
+    def test_conflicting_task_source_flagged_not_imported(self):
+        self.handoff("pending000001",approved=False,event=False)
+        review(self.bridge,handoff_id="pending000001",
+               decision="approve",owner_confirmation=APPROVE_CONFIRM)
+        with self.store.connect() as db:
+            db.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,'now','now')",
+                       ("handoff-pending000001","Somebody else","",None,
+                        "open",None,"manual"))
+        view=list_inbox(self.bridge,native_store=self.store)["items"][0]
+        self.assertEqual(view["native_state"],"conflict")
+        with self.assertRaisesRegex(ValueError,"different source"):
+            import_task(self.bridge,self.store,handoff_id="pending000001",
+                        owner_confirmation=IMPORT_CONFIRM)
+
     def test_reject_is_final_and_cannot_turn_into_task(self):
         self.handoff("pending000001",approved=False,event=False)
         result = review(self.bridge, handoff_id="pending000001",
