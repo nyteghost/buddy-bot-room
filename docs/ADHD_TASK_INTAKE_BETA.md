@@ -286,3 +286,19 @@ The browser inbox modules and tests now include `prepare-native-review-patch.py`
 The inbox now checks the **full native handoff** (direction, peer provenance, kind, original approved payload, native approval state and task source) before labeling a task as linked. A matching task ID alone is insufficient. Interrupted native approvals display as pending and require an explicit second confirmation to finish. Any mismatch disables the import action.
 
 The new regression suite `test_prepare_native_review_patch.py` tests that unfamiliar native auth methods, route parsing, duplicate routes, ambiguous HTTP handlers and unsafe staging paths fail closed; it also confirms the original server file remains byte-for-byte untouched.
+
+
+## Installed native browser authorization verified — Caddy remains a deployment blocker (November 6, 2026)
+
+The user provided a read-only source inspection of the installed `adhd_assistant/server.py`:
+
+- `_local()` checks the `X-ADHD-Local-Token` header using `hmac.compare_digest` against the server's private local token.
+- When `Origin` is present, its hostname must be loopback and its port must equal the native server's bound port.
+- `Host` must also resolve to `127.0.0.1`, `localhost`, or `::1`.
+- `do_GET` uses the exact source idiom `url=urlsplit(self.path);path=url.path;params=parse_qs(url.query)`, not the earlier fixture's `path=urlsplit(self.path).path`.
+
+`prepare-native-review-patch.py` now supports both AST-verified URL idioms without changing `_local()`. It reports flags for the local-token guard, loopback Host restriction, loopback Origin restriction and **always states that Caddy proxy behavior and browser writes are not verified**. The test fixture mirrors the installed source, including semicolon-separated statements, and exercises malformed or ambiguous path parsing.
+
+**Do not install the browser review page or enable write routes yet.** The user views ADHD Assistant through an existing HTTPS Caddy reverse proxy, rather than visiting the native `127.0.0.1:8765` server directly. A browser POST from that public-facing local-network origin may be rejected by native `_local()` if Caddy forwards `Origin` unchanged; forwarding a loopback `Host` to satisfy native checks can also conflict with the staged route's stricter Origin/Host comparison. Both native authorization **and** the existing Caddy Basic Auth must remain effective. We must inspect proxy header handling read-only and test a disposable HTTP stack before any deployment. Do **not** blindly strip Origin, disable the local token check, open a new port, or relax loopback restrictions to make the new page work.
+
+The existing Pixel Pals → sidecar handoff bridge is unaffected by this issue; it is separate from the native browser inbox.
