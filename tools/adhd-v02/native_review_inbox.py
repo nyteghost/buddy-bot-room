@@ -20,7 +20,7 @@ from typing import Any
 from urllib.parse import quote
 
 from native_local_intake import CONFIRM as IMPORT_CONFIRM
-from native_local_intake import LOCAL_SOURCE, link_local_task, preview_local_task
+from native_local_intake import link_local_task, preview_local_task
 
 HANDOFF_ID = re.compile(r"[A-Za-z0-9_-]{8,100}\Z")
 MAX_PAGE_SIZE = 50
@@ -92,28 +92,24 @@ def list_inbox(bridge_db: Path, *, native_store: Any = None,
                ORDER BY created_at DESC, id DESC LIMIT ?""", (limit,)
         ).fetchall()
         items = [_normalize(row) for row in rows]
-    # Only the installed Store may verify whether a reviewed handoff has
-    # become a real ADHD task. Never read titles, notes or memory from its DB.
-    approved_tasks = [item for item in items
-                      if item["state"] == "approved" and item["kind"] == "task"]
-    for item in approved_tasks:
-        item["native_state"] = "unverified"
-    if approved_tasks and native_store is not None:
-        keys = ["handoff-" + item["id"] for item in approved_tasks]
-        placeholders = ",".join("?" for _ in keys)
-        with native_store.connect() as db:
-            rows = db.execute(
-                "SELECT id,source FROM tasks WHERE id IN (" + placeholders + ")", keys
-            ).fetchall()
-        matched = {row["id"]: row["source"] for row in rows}
-        for item in approved_tasks:
-            found = matched.get("handoff-" + item["id"])
-            if found == "bridge:" + LOCAL_SOURCE:
-                item["native_state"] = "linked"
-            elif found is not None:
-                item["native_state"] = "conflict"
-            else:
-                item["native_state"] = "unlinked"
+    # Verify the full native handoff identity, state, source and approved
+    # payload. A matching task ID/source ALONE does not prove it was linked.
+    for item in items:
+        if item["state"] == "approved" and item["kind"] == "task":
+            item["native_state"] = "unverified"
+            if native_store is not None:
+                try:
+                    state = preview_local_task(
+                        bridge_db, native_store, handoff_id=item["id"]
+                    )["native_state"]
+                    if state in ("linked", "unlinked", "native-pending"):
+                        item["native_state"] = state
+                    else:
+                        item["native_state"] = "conflict"
+                except (ValueError, sqlite3.DatabaseError):
+                    # Fail closed: never offer task import if identity or
+                    # store state cannot be verified. No private error output.
+                    item["native_state"] = "conflict"
     pending = sum(x["state"] == "pending" for x in items)
     approved = sum(x["state"] == "approved" for x in items)
     return {"items": items, "pending_in_view": pending,
