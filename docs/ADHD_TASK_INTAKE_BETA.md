@@ -119,3 +119,36 @@ The owner ran another **read-only** SQLite inspection of the installed `/data/ad
 - The only observed indexes are `task_due_idx` and the SQLite primary-key autoindex.
 
 The experimental importer has been updated to check the verified NOT NULL/default contract, allow **only the verified `open` status** without requiring an existing task row, and convert omitted notes to `''`. The regression fixture now matches the actual v0.1 DDL and starts with an empty `tasks` table. The import remains an **undeployed development prototype**: the dashboard's task-creation endpoint and application-layer validations still must be reviewed before any live import is authorized.
+
+## Native ADHD Assistant handoff adapter — preferred path (November 6, 2026)
+
+A read-only inspection of the **installed** ADHD Assistant v0.1 source clarified that it already implements the correct task-creation and audit workflow:
+
+- `Store.create_handoff(kind, payload, peer_id, direction="in", message_id=...)` creates or deduplicates an incoming native handoff and rejects ID/payload/peer collisions.
+- `Store.approve_handoff(message_id)` reviews a pending native handoff, creates exactly one `open` task with ID `handoff-<message_id>`, and records `handoff.approved` in its audit log.
+- `POST /api/handoff/approve` invokes that Store method from ADHD Assistant's existing local-only API.
+
+The **installed bridge sidecar uses a separate SQLite queue** and its CLI approval does not invoke the native Store. This is why sidecar-approved tasks currently do not appear in the dashboard.
+
+`tools/adhd-v02/native_handoff_reconcile.py` introduces a small, **injectable and undeployed** integration adapter using the native Store instead of directly inserting task records:
+
+- Requires the bridge-side receiver to have already approved a task, with a matching approval audit event.
+- Requires an explicit handoff ID, a previously registered **enabled native ADHD peer ID**, and a distinct confirmation string for owner-authorized linking.
+- Requires `native_store.backup()` to succeed before writing through the native Store methods.
+- Uses native `create_handoff` and `approve_handoff`, preserving the existing `handoff-<id>` task IDs, task status rules, native audit trail and idempotency.
+- When a native pending handoff exists after an interruption, the adapter can finish its native approval on an explicitly approved retry; it does not replace or overwrite existing tasks.
+- Refuses native rejected records, mismatched IDs or payloads, missing task records after native approval, disabled/unregistered peers, and handoffs whose project names need mapping.
+- Returns only status labels and backup presence. It does **not** echo task titles, notes, peer tokens, or private memory.
+- Does not auto-import all handoffs and does not grant imported character assets any tool, memory, or AI permissions.
+
+**Important:** This is a reusable library, NOT a command to run on Unraid. The installed native Store must be inspected further for its constructor and peer registration details before providing an owner-facing installer or calling these methods in the live dashboard. The existing `reviewed_task_import.py` raw-SQL implementation remains a **fixture-only experimental prototype** and should NOT be deployed; native handoff approval is the preferred pathway.
+
+The new regression file `tools/adhd-v02/test_native_handoff_reconcile.py` exercises the API contract using disposable SQLite bridge and native Store fixture databases. No actual user task content is used and no running Unraid container is touched.
+
+### Next steps to deploy native linking safely
+
+1. Confirm the installed native Store initialization, peer registration and backup methods using **read-only source inspection**. Never display peer tokens.
+2. Test against the **actual ADHD-A v0.1 source** copied into a disposable container/fixture, including crashes and duplicate link attempts.
+3. Add a native handoff review/approval UI inside ADHD Assistant rather than relying on terminal approval.
+4. Provide an owner-reviewed, backup-first Unraid upgrade path. Only after explicit approval, enable task creation and test one harmless handoff.
+5. Keep the private Docker bridge and Pixel Pals independent if ADHD Assistant is stopped.
