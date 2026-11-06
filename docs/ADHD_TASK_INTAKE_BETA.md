@@ -302,3 +302,12 @@ The user provided a read-only source inspection of the installed `adhd_assistant
 **Do not install the browser review page or enable write routes yet.** The user views ADHD Assistant through an existing HTTPS Caddy reverse proxy, rather than visiting the native `127.0.0.1:8765` server directly. A browser POST from that public-facing local-network origin may be rejected by native `_local()` if Caddy forwards `Origin` unchanged; forwarding a loopback `Host` to satisfy native checks can also conflict with the staged route's stricter Origin/Host comparison. Both native authorization **and** the existing Caddy Basic Auth must remain effective. We must inspect proxy header handling read-only and test a disposable HTTP stack before any deployment. Do **not** blindly strip Origin, disable the local token check, open a new port, or relax loopback restrictions to make the new page work.
 
 The existing Pixel Pals → sidecar handoff bridge is unaffected by this issue; it is separate from the native browser inbox.
+
+
+## Read-only Unraid source preflight without another screenshot (November 6, 2026)
+
+`tools/adhd-v02/run-native-review-preflight.sh` is available in GitHub beta. It downloads only the reviewed patcher and inbox module sources from the pinned GitHub commit, runs a **new disposable Python container with `--network none`, `--read-only`, dropped capabilities and no `/data` mount**, and parses the existing `server.py` code read-only. It never installs routes, imports user tasks, changes Caddy or starts a new listener.
+
+The report includes `native_auth_contract`, confirming whether the code contains the local token, loopback Host restriction and loopback Origin restriction. It explicitly marks `caddy_proxy_behavior_verified: false`, `browser_write_routes_ready_for_deployment: false` and `live_installation_authorized: false`. Source compatibility is **not** proof that the remote browser origin will work through Caddy.
+
+On a read-only preflight failure, leave all running apps untouched; the next step is source review, not force-applying a patch. On a passing preflight, the next step is a **redacted Caddy header and authentication inspection**, not installation. Do not disclose the native session token, Caddy Basic Auth hashes, private task titles or memory contents in diagnostic output.
