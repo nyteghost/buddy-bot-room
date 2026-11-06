@@ -111,10 +111,16 @@ function render(item,container) {
       "Rejection","Reject this handoff? You cannot import it afterward.",
       api+"/review",{id:item.id,decision:"reject"}),false);
   }
-  if(item.state==="approved" && item.kind==="task" && !item.project) {
-    actionButton(controls,"Add to ADHD Tasks",()=>runAction(
-      "Task import","Create this approved task in ADHD Assistant? A database backup will be made first.",
-      api+"/import",{id:item.id}),true);
+  if(item.state==="approved" && item.kind==="task") {
+    if(item.native_state==="linked") {
+      addText(box,"p","Already added to ADHD Tasks.","muted");
+    } else if(item.native_state==="conflict" || item.native_state==="unverified") {
+      addText(box,"p","Import needs a safety review. No changes made.","muted");
+    } else if(!item.project && item.native_state==="unlinked") {
+      actionButton(controls,"Add to ADHD Tasks",()=>runAction(
+        "Task import","Create this approved task in ADHD Assistant? A database backup will be made first.",
+        api+"/import",{id:item.id}),true);
+    }
   }
   if(controls.children.length) box.append(controls);
   container.append(box);
