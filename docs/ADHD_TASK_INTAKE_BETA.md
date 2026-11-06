@@ -190,3 +190,21 @@ Do not enable the native `bridge_enabled` setting or register peers just to sati
 5. Only with explicit approval, stage the change in a backup-preserving environment, inspect the single test handoff, and then consider an in-app review UI.
 
 This diagnostic does not authorize or schedule an installation.
+
+
+## A more restrictive option: local-only native Store handoff (November 6, 2026)
+
+A subsequent read-only inspection of the installed `adhd_assistant/database.py` showed why enabling the native network bridge is inappropriate for this first local handoff:
+
+- `Store.connect()` is a **`@contextlib.contextmanager`** that owns locking, the SQLite connection, commits and rollbacks. The original prototype wrongly treated it like a bare SQLite connection. `native_handoff_reconcile.py` and its fixture have now been corrected to use `with store.connect() as db:` and to test connection lifecycle, rollback and close.
+- `Store.add_peer` rejects non-loopback endpoints. Native peers therefore cannot simply be configured with `http://adhd-bridge:18766`. Do **not** bypass that restriction, expose new ports, or switch on the native bridge to import approved local tasks.
+- `Store.backup()` makes a real SQLite backup inside `self.directory / "backups"`; we can require this before any approved task import. Its contents and path must remain private.
+- `Store.create_handoff()` and `Store.approve_handoff()` are the existing native task-creation/audit methods. Source review so far does **not** establish whether the native `handoffs.peer_id` column has a foreign-key constraint. That remains an explicit staging verification gate.
+
+`tools/adhd-v02/native_local_intake.py` is a **separate, undeployed development library** exploring this local-only path. It reads the sidecar's approved-with-audit task queue, uses the native Store APIs for task creation, and never opens a listener, adds a peer, enables `bridge_enabled`, or exposes remote memory and AI tools. It uses a fixed **non-network local provenance ID** rather than impersonating a registered peer. It refuses to operate if that ID is registered as a network peer, if the native HTTP bridge is enabled, or if native `handoffs.peer_id` has a foreign key requiring a registered peer.
+
+Local-only linking is a **single-task, explicit owner action**, not an automatic background job. The development library requires a distinct confirmation string, a successful existing Store backup, receiver-side approval plus audit event, matching native handoff payload/identity, and native task-source verification. It never writes directly to task tables; it calls only `Store.create_handoff` / `Store.approve_handoff`. It does not process notes, knowledge or project-linked tasks. It never prints private task content.
+
+The companion test suite `tools/adhd-v02/test_native_local_intake.py` exercises an empty native peer table with `bridge_enabled` off, duplicate protection, native audit, owner confirmation, bridge approval checks, project hold, task ID collision, reserved local identity collision, prohibited foreign keys, backup failure and interruption retries. It uses **disposable synthetic SQLite databases only** and is run by CI. Tests do not establish that the installed native Store accepts this local principal; that requires an explicit source-schema inspection and staging test against a disposable copy of the real app, not trial-and-error on the live DB.
+
+**No update or installation of ADHD Assistant or the sidecar is authorized by this experiment.** Continue keeping the current running sidecar and Pixel Pals deployment untouched. The HD256 Work session owns character and smoke-test failures separately.
