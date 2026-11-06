@@ -51,7 +51,7 @@ class MockHandler:
 class InboxHttpTests(LocalIntakeTests):
     def test_get_page_includes_csp_and_no_remote_fetch(self):
         handler=MockHandler(PAGE)
-        self.assertTrue(handle_get(handler,bridge_db=self.bridge,page_dir=HERE))
+        self.assertTrue(handle_get(handler,bridge_db=self.bridge,page_dir=HERE,store=self.store))
         html=handler.wfile.getvalue().decode("utf-8")
         self.assertEqual(handler.status,200)
         self.assertEqual(handler.auth_calls,1)
@@ -65,14 +65,14 @@ class InboxHttpTests(LocalIntakeTests):
     def test_list_is_auth_guarded_and_includes_no_peer_token(self):
         self.handoff("pending000001",approved=False,event=False)
         handler=MockHandler(API)
-        self.assertTrue(handle_get(handler,bridge_db=self.bridge,page_dir=HERE))
+        self.assertTrue(handle_get(handler,bridge_db=self.bridge,page_dir=HERE,store=self.store))
         self.assertEqual(handler.response()["pending_in_view"],1)
         self.assertNotIn("token",handler.wfile.getvalue().decode("utf-8"))
         self.assertEqual(handler.auth_calls,1)
         blocked=MockHandler(API)
         blocked.authorized=False
         with self.assertRaises(PermissionError):
-            handle_get(blocked,bridge_db=self.bridge,page_dir=HERE)
+            handle_get(blocked,bridge_db=self.bridge,page_dir=HERE,store=self.store)
         self.assertEqual(blocked.wfile.getvalue(),b"")
 
     def test_approval_then_native_task_import_is_separate_and_owner_only(self):
@@ -127,7 +127,7 @@ class InboxHttpTests(LocalIntakeTests):
 
     def test_unknown_routes_are_not_consumed(self):
         h=MockHandler("/api/memory")
-        self.assertFalse(handle_get(h,bridge_db=self.bridge,page_dir=HERE))
+        self.assertFalse(handle_get(h,bridge_db=self.bridge,page_dir=HERE,store=self.store))
         self.assertFalse(handle_post(h,bridge_db=self.bridge,store=self.store))
         self.assertEqual(h.auth_calls,0)
 
