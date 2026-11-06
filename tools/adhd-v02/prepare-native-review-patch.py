@@ -144,10 +144,18 @@ def patch_source(original: str) -> str:
     if any(isinstance(n, ast.Constant) and n.value in EXPECTED_ROUTES
            for n in ast.walk(tree)):
         raise ValueError("One or more Pixel Pals routes already exist")
-    get_line, get_indent = _method_with_path(methods["do_GET"])
-    post_line, post_indent = _method_with_path(methods["do_POST"])
+    get_line, _ = _method_with_path(methods["do_GET"])
+    post_line, _ = _method_with_path(methods["do_POST"])
     if get_line == post_line:
         raise ValueError("Native methods overlap unexpectedly")
+    # AST col_offset points at the *path* assignment, which may be after a
+    # semicolon on the same line as url=urlsplit(self.path). The insertion
+    # must use the physical line's indentation, not the AST column offset.
+    physical_lines = original.splitlines(keepends=True)
+    def line_indent(line: int) -> int:
+        source_line = physical_lines[line - 1]
+        return len(source_line) - len(source_line.lstrip(" "))
+    get_indent, post_indent = line_indent(get_line), line_indent(post_line)
     if get_indent < 8 or post_indent < 8:
         raise ValueError("Unexpected native handler indentation")
 
@@ -171,7 +179,7 @@ def patch_source(original: str) -> str:
             + sp + "        return\n"
         )
 
-    lines = original.splitlines(keepends=True)
+    lines = physical_lines
     # Insert after the exact AST-verified path assignment in each method.
     # Reverse order guarantees that line offsets do not drift.
     for line, indent, is_post in sorted((
