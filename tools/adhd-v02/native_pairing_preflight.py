@@ -52,7 +52,7 @@ def _source_features(source_root: Path) -> dict[str, bool]:
     return {name: name in methods for name in NATIVE_METHODS}
 
 
-def inspect_native(source_root: Path, native_db: Path) -> dict[str, object]:
+def inspect_native(source_root: Path, native_db: Path, *, expected_peer_id: str | None = None) -> dict[str, object]:
     features = _source_features(source_root)
     with closing(_read_only_db(native_db)) as db:
         tables = {row[0] for row in db.execute(
@@ -72,10 +72,17 @@ def inspect_native(source_root: Path, native_db: Path) -> dict[str, object]:
             row[1] for row in db.execute("PRAGMA table_info(peers)")
         }:
             peer_count = db.execute("SELECT COUNT(*) FROM peers WHERE enabled=1").fetchone()[0]
+            expected_peer_enabled = bool(
+                expected_peer_id
+                and db.execute(
+                    "SELECT 1 FROM peers WHERE id=? AND enabled=1", (expected_peer_id,)
+                ).fetchone()
+            )
         else:
             peer_count = 0
+            expected_peer_enabled = False
     implementation_available = schema_ok and all(features.values())
-    ready_for_staging = implementation_available and native_enabled and peer_count >= 1
+    ready_for_staging = implementation_available and native_enabled and expected_peer_enabled
     blockers = []
     if not implementation_available:
         blockers.append("native_schema_or_store_methods_unverified")
@@ -83,6 +90,8 @@ def inspect_native(source_root: Path, native_db: Path) -> dict[str, object]:
         blockers.append("native_bridge_disabled")
     if peer_count < 1:
         blockers.append("no_enabled_native_peer")
+    if not expected_peer_enabled:
+        blockers.append("intended_native_peer_not_verified")
     return {
         "format": "adhd-native-handoff-preflight",
         "version": 1,
@@ -91,6 +100,7 @@ def inspect_native(source_root: Path, native_db: Path) -> dict[str, object]:
         "native_store_methods_present": features,
         "native_bridge_enabled": native_enabled,
         "enabled_native_peer_count": peer_count,
+        "intended_native_peer_enabled": expected_peer_enabled,
         "ready_for_staging": ready_for_staging,
         "live_task_creation_authorized": False,
         "blockers": blockers,
@@ -103,9 +113,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="Directory containing adhd_assistant/database.py")
     parser.add_argument("--database", type=Path, required=True,
                         help="Existing ADHD Assistant SQLite database")
+    parser.add_argument("--expected-peer-id", default=None,
+                        help="Optional native peer ID to verify; never displayed")
     args = parser.parse_args(argv)
     try:
-        result = inspect_native(args.source_root, args.database)
+        result = inspect_native(args.source_root, args.database,
+                                expected_peer_id=args.expected_peer_id)
     except (OSError, ValueError, SyntaxError, sqlite3.Error, UnicodeError):
         # No paths or SQL error contents may inadvertently reveal private data.
         print("Native pairing preflight could not complete safely", file=sys.stderr)
