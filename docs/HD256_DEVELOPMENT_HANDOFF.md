@@ -93,3 +93,25 @@ the earlier verified release above.
 Gesture implementation: cd101bbe7e7bd49465da81382779aa919f269609.
 Local validation:29 movement/runtime tests, TypeScript and production build passed.
 Pack authors: see [HD256_CHARACTER_FORMAT.md](HD256_CHARACTER_FORMAT.md).
+
+## Verified gesture release — 2026-11-06
+
+Final code release:4aa09479a837f4816ca9074576a3ac9a837b4267.
+CI42294426503 and publish42294426591 both passed:1469 tests in162 files,
+TypeScript, production build, real browser smoke and Docker publication.
+Immutable image:ghcr.io/nyteghost/buddy-bot-room:beta-4aa09479a837f4816ca9074576a3ac9a837b4267.
+
+The first gesture smoke failed. Added diagnostics showed a paused visitor being
+asked to perform a signature action. The test now explicitly selects Playful
+mode before checking movement. Product controls were also corrected: the library
+signature button now respects Calm/Focus, reduced-motion, low-power and hidden-tab
+settings, matching the visitor's own guard. Both final browser runs verified v2/v3
+import, rendering and stationary signature playback. Floating-point route updates
+also preserve exactly unchanged position during a hold.
+
+No deployment was performed. No artwork, character IDs or bridge source was
+modified. Other conversation's ADHD commits were merged without edits. No new
+subagents ran for this follow-up. Next: desktop/mobile visual acceptance of the
+prototype packs, additional supplied animation artwork, and richer environmental
+interactions. Full wave/celebration artwork and species-specific rigs remain
+unfinished; this gesture release does not claim to complete those features.

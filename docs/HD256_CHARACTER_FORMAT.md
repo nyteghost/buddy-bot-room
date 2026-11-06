@@ -61,7 +61,9 @@ Manual wave/signature actions hold position and facing. Starting with the gestur
 follow-up, the hold lasts at least 1.7 seconds or the complete selected clip,
 whichever is longer. Looping clips repeat during that hold; nonlooping clips keep
 their final frame until the hold ends. Focus Mode pauses gesture and route time.
-Hidden tabs, reduced motion and low-power mode also suspend optional animation.
+Calm Mode, hidden tabs, reduced motion and low-power mode also suspend optional
+animation. The Character Library disables signature controls when those settings
+pause the visitor. Select Playful mode to resume room actions.
 
 ## Artwork and size limits
 
