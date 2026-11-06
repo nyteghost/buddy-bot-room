@@ -33,17 +33,25 @@ class ImportSafetyTests(unittest.TestCase):
             db.execute("CREATE TABLE handoffs (id TEXT PRIMARY KEY,kind TEXT,payload TEXT,state TEXT,created_at TEXT,updated_at TEXT)")
             db.execute("CREATE TABLE bridge_events (id INTEGER PRIMARY KEY,handoff_id TEXT,action TEXT,at TEXT)")
         with sqlite3.connect(self.tasks) as db:
+            db.execute("CREATE TABLE projects (id TEXT PRIMARY KEY, title TEXT)")
+            # Exact v0.1 task DDL observed on the user's Unraid server.
             db.execute("""CREATE TABLE tasks (
-                id TEXT PRIMARY KEY, title TEXT, notes TEXT, due_at TEXT,
-                status TEXT, project_id TEXT, source TEXT, created_at TEXT,updated_at TEXT
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
+                due_at TEXT,
+                status TEXT NOT NULL DEFAULT 'open',
+                project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+                source TEXT NOT NULL DEFAULT 'manual',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )""")
-            db.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)", (
-                "existing-row", "PRIVATE existing", None, None, "inbox", None, "manual",
-                "2026-11-05T20:00:00Z", "2026-11-05T20:00:00Z",
-            ))
+            # Deliberately empty: the installed tasks table returned no statuses.
 
-    def handoff(self, ident, title="PRIVATE import", *, state="approved", kind="task", project=None, approval=True):
-        data = {"title": title, "notes": "PRIVATE notes", "due_at": "2026-11-06T10:00:00Z"}
+    def handoff(self, ident, title="PRIVATE import", *, state="approved", kind="task", project=None, approval=True, notes="PRIVATE notes"):
+        data = {"title": title, "due_at": "2026-11-06T10:00:00Z"}
+        if notes is not None:
+            data["notes"] = notes
         if project is not None:
             data["project"] = project
         with sqlite3.connect(self.bridge) as db:
@@ -58,7 +66,7 @@ class ImportSafetyTests(unittest.TestCase):
         with sqlite3.connect(self.tasks) as db:
             return db.execute("SELECT id, title, source, status, project_id FROM tasks ORDER BY id").fetchall()
 
-    def apply(self, status="inbox", confirm=module.CONFIRM_PHRASE):
+    def apply(self, status="open", confirm=module.CONFIRM_PHRASE):
         return module.apply_explicitly_approved(
             self.bridge,self.tasks,task_status=status,confirm=confirm,backup_dir=self.backup_dir)
 
@@ -75,12 +83,12 @@ class ImportSafetyTests(unittest.TestCase):
         self.assertNotIn("PRIVATE",str(result))
         self.assertEqual((self.bridge.read_bytes(),self.tasks.read_bytes()),before)
 
-    def test_apply_requires_confirmation_and_existing_status(self):
+    def test_apply_requires_confirmation_and_verified_default_status(self):
         self.handoff("approved0001")
         original=self.task_rows()
         with self.assertRaisesRegex(ValueError,"confirmation"):
             self.apply(confirm="WRONG")
-        with self.assertRaisesRegex(ValueError,"Unverified"):
+        with self.assertRaisesRegex(ValueError,"verified ADHD task default"):
             self.apply(status="made-up")
         self.assertEqual(self.task_rows(),original)
         self.assertEqual(list(self.backup_dir.iterdir()),[])
@@ -98,16 +106,41 @@ class ImportSafetyTests(unittest.TestCase):
         with sqlite3.connect(backups[0]) as saved:
             self.assertEqual(saved.execute("SELECT COUNT(*) FROM tasks").fetchone()[0],len(initial))
         rows=self.task_rows()
-        self.assertEqual(len(rows),2)
+        self.assertEqual(len(rows),1)
         imported=[row for row in rows if row[2]=="pixel-pals:approved0001"]
         self.assertEqual(len(imported),1)
-        self.assertEqual(imported[0][3],"inbox")
+        self.assertEqual(imported[0][3],"open")
         self.assertIsNone(imported[0][4])
         again=self.apply()
         self.assertEqual(again["inserted"],0)
         self.assertEqual(again["already_present"],1)
         self.assertEqual(len(list(self.backup_dir.glob("*.sqlite3"))),1)
         self.assertEqual(self.task_rows(),rows)
+
+    def test_empty_live_schema_accepts_open_and_non_null_empty_notes(self):
+        # Actual Unraid schema is initially empty; defaults are enough to
+        # establish a valid new-task status without querying existing rows.
+        self.handoff("approved0001", notes=None)
+        self.assertEqual(self.task_rows(), [])
+        result = self.apply()
+        self.assertEqual(result["inserted"], 1)
+        with sqlite3.connect(self.tasks) as db:
+            row = db.execute("SELECT notes,status,source FROM tasks").fetchone()
+        self.assertEqual(row, ("", "open", "pixel-pals:approved0001"))
+
+    def test_unknown_default_or_nullable_notes_fails_closed(self):
+        self.handoff("approved0001")
+        with sqlite3.connect(self.tasks) as db:
+            db.execute("ALTER TABLE tasks RENAME TO tasks_original")
+            db.execute("""CREATE TABLE tasks (
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, notes TEXT,
+                due_at TEXT, status TEXT NOT NULL DEFAULT 'inbox',
+                project_id TEXT, source TEXT NOT NULL DEFAULT 'manual',
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            )""")
+        with self.assertRaisesRegex(ValueError, "nullable ADHD task column"):
+            self.apply()
+        self.assertFalse(list(self.backup_dir.iterdir()))
 
     def test_database_schema_and_duplicate_existing_source_fail_closed(self):
         self.handoff("approved0001")
@@ -143,7 +176,7 @@ class ImportSafetyTests(unittest.TestCase):
         self.assertEqual(proc.returncode,0,proc.stderr)
         self.assertEqual(json.loads(proc.stdout)["inserted"],0)
         self.assertNotIn("PRIVATE",proc.stdout)
-        self.assertEqual(len(self.task_rows()),1)
+        self.assertEqual(len(self.task_rows()),0)
 
 
 if __name__=="__main__":
