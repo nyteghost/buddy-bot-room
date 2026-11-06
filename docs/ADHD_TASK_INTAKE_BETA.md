@@ -86,3 +86,23 @@ python3 -B tools/adhd-v02/approved_task_plan.py --bridge-data-dir /path/to/safe-
 This preview helper is committed to GitHub beta but **has not been mounted or deployed** into the user's live Unraid containers. Existing data remains untouched.
 
 Before implementing any actual import writes, inspect the original ADHD Assistant task API, task status values, indexes/constraints, and recovery semantics. A source ID alone provides a stable matching key, but does **not** automatically enforce a unique source constraint: an approved importer needs transaction-safe deduplication and should preferably use the app's normal task API/storage layer, not bypass it with unreviewed SQL.
+
+## Experimental reviewed task importer — isolated fixtures only
+
+The next backend increment is `tools/adhd-v02/reviewed_task_import.py`. It is **not installed on Unraid** and **not approved for use against the live ADHD task database** until the installed ADHD Assistant v0.1 task-creation code, status vocabulary, constraints and backup restore process have been independently inspected.
+
+- **No-argument/default behavior:** read-only preview (no database writes).
+- **Opt-in prototype apply:** requires `--apply`, an exact confirmation phrase, an explicitly supplied task status that is already present in the existing task table, and a pre-existing private backup directory (mode 0700).
+- Reads only bridge tasks separately approved on the ADHD receiver side, never drafts, merely delivered messages, notes, pending tasks, or rejected handoffs.
+- Creates a separate SQLite backup before any task insert; backup file permissions are 0600.
+- Checks the existing task schema; rejects unreviewed task-table triggers, missing columns, unknown status values, and duplicate source IDs.
+- Stores a stable `tasks.source` value `pixel-pals:<handoff-id>`. Repeated imports skip already-created tasks. The insert pass uses a SQLite `BEGIN IMMEDIATE` transaction and checks duplicates again within that transaction.
+- Any insert failure rolls back the **whole batch**. No existing task row is updated or deleted.
+- Handoffs with a named project stay on hold for manual `project_id` mapping. No auto-created projects.
+- CLI output contains aggregate counts, not private task names or notes.
+
+**Testing:** `python3 -B tools/adhd-v02/test_reviewed_task_import.py` uses disposable SQLite fixture databases. Tests include preview-only behavior, excluded handoffs, consent guard, status guard, private backup, source-ID idempotency, bad schema rejection, no-file creation, transactional rollback, and non-disclosure of task content.
+
+**Known limitations:** a status value appearing in the existing task table does not by itself prove that it is the appropriate newly-created status. The live application API may perform additional validation or side effects (planning, scheduling, notifications) not reproduced by raw SQL. The importer prototype has no in-app review interface, no per-task scheduling behavior, and no integration with the dashboard's normal task-creation service. It must not be deployed or run against live appdata until those items are reviewed and the owner explicitly approves a guarded staging test.
+
+The HD256 / Living Universe Work stream has separate file ownership and must not modify these ADHD bridge or task-intake tools.
