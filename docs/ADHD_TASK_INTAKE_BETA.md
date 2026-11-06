@@ -268,3 +268,21 @@ The planned same-origin routes (not yet wired to the native server) are:
 5. Only after owner approval, install on Unraid, validate the private review page and existing dashboard, and perform one harmless task handoff. Keep independent apps, Caddy access, previous native tasks, and bridge sidecar data intact.
 
 The reviewed page is a **beta integration candidate**, not a link that currently works on the user's installed ADHD Assistant. No new user-facing route or login has been activated.
+
+
+## Fail-closed browser route staging patch (November 6, 2026)
+
+The browser inbox modules and tests now include `prepare-native-review-patch.py`:
+
+- It parses the installed `adhd_assistant/server.py` with the Python AST and requires exactly one HTTP handler with `do_GET`, `do_POST`, `_read` and `_local` methods.
+- It verifies that `_local` **raises `PermissionError`** for unauthorized callers. A guard that merely returns false or has an unfamiliar structure is rejected.
+- It requires exactly one known `path=urlsplit(self.path).path` assignment in each handler and exception-handling branches. It refuses existing Pixel Pals route names to avoid duplicate injection.
+- It prepares the reviewed GET/POST dispatch only at those verified insertion points, never by overwriting or replacing unrelated methods.
+- Default mode is **read-only preflight**: parse and hash source, check dependencies, report that the route overlay is compatible; do not write anything.
+- Optional `--stage /tmp/<new-empty-name>` mode writes only to a new, private temp directory. It stages a patched copy of `server.py`, the local-only task intake/review modules, and the standalone browser page. It does **not** install files into the running container or change the real `adhd.sqlite3` database.
+- The patcher does not request tokens, activate the native network bridge, open a new port, or modify Caddy.
+- No production installation command is provided yet. First inspect the running server's exact `_local` implementation and Caddy proxy behavior, then run the preflight and route security tests in a disposable environment.
+
+The inbox now checks the **full native handoff** (direction, peer provenance, kind, original approved payload, native approval state and task source) before labeling a task as linked. A matching task ID alone is insufficient. Interrupted native approvals display as pending and require an explicit second confirmation to finish. Any mismatch disables the import action.
+
+The new regression suite `test_prepare_native_review_patch.py` tests that unfamiliar native auth methods, route parsing, duplicate routes, ambiguous HTTP handlers and unsafe staging paths fail closed; it also confirms the original server file remains byte-for-byte untouched.
