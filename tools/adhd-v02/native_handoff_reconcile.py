@@ -10,7 +10,6 @@ construction, peer registration, authentication, and a real restore test.
 """
 from __future__ import annotations
 
-from contextlib import closing
 import json
 from pathlib import Path
 import re
@@ -50,10 +49,10 @@ def _read_native(store: Any, handoff_id: str, peer_id: str, payload: dict[str, s
     # the separate receiver sidecar has its own independent approval.
     if store.setting("bridge_enabled", "off") != "on":
         raise ValueError("Native ADHD bridge is disabled")
-    # Reads use the already-installed Store's connection method; no private
-    # task text is fetched or logged. Native peer must already be enabled.
-    with closing(store.connect()) as database:
-        database.row_factory = __import__("sqlite3").Row
+    # The installed Store.connect() is a @contextmanager, not a bare SQLite
+    # connection. Enter it directly to preserve Store's RLock, row factory,
+    # commit/rollback and close lifecycle. Native peer must already be enabled.
+    with store.connect() as database:
         peer = database.execute("SELECT 1 FROM peers WHERE id=? AND enabled=1", (peer_id,)).fetchone()
         if not peer:
             raise ValueError("Native ADHD peer is not configured and enabled")
