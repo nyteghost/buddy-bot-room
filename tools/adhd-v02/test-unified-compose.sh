@@ -179,4 +179,5 @@ python3 -B "$SELF/test_native_review_inbox.py"
 python3 -B "$SELF/test_native_review_http.py"
 python3 -B "$SELF/test_prepare_native_review_patch.py"
 bash -n "$SELF/run-isolated-native-staging.sh"
+bash -n "$SELF/run-native-review-preflight.sh"
 
