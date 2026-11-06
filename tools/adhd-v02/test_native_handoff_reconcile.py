@@ -2,6 +2,7 @@
 """Disposable bridge + native Store fixture tests for approved handoff linking."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import sqlite3
@@ -32,10 +33,20 @@ class FakeNativeStore:
               INSERT INTO peers(id,enabled) VALUES('pixelpals',1);""")
     def setting(self, name, default="off"):
         return "on" if name == "bridge_enabled" and self.native_bridge_enabled else default
+    @contextmanager
     def connect(self):
+        # Mirrors the installed native Store.connect() lifecycle instead of
+        # returning a bare sqlite3.Connection.
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
     def backup(self):
         self.backups += 1
         with self.connect() as db:
@@ -97,6 +108,19 @@ class NativeLinkTests(unittest.TestCase):
     def read(self, sql):
         with self.store.connect() as db:
             return db.execute(sql).fetchall()
+
+    def test_fake_store_context_manager_really_closes_connection(self):
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM peers").fetchone()[0], 1)
+        with self.assertRaises(sqlite3.ProgrammingError):
+            db.execute("SELECT 1")
+
+    def test_fake_store_context_manager_rolls_back_raises(self):
+        with self.assertRaisesRegex(RuntimeError, "stop"):
+            with self.store.connect() as db:
+                db.execute("INSERT INTO audit(action) VALUES('SHOULD_ROLL_BACK')")
+                raise RuntimeError("stop")
+        self.assertFalse(self.read("SELECT * FROM audit"))
 
     def test_preview_requires_receiver_approval_and_never_writes(self):
         self.source()
