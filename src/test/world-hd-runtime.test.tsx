@@ -94,6 +94,17 @@ describe("HD256 runtime",()=>{
   act(()=>vi.advanceTimersByTime(1000));
   expect(screen.getByRole("img").getAttribute("src")).toBe("walk2");
  });
+ it("disables library signature controls when room or motion settings pause actions",()=>{
+  const c=character();
+  const props={enabledIds:[c.id],customCharacters:[c],syncStatus:"Saved",onToggle:()=>{},onSave:async()=>true,onDelete:async()=>true,onInstallPack:async()=>true};
+  const view=render(<WorldCharacterLibrary {...props} paused/>);
+  expect(screen.getByRole("button",{name:"Signature action for Test Hero"})).toBeDisabled();
+  view.rerender(<WorldCharacterLibrary {...props}/>);
+  expect(screen.getByRole("button",{name:"Signature action for Test Hero"})).toBeEnabled();
+  act(()=>lowPower.set(true));
+  expect(screen.getByRole("button",{name:"Signature action for Test Hero"})).toBeDisabled();
+  act(()=>lowPower.set(false));
+ });
  it("requires separate update approval and never installs over an existing ID",async()=>{
   const c=character(),install=vi.fn(),update=vi.fn().mockResolvedValue(true);
   vi.mocked(parseCharacterZip).mockResolvedValue({name:"New art",characters:[c]});

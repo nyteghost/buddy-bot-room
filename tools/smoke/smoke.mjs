@@ -1195,6 +1195,8 @@ await step("Character Universe custom art, guest roster and interaction controls
   if(await roomEntry.getAttribute("aria-pressed")!=="true")await roomEntry.click();
   const room=page.locator('[data-window-id="room"]');
   const activities=room.getByRole("region",{name:"Pal Room activities"});
+  const mood=activities.getByRole("button",{name:/^Switch Pal Room to (Calm|Playful)$/});
+  if(await mood.getAttribute("aria-pressed")!=="true")await mood.click();
   await activities.getByRole("button",{name:"Wave to all Pals"}).waitFor();
   await activities.getByRole("button",{name:"Wave to all Pals"}).click();
   await page.locator('.room-scene .office-pal[data-world-cue="wave"]').first().waitFor({state:"visible"});
@@ -1245,7 +1247,7 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
       const img=document.querySelector('img[alt="Smoke HD Bot 256 pixel character"]');
       return img?.closest(".world-custom-guest")?.getAttribute("data-action")==="signature";
     },undefined,{timeout:1500}).catch(async()=>{
-      const state=await guest.evaluate(img=>({actor:img.closest(".world-custom-guest")?.outerHTML,hidden:document.hidden,lowPower:document.documentElement.dataset.lowpower}));
+      const state=await guest.evaluate(img=>({actor:img.closest(".world-custom-guest")?.outerHTML,hidden:document.hidden,lowPower:document.documentElement.dataset.lowpower,mood:localStorage.getItem("pixel-pals-room-playful-v1"),focus:localStorage.getItem("pixel-pals-focus-v1"),reduced:matchMedia("(prefers-reduced-motion: reduce)").matches}));
       throw Error("Signature action did not start: "+JSON.stringify(state));
     });
     const held=await guest.evaluate(async img=>{

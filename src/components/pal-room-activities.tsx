@@ -104,7 +104,7 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
           <Button type="button" size="sm" variant="outline" aria-label="Wave to all Pals" onClick={onWaveAll}><Sparkles className="size-3.5"/>Wave to everyone</Button>
           <Button type="button" size="sm" variant="outline" aria-label="Celebrate with Pals" onClick={onCelebrateWorld}><PartyPopper className="size-3.5"/>Celebrate together</Button>
         </div>}
-        {livingWorld && <WorldCharacterLibrary enabledIds={enabledWorldPacks} customCharacters={customCharacters} syncStatus={syncStatus} onToggle={onWorldPackChange} onSave={onCustomSave} onInstallPack={onCustomInstallPack} onDelete={onCustomDelete} {...(onCustomInstallBackup ? {onInstallBackup:onCustomInstallBackup} : {})} {...(onCustomUpdatePack ? {onUpdatePack:onCustomUpdatePack} : {})} {...(onCustomExportBackup ? {onExportBackup:onCustomExportBackup} : {})} recoveryBackup={recoveryBackup??null} paused={animationsPaused??false} />}
+        {livingWorld && <WorldCharacterLibrary enabledIds={enabledWorldPacks} customCharacters={customCharacters} syncStatus={syncStatus} onToggle={onWorldPackChange} onSave={onCustomSave} onInstallPack={onCustomInstallPack} onDelete={onCustomDelete} {...(onCustomInstallBackup ? {onInstallBackup:onCustomInstallBackup} : {})} {...(onCustomUpdatePack ? {onUpdatePack:onCustomUpdatePack} : {})} {...(onCustomExportBackup ? {onExportBackup:onCustomExportBackup} : {})} recoveryBackup={recoveryBackup??null} paused={!!animationsPaused || !playful} />}
         <AdhdHandoffPanel />
         {playful && (
           <div className="pal-room-life-list" role="group" aria-label="What the Pals are doing">

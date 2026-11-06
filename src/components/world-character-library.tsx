@@ -143,6 +143,8 @@ function downloadBackup(raw:string,name:string){
  window.setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
 export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,onToggle,onSave,onInstallPack,onDelete,onUpdatePack,onInstallBackup,onExportBackup,recoveryBackup,paused=false}:Props){
+ const reduced=useReducedMotion(),low=lowPower.use(),hidden=useTabHidden();
+ const actionsPaused=paused||reduced||low||hidden;
  const [editor,setEditor]=useState<WorldCustomCharacter|null>(null);
  const [message,setMessage]=useState("");
  const [zipPack,setZipPack]=useState<ImportedCharacterZip|null>(null);
@@ -210,6 +212,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
   <div className="world-library-body">
    <p className="text-xs text-muted-foreground">Choose who walks around your Living World. Tap a visitor to wave. HD characters can also perform their supplied signature action.</p>
    <p role="status" className="text-xs text-muted-foreground">{syncStatus}</p>
+   {actionsPaused&&<p className="text-xs text-muted-foreground">Character actions are paused by your room or motion settings.</p>}
    <div className="world-library-controls">
     <Button type="button" variant="outline" size="sm" disabled={customCharacters.length>=CUSTOM_WORLD_LIMIT} onClick={()=>setEditor(starterCustomCharacter())}><Plus className="size-3.5"/>Create character</Button>
     <Button type="button" variant="outline" size="sm" onClick={()=>void exportBackup()}><Download className="size-3.5"/>Export JSON</Button>
@@ -259,7 +262,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
       <div className="min-w-0 flex-1"><strong className="text-xs">{character.name}</strong><p className="text-xs text-muted-foreground">{character.hd3?"HD256 · v"+character.hd3.version+" · "+(character.hd3.artStatus==="prototype"?"Prototype":"Pack marked production-approved"):character.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p></div>
       <div className="world-library-card-controls">
        <Button size="sm" variant={on?"default":"outline"} aria-pressed={on} aria-label={(on?"Disable ":"Enable ")+character.name} onClick={()=>toggle(character.id)}>{on?"In room":"Add"}</Button>
-       {hasSignature&&<Button type="button" size="sm" variant="outline" disabled={!on||paused} aria-label={"Signature action for "+character.name} onClick={()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:character.id,action:"signature"}}))}>Signature</Button>}
+       {hasSignature&&<Button type="button" size="sm" variant="outline" disabled={!on||actionsPaused} aria-label={"Signature action for "+character.name} onClick={()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:character.id,action:"signature"}}))}>Signature</Button>}
        {!character.hd&&!character.hd3&&<Button size="sm" variant="ghost" aria-label={"Edit "+character.name} onClick={()=>setEditor(character)}><Pencil className="size-3.5"/></Button>}
        <Button size="sm" variant="ghost" aria-label={"Delete "+character.name} onClick={async()=>{
         if(window.confirm("Remove "+character.name+" from your Character Library? Export a backup first if you want to reinstall it later.")){
