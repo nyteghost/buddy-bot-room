@@ -114,6 +114,11 @@ function render(item,container) {
   if(item.state==="approved" && item.kind==="task") {
     if(item.native_state==="linked") {
       addText(box,"p","Already added to ADHD Tasks.","muted");
+    } else if(item.native_state==="native-pending") {
+      addText(box,"p","An earlier import was interrupted. Review and finish the pending task.","muted");
+      if(!item.project) actionButton(controls,"Finish pending task",()=>runAction(
+        "Task import","Finish the previously approved ADHD task? A fresh backup will be made first.",
+        api+"/import",{id:item.id}),true);
     } else if(item.native_state==="conflict" || item.native_state==="unverified") {
       addText(box,"p","Import needs a safety review. No changes made.","muted");
     } else if(!item.project && item.native_state==="unlinked") {
