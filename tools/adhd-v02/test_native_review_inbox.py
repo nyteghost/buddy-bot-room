@@ -73,6 +73,33 @@ class InboxTests(LocalIntakeTests):
             import_task(self.bridge,self.store,handoff_id="pending000001",
                         owner_confirmation=IMPORT_CONFIRM)
 
+    def test_matching_task_source_without_native_approval_is_not_linked(self):
+        self.handoff("pending000001",approved=False,event=False)
+        review(self.bridge,handoff_id="pending000001",decision="approve",
+               owner_confirmation=APPROVE_CONFIRM)
+        with self.store.connect() as db:
+            db.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,'now','now')",
+                       ("handoff-pending000001","Not approved","","2026-11-06T14:00:00Z",
+                        "open",None,"bridge:pixelpals_local_sidecar"))
+        item=list_inbox(self.bridge,native_store=self.store)["items"][0]
+        self.assertEqual(item["native_state"],"conflict")
+        with self.assertRaisesRegex(ValueError,"Orphan"):
+            import_task(self.bridge,self.store,handoff_id="pending000001",
+                        owner_confirmation=IMPORT_CONFIRM)
+
+    def test_native_pending_review_is_resumable_but_not_automatically_imported(self):
+        self.handoff("pending000001",approved=False,event=False)
+        review(self.bridge,handoff_id="pending000001",decision="approve",
+               owner_confirmation=APPROVE_CONFIRM)
+        payload={"title":"PRIVATE TEST TASK"}
+        with self.store.connect() as db:
+            db.execute("INSERT INTO handoffs VALUES(?,?,?,?,?,'pending','now','now')",
+                       ("pending000001","in","pixelpals_local_sidecar","task",
+                        json.dumps(payload)))
+        item=list_inbox(self.bridge,native_store=self.store)["items"][0]
+        self.assertEqual(item["native_state"],"native-pending")
+        self.assertEqual(self.native_count("tasks"),0)
+
     def test_reject_is_final_and_cannot_turn_into_task(self):
         self.handoff("pending000001",approved=False,event=False)
         result = review(self.bridge, handoff_id="pending000001",
