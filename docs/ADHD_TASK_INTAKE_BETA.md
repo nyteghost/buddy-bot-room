@@ -208,3 +208,30 @@ Local-only linking is a **single-task, explicit owner action**, not an automatic
 The companion test suite `tools/adhd-v02/test_native_local_intake.py` exercises an empty native peer table with `bridge_enabled` off, duplicate protection, native audit, owner confirmation, bridge approval checks, project hold, task ID collision, reserved local identity collision, prohibited foreign keys, backup failure and interruption retries. It uses **disposable synthetic SQLite databases only** and is run by CI. Tests do not establish that the installed native Store accepts this local principal; that requires an explicit source-schema inspection and staging test against a disposable copy of the real app, not trial-and-error on the live DB.
 
 **No update or installation of ADHD Assistant or the sidecar is authorized by this experiment.** Continue keeping the current running sidecar and Pixel Pals deployment untouched. The HD256 Work session owns character and smoke-test failures separately.
+
+
+## Installed native handoff schema verified; disposable real-Store rehearsal ready
+
+On November 6, 2026, the owner checked the **installed native** `adhd.sqlite3` using a read-only SQLite connection:
+
+- `PRAGMA foreign_key_list(handoffs)` returned **`[]`**.
+- `handoffs` has: `id, direction, peer_id, kind, payload, state, attempts, last_error, receipt, created_at, updated_at`.
+- Therefore native `handoffs.peer_id` has no SQLite foreign-key restriction, allowing a reserved **local-only provenance identifier** without creating a network peer. This proves schema compatibility, **not live end-to-end operation**.
+- The native `bridge_enabled` setting remains unset and the enabled native peer count was zero at the most recent inspection. Do **not** turn it on to satisfy a setup check.
+
+A new script `tools/adhd-v02/stage_native_local_intake.py` rehearses the **actual installed** `adhd_assistant.database.Store` methods in a disposable environment. It verifies native task creation, `open` status, the `handoff-<id>` source linkage, native audit, native SQLite backup, repeat-call idempotency, and zero network peers. The synthetic test task uses only hardcoded nonprivate content. All state lives in an ephemeral temporary directory that is deleted afterwards; **the real `/data` directory is neither mounted nor read**. The script refuses to run if `ADHD_STAGING_ONLY=1` is absent or if `/data/adhd.sqlite3` is present.
+
+The rehearsal is intentionally designed for an offline disposable Docker container with the application's source mounted **read-only** and no network, live task database, user memory vault, or source-code write access. Its Python unit tests use a synthetic Store fixture. Until the owner explicitly runs the isolated rehearsal, no claim of compatibility with the installed native Store may be made.
+
+Example developer invocation from a disposable environment where the repo's `tools/adhd-v02` files and ADHD app source are already mounted:
+
+```bash
+ADHD_STAGING_ONLY=1 PYTHONPATH="/opt/adhd:/checks" \
+  python3 -B /checks/stage_native_local_intake.py
+```
+
+The **recommended Docker execution environment** for this test must be `--network none --read-only`, with `/opt/adhd` bound read-only to the current source directory, `/checks` bound read-only to the scripts, `/tmp` provided as a limited tmpfs and **no user data volume mounted**. A passing rehearsal is **not authorization** to install the adapter in the live container; owner review, a real restore rehearsal, explicit one-task opt-in and in-app approval UI are still required.
+
+### Development ownership and CI status
+
+Shared Intelligence work is limited to `tools/adhd-v02/` and `docs/ADHD_TASK_INTAKE_BETA.md`. The latest known HD256 v3 browser smoke regression, `Signature action did not hold the visitor in place`, is owned by the separate Living Universe Work stream. This is not an ADHD backend-test failure. Do not modify Work's character files from the ADHD integration stream.
