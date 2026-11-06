@@ -169,3 +169,4 @@ PY
 
 # Read-only task intake preparation: future importer receives only owner-approved tasks.
 python3 -B "$SELF/test_approved_task_export.py"
+python3 -B "$SELF/test_approved_task_plan.py"
