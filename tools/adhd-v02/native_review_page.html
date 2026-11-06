@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Pixel Pals handoff inbox · ADHD Assistant</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}body{margin:0;max-width:1050px;margin-inline:auto;padding:24px 16px}
+h1{margin:0 0 8px;font-size:1.6rem}h2{font-size:1.1rem}
+a{color:inherit}header{display:flex;justify-content:space-between;align-items:start;gap:18px;flex-wrap:wrap}
+.subtle{opacity:.72}#message{min-height:1.8em;margin-top:12px}
+.panel{border:1px solid color-mix(in srgb, currentColor 24%,transparent);border-radius:14px;margin:18px 0;padding:16px}
+.list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.item{border:1px solid color-mix(in srgb, currentColor 22%,transparent);border-radius:12px;padding:14px;min-width:0}
+.item h3{margin:0 0 10px;overflow-wrap:anywhere;font-size:1rem}
+.item p{margin:6px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.status{font-weight:600;font-size:.9rem}.muted{opacity:.7}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+button{font:inherit;cursor:pointer;border:1px solid currentColor;border-radius:9px;padding:9px 12px;background:transparent;color:inherit}
+button.primary{background:#1464bd;color:#fff;border-color:#1464bd}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:3px solid #e79a17;outline-offset:3px}
+.notice{border-left:3px solid #d19619;padding:10px 12px;margin:16px 0}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>Pixel Pals handoff inbox</h1>
+ <p class="subtle">Review incoming tasks before they become ADHD Assistant tasks.</p></div>
+ <button id="refresh" type="button">Refresh inbox</button>
+</header>
+<p id="message" role="status" aria-live="polite">Loading inbox…</p>
+<section class="notice">Nothing is imported automatically. <strong>Approve</strong> and
+ <strong>Add to ADHD Tasks</strong> are separate decisions. Your private memories are not shared.</section>
+<section class="panel">
+ <h2>Needs review <span id="pending-count"></span></h2>
+ <div id="pending" class="list"></div>
+</section>
+<section class="panel">
+ <h2>Approved handoffs <span id="approved-count"></span></h2>
+ <div id="approved" class="list"></div>
+</section>
+<section class="panel">
+ <h2>Rejected <span id="rejected-count"></span></h2>
+ <div id="rejected" class="list"></div>
+</section>
+<script>
+"use strict";
+// This static file is a BETA integration candidate. Native ADHD's existing
+// local-only authentication MUST gate both this page and its API routes.
+const api="/api/pixel-pals/inbox";
+const message=document.getElementById("message");
+let working=false;
+
+async function send(path,data) {
+  const response=await fetch(path,{
+    method:"POST",
+    credentials:"same-origin",
+    cache:"no-store",
+    headers:{"Content-Type":"application/json","X-ADHD-Review":"1"},
+    body:JSON.stringify(data)
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(typeof result.error==="string"?result.error:"Request failed");
+  return result;
+}
+function addText(parent,tag,value,className) {
+  const node=document.createElement(tag);
+  if(className) node.className=className;
+  node.textContent=String(value ?? "");
+  parent.append(node);
+  return node;
+}
+function actionButton(parent,label,callback,isPrimary) {
+  const button=document.createElement("button");
+  button.type="button";
+  button.textContent=label;
+  if(isPrimary) button.className="primary";
+  button.addEventListener("click",callback);
+  parent.append(button);
+}
+async function runAction(label,question,path,data) {
+  if(working || !window.confirm(question)) return;
+  working=true;
+  message.textContent=label+"…";
+  try {
+    await send(path,data);
+    message.textContent=label+" completed.";
+    await refresh();
+  } catch(error) {
+    message.textContent="Could not complete "+label.toLowerCase()+". "+error.message;
+  } finally {working=false;}
+}
+function render(item,container) {
+  const box=document.createElement("article");
+  box.className="item";
+  addText(box,"h3",item.title);
+  addText(box,"p",item.kind+" · "+item.state,"status");
+  if(item.notes) addText(box,"p",item.notes);
+  if(item.due_at) addText(box,"p","Due: "+item.due_at,"muted");
+  if(item.project) addText(box,"p","Project needs mapping: "+item.project,"muted");
+  const controls=document.createElement("div");
+  controls.className="actions";
+  if(item.state==="pending") {
+    actionButton(controls,"Approve",()=>runAction(
+      "Approval","Approve this Pixel Pals handoff? This will not create an ADHD task.",
+      api+"/review",{id:item.id,decision:"approve"}),true);
+    actionButton(controls,"Reject",()=>runAction(
+      "Rejection","Reject this handoff? You cannot import it afterward.",
+      api+"/review",{id:item.id,decision:"reject"}),false);
+  }
+  if(item.state==="approved" && item.kind==="task" && !item.project) {
+    actionButton(controls,"Add to ADHD Tasks",()=>runAction(
+      "Task import","Create this approved task in ADHD Assistant? A database backup will be made first.",
+      api+"/import",{id:item.id}),true);
+  }
+  if(controls.children.length) box.append(controls);
+  container.append(box);
+}
+async function refresh() {
+  if(working) return;
+  const response=await fetch(api,{credentials:"same-origin",cache:"no-store",
+    headers:{"X-ADHD-Review":"1"}});
+  if(!response.ok) throw new Error("Inbox could not be loaded");
+  const data=await response.json();
+  const categories=["pending","approved","rejected"];
+  for(const status of categories){
+    const root=document.getElementById(status);
+    root.replaceChildren();
+    const items=(Array.isArray(data.items)?data.items:[]).filter(x=>x.state===status);
+    document.getElementById(status+"-count").textContent="("+items.length+")";
+    if(!items.length) addText(root,"p","Nothing here.","muted");
+    for(const item of items) render(item,root);
+  }
+  message.textContent="Inbox loaded. No tasks are created without approval.";
+}
+document.getElementById("refresh").addEventListener("click",()=>{
+  refresh().catch(error=>{message.textContent=error.message;});
+});
+refresh().catch(error=>{message.textContent=error.message;});
+</script>
+</body></html>
