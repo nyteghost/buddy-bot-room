@@ -46,6 +46,10 @@ def _payload(item: dict[str, Any]) -> dict[str, str]:
 
 
 def _read_native(store: Any, handoff_id: str, peer_id: str, payload: dict[str, str]) -> str:
+    # Store setting and peer authorization must remain opt-in, even though
+    # the separate receiver sidecar has its own independent approval.
+    if store.setting("bridge_enabled", "off") != "on":
+        raise ValueError("Native ADHD bridge is disabled")
     # Reads use the already-installed Store's connection method; no private
     # task text is fetched or logged. Native peer must already be enabled.
     with closing(store.connect()) as database:
@@ -57,8 +61,10 @@ def _read_native(store: Any, handoff_id: str, peer_id: str, payload: dict[str, s
             "SELECT direction,peer_id,kind,payload,state FROM handoffs WHERE id=?", (handoff_id,)
         ).fetchone()
         task = database.execute(
-            "SELECT 1 FROM tasks WHERE id=?", ("handoff-" + handoff_id,)
+            "SELECT source FROM tasks WHERE id=?", ("handoff-" + handoff_id,)
         ).fetchone()
+    if task is not None and task["source"] != "bridge:" + peer_id:
+        raise ValueError("Native task ID belongs to a different source")
     if record is None:
         if task is not None:
             raise ValueError("Native task ID collision; not overwriting anything")
