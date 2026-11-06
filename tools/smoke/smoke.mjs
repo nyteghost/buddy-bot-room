@@ -1241,6 +1241,14 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
     const asset=await page.request.get(URL_+src);
     if(!asset.ok()||!asset.headers()["content-type"]?.includes("image/png"))throw Error("Owner cannot load persisted HD256 PNG");
     await library.getByRole("button",{name:"Signature action for Smoke HD Bot",exact:true}).click();
+    const held=await guest.evaluate(async img=>{
+      const actor=img.closest(".world-custom-guest");
+      const before=actor.getAttribute("style");
+      const action=actor.getAttribute("data-action");
+      await new Promise(resolve=>setTimeout(resolve,300));
+      return {before,after:actor.getAttribute("style"),action};
+    });
+    if(held.action!=="signature"||held.before!==held.after)throw Error("Signature action did not hold the visitor in place");
     const exported=await page.request.get(URL_+"/api/character-universe?export=1");
     if(!exported.ok())throw Error("HD256 backup export failed");
   }

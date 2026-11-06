@@ -14,8 +14,8 @@ import { selectWorldHdClip, worldHdAction, worldHdFrameAt } from "@/lib/world-hd
 export function WorldCustomGuest({ character, index, theme, active, cue, paused = false }: {
  character: WorldCustomCharacter; index: number; theme: CharacterMode; active: boolean; cue?: WorldRoomCue; paused?: boolean;
 }) {
- const [elapsed, setElapsed] = useState(0);
- const [gesture, setGesture] = useState<{ action: "wave" | "signature"; start: number } | null>(null);
+ const [{elapsed, routeElapsed}, setClock] = useState({elapsed:0, routeElapsed:0});
+ const [gesture, setGesture] = useState<{ action: "wave" | "signature"; start: number; duration: number } | null>(null);
  const previous = useRef(0);
  const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
  const animate = active && !paused && !reduced && !low && !hidden;
@@ -24,15 +24,20 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
   const now = performance.now();
   const delta = now - previous.current;
   previous.current = now;
-  setElapsed(value => advanceMotionClock(value, delta));
+  setClock(clock => {
+   const next = advanceMotionClock(clock.elapsed, delta);
+   const step = next - clock.elapsed;
+   const held = gesture ? Math.max(0, Math.min(step, gesture.start + gesture.duration - clock.elapsed)) : 0;
+   return {elapsed:next, routeElapsed:clock.routeElapsed + step - held};
+  });
  }, 50, animate);
  const routeId = guestIds[index % guestIds.length]!;
  // Keep the last route position while paused instead of returning to the start.
- const pose = guestPose(routeId, theme, elapsed + index * 2200);
+ const pose = guestPose(routeId, theme, routeElapsed + index * 2200);
  const reaction = worldCueReaction(cue, character.id, Date.now(), paused || reduced || low || hidden);
- const gestureActive = gesture !== null && elapsed - gesture.start < 1700;
+ const gestureActive = gesture !== null && elapsed - gesture.start < gesture.duration;
  const fallbackAction = gestureActive && gesture.action === "wave" ? "wave" : pose.action;
- const action = reaction?.action ?? (gestureActive ? gesture.action : fallbackAction);
+ const action = gestureActive ? gesture.action : reaction?.action ?? fallbackAction;
  const runs = useMemo(() => character.hd || character.hd3 ? [] : spriteRuns(
   worldReactionFrame(character.pixels, pose.facing, reaction, fallbackAction, Math.floor(elapsed / 175) % 4),
   (x, y) => y < 24 ? "body" : x < 16 ? "left-leg" : "right-leg"
@@ -48,15 +53,21 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
  const image = selected ? worldHdFrameAt(selected.clip, clipElapsed) : frames?.[Math.floor(elapsed / 175) % frames.length];
  const style = { "--world-guest-x": pose.x + "%", "--world-guest-y": pose.y + "%" } as CSSProperties;
  const signature = !!character.hd3 && Object.values(character.hd3.directions).some(actions => actions?.signature);
- const trigger = (action: "wave" | "signature") => { if (animate) setGesture({ action, start: elapsed }); };
+ const trigger = (action: "wave" | "signature") => {
+  if (!animate) return;
+  const clip = character.hd3 ? selectWorldHdClip(character.hd3, pose.facing, action).clip : undefined;
+  // Hold a static pose long enough to read it; never truncate supplied animation.
+  const duration = Math.max(1700, clip?.frames.reduce((sum, frame) => sum + frame.durationMs, 0) ?? 0);
+  setGesture({ action, start: elapsed, duration });
+ };
  useEffect(() => {
   const receive = (event: Event) => {
    const detail = (event as CustomEvent<unknown>).detail;
-   if (animate && signature && detail && typeof detail === "object" && "id" in detail && "action" in detail && detail.id === character.id && detail.action === "signature") setGesture({ action: "signature", start: elapsed });
+   if (animate && signature && detail && typeof detail === "object" && "id" in detail && "action" in detail && detail.id === character.id && detail.action === "signature") trigger("signature");
   };
   window.addEventListener("pixel-pals:hd-action", receive);
   return () => window.removeEventListener("pixel-pals:hd-action", receive);
- }, [animate, signature, character.id, elapsed]);
+ }, [animate, signature, character.id, character.hd3, pose.facing, elapsed]);
  return <div className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? pose.facing} data-paused={!animate}>
   <button type="button" className="world-custom-actor" aria-label={"Wave to " + character.name}
    title={signature ? "Tap to wave. Shift-click or press S for signature action." : "Tap to wave"}

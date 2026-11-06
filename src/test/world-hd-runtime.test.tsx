@@ -8,7 +8,7 @@ import {lowPower} from "@/lib/power";
 import {parseCharacterZip} from "@/lib/character-zip";
 import type {WorldHdCharacter,WorldHdClip} from "@/lib/world-hd";
 vi.mock("@/lib/character-zip",()=>({CHARACTER_ZIP_MAX_BYTES:8000000,parseCharacterZip:vi.fn()}));
-vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestPose:()=>({x:30,y:40,facing:"e",action:"walking"})}));
+vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestPose:(_id:unknown,_theme:unknown,elapsed:number)=>({x:30+elapsed/1000,y:40,facing:"e",action:"walking"})}));
 const clip=(names:string[],loop=true):WorldHdClip=>({frames:names.map((src,i)=>({src,durationMs:i?300:100})),loop});
 const art:WorldHdCharacter={version:2,artStatus:"prototype",movement:"humanoid",directions:{s:{idle:clip(["south"]),signature:clip(["signature"])},e:{idle:clip(["east"]),walk:clip(["walk1","walk2"]),signature:clip(["sig-east"])}}};
 const character=()=>({...starterCustomCharacter(),name:"Test Hero",hd3:art});
@@ -55,11 +55,33 @@ describe("HD256 runtime",()=>{
   view.rerender(<WorldCustomGuest character={c} index={0} theme="normal" active={false}/>);assertFrozen();
  });
  it("exposes a touch signature action and only accepts events for this enabled actor",()=>{
-  const c=character();render(<WorldCustomGuest character={c} index={0} theme="normal" active/>);
+  const c=character();render(<WorldCustomGuest character={c} index={0} theme="normal" active cue={{action:"wave",at:Date.now()}}/>);
   act(()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:"another",action:"signature"}})));
-  expect(screen.getByRole("img").getAttribute("src")).toBe("walk1");
+  expect(screen.getByRole("img").getAttribute("src")).toBe("east");
   fireEvent.click(screen.getByRole("button",{name:"Signature action for Test Hero"}));
   expect(screen.getByRole("img").getAttribute("src")).toBe("sig-east");
+ });
+ it("holds a long gesture in place and resumes the route without jumping",()=>{
+  vi.useFakeTimers();
+  const c=character();
+  c.hd3={...art,directions:{...art.directions,e:{...art.directions.e,signature:{loop:false,frames:[{src:"first",durationMs:1500},{src:"last",durationMs:1500}]}}}};
+  const view=render(<WorldCustomGuest character={c} index={0} theme="normal" active/>);
+  const actor=view.container.querySelector(".world-custom-guest") as HTMLElement;
+  act(()=>vi.advanceTimersByTime(200));
+  const x=actor.style.getPropertyValue("--world-guest-x");
+  fireEvent.click(screen.getByRole("button",{name:"Signature action for Test Hero"}));
+  act(()=>vi.advanceTimersByTime(2000));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("last");
+  expect(actor.style.getPropertyValue("--world-guest-x")).toBe(x);
+  view.rerender(<WorldCustomGuest character={c} index={0} theme="normal" active paused/>);
+  act(()=>vi.advanceTimersByTime(5000));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("last");
+  view.rerender(<WorldCustomGuest character={c} index={0} theme="normal" active/>);
+  act(()=>vi.advanceTimersByTime(1000));
+  expect(actor.style.getPropertyValue("--world-guest-x")).toBe(x);
+  expect(actor.getAttribute("data-action")).toBe("walking");
+  act(()=>vi.advanceTimersByTime(100));
+  expect(parseFloat(actor.style.getPropertyValue("--world-guest-x"))-parseFloat(x)).toBeCloseTo(0.1);
  });
  it("previews directions and timed actions, preserving the frame on pause",()=>{
   vi.useFakeTimers();render(<HdCharacterPreview character={character()}/>);

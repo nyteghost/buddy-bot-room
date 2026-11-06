@@ -77,3 +77,15 @@ route generation. Private fan artwork is distributed separately, never committed
 Parallel agents actually used: finish_storage, finish_runtime_ui, finish_packs.
 They saved code and tests before usage-limit interruptions; root integrated and
 retested their changes. Earlier recovery agent details remain in conversation.
+
+## Follow-up: gestures stop route movement
+
+Manual waves/signatures now hold the visitor at its route position and facing,
+play for at least the full supplied clip duration, and resume the route without
+teleporting. Explicit gestures take priority over ambient room cues. Focus Mode
+freezes both the gesture and route clocks. No artwork or shared infrastructure
+changed. Regression coverage includes a long gesture, Focus Mode interruption,
+route resumption and manual action priority; browser smoke checks stationary
+signature playback. Local focused tests, TypeScript and production build passed;
+CI/browser/publication results for this follow-up must be checked separately from
+the earlier verified release above.
