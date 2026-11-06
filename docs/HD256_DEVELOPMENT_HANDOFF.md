@@ -41,22 +41,31 @@ Converter: tools/characters/build-hd256-pack.py --source HANDOFF --output NEW_DI
 
 ## Verification and gates
 
-Local full Vitest run:163 files,1491 tests passed, including a temporary private
-artifact verification test covering all24 ZIPs through the real importer.
-Production Vite/Nitro build passed. TypeScript identified one missing resolution
-field in a test fixture; corrected and final TypeScript recheck passed. Runtime
-regression recheck:6 tests passed. Published implementation:649d7456e80df0bc9be1a61ddca5ccc2d61bbf4f.
-The temporary artifact test is not committed because it references private files.
+Implementation commit:649d7456e80df0bc9be1a61ddca5ccc2d61bbf4f.
+Smoke correction and tested release:2d70e4ea174e03a7f54ca65974bce5a976faed27.
 
-Browser smoke expanded to cover v2/v3 preview, approval, rendering, owner asset
-loading and export. Local Chromium launch is blocked by socket Operation not
-permitted. Browser smoke and GitHub CI/Docker publication remain release gates;
-no deployment readiness is claimed. Generated routeTree changes from local build
-are excluded because they include unrelated Shared Intelligence route generation.
+- GitHub CI42245998026: TypeScript,162 test files /1467 tests, production build
+  and real browser smoke passed. Smoke includes v2/v3 ZIP preview, approval,
+  rendered256px art, immutable owner asset access and backup export.
+- First implementation smoke failed on outdated install-confirmation text; the
+  corrected release above passed. No product failure is hidden by that result.
+- Local full run including private pack verification:163 files /1491 tests passed.
+  All24 private ZIPs passed the real application importer. Separate full server
+  decoder checks passed for all272 supplied PNGs (273 assertions/tests).
+- Local production build and TypeScript passed. Local Chromium cannot launch due
+  to sandbox socket restrictions; real browser results above come from GitHub.
+- Publish workflow42245998035 passed, including immutable tag verification:
+  ghcr.io/nyteghost/buddy-bot-room:beta-2d70e4ea174e03a7f54ca65974bce5a976faed27
+  digest sha256:ecaf7539c657d0e86a6bc3372e4fa3aa7591203fd6a7ea762ebb308c321ddd26
+- No Unraid deployment or live-data migration was performed.
+
+Temporary private-artifact tests are excluded from GitHub. Generated routeTree
+changes from local build were excluded because they contain unrelated bridge
+route generation. Private fan artwork is distributed separately, never committed.
 
 ## Next exact tasks
 
-1. Verify GitHub CI/browser smoke on the HD milestone commit; correct failures.
+1. Use the immutable tested release above for review; obtain deployment approval.
 2. Inspect256px rendering and controls at desktop/mobile widths and Focus Mode.
 3. Obtain owner visual acceptance of private prototype packs; expand supplied
    animation art without overwriting originals.
