@@ -1225,7 +1225,7 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
   if(before.characters?.some(c=>c.id==="user-smokebot2026"))throw Error("Synthetic smoke character already existed");
   const approve=library.getByRole("button",{name:"Approve & install 1 character(s)"});
   await approve.click();
-  await library.getByText(/1 character\(s\) installed!/).waitFor({timeout:15000});
+  await library.getByRole("status").filter({hasText:"1 character(s) installed."}).waitFor({timeout:15000});
   const after=await (await page.request.get(URL_+"/api/character-universe")).json();
   if(!after.characters?.some(c=>c.id==="user-smokebot2026")||after.revision!==before.revision+1)
    throw Error("Owner-approved ZIP install was not saved to the Character Universe");

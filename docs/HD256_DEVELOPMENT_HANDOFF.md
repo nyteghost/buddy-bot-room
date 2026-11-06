@@ -44,7 +44,8 @@ Converter: tools/characters/build-hd256-pack.py --source HANDOFF --output NEW_DI
 Local full Vitest run:163 files,1491 tests passed, including a temporary private
 artifact verification test covering all24 ZIPs through the real importer.
 Production Vite/Nitro build passed. TypeScript identified one missing resolution
-field in a test fixture; corrected and final recheck recorded in session report.
+field in a test fixture; corrected and final TypeScript recheck passed. Runtime
+regression recheck:6 tests passed. Published implementation:649d7456e80df0bc9be1a61ddca5ccc2d61bbf4f.
 The temporary artifact test is not committed because it references private files.
 
 Browser smoke expanded to cover v2/v3 preview, approval, rendering, owner asset
