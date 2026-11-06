@@ -133,11 +133,11 @@ The **installed bridge sidecar uses a separate SQLite queue** and its CLI approv
 `tools/adhd-v02/native_handoff_reconcile.py` introduces a small, **injectable and undeployed** integration adapter using the native Store instead of directly inserting task records:
 
 - Requires the bridge-side receiver to have already approved a task, with a matching approval audit event.
-- Requires an explicit handoff ID, a previously registered **enabled native ADHD peer ID**, and a distinct confirmation string for owner-authorized linking.
+- Requires an explicit handoff ID, a previously registered **enabled native ADHD peer ID**, the native ADHD `bridge_enabled` setting explicitly set to `on`, and a distinct confirmation string for owner-authorized linking.
 - Requires `native_store.backup()` to succeed before writing through the native Store methods.
 - Uses native `create_handoff` and `approve_handoff`, preserving the existing `handoff-<id>` task IDs, task status rules, native audit trail and idempotency.
 - When a native pending handoff exists after an interruption, the adapter can finish its native approval on an explicitly approved retry; it does not replace or overwrite existing tasks.
-- Refuses native rejected records, mismatched IDs or payloads, missing task records after native approval, disabled/unregistered peers, and handoffs whose project names need mapping.
+- Refuses native rejected records, mismatched IDs or payloads, missing task records after native approval, task ID collisions from other sources, disabled/unregistered peers, and handoffs whose project names need mapping.
 - Returns only status labels and backup presence. It does **not** echo task titles, notes, peer tokens, or private memory.
 - Does not auto-import all handoffs and does not grant imported character assets any tool, memory, or AI permissions.
 
