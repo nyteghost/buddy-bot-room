@@ -28,7 +28,7 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
    const next = advanceMotionClock(clock.elapsed, delta);
    const step = next - clock.elapsed;
    const held = gesture ? Math.max(0, Math.min(step, gesture.start + gesture.duration - clock.elapsed)) : 0;
-   return {elapsed:next, routeElapsed:clock.routeElapsed + step - held};
+   return {elapsed:next, routeElapsed:clock.routeElapsed + (step - held)};
   });
  }, 50, animate);
  const routeId = guestIds[index % guestIds.length]!;
