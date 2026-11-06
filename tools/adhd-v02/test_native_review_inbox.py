@@ -149,6 +149,18 @@ class InboxTests(LocalIntakeTests):
                          owner_confirmation=IMPORT_CONFIRM)
         self.assertNotIn("CONFIDENTIAL",str(task))
 
+    def test_optional_null_notes_and_project_are_displayed_safely(self):
+        self.handoff("pending000001",approved=False,event=False)
+        with sqlite3.connect(self.bridge) as db:
+            db.execute("UPDATE handoffs SET payload=? WHERE id=?", (
+                json.dumps({"title":"PRIVATE TEST TASK","notes":None,"project":None,
+                            "due_at":None}), "pending000001"))
+        item=list_inbox(self.bridge,native_store=self.store)["items"][0]
+        self.assertEqual(item["notes"],"")
+        self.assertIsNone(item["due_at"])
+        self.assertIsNone(item["project"])
+        self.assertEqual(item["state"],"pending")
+
     def test_review_does_not_create_database_if_missing(self):
         self.bridge.unlink()
         with self.assertRaisesRegex(ValueError,"unavailable"):
