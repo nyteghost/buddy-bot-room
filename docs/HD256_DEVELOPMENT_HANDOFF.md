@@ -89,3 +89,7 @@ route resumption and manual action priority; browser smoke checks stationary
 signature playback. Local focused tests, TypeScript and production build passed;
 CI/browser/publication results for this follow-up must be checked separately from
 the earlier verified release above.
+
+Gesture implementation: cd101bbe7e7bd49465da81382779aa919f269609.
+Local validation:29 movement/runtime tests, TypeScript and production build passed.
+Pack authors: see [HD256_CHARACTER_FORMAT.md](HD256_CHARACTER_FORMAT.md).
