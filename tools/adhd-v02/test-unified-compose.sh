@@ -175,5 +175,6 @@ python3 -B "$SELF/test_native_handoff_reconcile.py"
 python3 -B "$SELF/test_native_pairing_preflight.py"
 python3 -B "$SELF/test_native_local_intake.py"
 python3 -B "$SELF/test_stage_native_local_intake.py"
+python3 -B "$SELF/test_native_review_inbox.py"
 bash -n "$SELF/run-isolated-native-staging.sh"
 
