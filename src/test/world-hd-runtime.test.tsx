@@ -1,0 +1,86 @@
+import {afterEach,describe,expect,it,vi} from "vitest";
+import {act,cleanup,fireEvent,render,screen} from "@testing-library/react";
+import {WorldCustomGuest} from "@/components/world-custom-guest";
+import {HdCharacterPreview,WorldCharacterLibrary} from "@/components/world-character-library";
+import {starterCustomCharacter} from "@/lib/world-custom-packs";
+import {selectWorldHdClip,worldHdFrameAt} from "@/lib/world-hd-animation";
+import {lowPower} from "@/lib/power";
+import {parseCharacterZip} from "@/lib/character-zip";
+import type {WorldHdCharacter,WorldHdClip} from "@/lib/world-hd";
+vi.mock("@/lib/character-zip",()=>({CHARACTER_ZIP_MAX_BYTES:8000000,parseCharacterZip:vi.fn()}));
+vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestPose:()=>({x:30,y:40,facing:"e",action:"walking"})}));
+const clip=(names:string[],loop=true):WorldHdClip=>({frames:names.map((src,i)=>({src,durationMs:i?300:100})),loop});
+const art:WorldHdCharacter={version:2,artStatus:"prototype",movement:"humanoid",directions:{s:{idle:clip(["south"]),signature:clip(["signature"])},e:{idle:clip(["east"]),walk:clip(["walk1","walk2"]),signature:clip(["sig-east"])}}};
+const character=()=>({...starterCustomCharacter(),name:"Test Hero",hd3:art});
+afterEach(()=>{cleanup();vi.useRealTimers();vi.restoreAllMocks();});
+describe("HD256 runtime",()=>{
+ it("uses actual facing art, variable frame durations and non-looping endings",()=>{
+  expect(selectWorldHdClip(art,"e","walk").clip.frames[0]?.src).toBe("walk1");
+  expect(selectWorldHdClip(art,"e","wave").clip.frames[0]?.src).toBe("east");
+  expect(selectWorldHdClip(art,"nw","walk").clip.frames[0]?.src).toBe("south");
+  expect(worldHdFrameAt(clip(["a","b"]),99)).toBe("a");
+  expect(worldHdFrameAt(clip(["a","b"]),100)).toBe("b");
+  expect(worldHdFrameAt(clip(["a","b"]),400)).toBe("a");
+  expect(worldHdFrameAt(clip(["a","b"],false),900)).toBe("b");
+ });
+ it("maps legacy walking and freezes the current HD frame in focus mode",()=>{
+  vi.useFakeTimers();
+  const c=character(),view=render(<WorldCustomGuest character={c} index={0} theme="normal" active/>);
+  expect(screen.getByRole("img").getAttribute("src")).toBe("walk1");
+  act(()=>vi.advanceTimersByTime(150));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("walk2");
+  view.rerender(<WorldCustomGuest character={c} index={0} theme="normal" active paused/>);
+  act(()=>vi.advanceTimersByTime(1000));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("walk2");
+  expect(screen.getByRole("button",{name:"Signature action for Test Hero"})).toBeDisabled();
+  view.unmount();
+  const legacy={...starterCustomCharacter(),hd:{resolution:256 as const,idle:["idle"],walk:["legacy-walk"]}};
+  render(<WorldCustomGuest character={legacy} index={0} theme="normal" active/>);
+  expect(screen.getByRole("img").getAttribute("src")).toBe("legacy-walk");
+ });
+ it("freezes while inactive, hidden, reduced motion or low power",()=>{
+  vi.useFakeTimers();
+  const c=character(),view=render(<WorldCustomGuest character={c} index={0} theme="normal" active/>);
+  act(()=>vi.advanceTimersByTime(150));
+  const frame=screen.getByRole("img").getAttribute("src");
+  const assertFrozen=()=>{act(()=>vi.advanceTimersByTime(1000));expect(screen.getByRole("img").getAttribute("src")).toBe(frame);expect(screen.getByRole("button",{name:"Signature action for Test Hero"})).toBeDisabled();};
+  act(()=>lowPower.set(true));assertFrozen();act(()=>lowPower.set(false));
+  vi.spyOn(document,"visibilityState","get").mockReturnValue("hidden");
+  act(()=>document.dispatchEvent(new Event("visibilitychange")));assertFrozen();
+  vi.restoreAllMocks();act(()=>document.dispatchEvent(new Event("visibilitychange")));
+  const original=window.matchMedia;
+  vi.spyOn(window,"matchMedia").mockImplementation(query=>({...original(query),matches:true}));
+  view.rerender(<WorldCustomGuest character={c} index={0} theme="normal" active/>);assertFrozen();
+  vi.restoreAllMocks();
+  view.rerender(<WorldCustomGuest character={c} index={0} theme="normal" active={false}/>);assertFrozen();
+ });
+ it("exposes a touch signature action and only accepts events for this enabled actor",()=>{
+  const c=character();render(<WorldCustomGuest character={c} index={0} theme="normal" active/>);
+  act(()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:"another",action:"signature"}})));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("walk1");
+  fireEvent.click(screen.getByRole("button",{name:"Signature action for Test Hero"}));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("sig-east");
+ });
+ it("previews directions and timed actions, preserving the frame on pause",()=>{
+  vi.useFakeTimers();render(<HdCharacterPreview character={character()}/>);
+  fireEvent.change(screen.getByLabelText("Test Hero preview facing"),{target:{value:"e"}});
+  fireEvent.change(screen.getByLabelText("Test Hero preview action"),{target:{value:"walk"}});
+  fireEvent.click(screen.getByRole("button",{name:"Play preview"}));
+  act(()=>vi.advanceTimersByTime(160));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("walk2");
+  fireEvent.click(screen.getByRole("button",{name:"Pause preview"}));
+  act(()=>vi.advanceTimersByTime(1000));
+  expect(screen.getByRole("img").getAttribute("src")).toBe("walk2");
+ });
+ it("requires separate update approval and never installs over an existing ID",async()=>{
+  const c=character(),install=vi.fn(),update=vi.fn().mockResolvedValue(true);
+  vi.mocked(parseCharacterZip).mockResolvedValue({name:"New art",characters:[c]});
+  render(<WorldCharacterLibrary enabledIds={[]} customCharacters={[{...c,hd3:{...art,version:1}}]} syncStatus="Saved" onToggle={()=>{}} onSave={async()=>true} onDelete={async()=>true} onInstallPack={install} onUpdatePack={update}/>);
+  await act(async()=>fireEvent.change(screen.getByLabelText("Choose character ZIP file"),{target:{files:[new File(["zip"],"test.zip")]}}));
+  expect(install).not.toHaveBeenCalled();expect(update).not.toHaveBeenCalled();
+  expect(screen.getByRole("button",{name:"Approve & install 0 character(s)"})).toBeDisabled();
+  fireEvent.click(screen.getByRole("checkbox",{name:"Update Test Hero"}));
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Approve version update for 1 character(s)"})));
+  expect(update).toHaveBeenCalledWith([c]);expect(install).not.toHaveBeenCalled();
+ });
+});

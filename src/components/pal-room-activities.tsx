@@ -12,7 +12,7 @@ import { AdhdHandoffPanel } from "./adhd-handoff-panel";
 import type { WorldCustomCharacter } from "@/lib/world-custom-packs";
 import "./pal-room-activities.css";
 
-export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange, enabledWorldPacks, onWorldPackChange, customCharacters, syncStatus, onCustomSave, onCustomInstallPack, onCustomDelete, onWaveAll, onCelebrateWorld }: {
+export function PalRoomActivities({ session, onStart, onPauseChange, paused, playful, onPlayfulChange, phase, livingWorld, onLivingWorldChange, enabledWorldPacks, onWorldPackChange, customCharacters, syncStatus, onCustomSave, onCustomInstallPack, onCustomDelete, onWaveAll, onCelebrateWorld, onCustomInstallBackup, onCustomUpdatePack, onCustomExportBackup, recoveryBackup, animationsPaused }: {
   session: FocusSession | null;
   onStart: () => void;
   onPauseChange: (value: boolean) => void;
@@ -28,6 +28,11 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
   syncStatus: string;
   onCustomSave: (character:WorldCustomCharacter)=>Promise<boolean>;
   onCustomInstallPack: (characters:WorldCustomCharacter[])=>Promise<boolean>;
+  onCustomInstallBackup?: (characters:WorldCustomCharacter[])=>Promise<boolean>;
+  onCustomUpdatePack?: (characters:WorldCustomCharacter[])=>Promise<boolean>;
+  onCustomExportBackup?: ()=>Promise<string>;
+  recoveryBackup?: string|null;
+  animationsPaused?: boolean;
   onCustomDelete: (id:string)=>Promise<boolean>;
   onWaveAll: ()=>void;
   onCelebrateWorld: ()=>void;
@@ -99,7 +104,7 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
           <Button type="button" size="sm" variant="outline" aria-label="Wave to all Pals" onClick={onWaveAll}><Sparkles className="size-3.5"/>Wave to everyone</Button>
           <Button type="button" size="sm" variant="outline" aria-label="Celebrate with Pals" onClick={onCelebrateWorld}><PartyPopper className="size-3.5"/>Celebrate together</Button>
         </div>}
-        {livingWorld && <WorldCharacterLibrary enabledIds={enabledWorldPacks} customCharacters={customCharacters} syncStatus={syncStatus} onToggle={onWorldPackChange} onSave={onCustomSave} onInstallPack={onCustomInstallPack} onDelete={onCustomDelete} />}
+        {livingWorld && <WorldCharacterLibrary enabledIds={enabledWorldPacks} customCharacters={customCharacters} syncStatus={syncStatus} onToggle={onWorldPackChange} onSave={onCustomSave} onInstallPack={onCustomInstallPack} onDelete={onCustomDelete} {...(onCustomInstallBackup ? {onInstallBackup:onCustomInstallBackup} : {})} {...(onCustomUpdatePack ? {onUpdatePack:onCustomUpdatePack} : {})} {...(onCustomExportBackup ? {onExportBackup:onCustomExportBackup} : {})} recoveryBackup={recoveryBackup??null} paused={animationsPaused??false} />}
         <AdhdHandoffPanel />
         {playful && (
           <div className="pal-room-life-list" role="group" aria-label="What the Pals are doing">

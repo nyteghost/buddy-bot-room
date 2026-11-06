@@ -1,42 +1,74 @@
-import { useEffect,useMemo,useRef,useState,type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { WorldCustomCharacter } from "@/lib/world-custom-packs";
-import { guestIds,guestPose } from "@/lib/world-guest-packs";
-import { useCalmInterval,lowPower } from "@/lib/power";
+import { guestIds, guestPose } from "@/lib/world-guest-packs";
+import { useCalmInterval, lowPower, useTabHidden } from "@/lib/power";
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { advanceMotionClock } from "@/lib/pal-motion";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { worldReactionFrame } from "@/lib/world-animation";
 import { worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs";
 import { spriteRuns } from "@/lib/sprite-upscale";
+import { selectWorldHdClip, worldHdAction, worldHdFrameAt } from "@/lib/world-hd-animation";
 
-/** A data-only user-created visitor. An image cannot become an AI agent via this path. */
-export function WorldCustomGuest({character,index,theme,active,cue}:{character:WorldCustomCharacter;index:number;theme:CharacterMode;active:boolean;cue?:WorldRoomCue}){
- const [elapsed,setElapsed]=useState(0),[wave,setWave]=useState(false);
- const prev=useRef(0),reduced=useReducedMotion(),low=lowPower.use();
- const animate=active&&!reduced&&!low;
- const reacting=!!cue&&!reduced&&!low;
- useEffect(()=>{prev.current=performance.now();},[animate,reacting]);
- useCalmInterval(()=>{const now=performance.now(),delta=now-prev.current;prev.current=now;setElapsed(e=>advanceMotionClock(e,delta));},125,animate||reacting);
- useEffect(()=>{if(!wave)return;const t=window.setTimeout(()=>setWave(false),1700);return()=>window.clearTimeout(t);},[wave]);
- const routeId=guestIds[index%guestIds.length]!;
- const pose=guestPose(routeId,theme,animate?elapsed+index*2200:0);
- const reaction=worldCueReaction(cue,character.id,Date.now(),reduced||low);
- const fallbackAction=wave?"wave":pose.action;
- const action=reaction?.action??fallbackAction;
- const frame=reaction?.frame??Math.floor(elapsed/175)%4;
- const runs=useMemo(()=>character.hd?[]:spriteRuns(worldReactionFrame(character.pixels,pose.facing,reaction,fallbackAction,Math.floor(elapsed/175)%4),(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[character.pixels,character.hd,pose.facing,action,frame]);
- const art=character.hd;
- const kind=action==="wave"?"wave":action==="celebrate"?"celebrate"
-  :["walking","return","retreat"].includes(action)?"walk":"idle";
- const frames=art?(kind==="wave"?art.wave:kind==="celebrate"?art.celebrate:kind==="walk"?art.walk:art.idle)??art.idle:undefined;
- const image=frames?.[Math.floor(elapsed/175)%frames.length];
- const style={"--world-guest-x":pose.x+"%","--world-guest-y":pose.y+"%"} as CSSProperties;
- return <button type="button" className="world-guest world-custom-guest" aria-label={"Wave to "+character.name} style={style} data-action={action} onClick={()=>setWave(true)}>
-  {image?<img className="world-guest-pixels world-guest-hd-pixels" src={image} width={256} height={256} draggable={false} alt={character.name+" 256 pixel character"}/>:
-   <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name+" custom pixel character"}>
-    {runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={character.palette[r.c]??"transparent"}/>)}
-   </svg>}
-  <span className="world-guest-name">{character.name}</span>
-  {(wave||action==="wave"||action==="celebrate")&&<span className="world-guest-spark" aria-hidden="true">✦</span>}
- </button>;
+/** Cosmetic animation only, using the existing obstacle-aware room route. */
+export function WorldCustomGuest({ character, index, theme, active, cue, paused = false }: {
+ character: WorldCustomCharacter; index: number; theme: CharacterMode; active: boolean; cue?: WorldRoomCue; paused?: boolean;
+}) {
+ const [elapsed, setElapsed] = useState(0);
+ const [gesture, setGesture] = useState<{ action: "wave" | "signature"; start: number } | null>(null);
+ const previous = useRef(0);
+ const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
+ const animate = active && !paused && !reduced && !low && !hidden;
+ useEffect(() => { previous.current = performance.now(); }, [animate]);
+ useCalmInterval(() => {
+  const now = performance.now();
+  const delta = now - previous.current;
+  previous.current = now;
+  setElapsed(value => advanceMotionClock(value, delta));
+ }, 50, animate);
+ const routeId = guestIds[index % guestIds.length]!;
+ // Keep the last route position while paused instead of returning to the start.
+ const pose = guestPose(routeId, theme, elapsed + index * 2200);
+ const reaction = worldCueReaction(cue, character.id, Date.now(), paused || reduced || low || hidden);
+ const gestureActive = gesture !== null && elapsed - gesture.start < 1700;
+ const fallbackAction = gestureActive && gesture.action === "wave" ? "wave" : pose.action;
+ const action = reaction?.action ?? (gestureActive ? gesture.action : fallbackAction);
+ const runs = useMemo(() => character.hd || character.hd3 ? [] : spriteRuns(
+  worldReactionFrame(character.pixels, pose.facing, reaction, fallbackAction, Math.floor(elapsed / 175) % 4),
+  (x, y) => y < 24 ? "body" : x < 16 ? "left-leg" : "right-leg"
+ ), [character.pixels, character.hd, character.hd3, pose.facing, reaction, fallbackAction, elapsed]);
+ const kind = worldHdAction(action);
+ const art = character.hd;
+ const frames = art ? (kind === "wave" ? art.wave : kind === "celebrate" ? art.celebrate : kind === "walk" ? art.walk : art.idle) ?? art.idle : undefined;
+ const selected = character.hd3 ? selectWorldHdClip(character.hd3, pose.facing, kind) : undefined;
+ const clipKey = `${character.id}:${character.hd3?.version}:${selected?.direction}:${selected?.action}:${gestureActive ? gesture?.start : "route"}`;
+ const [clipClock, setClipClock] = useState({ key: clipKey, start: elapsed });
+ if (clipClock.key !== clipKey) setClipClock({ key: clipKey, start: elapsed });
+ const clipElapsed = clipClock.key === clipKey ? elapsed - clipClock.start : 0;
+ const image = selected ? worldHdFrameAt(selected.clip, clipElapsed) : frames?.[Math.floor(elapsed / 175) % frames.length];
+ const style = { "--world-guest-x": pose.x + "%", "--world-guest-y": pose.y + "%" } as CSSProperties;
+ const signature = !!character.hd3 && Object.values(character.hd3.directions).some(actions => actions?.signature);
+ const trigger = (action: "wave" | "signature") => { if (animate) setGesture({ action, start: elapsed }); };
+ useEffect(() => {
+  const receive = (event: Event) => {
+   const detail = (event as CustomEvent<unknown>).detail;
+   if (animate && signature && detail && typeof detail === "object" && "id" in detail && "action" in detail && detail.id === character.id && detail.action === "signature") setGesture({ action: "signature", start: elapsed });
+  };
+  window.addEventListener("pixel-pals:hd-action", receive);
+  return () => window.removeEventListener("pixel-pals:hd-action", receive);
+ }, [animate, signature, character.id, elapsed]);
+ return <div className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? pose.facing} data-paused={!animate}>
+  <button type="button" className="world-custom-actor" aria-label={"Wave to " + character.name}
+   title={signature ? "Tap to wave. Shift-click or press S for signature action." : "Tap to wave"}
+   onClick={event => trigger(signature && event.shiftKey ? "signature" : "wave")}
+   onKeyDown={event => { if (signature && event.key.toLowerCase() === "s") { event.preventDefault(); trigger("signature"); } }}>
+   {image ? <img className="world-guest-pixels world-guest-hd-pixels" src={image} width={256} height={256} draggable={false} alt={character.name + " 256 pixel character"}/> :
+    <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name + " custom pixel character"}>
+     {runs.map(run => <rect key={run.x + "-" + run.y} x={run.x} y={run.y} width={run.w} height="1" fill={character.palette[run.c] ?? "transparent"}/>)}
+    </svg>}
+   <span className="world-guest-name">{character.name}</span>
+   {animate && (action === "wave" || action === "celebrate" || action === "signature") && <span className="world-guest-spark" aria-hidden="true">✦</span>}
+  </button>
+  {signature && <button type="button" className="world-signature-button" aria-label={"Signature action for " + character.name} disabled={!animate} onClick={() => trigger("signature")}>✦</button>}
+ </div>;
 }

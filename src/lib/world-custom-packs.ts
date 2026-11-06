@@ -1,13 +1,16 @@
+import { validateWorldHdCharacter, type WorldHdCharacter } from "./world-hd";
 /** Data-only, 32×32 custom cosmetic characters. No external JS, SVG or URL fields. */
 export const CUSTOM_WORLD_KEY="pixel-pals-custom-world-characters-v1";
-export const CUSTOM_WORLD_LIMIT=12;
+export const CUSTOM_WORLD_LIMIT=100;
+export const CUSTOM_WORLD_PACK_LIMIT=12;
+export const CUSTOM_WORLD_BACKUP_LIMIT=128*1024*1024;
 export const CUSTOM_WORLD_FILE_LIMIT=32*1024*1024;
 export const CUSTOM_WORLD_PNG_URL_LIMIT=700_000;
 export const CUSTOM_WORLD_HD_CHAR_LIMIT=2_400_000;
 export const CUSTOM_WORLD_COLOR_KEYS="abcdefghijklmnop";
 export type WorldHdSpriteSet={resolution:256;idle:string[];walk?:string[];wave?:string[];celebrate?:string[]};
 export type WorldCustomCharacter={
- id:string;name:string;pixels:string[];palette:Record<string,string>;hd?:WorldHdSpriteSet;
+ id:string;name:string;pixels:string[];palette:Record<string,string>;hd?:WorldHdSpriteSet;hd3?:WorldHdCharacter;
 };
 export const STARTER_PALETTE:Record<string,string>={
  a:"#202335",b:"#fac19a",c:"#82543c",d:"#4e7dcf",e:"#c3ed6b",f:"#f6ebdc",
@@ -72,9 +75,12 @@ export function validateCustomCharacter(value:unknown):WorldCustomCharacter|null
  const colors=new Set((v['pixels'] as string[]).join("").replace(/\./g,""));
  if(colors.size===0||[...colors].some(c=>!(c in palette)))return null;
  if((v['pixels'] as string[]).join("").replace(/\./g,"").length<15)return null;
+ const hd3=v["hd3"]===undefined?undefined:validateWorldHdCharacter(v["hd3"]);
+ if(v["hd3"]!==undefined&&!hd3)return null;
+ if(hd3&&v["hd"]!==undefined)return null;
  const hd=v["hd"]===undefined?undefined:validateHdSprites(v["hd"]);
  if(v["hd"]!==undefined&&!hd)return null;
- return {id:v['id'],name:v['name'].trim(),pixels:[...(v['pixels'] as string[])],palette,...(hd?{hd}:{})};
+ return {id:v['id'],name:v['name'].trim(),pixels:[...(v['pixels'] as string[])],palette,...(hd?{hd}:{}),...(hd3?{hd3}:{})};
 }
 export function cleanCustomCharacters(value:unknown):WorldCustomCharacter[]{
  if(!Array.isArray(value)||value.length>CUSTOM_WORLD_LIMIT)return [];
@@ -90,7 +96,7 @@ export function exportCustomCharacters(characters:WorldCustomCharacter[]):string
  return JSON.stringify({format:"pixel-pals-character-universe",version:1,characters:cleanCustomCharacters(characters)},null,2);
 }
 export function importCustomCharacters(raw:string):WorldCustomCharacter[]|null{
- if(raw.length>CUSTOM_WORLD_FILE_LIMIT)return null;
+ if(raw.length>CUSTOM_WORLD_BACKUP_LIMIT)return null;
  try{
   const data:unknown=JSON.parse(raw);
   if(!data||typeof data!=="object")return null;

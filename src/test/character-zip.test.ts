@@ -77,3 +77,49 @@ describe("256x256 character ZIP importer",()=>{
   await expect(parseCharacterZip(new NodeBlob([bytes.buffer as ArrayBuffer]) as unknown as Blob)).rejects.toThrow();
  });
 });
+
+const v3Character=()=>({id:"user-testhero003",name:"Directional Hero",resolution:256,revision:1,artStatus:"prototype",movement:"humanoid",directions:{
+ s:{idle:{frames:[{file:"s.png",durationMs:300}],loop:true},walk:{frames:[{file:"s.png",durationMs:120},{file:"e.png",durationMs:240}],loop:true}},
+ e:{idle:{frames:[{file:"e.png",durationMs:400}],loop:true}}
+}});
+const v3Pack=(character:unknown=v3Character(),extra:Entry[]=[])=>zip([
+ {name:"character-pack.json",bytes:Buffer.from(JSON.stringify({format:"pixel-pals-character-addon",version:3,name:"Directional prototype",characters:[character]}))},
+ {name:"s.png",bytes:png()},{name:"e.png",bytes:png()},...extra
+]);
+describe("HD v3 directional import",()=>{
+ it("preserves directional clips, revision, variable timing and legacy fallback",async()=>{
+  const result=await parseCharacterZip(v3Pack());
+  const character=result.characters[0]!;
+  expect(character.hd3?.version).toBe(1);
+  expect(character.hd3?.directions.s?.walk?.frames.map(frame=>frame.durationMs)).toEqual([120,240]);
+  expect(character.hd3?.directions.e?.idle?.frames).toHaveLength(1);
+  expect(character.pixels).toHaveLength(32);
+  expect(character.hd).toBeUndefined();
+  expect(validateCustomCharacter(character)).not.toBeNull();
+ });
+ it("rejects private permissions, invalid timings and unsupported facing/action names",async()=>{
+  await expect(parseCharacterZip(v3Pack({...v3Character(),tools:["memory"]}))).rejects.toThrow("metadata");
+  const badTime=v3Character();badTime.directions.s.walk.frames[0]!.durationMs=0;
+  await expect(parseCharacterZip(v3Pack(badTime))).rejects.toThrow("duration");
+  await expect(parseCharacterZip(v3Pack({...v3Character(),directions:{up:v3Character().directions.s}}))).rejects.toThrow("facing");
+  await expect(parseCharacterZip(v3Pack({...v3Character(),directions:{s:{execute:v3Character().directions.s.idle}}}))).rejects.toThrow("action");
+ });
+ it("rejects missing front idle, remote references and incomplete PNGs",async()=>{
+  await expect(parseCharacterZip(v3Pack({...v3Character(),directions:{e:v3Character().directions.e}}))).rejects.toThrow("front idle");
+  const remote=v3Character();remote.directions.s.idle.frames[0]!.file="https://external.invalid/a.png";
+  await expect(parseCharacterZip(v3Pack(remote))).rejects.toThrow("path");
+  const character=v3Character();character.directions.s.idle.frames[0]!.file="bad.png";
+  await expect(parseCharacterZip(v3Pack(character,[{name:"bad.png",bytes:png().subarray(0,33)}]))).rejects.toThrow("complete");
+ });
+ it("enforces per-pack count independently from the larger library",async()=>{
+  const characters=Array.from({length:13},(_,i)=>({...v3Character(),id:"user-heropack"+String(i).padStart(4,"0")}));
+  const archive=zip([{name:"character-pack.json",bytes:Buffer.from(JSON.stringify({format:"pixel-pals-character-addon",version:3,name:"Too many",characters}))}]);
+  await expect(parseCharacterZip(archive)).rejects.toThrow("1 to 12");
+ });
+ it("rejects scripts, duplicate paths and local header inconsistencies",async()=>{
+  await expect(parseCharacterZip(v3Pack(v3Character(),[{name:"script.js",bytes:Buffer.from("alert(1)")}]))).rejects.toThrow("only PNG");
+  await expect(parseCharacterZip(v3Pack(v3Character(),[{name:"s.png",bytes:png()}]))).rejects.toThrow("duplicate");
+  const bytes=new Uint8Array(await v3Pack().arrayBuffer());new DataView(bytes.buffer).setUint16(6,1,true);
+  await expect(parseCharacterZip(new NodeBlob([bytes]) as unknown as Blob)).rejects.toThrow("headers");
+ });
+});

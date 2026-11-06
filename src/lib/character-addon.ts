@@ -1,4 +1,4 @@
-import { CUSTOM_WORLD_LIMIT, validateCustomCharacter, type WorldCustomCharacter } from "./world-custom-packs";
+import { CUSTOM_WORLD_LIMIT, CUSTOM_WORLD_PACK_LIMIT, validateCustomCharacter, type WorldCustomCharacter } from "./world-custom-packs";
 
 /** ZIP add-on v1 is strictly data-only: 32x32 native pixel characters.
  * HD sprite assets and AI personalities are a future, separate opt-in schema. */
@@ -16,7 +16,7 @@ export type CharacterAddonManifest=Readonly<{
 
 const onlyKeys=(obj:Record<string,unknown>,keys:readonly string[])=>Object.keys(obj).every(k=>keys.includes(k));
 const safeLabel=(s:unknown,max:number):s is string=>typeof s==="string"&&s.trim().length>0
- &&s.length<=max&&!/[\\x00-\\x1f<>]/.test(s);
+ &&s.length<=max&&!/[\x00-\x1f<>]/.test(s);
 
 /** Rejects unexpected fields rather than silently installing executable or privileged metadata. */
 export function parseCharacterAddonManifest(source:unknown):CharacterAddonManifest{
@@ -26,10 +26,10 @@ export function parseCharacterAddonManifest(source:unknown):CharacterAddonManife
  if(obj["format"]!==CHARACTER_ADDON_FORMAT||obj["version"]!==CHARACTER_ADDON_VERSION)throw Error("Unsupported character add-on version");
  if(!safeLabel(obj["name"],72))throw Error("Invalid add-on name");
  if(obj["description"]!==undefined&&
-   (typeof obj["description"]!=="string"||obj["description"].length>280||/[\\x00-\\x1f<>]/.test(obj["description"])))
+   (typeof obj["description"]!=="string"||obj["description"].length>280||/[\x00-\x1f<>]/.test(obj["description"])))
   throw Error("Invalid add-on description");
  const raw=obj["characters"];
- if(!Array.isArray(raw)||raw.length<1||raw.length>CUSTOM_WORLD_LIMIT)throw Error("Add-on must contain 1 to 12 characters");
+ if(!Array.isArray(raw)||raw.length<1||raw.length>CUSTOM_WORLD_PACK_LIMIT)throw Error("Add-on must contain 1 to 12 characters");
  const chars:WorldCustomCharacter[]=[];
  for(const entry of raw){
   if(!entry||typeof entry!=="object"||Array.isArray(entry)||
@@ -49,12 +49,12 @@ export function parseCharacterAddonManifest(source:unknown):CharacterAddonManife
 export function planCharacterAddonInstall(
  manifest:CharacterAddonManifest,existing:readonly WorldCustomCharacter[],requestedIds:readonly string[],
 ):WorldCustomCharacter[]{
- if(requestedIds.length===0||requestedIds.length>CUSTOM_WORLD_LIMIT||
+ if(requestedIds.length===0||requestedIds.length>CUSTOM_WORLD_PACK_LIMIT||
    new Set(requestedIds).size!==requestedIds.length)throw Error("Select unique characters to install");
  const ids=new Set(requestedIds),available=new Set(manifest.characters.map(c=>c.id));
  if([...ids].some(id=>!available.has(id)))throw Error("Unknown character selected");
  const existingIds=new Set(existing.map(c=>c.id));
  if([...ids].some(id=>existingIds.has(id)))throw Error("A selected character is already installed. Existing art is never overwritten");
- if(existing.length+ids.size>CUSTOM_WORLD_LIMIT)throw Error("Character Library is full; remove an unused creation before importing");
+ if(existing.length+ids.size>CUSTOM_WORLD_LIMIT)throw Error("Character Library has reached its storage limit");
  return manifest.characters.filter(c=>ids.has(c.id));
 }

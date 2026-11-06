@@ -388,7 +388,7 @@ export function Room() {
   const [worldCue,setWorldCue]=useState<({action:"wave"|"celebrate";id?:AgentId;at:number}|{action:"inspect-prop";targetId:RoomTarget;id?:AgentId;at:number})|null>(null);
   const cue=(action:"wave"|"celebrate",id?:AgentId)=>setWorldCue({action,...(id?{id}:{}),at:Date.now()});
   useEffect(()=>{if(!worldCue)return;const timer=window.setTimeout(()=>setWorldCue(null),2600);return()=>window.clearTimeout(timer);},[worldCue]);
-  const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor,installPack:installCustomWorldPack}=useWorldCharacterUniverse();
+  const {state:worldUniverse,status:worldUniverseStatus,toggle:toggleWorldVisitor,save:saveCustomWorldVisitor,remove:removeCustomWorldVisitor,installPack:installCustomWorldPack,installBackup:installWorldBackup,updatePack:updateWorldPack,exportBackup:exportWorldBackup,recoveryBackup:worldRecoveryBackup}=useWorldCharacterUniverse();
   const enabledWorldPacks=worldUniverse.enabled;
   const changeWorldPack=(id:string,on:boolean)=>{void toggleWorldVisitor(id,on);};
   const [palRoomPhase, setPalRoomPhase] = useState(0);
@@ -2091,7 +2091,7 @@ export function Room() {
             <RoomLive active={roomOpen} running={running} theme={characterMode} onInspect={(target)=>{if(livingWorld && roomOpen)setWorldCue({action:"inspect-prop",targetId:target,at:Date.now()});}} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})} />}
             {livingWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
-            {livingWorld && worldUniverse.characters.filter(c=>enabledWorldPacks.includes(c.id)).map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
+            {livingWorld && worldUniverse.characters.filter(c=>enabledWorldPacks.includes(c.id)).map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />
@@ -2142,7 +2142,7 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} />
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} onCustomInstallBackup={installWorldBackup} onCustomUpdatePack={updateWorldPack} onCustomExportBackup={exportWorldBackup} recoveryBackup={worldRecoveryBackup} animationsPaused={focusMode} />
           <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
           <QuestCorner session={focusCompanion} />
           <div className="section-heading">

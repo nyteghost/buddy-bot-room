@@ -39,13 +39,21 @@ function png256(pose){
   pngChunk("IHDR",ihdr),pngChunk("IDAT",deflateSync(raw)),pngChunk("IEND",Buffer.alloc(0)),
  ]);
 }
-export function hdCharacterSmokeZip(){
- const manifest={
+export function hdCharacterSmokeZip(version=2){
+ let manifest={
   format:"pixel-pals-character-addon",version:2,name:"Smoke HD Pack",
   characters:[{id:"user-smokebot2026",name:"Smoke HD Bot",sprites:{
    idle:"smoke/idle.png",walk:["smoke/walk.png"],wave:["smoke/wave.png"],
   }}],
  };
+ if(version===3){
+  const clip=(file,loop=true)=>({frames:[{file:"smoke/"+file+".png",durationMs:180}],loop});
+  const actions={idle:clip("idle"),walk:{frames:[{file:"smoke/idle.png",durationMs:120},{file:"smoke/wave.png",durationMs:240}],loop:true},wave:clip("wave",false),signature:clip("wave",false)};
+  manifest={format:"pixel-pals-character-addon",version:3,name:"Smoke HD Pack",characters:[{
+   id:"user-smokebot2026",name:"Smoke HD Bot",resolution:256,revision:1,artStatus:"prototype",movement:"humanoid",
+   directions:Object.fromEntries(["s","se","e","ne","n","nw","w","sw"].map(direction=>[direction,actions])),
+  }]};
+ }
  const entries=[
   {name:"character-pack.json",data:Buffer.from(JSON.stringify(manifest))},
   {name:"smoke/idle.png",data:png256("idle")},

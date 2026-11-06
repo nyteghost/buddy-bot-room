@@ -2698,3 +2698,11 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
  content:"✦";position:absolute;right:3px;top:-7px;color:#ffe36e;font-size:18px;animation:world-visitor-wave .5s steps(3) infinite alternate;pointer-events:none;
 }
 @media(prefers-reduced-motion:reduce){.world-atmosphere .world-weather-window,.world-atmosphere .world-weather-front,.room-scene .office-pal[data-world-cue] .office-character:after{animation:none!important;}}
+
+.world-custom-actor{display:flex;flex-direction:column;align-items:center;border:0;padding:0;background:transparent;color:inherit;cursor:pointer;}
+.world-custom-actor:focus-visible,.world-signature-button:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:5px;}
+.world-custom-guest:has(.world-guest-hd-pixels){width:96px;min-height:112px;}
+.world-custom-guest .world-guest-hd-pixels{height:96px;width:96px;image-rendering:auto;}
+.world-signature-button{position:absolute;right:-10px;bottom:0;min-width:32px;min-height:32px;border:1px solid var(--border);border-radius:50%;background:var(--background);color:var(--foreground);cursor:pointer;}
+.world-custom-guest[data-paused="true"],.world-custom-guest[data-paused="true"] *{animation:none!important;transition:none!important;}
+@media(max-width:700px){.world-custom-guest:has(.world-guest-hd-pixels){width:72px;min-height:88px}.world-custom-guest .world-guest-hd-pixels{width:72px;height:72px}.world-signature-button{min-width:36px;min-height:36px;right:-14px}}

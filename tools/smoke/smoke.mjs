@@ -1208,15 +1208,15 @@ await step("Character Universe custom art, guest roster and interaction controls
    throw Error("Character Creator lost its 32x32 pixel grid");
   await editor.getByRole("button",{name:"Close editor"}).click();
 });
-await step("import a compressed 256x256 ZIP, preview, approve, render, and clean up",async()=>{
+for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, approve, render, and clean up`,async()=>{
   const library=page.locator('[data-window-id="room"] details.world-character-library');
   await library.waitFor({state:"visible"});
   if(await library.getAttribute("open")===null)await library.locator("summary").click();
-  const pack=hdCharacterSmokeZip();
+  const pack=hdCharacterSmokeZip(version);
   const input=library.getByLabel("Choose character ZIP file");
   await input.setInputFiles({name:"smoke-hd-character.zip",mimeType:"application/zip",buffer:pack});
   await library.getByText("Smoke HD Pack · 256×256 character preview",{exact:true}).waitFor({timeout:12000});
-  const preview=library.locator('img[alt="Smoke HD Bot 256 by 256 PNG preview"]');
+  const preview=library.locator(version===3?'img[alt="Smoke HD Bot Front idle preview"]':'img[alt="Smoke HD Bot high resolution pixel art"]');
   await preview.waitFor({state:"visible"});
   const previewDimensions=await preview.evaluate(img=>({width:img.naturalWidth,height:img.naturalHeight}));
   if(previewDimensions.width!==256||previewDimensions.height!==256)
@@ -1234,6 +1234,16 @@ await step("import a compressed 256x256 ZIP, preview, approve, render, and clean
   await guest.waitFor({state:"visible",timeout:15000});
   const rendered=await guest.evaluate(img=>({w:img.naturalWidth,h:img.naturalHeight}));
   if(rendered.w!==256||rendered.h!==256)throw Error("Imported HD art is not rendered in the Living World");
+  if(version===3){
+    const saved=after.characters.find(c=>c.id==="user-smokebot2026");
+    const src=saved.hd3?.directions?.s?.idle?.frames?.[0]?.src;
+    if(!src?.startsWith("/api/character-universe?asset="))throw Error("HD256 assets were not persisted outside metadata");
+    const asset=await page.request.get(URL_+src);
+    if(!asset.ok()||!asset.headers()["content-type"]?.includes("image/png"))throw Error("Owner cannot load persisted HD256 PNG");
+    await library.getByRole("button",{name:"Signature action for Smoke HD Bot",exact:true}).click();
+    const exported=await page.request.get(URL_+"/api/character-universe?export=1");
+    if(!exported.ok())throw Error("HD256 backup export failed");
+  }
   page.once("dialog",dialog=>dialog.accept());
   await library.getByRole("button",{name:"Delete Smoke HD Bot"}).click();
   await page.waitForFunction(async()=>{
