@@ -19,6 +19,7 @@ class FakeNativeStore:
     def __init__(self, root: Path):
         self.path = root / "adhd.sqlite3"
         self.backups = 0
+        self.native_bridge_enabled = True
         self.fail_approval_once = False
         with self.connect() as db:
             db.executescript("""CREATE TABLE peers (id TEXT PRIMARY KEY,enabled INTEGER);
@@ -29,6 +30,8 @@ class FakeNativeStore:
                 created_at TEXT,updated_at TEXT);
               CREATE TABLE audit(id INTEGER PRIMARY KEY, action TEXT);
               INSERT INTO peers(id,enabled) VALUES('pixelpals',1);""")
+    def setting(self, name, default="off"):
+        return "on" if name == "bridge_enabled" and self.native_bridge_enabled else default
     def connect(self):
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
@@ -184,6 +187,28 @@ class NativeLinkTests(unittest.TestCase):
             link_one_reviewed_task(self.bridge,self.store,
                 handoff_id="handoff0001",peer_id="pixelpals",confirm=CONFIRM)
         self.assertEqual(self.store.backups,0)
+
+    def test_disabled_native_bridge_fails_before_backup_and_mutation(self):
+        self.source()
+        self.store.native_bridge_enabled = False
+        with self.assertRaisesRegex(ValueError, "bridge is disabled"):
+            link_one_reviewed_task(self.bridge,self.store,
+                handoff_id="handoff0001",peer_id="pixelpals",confirm=CONFIRM)
+        self.assertFalse(self.read("SELECT * FROM handoffs"))
+        self.assertEqual(self.store.backups, 0)
+
+    def test_native_task_source_collision_fails_closed(self):
+        self.source()
+        with self.store.connect() as db:
+            db.execute("INSERT INTO handoffs VALUES(?,?,?,?,?,'approved','now','now')",
+                ("handoff0001","in","pixelpals","task",json.dumps({"title":"PRIVATE TITLE"})))
+            db.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,'now','now')",
+                ("handoff-handoff0001", "PRIVATE title from elsewhere", "", None,
+                 "open", None, "manual"))
+        with self.assertRaisesRegex(ValueError, "different source"):
+            link_one_reviewed_task(self.bridge,self.store,
+                handoff_id="handoff0001",peer_id="pixelpals",confirm=CONFIRM)
+        self.assertEqual(self.store.backups, 0)
 
     def test_backup_failure_does_not_mutate_native_queue(self):
         self.source()
