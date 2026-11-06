@@ -42,3 +42,24 @@ docker run --rm --pull never --network none --read-only \
   "$IMAGE" python -B /checks/prepare-native-review-patch.py \
   --source-root /opt/adhd
 echo "Read-only native browser-route inspection completed."
+
+# Read only directive *presence* in the existing Caddy proxy; never print
+# the Caddyfile, auth hashes, session token, host credentials or header values.
+if docker inspect adhd-assistant-lan >/dev/null 2>&1; then
+  echo "Caddy proxy keyword inspection (presence only; not proof of safety):"
+  docker exec adhd-assistant-lan sh -c '
+    file=/etc/caddy/Caddyfile
+    if [ ! -r "$file" ]; then
+      echo "caddyfile_available=no"
+      exit 0
+    fi
+    echo "caddyfile_available=yes"
+    if grep -Eiq "reverse_proxy" "$file"; then echo "reverse_proxy_keyword=yes"; else echo "reverse_proxy_keyword=no"; fi
+    if grep -Eiq "basic_auth|basicauth" "$file"; then echo "basic_auth_keyword=yes"; else echo "basic_auth_keyword=no"; fi
+    if grep -Eiq "header_up[[:space:]]+Host" "$file"; then echo "host_rewrite_keyword=yes"; else echo "host_rewrite_keyword=no"; fi
+    if grep -Eiq "header_up[[:space:]]+Origin" "$file"; then echo "origin_rewrite_keyword=yes"; else echo "origin_rewrite_keyword=no"; fi
+    if grep -Eiq "X-ADHD-Local-Token" "$file"; then echo "local_token_header_keyword=yes"; else echo "local_token_header_keyword=no"; fi
+  ' || echo "Caddy inspection unavailable; no settings changed."
+else
+  echo "Caddy container not found; no settings changed."
+fi
