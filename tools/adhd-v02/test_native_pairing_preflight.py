@@ -51,6 +51,7 @@ class NativePreflightTests(unittest.TestCase):
         self.assertFalse(result["live_task_creation_authorized"])
         self.assertEqual(set(result["blockers"]), {
             "native_bridge_disabled", "no_enabled_native_peer",
+            "intended_native_peer_not_verified",
         })
         self.assertEqual(self.dbpath.read_bytes(), before)
         self.assertNotIn("PRIVATE", json.dumps(result))
@@ -59,11 +60,23 @@ class NativePreflightTests(unittest.TestCase):
         with sqlite3.connect(self.dbpath) as db:
             db.execute("INSERT INTO settings VALUES('bridge_enabled','on')")
             db.execute("UPDATE peers SET enabled=1")
-        result = inspect_native(self.root, self.dbpath)
+        result = inspect_native(self.root, self.dbpath, expected_peer_id="disabled-peer")
         self.assertTrue(result["ready_for_staging"])
+        self.assertTrue(result["intended_native_peer_enabled"])
         self.assertFalse(result["live_task_creation_authorized"])
         self.assertEqual(result["blockers"], [])
         self.assertNotIn("PRIVATE_TOKEN", json.dumps(result))
+
+    def test_unrelated_enabled_peer_is_not_sufficient_for_staging(self):
+        with sqlite3.connect(self.dbpath) as db:
+            db.execute("INSERT INTO settings VALUES('bridge_enabled','on')")
+            db.execute("UPDATE peers SET enabled=1")
+        result = inspect_native(self.root, self.dbpath, expected_peer_id="pixelpals-peer")
+        self.assertFalse(result["ready_for_staging"])
+        self.assertFalse(result["intended_native_peer_enabled"])
+        self.assertIn("intended_native_peer_not_verified", result["blockers"])
+        self.assertEqual(result["enabled_native_peer_count"], 1)
+        self.assertNotIn("disabled-peer", json.dumps(result))
 
     def test_unknown_bridge_setting_is_not_on(self):
         with sqlite3.connect(self.dbpath) as db:
