@@ -120,7 +120,6 @@ function render(item,container) {
   container.append(box);
 }
 async function refresh() {
-  if(working) return;
   const response=await fetch(api,{credentials:"same-origin",cache:"no-store",
     headers:{"X-ADHD-Review":"1"}});
   if(!response.ok) throw new Error("Inbox could not be loaded");
