@@ -48,25 +48,72 @@ def _is_permission_raise(method: ast.AST) -> bool:
     )
 
 
+def _urlsplit_self_path(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "urlsplit"
+        and len(node.args) == 1 and not node.keywords
+        and isinstance(node.args[0], ast.Attribute)
+        and node.args[0].attr == "path"
+        and isinstance(node.args[0].value, ast.Name)
+        and node.args[0].value.id == "self"
+    )
+
+
 def _method_with_path(method: ast.FunctionDef) -> tuple[int, int]:
-    """Return source line and indent of path=urlsplit(self.path).path in try."""
+    """Find either verified installed route idiom; reject other layouts.
+
+    Supported:
+      path = urlsplit(self.path).path
+      url = urlsplit(self.path); path = url.path; params = ...
+    The actual installed ADHD Assistant uses the second form, sometimes with
+    semicolon-separated assignments on the same physical source line.
+    """
+    assignments = [
+        node for node in ast.walk(method)
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    ]
     matches = []
-    for node in ast.walk(method):
-        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
-            continue
-        target = node.targets[0]
-        if not (isinstance(target, ast.Name) and target.id == "path"):
+    for node in assignments:
+        if node.targets[0].id != "path":
             continue
         expr = node.value
-        if not (isinstance(expr, ast.Attribute) and expr.attr == "path"
-                and isinstance(expr.value, ast.Call)
-                and isinstance(expr.value.func, ast.Name)
-                and expr.value.func.id == "urlsplit"):
-            continue
-        matches.append((node.end_lineno, node.col_offset))
+        valid = False
+        if isinstance(expr, ast.Attribute) and expr.attr == "path":
+            if _urlsplit_self_path(expr.value):
+                valid = True
+            elif isinstance(expr.value, ast.Name):
+                name = expr.value.id
+                origins = [
+                    prev for prev in assignments
+                    if prev.targets[0].id == name and _urlsplit_self_path(prev.value)
+                    and prev.lineno <= node.lineno
+                ]
+                valid = len(origins) == 1
+        if valid:
+            matches.append((node.end_lineno, node.col_offset))
     if len(matches) != 1:
         raise ValueError("Unsupported native route parsing layout")
     return matches[0]
+
+
+def _native_auth_contract(source: str) -> dict[str, object]:
+    """Describe risks, not a proxy-compatibility approval."""
+    methods = _handler_class(ast.parse(source))
+    constants = {
+        n.value for n in ast.walk(methods["_local"])
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+    }
+    loopback = bool({"127.0.0.1", "localhost", "::1"} & constants)
+    return {
+        "local_session_token_guard_detected": "X-ADHD-Local-Token" in constants,
+        "loopback_host_restriction_detected": "Host" in constants and loopback,
+        "loopback_origin_restriction_detected": "Origin" in constants and loopback,
+        "caddy_proxy_behavior_verified": False,
+        "browser_write_routes_ready_for_deployment": False,
+    }
 
 
 def _handler_class(tree: ast.Module) -> dict[str, ast.FunctionDef]:
@@ -161,6 +208,8 @@ def prepare(source_root: Path, source_modules: Path, stage: Path | None) -> dict
         "native_bridge_settings_changed": False,
         "network_service_added": False,
         "routes_prepared": len(EXPECTED_ROUTES),
+        "native_auth_contract": _native_auth_contract(original),
+        "live_installation_authorized": False,
     }
     if stage is not None:
         # Deliberately refuse stages under appdata, the user home directory,
