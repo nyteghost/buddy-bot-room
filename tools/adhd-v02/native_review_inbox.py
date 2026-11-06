@@ -62,9 +62,16 @@ def _normalize(row: sqlite3.Row) -> dict[str, object]:
     title = payload.get("title")
     if not isinstance(title, str) or len(title) > 240 or not title.strip():
         raise ValueError("Invalid stored handoff title")
-    notes = payload.get("notes", "")
+    notes = payload.get("notes")
+    if notes is None:
+        notes = ""
     if not isinstance(notes, str) or len(notes) > 1500:
         raise ValueError("Invalid stored handoff notes")
+    due = payload.get("due_at")
+    project = payload.get("project")
+    for field, value, limit in (("due_at", due, 50), ("project", project, 120)):
+        if value is not None and (not isinstance(value, str) or len(value) > limit):
+            raise ValueError("Invalid stored handoff " + field)
     kind, state = row["kind"], row["state"]
     if kind not in SUPPORTED_KINDS or state not in ("pending", "approved", "rejected"):
         raise ValueError("Unsupported handoff kind/state")
