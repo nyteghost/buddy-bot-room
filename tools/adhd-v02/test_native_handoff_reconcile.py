@@ -90,7 +90,7 @@ class NativeLinkTests(unittest.TestCase):
                        (ident,kind,json.dumps(payload),"approved" if approved else "pending","now","now"))
             if event:
                 db.execute("INSERT INTO bridge_events(handoff_id,action,at) VALUES(?,?,?)",
-                           (ident,"approve","now"))
+                           (ident,"approve","2026-11-06T12:00:00Z"))
     def read(self, sql):
         with self.store.connect() as db:
             return db.execute(sql).fetchall()
