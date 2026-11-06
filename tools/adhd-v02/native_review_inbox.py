@@ -20,7 +20,7 @@ from typing import Any
 from urllib.parse import quote
 
 from native_local_intake import CONFIRM as IMPORT_CONFIRM
-from native_local_intake import link_local_task, preview_local_task
+from native_local_intake import LOCAL_SOURCE, link_local_task, preview_local_task
 
 HANDOFF_ID = re.compile(r"[A-Za-z0-9_-]{8,100}\Z")
 MAX_PAGE_SIZE = 50
@@ -77,7 +77,8 @@ def _normalize(row: sqlite3.Row) -> dict[str, object]:
     }
 
 
-def list_inbox(bridge_db: Path, *, limit: int = MAX_PAGE_SIZE) -> dict[str, object]:
+def list_inbox(bridge_db: Path, *, native_store: Any = None,
+               limit: int = MAX_PAGE_SIZE) -> dict[str, object]:
     """Returns user-visible preview data for an already AUTHORIZED local UI.
 
     IMPORTANT: title and notes are private; never print or log this result.
@@ -91,6 +92,28 @@ def list_inbox(bridge_db: Path, *, limit: int = MAX_PAGE_SIZE) -> dict[str, obje
                ORDER BY created_at DESC, id DESC LIMIT ?""", (limit,)
         ).fetchall()
         items = [_normalize(row) for row in rows]
+    # Only the installed Store may verify whether a reviewed handoff has
+    # become a real ADHD task. Never read titles, notes or memory from its DB.
+    approved_tasks = [item for item in items
+                      if item["state"] == "approved" and item["kind"] == "task"]
+    for item in approved_tasks:
+        item["native_state"] = "unverified"
+    if approved_tasks and native_store is not None:
+        keys = ["handoff-" + item["id"] for item in approved_tasks]
+        placeholders = ",".join("?" for _ in keys)
+        with native_store.connect() as db:
+            rows = db.execute(
+                "SELECT id,source FROM tasks WHERE id IN (" + placeholders + ")", keys
+            ).fetchall()
+        matched = {row["id"]: row["source"] for row in rows}
+        for item in approved_tasks:
+            found = matched.get("handoff-" + item["id"])
+            if found == "bridge:" + LOCAL_SOURCE:
+                item["native_state"] = "linked"
+            elif found is not None:
+                item["native_state"] = "conflict"
+            else:
+                item["native_state"] = "unlinked"
     pending = sum(x["state"] == "pending" for x in items)
     approved = sum(x["state"] == "approved" for x in items)
     return {"items": items, "pending_in_view": pending,
