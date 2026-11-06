@@ -53,6 +53,14 @@ def _verify_schema(db: sqlite3.Connection) -> None:
     for field in REQUIRED_TASK_COLUMNS:
         if columns[field][2].upper() != "TEXT":
             raise ValueError("Unexpected ADHD task column type: " + field)
+    # Confirm the actual v0.1 NOT NULL + default contract observed on Unraid.
+    for field in ("title", "notes", "status", "source", "created_at", "updated_at"):
+        if columns[field][3] != 1:
+            raise ValueError("Unexpected nullable ADHD task column: " + field)
+    defaults = {"notes": "''", "status": "'open'", "source": "'manual'"}
+    for field, expected in defaults.items():
+        if columns[field][4] != expected:
+            raise ValueError("Unexpected ADHD task default for " + field)
     triggers = db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger' AND tbl_name='tasks'").fetchone()[0]
     if triggers:
         raise ValueError("ADHD task triggers require application-level review")
@@ -132,16 +140,15 @@ def apply_explicitly_approved(
     """
     if confirm != CONFIRM_PHRASE:
         raise ValueError("Explicit import confirmation missing")
-    if not STATUS_RE.fullmatch(task_status):
-        raise ValueError("Invalid task status")
+    # The verified v0.1 table declares DEFAULT 'open' even when tasks is empty.
+    # Do not assume any other runtime status semantics based on existing rows.
+    if task_status != "open":
+        raise ValueError("Only the verified ADHD task default status 'open' is supported")
     tasks = export_approved_tasks(bridge_db)["tasks"]
     with closing(_connect(tasks_db, readonly=False)) as db:
         _verify_schema(db)
-        # The user's installed app's normal status semantics are not yet known.
-        # Refuse unknown status names rather than guessing 'todo' or 'pending'.
-        status_seen = db.execute("SELECT 1 FROM tasks WHERE status=? LIMIT 1", (task_status,)).fetchone()
-        if not status_seen:
-            raise ValueError("Unverified ADHD task status: inspect the app's normal task API first")
+        # The table's NOT NULL DEFAULT 'open' is verified by _verify_schema;
+        # do not require an existing row, because the live tasks table is empty.
         # Pre-classification is non-mutating and catches duplicate sources early.
         initial = _classify(db, tasks)
         if not initial["ready"]:
@@ -161,7 +168,7 @@ def apply_explicitly_approved(
                        VALUES(?,?,?,?,?,NULL,?,?,?)""",
                     (
                         uuid4().hex,
-                        item["title"], item["notes"], item["due_at"],
+                        item["title"], item["notes"] if item["notes"] is not None else "", item["due_at"],
                         task_status, item["source_id"], timestamp, timestamp,
                     ),
                 )
@@ -177,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="ADHD task import prototype: dry-run by default")
     parser.add_argument("--bridge-data-dir", type=Path, default=Path(os.environ.get("ADHD_DATA_DIR", "/data")))
     parser.add_argument("--adhd-data-dir", type=Path, default=Path(os.environ.get("ADHD_DATA_DIR", "/data")))
-    parser.add_argument("--apply", action="store_true", help="Experimental: requires backup, confirmation, and previously observed status")
+    parser.add_argument("--apply", action="store_true", help="Experimental: requires backup, confirmation, and verified default status 'open'")
     parser.add_argument("--status", default="")
     parser.add_argument("--confirm", default="")
     parser.add_argument("--backup-dir", type=Path)
