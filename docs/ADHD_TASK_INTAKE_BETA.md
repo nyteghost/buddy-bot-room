@@ -92,10 +92,10 @@ Before implementing any actual import writes, inspect the original ADHD Assistan
 The next backend increment is `tools/adhd-v02/reviewed_task_import.py`. It is **not installed on Unraid** and **not approved for use against the live ADHD task database** until the installed ADHD Assistant v0.1 task-creation code, status vocabulary, constraints and backup restore process have been independently inspected.
 
 - **No-argument/default behavior:** read-only preview (no database writes).
-- **Opt-in prototype apply:** requires `--apply`, an exact confirmation phrase, an explicitly supplied task status that is already present in the existing task table, and a pre-existing private backup directory (mode 0700).
+- **Opt-in prototype apply:** requires `--apply`, an exact confirmation phrase, the explicitly supplied `open` task status verified by the installed table's default, and a pre-existing private backup directory (mode 0700).
 - Reads only bridge tasks separately approved on the ADHD receiver side, never drafts, merely delivered messages, notes, pending tasks, or rejected handoffs.
 - Creates a separate SQLite backup before any task insert; backup file permissions are 0600.
-- Checks the existing task schema; rejects unreviewed task-table triggers, missing columns, unknown status values, and duplicate source IDs.
+- Checks the existing task schema; rejects unreviewed task-table triggers, mismatched NOT NULL/default constraints, unknown status values, and duplicate source IDs.
 - Stores a stable `tasks.source` value `pixel-pals:<handoff-id>`. Repeated imports skip already-created tasks. The insert pass uses a SQLite `BEGIN IMMEDIATE` transaction and checks duplicates again within that transaction.
 - Any insert failure rolls back the **whole batch**. No existing task row is updated or deleted.
 - Handoffs with a named project stay on hold for manual `project_id` mapping. No auto-created projects.
@@ -106,3 +106,16 @@ The next backend increment is `tools/adhd-v02/reviewed_task_import.py`. It is **
 **Known limitations:** a status value appearing in the existing task table does not by itself prove that it is the appropriate newly-created status. The live application API may perform additional validation or side effects (planning, scheduling, notifications) not reproduced by raw SQL. The importer prototype has no in-app review interface, no per-task scheduling behavior, and no integration with the dashboard's normal task-creation service. It must not be deployed or run against live appdata until those items are reviewed and the owner explicitly approves a guarded staging test.
 
 The HD256 / Living Universe Work stream has separate file ownership and must not modify these ADHD bridge or task-intake tools.
+
+## Verified Unraid v0.1 constraints (November 6, 2026)
+
+The owner ran another **read-only** SQLite inspection of the installed `/data/adhd.sqlite3`. This confirmed the complete `tasks` DDL, not merely the column list:
+
+- `id TEXT PRIMARY KEY`; `title TEXT NOT NULL`.
+- `notes TEXT NOT NULL DEFAULT ''`: absent notes must become an empty string, not SQL NULL.
+- `status TEXT NOT NULL DEFAULT 'open'`: `open` is the only task status verified by the schema. The live tasks table currently has **no rows**, so `SELECT DISTINCT status` returned `[]`. This does not establish which other statuses the application supports.
+- `source TEXT NOT NULL DEFAULT 'manual'`; no unique index on `source` exists. The importer must serialize and re-check duplicate source IDs, but true cross-client uniqueness is **not** guaranteed without an app-level constraint.
+- `project_id` has a foreign key to `projects(id)` with `ON DELETE SET NULL`; project names cannot safely be put into `project_id`.
+- The only observed indexes are `task_due_idx` and the SQLite primary-key autoindex.
+
+The experimental importer has been updated to check the verified NOT NULL/default contract, allow **only the verified `open` status** without requiring an existing task row, and convert omitted notes to `''`. The regression fixture now matches the actual v0.1 DDL and starts with an empty `tasks` table. The import remains an **undeployed development prototype**: the dashboard's task-creation endpoint and application-layer validations still must be reviewed before any live import is authorized.
