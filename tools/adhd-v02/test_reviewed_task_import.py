@@ -169,6 +169,17 @@ class ImportSafetyTests(unittest.TestCase):
         self.assertEqual(self.task_rows(),before)
         self.assertEqual(len(list(self.backup_dir.iterdir())),1)
 
+    def test_cli_refuses_direct_sql_apply_even_with_confirmation(self):
+        self.handoff("approved0001")
+        cmd=[sys.executable, str(SOURCE), "--bridge-data-dir", str(self.root),
+            "--adhd-data-dir", str(self.root), "--apply", "--status", "open",
+            "--confirm", module.CONFIRM_PHRASE, "--backup-dir", str(self.backup_dir)]
+        proc=subprocess.run(cmd, text=True, capture_output=True)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("Direct SQLite task creation is disabled", proc.stderr)
+        self.assertEqual(self.task_rows(), [])
+        self.assertEqual(list(self.backup_dir.iterdir()), [])
+
     def test_cli_defaults_to_dry_run_and_no_private_content(self):
         self.handoff("approved0001")
         proc=subprocess.run([sys.executable,str(SOURCE),"--bridge-data-dir",str(self.root),
