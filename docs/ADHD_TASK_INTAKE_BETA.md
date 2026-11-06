@@ -141,7 +141,7 @@ The **installed bridge sidecar uses a separate SQLite queue** and its CLI approv
 - Returns only status labels and backup presence. It does **not** echo task titles, notes, peer tokens, or private memory.
 - Does not auto-import all handoffs and does not grant imported character assets any tool, memory, or AI permissions.
 
-**Important:** This is a reusable library, NOT a command to run on Unraid. The installed native Store must be inspected further for its constructor and peer registration details before providing an owner-facing installer or calling these methods in the live dashboard. The existing `reviewed_task_import.py` raw-SQL implementation remains a **fixture-only experimental prototype** and should NOT be deployed; native handoff approval is the preferred pathway.
+**Important:** This is a reusable library, NOT a command to run on Unraid. The installed native Store must be inspected further for its constructor and peer registration details before providing an owner-facing installer or calling these methods in the live dashboard. The existing `reviewed_task_import.py` raw-SQL implementation remains a **fixture-only experimental prototype**; its `--apply` CLI mode is now explicitly **disabled** to prevent accidental task writes. It should NOT be deployed; native handoff approval is the preferred pathway.
 
 The new regression file `tools/adhd-v02/test_native_handoff_reconcile.py` exercises the API contract using disposable SQLite bridge and native Store fixture databases. No actual user task content is used and no running Unraid container is touched.
 
