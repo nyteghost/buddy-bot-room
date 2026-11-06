@@ -175,7 +175,7 @@ python3 -B tools/adhd-v02/native_pairing_preflight.py \
   --database /path/to/existing/adhd.sqlite3
 ```
 
-The JSON report includes `native_schema_matches`, `native_store_methods_present`, `native_bridge_enabled`, `enabled_native_peer_count`, `ready_for_staging` and named readiness blockers. **Even when all readiness checks pass**, `live_task_creation_authorized` is always false; explicit owner authorization and separate staging tests are still required.
+The JSON report includes `native_schema_matches`, `native_store_methods_present`, `native_bridge_enabled`, `enabled_native_peer_count`, `intended_native_peer_enabled`, `ready_for_staging` and named readiness blockers. The optional `--expected-peer-id` flag checks a specific registered native peer **without printing its ID**. Without a verified intended peer, `ready_for_staging` stays false even if unrelated peers are enabled. **Even when all readiness checks pass**, `live_task_creation_authorized` is always false; explicit owner authorization and separate staging tests are still required.
 
 Automated fixture tests: `python3 -B tools/adhd-v02/test_native_pairing_preflight.py` (included in CI). The actual Unraid installation has **not** been modified or inspected by this new script.
 
