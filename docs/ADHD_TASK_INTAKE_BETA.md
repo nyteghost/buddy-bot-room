@@ -235,3 +235,36 @@ The **recommended Docker execution environment** for this test must be `--networ
 ### Development ownership and CI status
 
 Shared Intelligence work is limited to `tools/adhd-v02/` and `docs/ADHD_TASK_INTAKE_BETA.md`. The latest known HD256 v3 browser smoke regression, `Signature action did not hold the visitor in place`, is owned by the separate Living Universe Work stream. This is not an ADHD backend-test failure. Do not modify Work's character files from the ADHD integration stream.
+
+
+## Owner review inbox UI — beta module, NOT installed (November 6, 2026)
+
+The user's **isolated Unraid native Store rehearsal returned `result: PASS`**, with `real_app_source_tested: true`, `native_audit_verified: true`, `backup_verified: true`, `duplicate_protection_verified: true`, `network_bridge_enabled: false`, `native_peer_created: false`, and `user_database_accessed: false`. The synthetic staging container exited and discarded its databases. The warning about unsupported kernel swap limits is a Docker host warning, not a staging failure.
+
+That is strong evidence that the local-only adapter can use the real installed Store code. It is **not** evidence that the running live dashboard has received a new update or that any real tasks have been imported.
+
+### New implementation (source and unit tests only)
+
+- `native_review_inbox.py`: review service. A list of pending/approved/rejected sidecar handoffs; explicit audited approve/reject transitions; separate explicit native Store task import through `native_local_intake.link_local_task`. A review does **not** create a task; a reject is final. Nothing runs automatically or shares memories.
+- `native_review_page.html`: self-contained responsive browser inbox for the existing ADHD dashboard. All titles/notes are inserted using `textContent`, never raw HTML. No remote CDN, authentication code, or external analytics.
+- `native_review_http.py`: integration adapter for **the existing** ADHD local-only HTTP handler. It uses that handler's `_local()` protection, requires a custom same-origin request header, rejects cross-site POST requests using the `Origin`/`Host` match, requires JSON and a bounded body, adds no-store/no-frame/no-sniff headers, and uses a SHA-256 Content Security Policy hash for the embedded script.
+- `test_native_review_inbox.py` and `test_native_review_http.py`: offline tests for approval/rejection, explicit second-stage import, idempotency, invalid IDs, private-data non-disclosure, no unauthorized writes, and cross-origin rejection.
+
+The planned same-origin routes (not yet wired to the native server) are:
+
+| HTTP route | Purpose | Safety requirement |
+| --- | --- | --- |
+| `GET /pixel-pals-inbox` | Review page | Native local authorization + existing Caddy authentication |
+| `GET /api/pixel-pals/inbox` | Private owner inbox summary | Native local authorization, same-origin custom header, no-store |
+| `POST /api/pixel-pals/inbox/review` | Explicit approve or reject | Native local authorization, Origin/Host match, JSON, exact reviewed ID |
+| `POST /api/pixel-pals/inbox/import` | Explicitly add receiver-approved task via native Store | Separate owner action, native SQLite backup and audit, duplicate checks |
+
+### Still required before enabling the browser page
+
+1. Inspect the installed `server.py` `_local` implementation and routing conventions, and the installed Caddy proxy's authentication and Host handling **without exposing passwords**. The in-app UI must not accidentally bypass either.
+2. Rehearse the exact new routes with the actual ADHD Assistant server source and an offline synthetic database (not only mock HTTP handlers).
+3. Integrate these modules into a versioned ADHD Assistant package. Do not inject source patches into the live Unraid volume without making a full recovery backup.
+4. Add a clear dashboard navigation entry to the inbox, then test on iPhone and Windows at LAN/Tailscale addresses.
+5. Only after owner approval, install on Unraid, validate the private review page and existing dashboard, and perform one harmless task handoff. Keep independent apps, Caddy access, previous native tasks, and bridge sidecar data intact.
+
+The reviewed page is a **beta integration candidate**, not a link that currently works on the user's installed ADHD Assistant. No new user-facing route or login has been activated.
