@@ -344,7 +344,8 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   if (await page.evaluate(() => localStorage.getItem("pixel-pals-room-playful-v1")) !== "1") throw Error("Playful preference wasn't saved");
   const rig = page.locator('.room-scene .world-native-sprite').first();
   await rig.waitFor({ state: "visible" });
-  if (await rig.getAttribute("viewBox") !== "0 0 32 32") throw Error("Living World lost native 32px pixel models");
+  // Native 32px-wide models; Living World may add whole leg rows for adult proportions (e.g. 32×38).
+  if (!/^0 0 32 (3[2-9]|4[0-4])$/.test(await rig.getAttribute("viewBox") ?? "")) throw Error("Living World lost native 32px pixel models");
   const animated = await rig.evaluate(e => e.getAnimations({ subtree: true }).some(animation => animation.playState === "running"));
   if (!animated) throw Error("Playful Living World poses are not animating");
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -1260,6 +1261,28 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
     if(held.action!=="signature"||held.before!==held.after)throw Error("Signature action did not hold the visitor in place: "+JSON.stringify(held));
     const exported=await page.request.get(URL_+"/api/character-universe?export=1");
     if(!exported.ok())throw Error("HD256 backup export failed");
+    // Living World rollout (#26): the imported HD actor walks the calibrated floor, turns to
+    // several facings, stands with its feet on its floor point, and can be removed and restored
+    // from the Library without deleting it.
+    const seen=await guest.evaluate(async img=>{
+      const actor=img.closest(".world-custom-guest"),scene=actor.closest(".room-scene"),facings=new Set(),actions=new Set();let worstFeet=0;
+      for(let i=0;i<64;i++){
+        facings.add(actor.getAttribute("data-facing"));actions.add(actor.getAttribute("data-action"));
+        // Measured while standing: positions ease over 0.1s while walking.
+        if(actor.getAttribute("data-action")!=="walk"){
+          const box=scene.getBoundingClientRect(),feetY=box.top+box.height*parseFloat(actor.style.getPropertyValue("--world-guest-y"))/100;
+          worstFeet=Math.max(worstFeet,Math.abs(actor.getBoundingClientRect().bottom-feetY));
+        }
+        await new Promise(resolve=>setTimeout(resolve,250));
+      }
+      return {facings:[...facings],actions:[...actions],worstFeet};
+    });
+    if(!seen.actions.includes("walk")||seen.facings.length<2)throw Error("Imported HD actor did not walk and turn in the room: "+JSON.stringify(seen));
+    if(seen.worstFeet>3)throw Error("Imported HD actor is not standing on its floor point: "+JSON.stringify(seen));
+    await library.getByRole("button",{name:"Disable Smoke HD Bot"}).click();
+    await guest.waitFor({state:"detached",timeout:5000});
+    await library.getByRole("button",{name:"Enable Smoke HD Bot"}).click();
+    await guest.waitFor({state:"visible",timeout:5000});
   }
   page.once("dialog",dialog=>dialog.accept());
   await library.getByRole("button",{name:"Delete Smoke HD Bot"}).click();

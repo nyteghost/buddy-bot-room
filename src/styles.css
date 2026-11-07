@@ -2586,10 +2586,16 @@ html[data-hidden="1"] .world-atmosphere *,html[data-lowpower="1"] .world-atmosph
 .room-scene.living-world .world-native-sprite[data-world-motion="look"]{animation:world-pal-look 5.2s steps(6) infinite;}
 .room-scene.living-world .world-native-sprite[data-world-motion="wave"]{animation:world-pal-wave 2.5s steps(5) infinite;}
 .room-scene.living-world .world-native-sprite[data-world-motion="stretch"]{animation:world-pal-stretch 4s steps(6) infinite;}
+/* Furniture use and celebrations from Living World wandering also move, so no pose ever looks frozen. */
+.room-scene.living-world .world-native-sprite[data-world-motion="work"]{animation:world-pal-work 1.1s steps(2) infinite;}
+.room-scene.living-world .world-native-sprite[data-world-motion="celebrate"]{animation:world-pal-hop .9s steps(3) infinite;}
+.room-scene.living-world .world-native-sprite[data-world-motion="talk"]{animation:world-pal-breathe 1.6s steps(2) infinite;}
 @keyframes world-pal-breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-1px)}}
 @keyframes world-pal-look{0%,100%{transform:rotate(0)}50%{transform:rotate(3deg)}}
 @keyframes world-pal-wave{0%,100%{transform:rotate(0)}45%{transform:rotate(-5deg) translateY(-2px)}}
 @keyframes world-pal-stretch{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.055)}}
+@keyframes world-pal-work{0%,100%{transform:translateY(0)}50%{transform:translateY(1px) rotate(-1.5deg)}}
+@keyframes world-pal-hop{0%,100%{transform:translateY(0)}45%{transform:translateY(-4px)}}
 /* Tiny chunky props are intentionally lightweight; they never consume AI calls.
    Consoles blink, cyber signs pulse, fantasy crystals hover, torches flicker. */
 .world-atmosphere{--world-prop-color:rgba(255,236,156,.72);}
@@ -2706,3 +2712,86 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
 .world-signature-button{position:absolute;right:-10px;bottom:0;min-width:32px;min-height:32px;border:1px solid var(--border);border-radius:50%;background:var(--background);color:var(--foreground);cursor:pointer;}
 .world-custom-guest[data-paused="true"],.world-custom-guest[data-paused="true"] *{animation:none!important;transition:none!important;}
 @media(max-width:700px){.world-custom-guest:has(.world-guest-hd-pixels){width:72px;min-height:88px}.world-custom-guest .world-guest-hd-pixels{width:72px;height:72px}.world-signature-button{min-width:36px;min-height:36px;right:-14px}}
+
+/* Living World: calibrated floor. Characters stand with their FEET on their room position, are
+   sorted by depth (further down the floor = in front, z 10–110), and shrink slightly toward the
+   back wall. The room's function shelf, ticker and level badge always stay above characters so
+   Mail, Calendar, Board and Settings can never be covered. */
+.room-scene.living-world .live-shelf,.room-scene.living-world .live-ticker,.room-scene.living-world .live-progress{z-index:130;}
+.room-scene.living-world .office-pal[data-world-floor]{z-index:var(--world-z,3);transform:translate(-50%,-100%) scale(var(--world-depth-scale,1));transform-origin:50% 100%;}
+.room-scene.living-world .office-pal[data-world-floor].office-assigned{z-index:120;}
+.room-scene.living-world .office-pal[data-world-floor] > span{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);white-space:nowrap;}
+.room-scene.living-world .world-visitor{z-index:var(--world-z,5);}
+.room-scene.living-world .world-visitor-hideout{z-index:var(--world-z,6);}
+.room-scene.living-world .world-guest{
+ z-index:var(--world-z,5);min-height:0;justify-content:flex-end;
+ transform:translate(-50%,-100%) scale(var(--world-depth-scale,1));transform-origin:50% 100%;
+ transition:left .1s linear,top .1s linear;
+}
+/* Native 32px sprites: one sprite pixel = --world-pixel css px, chosen so it is a whole number of device
+   pixels on common screens (1×, 1.25×, 1.5×, 2×, 3×). Pals and built-in guests share it. */
+.room-scene.living-world{--world-pixel:2px;}
+@media (min-resolution:1.2dppx) and (max-resolution:1.3dppx){.room-scene.living-world{--world-pixel:1.6px;}}
+@media (max-width:700px){.room-scene.living-world{--world-pixel:1.5px;}}
+@media (max-width:700px) and (min-resolution:2.5dppx){.room-scene.living-world{--world-pixel:1.3334px;}}
+.room-scene.living-world .world-guest .world-guest-pixels:not(.world-guest-hd-pixels){width:calc(32 * var(--world-pixel));height:calc(38 * var(--world-pixel));}
+.room-scene.living-world .office-pal[data-world-floor] .office-character{width:calc(32 * var(--world-pixel));height:calc(38 * var(--world-pixel));}
+.room-scene.living-world .office-pal[data-world-floor] .office-character > .pixel-character{width:100%;height:100%;}
+/* HD256 humanoids fill ~90% of their frame: 76px makes them stand about as tall as the Pals. */
+.room-scene.living-world .world-custom-guest:has(.world-guest-hd-pixels){width:var(--world-hd-size,76px);min-height:0;}
+.room-scene.living-world .world-custom-guest .world-guest-hd-pixels{width:var(--world-hd-size,76px);height:var(--world-hd-size,76px);object-position:50% 100%;}
+/* Grid-aligned pixel art (detected per pack) is drawn nearest-neighbour at a whole number of device pixels per art pixel. */
+.room-scene.living-world .world-custom-guest .world-guest-hd-pixels.world-hd-crisp{image-rendering:pixelated;}
+.room-scene.living-world .office-pal[data-world-floor] .office-character::after{bottom:-2px;}
+.room-scene.living-world .world-guest-name{position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);}
+.room-scene.living-world .world-custom-actor{position:relative;}
+/* Soft contact shadow at the feet; hovering movers keep a smaller shadow on the floor. */
+.room-scene.living-world .world-guest::before{content:"";position:absolute;left:50%;bottom:-3px;width:58%;height:7px;transform:translateX(-50%);border-radius:50%;background:rgb(0 0 0 / .32);pointer-events:none;z-index:-1;}
+.room-scene.living-world .world-guest[data-movement="floating"]::before,.room-scene.living-world .world-guest[data-movement="flying"]::before{width:40%;opacity:.7;}
+.room-scene.living-world .world-guest[data-movement="floating"] .world-guest-pixels{animation:world-guest-float 2.6s ease-in-out infinite;}
+.room-scene.living-world .world-guest[data-movement="flying"] .world-guest-pixels{animation:world-guest-fly 1.1s ease-in-out infinite;}
+.room-scene.living-world .world-guest[data-movement="rolling"][data-action="walk"] .world-guest-pixels{animation:world-guest-roll .3s steps(2) infinite;}
+@keyframes world-guest-float{0%,100%{transform:translateY(-7px)}50%{transform:translateY(-12px)}}
+@keyframes world-guest-fly{0%,100%{transform:translateY(-14px)}50%{transform:translateY(-19px)}}
+@keyframes world-guest-roll{50%{transform:translateY(-1px)}}
+.room-scene.living-world .world-guest-chat{position:absolute;top:-6px;left:calc(50% + 14px);padding:0 4px;border:1px solid currentColor;border-radius:6px;background:rgb(10 12 20 / .82);color:#f4f1de;font:9px/1.3 "Silkscreen",monospace;pointer-events:none;animation:world-guest-chat 1.2s steps(3) infinite;}
+@keyframes world-guest-chat{50%{opacity:.55}}
+.room-scene.living-world .world-guest[data-paused="true"] .world-guest-pixels,.room-scene.living-world .world-guest[data-paused="true"] .world-guest-chat{animation:none!important;}
+@media(max-width:700px){
+
+ .room-scene.living-world .office-pal[data-world-floor] > span{font-size:7px;padding:2px 4px;}
+ .room-scene.living-world .world-guest-name{font-size:7px;}
+}
+/* Furniture glows: a faint idle shimmer, brightening while a character uses it. */
+.world-atmosphere .world-fixture{--fixture-color:rgba(255,236,170,.9);width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:radial-gradient(circle,var(--fixture-color) 0,transparent 68%);opacity:.18;transform:scale(1);transition:opacity .5s ease,transform .5s ease;}
+.world-atmosphere .world-fixture[data-active="true"]{opacity:.9;transform:scale(2.6);animation:world-fixture-use 1.4s steps(4) infinite;}
+.world-atmosphere .world-fixture[data-kind="screen"],.world-atmosphere .world-fixture[data-kind="rack"],.world-atmosphere .world-fixture[data-kind="phone"]{--fixture-color:rgba(110,255,180,.9);}
+.world-atmosphere .world-fixture[data-kind="holo"],.world-atmosphere .world-fixture[data-kind="crystal"],.world-atmosphere .world-fixture[data-kind="sky"]{--fixture-color:rgba(120,225,255,.92);}
+.world-atmosphere .world-fixture[data-kind="portal"]{--fixture-color:rgba(100,160,255,.95);}
+.world-atmosphere .world-fixture[data-kind="flame"],.world-atmosphere .world-fixture[data-kind="candle"]{--fixture-color:rgba(255,150,60,.95);}
+.world-atmosphere .world-fixture[data-kind="potion"]{--fixture-color:rgba(225,120,255,.92);}
+.world-atmosphere .world-fixture[data-kind="loot"],.world-atmosphere .world-fixture[data-kind="puzzle"]{--fixture-color:rgba(255,210,80,.95);}
+.world-atmosphere .world-fixture[data-kind="tv"],.world-atmosphere .world-fixture[data-kind="steam"],.world-atmosphere .world-fixture[data-kind="board"]{--fixture-color:rgba(235,240,255,.9);}
+.world-atmosphere .world-fixture[data-kind="table"]{--fixture-color:rgba(170,255,210,.85);}
+.world-atmosphere .world-fixture[data-kind="flame"]:not([data-active="true"]),.world-atmosphere .world-fixture[data-kind="candle"]:not([data-active="true"]){animation:world-fixture-flicker 2.2s steps(5) infinite;}
+.world-atmosphere .world-fixture[data-kind="screen"]:not([data-active="true"]),.world-atmosphere .world-fixture[data-kind="rack"]:not([data-active="true"]),.world-atmosphere .world-fixture[data-kind="tv"]:not([data-active="true"]){animation:world-fixture-flicker 3.4s steps(3) infinite;}
+@keyframes world-fixture-use{0%,100%{opacity:.95}50%{opacity:.6}}
+@keyframes world-fixture-flicker{0%,100%{opacity:.14}40%{opacity:.3}70%{opacity:.18}}
+@media(prefers-reduced-motion:reduce){.room-scene.living-world .world-guest .world-guest-pixels,.room-scene.living-world .world-guest-chat,.world-atmosphere .world-fixture{animation:none!important;transition:none!important;}}
+html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower="1"] .room-scene.living-world .world-guest *{animation-play-state:paused!important;}
+
+/* Name labels: a label covered by a nearer character's body or label fades out (no stacked or
+   overlapping names); hover, keyboard focus or tap brings it back. Accessible names are unchanged. */
+.room-scene.living-world .world-guest-name,.room-scene.living-world .office-pal > span{transition:opacity .25s ease;}
+.room-scene.living-world .world-guest-name{background:rgb(12 16 24 / .92);}
+.room-scene.living-world .world-label-hidden{opacity:0;}
+.room-scene.living-world .world-guest:hover .world-label-hidden,.room-scene.living-world .world-guest:focus-within .world-label-hidden,
+.room-scene.living-world .office-pal:hover > .world-label-hidden,.room-scene.living-world .office-pal:focus-visible > .world-label-hidden{opacity:1;}
+@media(prefers-reduced-motion:reduce){.room-scene.living-world .world-guest-name,.room-scene.living-world .office-pal[data-world-floor] > span{transition:none;}}
+
+/* Opt-in HD256 looks for the original Pals (Living World only). */
+.room-scene.living-world .office-character.world-pal-hd,.room-scene.living-world .office-pal[data-world-floor] .office-character.world-pal-hd{width:auto;height:auto;display:flex;align-items:flex-end;justify-content:center;}
+.room-scene.living-world .world-pal-hd-art{display:block;object-fit:contain;object-position:50% 100%;}
+.room-scene.living-world .world-pal-hd-art.world-hd-crisp{image-rendering:pixelated;}
+.world-pal-skin-select{display:flex;align-items:center;gap:4px;}
+.world-pal-skin-select select{font-size:11px;max-width:110px;background:var(--background);color:var(--foreground);border:1px solid var(--border);border-radius:4px;}

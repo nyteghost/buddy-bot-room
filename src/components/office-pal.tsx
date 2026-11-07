@@ -3,7 +3,10 @@ import type { CSSProperties } from "react";
 import { agentName, type AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
-import { worldPose, worldRoomPlan } from "@/lib/world-navigation";
+import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan, type WorldPose } from "@/lib/world-navigation";
+import { useWorldActor, useWorldFixtureUse } from "@/lib/world-presence";
+import { useWorldPalSkin } from "@/lib/world-pal-skins";
+import { WorldHdSkin } from "./world-hd-skin";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
 import { ambientMotion, advanceMotionClock, type PalMotion } from "@/lib/pal-motion";
@@ -55,15 +58,27 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   const heading = active && walking ? headingOf(sceneHome.x - pose.x, sceneHome.y - pose.y) : pose.heading;
   // Seated whenever the pal is parked at its own desk chair.
   const seated = !themeWorld && (active ? working : !walking && x === sceneHome.x && y === sceneHome.y);
+  // Themed Living World rooms place Pals by their feet on a calibrated floor, sorted by depth.
   const position = {
     "--office-x": `${x}%`,
     "--office-y": `${y}%`,
+    ...(themeWorld ? { "--world-z": String(worldDepthZ(y)), "--world-depth-scale": String(worldDepthScale(y)) } : {}),
   } as CSSProperties;
+  const strolling = themeWorld && enabled && visible && !active && wandering;
+  // In themed rooms the pose always comes from worldPose (office choreography has no actions or furniture).
+  const roomPose: WorldPose | null = themeWorld ? pose as WorldPose : null;
+  useWorldFixtureUse("pal:" + id, mode, strolling && roomPose?.action === "work" ? roomPose.fixture : null);
+  const { rootRef, labelRef, labelHidden } = useWorldActor("pal:" + id, x, y, !walking, world && enabled && visible, elapsed);
+  // Opt-in HD256 look (Living World only; Classic mode and identity unaffected).
+  const skin = useWorldPalSkin(id);
+  const hdLook = world && enabled && skin ? skin : undefined;
+  const worldAction: PalMotion | null = roomPose && roomPose.action !== "walk" && roomPose.action !== "idle" ? roomPose.action : null;
   return (
     <div
       style={position}
       className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !directional && `office-dir-${heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !directional && (walking ? heading.includes("w") : !active && pose.facingLeft) && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
+      data-world-floor={themeWorld ? "feet" : undefined}
       role={world && enabled ? "button" : undefined}
       tabIndex={world && enabled ? 0 : undefined}
       onClick={world && enabled ? onInteract : undefined}
@@ -72,8 +87,8 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}${world&&enabled?". Activate to wave.":""}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && "action" in pose && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
-      <span>{displayLabel}</span>
+      <div className={cn("office-character", hdLook && "world-pal-hd")} ref={el => { rootRef.current = el; }}>{hdLook ? <WorldHdSkin character={hdLook} name={displayLabel} facing={walking ? heading : seated && station.facing === "away" ? "n" : pose.heading} walking={walking && !reduced} elapsed={elapsed} motion={cue ?? (worldAction ?? undefined)} /> : <PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? worldAction ?? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />}{seated && station.facing === "away" && <ChairBack />}</div>
+      <span ref={el => { labelRef.current = el; }} className={labelHidden ? "world-label-hidden" : undefined}>{displayLabel}</span>
     </div>
   );
 }

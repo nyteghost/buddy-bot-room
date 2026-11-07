@@ -54,6 +54,10 @@ select one individual pack in Character Universe.
 South idle is mandatory. Each provided direction must include its own idle.
 The production-approved label additionally requires idle for all eight directions.
 Missing action artwork falls back to that direction's idle, then south idle.
+When a pack has no art at all for a facing, the room first borrows the same action
+from a supplied direction 45° away (nearer the front first), then that neighbour's idle.
+A pack with no art near that facing (e.g. front-only) uses its south clip for the same action
+before south idle, so a front-only walk keeps stepping instead of sliding.
 The renderer does not mirror or invent directional frames. Supporting an action
 in the format does not mean every room behavior currently triggers it.
 
@@ -102,3 +106,45 @@ it does not overwrite installed IDs or automatically enable them.
 
 Any future Visiting Pals integration must obtain separate sharing approval and
 respect Focus Mode. This format itself transfers no memories or tool permissions.
+
+## Converting designer animation prototypes
+
+`tools/characters/convert-hd256-animation-prototype.py` packages the Character Designer's
+multi-frame prototype layouts (`pixel-pals-hd256-character-pack`, `pixel-pals-hd-asset-prototype`,
+and per-direction `pixel-pals-hd-character-pack`) as one v3 ZIP per character. It reads the source
+archive in place, copies PNG bytes unchanged, keeps `prototype` status, never invents or mirrors
+frames, and refuses an existing output folder. Use `--ids ids.json` with the IDs already installed
+and a higher `--revision` so the Character Library offers a reviewed version update. Designer action
+names map to the closest Pixel Pals action (e.g. `laugh`/`roar` → celebrate, `heal`/`potion`/`ritual`
+→ interaction, `strike`/`pounce`/`takeoff` → signature, the manifest's `signatureAction` → signature);
+movers without `walk` use `roll`, `glide`, `fly` or `hover` as their walk clip. The conversion report
+lists unmapped and missing actions. Generated packs contain private art: keep them out of git.
+
+## Render-scale rules for crisp pixel art (owner art direction, 2026-11-07)
+
+The approved style is crisp, visibly square pixels. Packs stay 256×256 PNGs, but the room only
+keeps pixels crisp when each art pixel covers a whole number of screen (device) pixels:
+
+- **Draw on a coarser master grid and enlarge by an integer with nearest-neighbour.** Recommended:
+  a 64×64 master enlarged 4× (also accepted: 128×128 at 2×, 32×32 at 8×, 16×16 at 16×). No
+  smoothing, anti-aliased resize, sub-pixel offset or soft shadow on the 256 canvas, otherwise the
+  block grid breaks and the room falls back to smooth scaling.
+- **The room detects the grid automatically** from the pack's south idle frame (blocks of 16, 8, 4
+  or 2 pixels; fully transparent pixels match each other). Grid art is drawn with
+  `image-rendering: pixelated` at the size closest to the room target (≈76 css px desktop, ≈48 css
+  px phone) that gives whole device pixels per art pixel. For a 64×64 master: 64 px on 1× and 2×
+  screens, ≈85 px on 3× iPhones (desktop); ≈43 px on 3× iPhones (phone layout). Painted art
+  (grid 1) is scaled smoothly and is not "crisp pixel" art.
+- **Feet on row 248 ±4** of the 256 canvas (row 62 of a 64 master), figure horizontally centred,
+  transparent margin above the head. Humanoids should fill about 85–92% of the canvas height so
+  mixed casts stand at similar heights.
+- Native 32px fallbacks use the same idea: one sprite pixel = 2 css px on desktop (1.6 at 1.25×),
+  1.5 css px on 2× phones and 1.333 css px on 3× phones.
+
+## HD looks for the original Pals
+
+In Living World, the Character Library's **Look for a Pal** selector lets the owner dress one of the
+nine original Pals with an imported HD256 character. It is visual only and saved on that device.
+The Pal's name, personality, memories, voice, tasks and permissions do not change, and Classic mode
+is unaffected. **Restore original Pal looks** removes every mapping. If the chosen character is
+removed, or has no HD art, the Pal shows its native sprite again.

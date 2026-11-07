@@ -39,7 +39,8 @@ describe("native pixel rendering and dynamic props",()=>{
  it("renders 32px step art without thousands of unnecessary upscaled rectangles",()=>{
   const view=render(createElement(PixelCharacter,{id:"byte",mode:"cyberpunk",pixelWorld:true,walking:true,facing:"se",walkFrame:1}));
   const sprite=view.container.querySelector("svg.world-native-sprite");
-  expect(sprite?.getAttribute("viewBox")).toBe("0 0 32 32");
+  // Native 32-pixel-wide grid; Living World lengthens legs by whole rows (world-proportions).
+  expect(sprite?.getAttribute("viewBox")).toMatch(/^0 0 32 (3[2-9]|4[0-4])$/);
   expect(view.container.querySelectorAll("svg rect").length).toBeLessThan(700);
   view.unmount();
  });
