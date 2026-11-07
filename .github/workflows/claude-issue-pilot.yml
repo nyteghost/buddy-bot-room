@@ -1,0 +1,129 @@
+# Owner-only, docs-only Claude pilot. NOT ACTIVE until reviewed on main.
+name: Claude Code - owner-labeled docs pilot
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-pilot-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  docs-pilot:
+    if: >-
+      github.actor == 'nyteghost' &&
+      github.event.issue.number == 28 &&
+      github.event.label.name == 'agent:claude'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
+    steps:
+      - name: Checkout development base beta
+        uses: actions/checkout@v4
+        with:
+          ref: beta
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require configured Claude authentication
+        env:
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+        run: |
+          if [[ "$HAS_API_KEY" != true && "$HAS_OAUTH_TOKEN" != true ]]; then
+            echo '::error::Configure ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in GitHub Actions secrets.'
+            exit 1
+          fi
+
+      - name: Claude implements documentation-only test issue
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          base_branch: beta
+          branch_prefix: claude/
+          label_trigger: agent:claude
+          prompt: |
+            This is owner-approved issue #28 in nyteghost/buddy-bot-room.
+            Read AGENTS.md and coordination issue #23. Create a fresh
+            claude/ branch based on beta, then CREATE ONLY ONE NEW FILE:
+            docs/AI_AGENT_PILOT_NOTES.md.
+            Describe branch isolation, PR review into beta and non-destructive
+            test/approval gates. Do not modify existing files, code, workflows,
+            private assets, secrets, Docker or deployment configuration.
+            Do not push to beta/main, merge, deploy, or use live data.
+            Report branch and work summary to issue #28. Stop if blocked.
+          claude_args: |
+            --max-turns 8
+            --max-budget-usd 2
+
+      - name: Verify only the approved documentation file changed
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_BRANCH: ${{ steps.claude.outputs.branch_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$NEW_BRANCH" =~ ^claude/[A-Za-z0-9._/-]+$ ]] ||
+             [[ "$NEW_BRANCH" == *'..'* || "$NEW_BRANCH" == */ ]]; then
+            echo '::error::Claude did not report a safe feature branch.'
+            exit 1
+          fi
+          mapfile -t files < <(gh api "repos/$GITHUB_REPOSITORY/compare/beta...$NEW_BRANCH" --jq '.files[].filename')
+          if [[ "${#files[@]}" -ne 1 || "${files[0]}" != 'docs/AI_AGENT_PILOT_NOTES.md' ]]; then
+            echo '::error::Unexpected files changed. Review branch; no PR created.'
+            exit 1
+          fi
+          echo "branch=$NEW_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Verified only the allowed docs file on $NEW_BRANCH." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open draft PR targeting beta if repository settings permit
+        id: draft_pr
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_BRANCH: ${{ steps.verify.outputs.branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(gh pr create --draft --base beta --head "$NEW_BRANCH" \
+            --title 'docs: automated Claude issue pilot #28' \
+            --body 'Owner-authorized docs-only pilot. Review required; do not merge or deploy.')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Draft PR: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout result for tests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.verify.outputs.branch }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+      - name: Run tests and production build
+        run: |
+          bun install --frozen-lockfile
+          bun run test
+          bun run build
+
+      - name: Post the outcome to issue 28
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ job.status }}
+          NEW_BRANCH: ${{ steps.verify.outputs.branch }}
+          PR_URL: ${{ steps.draft_pr.outputs.url }}
+        run: |
+          printf 'Claude pilot status: %s\nBranch: %s\nDraft PR: %s\nActions run: https://github.com/%s/actions/runs/%s\nNo merge/deploy was authorized.\n' \
+            "$STATUS" "${NEW_BRANCH:-not verified}" "${PR_URL:-not created}" \
+            "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > /tmp/claude-report.txt
+          gh issue comment 28 --body-file /tmp/claude-report.txt
