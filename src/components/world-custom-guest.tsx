@@ -10,6 +10,7 @@ import { worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs
 import { spriteRuns } from "@/lib/sprite-upscale";
 import { selectWorldHdClip, worldHdAction, worldHdFrameAt } from "@/lib/world-hd-animation";
 import { worldDepthScale, worldDepthZ } from "@/lib/world-floor";
+import { worldHdDisplaySize, worldHdFrameGrid } from "@/lib/world-hd-render";
 import { WORLD_GAITS, worldGaitOf, worldStepFrame } from "@/lib/world-wander";
 import { clearWorldPresence, publishWorldPresence, useWorldFixtureUse, worldGreeting, worldPresenceSnapshot } from "@/lib/world-presence";
 import { worldMotionFor } from "./world-guest";
@@ -67,7 +68,14 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
  const clipElapsed = walking && selected?.action === "walk" ? pose.travelled / WORLD_GAITS[gait].speed * 1000 :
   clipClock.key === clipKey ? elapsed - clipClock.start : 0;
  const image = selected ? worldHdFrameAt(selected.clip, clipElapsed) : frames?.[Math.floor(elapsed / 175) % frames.length];
- const style = { "--world-guest-x": pose.x + "%", "--world-guest-y": pose.y + "%", "--world-z": String(worldDepthZ(pose.y)), "--world-depth-scale": String(worldDepthScale(pose.y)) } as CSSProperties;
+ // Crisp pixel art: detect the art's pixel grid once, then draw each art pixel on whole device pixels.
+ const gridSource = character.hd3?.directions.s?.idle?.frames[0]?.src ?? character.hd?.idle[0];
+ const [grid, setGrid] = useState(1);
+ useEffect(() => { let live = true; setGrid(1); if (gridSource) void worldHdFrameGrid(gridSource).then(found => { if (live) setGrid(found); }); return () => { live = false; }; }, [gridSource]);
+ const phone = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 700px)").matches;
+ const hdSize = worldHdDisplaySize(phone ? 48 : 76, typeof window !== "undefined" ? window.devicePixelRatio : 1, grid);
+ const style = { "--world-guest-x": pose.x + "%", "--world-guest-y": pose.y + "%", "--world-z": String(worldDepthZ(pose.y)), "--world-depth-scale": String(worldDepthScale(pose.y)),
+  ...(image ? { "--world-hd-size": hdSize + "px" } : {}) } as CSSProperties;
  const signature = !!character.hd3 && Object.values(character.hd3.directions).some(actions => actions?.signature);
  const trigger = (action: "wave" | "signature") => {
   if (!animate) return;
@@ -90,7 +98,7 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
    title={signature ? "Tap to wave. Shift-click or press S for signature action." : "Tap to wave"}
    onClick={event => trigger(signature && event.shiftKey ? "signature" : "wave")}
    onKeyDown={event => { if (signature && event.key.toLowerCase() === "s") { event.preventDefault(); trigger("signature"); } }}>
-   {image ? <img className="world-guest-pixels world-guest-hd-pixels" src={image} width={256} height={256} draggable={false} alt={character.name + " 256 pixel character"}/> :
+   {image ? <img className={"world-guest-pixels world-guest-hd-pixels" + (grid > 1 ? " world-hd-crisp" : "")} data-hd-grid={grid} src={image} width={256} height={256} draggable={false} alt={character.name + " 256 pixel character"}/> :
     <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name + " custom pixel character"}>
      {runs.map(run => <rect key={run.x + "-" + run.y} x={run.x} y={run.y} width={run.w} height="1" fill={character.palette[run.c] ?? "transparent"}/>)}
     </svg>}

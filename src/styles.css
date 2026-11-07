@@ -2728,11 +2728,20 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
  transform:translate(-50%,-100%) scale(var(--world-depth-scale,1));transform-origin:50% 100%;
  transition:left .1s linear,top .1s linear;
 }
-/* Same pixel scale as the Pals (1.875px per sprite pixel; 32×38 adult-proportion grid). */
-.room-scene.living-world .world-guest .world-guest-pixels:not(.world-guest-hd-pixels){width:60px;height:71px;}
+/* Native 32px sprites: one sprite pixel = --world-pixel css px, chosen so it is a whole number of device
+   pixels on common screens (1×, 1.25×, 1.5×, 2×, 3×). Pals and built-in guests share it. */
+.room-scene.living-world{--world-pixel:2px;}
+@media (min-resolution:1.2dppx) and (max-resolution:1.3dppx){.room-scene.living-world{--world-pixel:1.6px;}}
+@media (max-width:700px){.room-scene.living-world{--world-pixel:1.5px;}}
+@media (max-width:700px) and (min-resolution:2.5dppx){.room-scene.living-world{--world-pixel:1.3334px;}}
+.room-scene.living-world .world-guest .world-guest-pixels:not(.world-guest-hd-pixels){width:calc(32 * var(--world-pixel));height:calc(38 * var(--world-pixel));}
+.room-scene.living-world .office-pal[data-world-floor] .office-character{width:calc(32 * var(--world-pixel));height:calc(38 * var(--world-pixel));}
+.room-scene.living-world .office-pal[data-world-floor] .office-character > .pixel-character{width:100%;height:100%;}
 /* HD256 humanoids fill ~90% of their frame: 76px makes them stand about as tall as the Pals. */
-.room-scene.living-world .world-custom-guest:has(.world-guest-hd-pixels){width:76px;min-height:0;}
-.room-scene.living-world .world-custom-guest .world-guest-hd-pixels{width:76px;height:76px;object-position:50% 100%;}
+.room-scene.living-world .world-custom-guest:has(.world-guest-hd-pixels){width:var(--world-hd-size,76px);min-height:0;}
+.room-scene.living-world .world-custom-guest .world-guest-hd-pixels{width:var(--world-hd-size,76px);height:var(--world-hd-size,76px);object-position:50% 100%;}
+/* Grid-aligned pixel art (detected per pack) is drawn nearest-neighbour at a whole number of device pixels per art pixel. */
+.room-scene.living-world .world-custom-guest .world-guest-hd-pixels.world-hd-crisp{image-rendering:pixelated;}
 .room-scene.living-world .office-pal[data-world-floor] .office-character::after{bottom:-2px;}
 .room-scene.living-world .world-guest-name{position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);}
 .room-scene.living-world .world-custom-actor{position:relative;}
@@ -2749,9 +2758,7 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
 @keyframes world-guest-chat{50%{opacity:.55}}
 .room-scene.living-world .world-guest[data-paused="true"] .world-guest-pixels,.room-scene.living-world .world-guest[data-paused="true"] .world-guest-chat{animation:none!important;}
 @media(max-width:700px){
- .room-scene.living-world .world-guest .world-guest-pixels:not(.world-guest-hd-pixels){width:38px;height:45px;}
- .room-scene.living-world .world-custom-guest:has(.world-guest-hd-pixels){width:48px;}
- .room-scene.living-world .world-custom-guest .world-guest-hd-pixels{width:48px;height:48px;}
+
  .room-scene.living-world .office-pal[data-world-floor] > span{font-size:6px;padding:2px 4px;}
 }
 /* Furniture glows: a faint idle shimmer, brightening while a character uses it. */
