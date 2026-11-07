@@ -12,7 +12,7 @@ import { selectWorldHdClip, worldHdAction, worldHdFrameAt } from "@/lib/world-hd
 import { worldDepthScale, worldDepthZ } from "@/lib/world-floor";
 import { worldHdDisplaySize, worldHdFrameGrid } from "@/lib/world-hd-render";
 import { WORLD_GAITS, worldGaitOf, worldStepFrame } from "@/lib/world-wander";
-import { clearWorldPresence, publishWorldPresence, useWorldFixtureUse, worldGreeting, worldPresenceSnapshot } from "@/lib/world-presence";
+import { useWorldActor, useWorldFixtureUse, worldGreeting, worldPresenceSnapshot } from "@/lib/world-presence";
 import { worldMotionFor } from "./world-guest";
 
 /** Cosmetic animation only, using the existing obstacle-aware room route. */
@@ -41,8 +41,7 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
  const pose = guestWanderPose(character.id, index + 8, theme, routeElapsed, gait);
  const gestureActive = gesture !== null && elapsed - gesture.start < gesture.duration;
  const standing = !gestureActive && pose.dwelling && (pose.action === "idle" || pose.action === "look");
- useEffect(() => { publishWorldPresence({ id: actor, x: pose.x, y: pose.y, dwelling: animate && standing, at: Date.now() }); }, [actor, pose.x, pose.y, animate, standing, elapsed]);
- useEffect(() => () => clearWorldPresence(actor), [actor]);
+ const { rootRef, labelRef, labelHidden } = useWorldActor(actor, pose.x, pose.y, animate && standing, true, elapsed);
  const greeting = animate && standing ? worldGreeting({ id: actor, x: pose.x, y: pose.y, dwelling: true, at: Date.now() }, worldPresenceSnapshot(), Date.now()) : null;
  useWorldFixtureUse(actor, theme, animate && !gestureActive && pose.action === "interaction" ? pose.fixture : null);
  const reaction = worldCueReaction(cue, character.id, Date.now(), paused || reduced || low || hidden);
@@ -92,7 +91,7 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
   window.addEventListener("pixel-pals:hd-action", receive);
   return () => window.removeEventListener("pixel-pals:hd-action", receive);
  }, [animate, signature, character.id, character.hd3, facing, elapsed]);
- return <div className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? facing} data-movement={gait} data-paused={!animate}
+ return <div ref={el => { rootRef.current = el; }} className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? facing} data-movement={gait} data-paused={!animate}
   data-hd-fallback={selected ? [selected.direction !== facing && "facing", selected.action !== kind && "clip"].filter(Boolean).join("+") || undefined : undefined}>
   <button type="button" className="world-custom-actor" aria-label={"Wave to " + character.name}
    title={signature ? "Tap to wave. Shift-click or press S for signature action." : "Tap to wave"}
@@ -102,7 +101,7 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
     <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name + " custom pixel character"}>
      {runs.map(run => <rect key={run.x + "-" + run.y} x={run.x} y={run.y} width={run.w} height="1" fill={character.palette[run.c] ?? "transparent"}/>)}
     </svg>}
-   <span className="world-guest-name">{character.name}</span>
+   <span ref={el => { labelRef.current = el; }} className={"world-guest-name" + (labelHidden ? " world-label-hidden" : "")}>{character.name}</span>
    {animate && (action === "wave" || action === "celebrate" || action === "signature") && <span className="world-guest-spark" aria-hidden="true">✦</span>}
   {animate && action === "talk" && <span className="world-guest-chat" aria-hidden="true">…</span>}
   </button>

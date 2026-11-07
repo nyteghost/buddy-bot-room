@@ -4,7 +4,7 @@ import { agentName, type AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
 import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan, type WorldPose } from "@/lib/world-navigation";
-import { clearWorldPresence, publishWorldPresence, useWorldFixtureUse } from "@/lib/world-presence";
+import { useWorldActor, useWorldFixtureUse } from "@/lib/world-presence";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
 import { ambientMotion, advanceMotionClock, type PalMotion } from "@/lib/pal-motion";
@@ -66,8 +66,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   // In themed rooms the pose always comes from worldPose (office choreography has no actions or furniture).
   const roomPose: WorldPose | null = themeWorld ? pose as WorldPose : null;
   useWorldFixtureUse("pal:" + id, mode, strolling && roomPose?.action === "work" ? roomPose.fixture : null);
-  useEffect(() => { if (themeWorld && enabled && visible) publishWorldPresence({ id: "pal:" + id, x, y, dwelling: !walking, at: Date.now() }); else clearWorldPresence("pal:" + id); }, [themeWorld, enabled, visible, id, x, y, walking, elapsed]);
-  useEffect(() => () => clearWorldPresence("pal:" + id), [id]);
+  const { rootRef, labelRef, labelHidden } = useWorldActor("pal:" + id, x, y, !walking, world && enabled && visible, elapsed);
   const worldAction: PalMotion | null = roomPose && roomPose.action !== "walk" && roomPose.action !== "idle" ? roomPose.action : null;
   return (
     <div
@@ -83,8 +82,8 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}${world&&enabled?". Activate to wave.":""}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? worldAction ?? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
-      <span>{displayLabel}</span>
+      <div className="office-character" ref={el => { rootRef.current = el; }}><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? worldAction ?? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <span ref={el => { labelRef.current = el; }} className={labelHidden ? "world-label-hidden" : undefined}>{displayLabel}</span>
     </div>
   );
 }

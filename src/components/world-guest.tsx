@@ -10,7 +10,7 @@ import { guestIds,guestName,guestPalette,guestSprite,guestWanderPose,type GuestI
 import { worldDepthScale,worldDepthZ } from "@/lib/world-floor";
 import { WORLD_LEG_EXTENSION,worldGuestBody,worldLegRow,worldTallSprite } from "@/lib/world-proportions";
 import { worldStepFrame,type WorldGait,type WorldWanderAction } from "@/lib/world-wander";
-import { clearWorldPresence,publishWorldPresence,useWorldFixtureUse,worldGreeting,worldPresenceSnapshot } from "@/lib/world-presence";
+import { useWorldActor,useWorldFixtureUse,worldGreeting,worldPresenceSnapshot } from "@/lib/world-presence";
 
 const artById=new Map<GuestId,string[]>();
 function getArt(id:GuestId){let found=artById.get(id);if(!found){found=guestSprite(id);artById.set(id,found);}return found;}
@@ -42,8 +42,7 @@ export function WorldGuest({id,theme,active,cue,paused=false}:{id:GuestId;theme:
  // Paused guests keep their last position (the clock simply stops) instead of snapping back to the start.
  const pose=guestWanderPose(id,guestIds.indexOf(id),theme,elapsed,gait);
  const standing=pose.dwelling&&(pose.action==="idle"||pose.action==="look");
- useEffect(()=>{publishWorldPresence({id:actor,x:pose.x,y:pose.y,dwelling:animate&&standing,at:Date.now()});},[actor,pose.x,pose.y,animate,standing,elapsed]);
- useEffect(()=>()=>clearWorldPresence(actor),[actor]);
+ const {rootRef,labelRef,labelHidden}=useWorldActor(actor,pose.x,pose.y,animate&&standing,true,elapsed);
  const greeting=animate&&standing?worldGreeting({id:actor,x:pose.x,y:pose.y,dwelling:true,at:Date.now()},worldPresenceSnapshot(),Date.now()):null;
  useWorldFixtureUse(actor,theme,animate&&pose.action==="interaction"?pose.fixture:null);
  const reaction=worldCueReaction(cue,id,Date.now(),paused||reduced||low||hidden);
@@ -56,9 +55,9 @@ export function WorldGuest({id,theme,active,cue,paused=false}:{id:GuestId;theme:
  const grid=useMemo(()=>worldTallSprite(worldReactionFrame(getArt(id),facing,reaction,fallbackAction,step),WORLD_LEG_EXTENSION[worldGuestBody(id)],worldLegRow("guest:"+id,()=>getArt(id))),[id,facing,action,frame]); // eslint-disable-line react-hooks/exhaustive-deps
  const runs=useMemo(()=>spriteRuns(grid,(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[grid]);
  const style={"--world-guest-x":pose.x+"%","--world-guest-y":pose.y+"%","--world-z":String(worldDepthZ(pose.y)),"--world-depth-scale":String(worldDepthScale(pose.y))} as CSSProperties;
- return <button type="button" style={style} className="world-guest" data-action={action} data-facing={facing} data-movement={gait} data-paused={!animate} aria-label={"Wave to "+guestName(id)} title={"Wave to "+guestName(id)+" · visual only"} onClick={()=>setGreet(true)}>
+ return <button type="button" ref={el=>{rootRef.current=el;}} style={style} className="world-guest" data-action={action} data-facing={facing} data-movement={gait} data-paused={!animate} aria-label={"Wave to "+guestName(id)} title={"Wave to "+guestName(id)+" · visual only"} onClick={()=>setGreet(true)}>
    <svg viewBox={"0 0 32 "+grid.length} preserveAspectRatio="xMidYMax meet" className="world-guest-pixels" shapeRendering="crispEdges" role="img" aria-label={guestName(id)+" animated pixel character"}>{runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={guestPalette[r.c]??"transparent"}/>)}</svg>
-   <span className="world-guest-name">{guestName(id)}</span>
+   <span ref={el=>{labelRef.current=el;}} className={"world-guest-name"+(labelHidden?" world-label-hidden":"")}>{guestName(id)}</span>
    {(action==="wave"||action==="celebrate")&&<span className="world-guest-spark" aria-hidden="true">✦</span>}
    {action==="talk"&&<span className="world-guest-chat" aria-hidden="true">…</span>}
  </button>;

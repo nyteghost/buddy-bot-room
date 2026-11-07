@@ -2759,7 +2759,8 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
 .room-scene.living-world .world-guest[data-paused="true"] .world-guest-pixels,.room-scene.living-world .world-guest[data-paused="true"] .world-guest-chat{animation:none!important;}
 @media(max-width:700px){
 
- .room-scene.living-world .office-pal[data-world-floor] > span{font-size:6px;padding:2px 4px;}
+ .room-scene.living-world .office-pal[data-world-floor] > span{font-size:7px;padding:2px 4px;}
+ .room-scene.living-world .world-guest-name{font-size:7px;}
 }
 /* Furniture glows: a faint idle shimmer, brightening while a character uses it. */
 .world-atmosphere .world-fixture{--fixture-color:rgba(255,236,170,.9);width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:radial-gradient(circle,var(--fixture-color) 0,transparent 68%);opacity:.18;transform:scale(1);transition:opacity .5s ease,transform .5s ease;}
@@ -2778,3 +2779,12 @@ html[data-lowpower="1"] .world-visitor *,html[data-hidden="1"] .world-visitor *{
 @keyframes world-fixture-flicker{0%,100%{opacity:.14}40%{opacity:.3}70%{opacity:.18}}
 @media(prefers-reduced-motion:reduce){.room-scene.living-world .world-guest .world-guest-pixels,.room-scene.living-world .world-guest-chat,.world-atmosphere .world-fixture{animation:none!important;transition:none!important;}}
 html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower="1"] .room-scene.living-world .world-guest *{animation-play-state:paused!important;}
+
+/* Name labels: a label covered by a nearer character's body or label fades out (no stacked or
+   overlapping names); hover, keyboard focus or tap brings it back. Accessible names are unchanged. */
+.room-scene.living-world .world-guest-name,.room-scene.living-world .office-pal > span{transition:opacity .25s ease;}
+.room-scene.living-world .world-guest-name{background:rgb(12 16 24 / .92);}
+.room-scene.living-world .world-label-hidden{opacity:0;}
+.room-scene.living-world .world-guest:hover .world-label-hidden,.room-scene.living-world .world-guest:focus-within .world-label-hidden,
+.room-scene.living-world .office-pal:hover > .world-label-hidden,.room-scene.living-world .office-pal:focus-visible > .world-label-hidden{opacity:1;}
+@media(prefers-reduced-motion:reduce){.room-scene.living-world .world-guest-name,.room-scene.living-world .office-pal[data-world-floor] > span{transition:none;}}

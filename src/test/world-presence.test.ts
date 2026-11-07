@@ -58,3 +58,38 @@ describe("HD256 nearest supplied direction",()=>{
   expect(worldHdNeighbours("n")).toHaveLength(2);
  });
 });
+
+import {worldLabelCovered} from "@/lib/world-presence";
+describe("Living World name labels never stack",()=>{
+ const scene={w:800,h:465};
+ const actor=(id:string,x:number,y:number):WorldPresence=>({id,x,y,dwelling:true,at:1000,sprite:{w:64,h:76},label:{w:70,h:14}});
+ it("hides the label of a character standing just behind a nearer one",()=>{
+  const back=actor("back",50,60),front=actor("front",51,64);
+  expect(worldLabelCovered(back,[back,front],scene,1100)).toBe(true);   // front body covers back's label
+  expect(worldLabelCovered(front,[back,front],scene,1100)).toBe(false); // nearer label always stays
+ });
+ it("hides the deeper of two side-by-side labels and keeps distant labels",()=>{
+  const a=actor("a",50,70),b=actor("b",54,70.4);
+  expect(worldLabelCovered(a,[a,b],scene,1100)).toBe(true);
+  expect(worldLabelCovered(b,[a,b],scene,1100)).toBe(false);
+  const far=actor("far",80,70);
+  expect(worldLabelCovered(a,[a,far],scene,1100)).toBe(false);
+ });
+ it("breaks exact ties deterministically and ignores stale or unsized entries",()=>{
+  const a=actor("a",50,70),b=actor("b",50,70);
+  expect(worldLabelCovered(a,[a,b],scene,1100)).toBe(true);
+  expect(worldLabelCovered(b,[a,b],scene,1100)).toBe(false);
+  expect(worldLabelCovered(a,[a,{...b,at:0}],scene,5000)).toBe(false);
+  const {label:_unsized,...unsized}=a;
+  expect(worldLabelCovered(unsized,[a,b],scene,1100)).toBe(false);
+ });
+});
+describe("measured label boxes (any anchoring)",()=>{
+ it("uses measured on-screen rectangles when present",()=>{
+  const back:WorldPresence={id:"back",x:0,y:40,dwelling:true,at:1000,labelRect:{l:100,t:200,r:170,b:214}};
+  const front:WorldPresence={id:"front",x:0,y:45,dwelling:true,at:1000,spriteRect:{l:110,t:150,r:174,b:226}};
+  expect(worldLabelCovered(back,[back,front],{w:800,h:465},1100)).toBe(true);
+  const clear:WorldPresence={...front,spriteRect:{l:300,t:150,r:364,b:226}};
+  expect(worldLabelCovered(back,[back,clear],{w:800,h:465},1100)).toBe(false);
+ });
+});
