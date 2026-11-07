@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { agentName, type AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
-import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan } from "@/lib/world-navigation";
+import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan, type WorldPose } from "@/lib/world-navigation";
 import { clearWorldPresence, publishWorldPresence, useWorldFixtureUse } from "@/lib/world-presence";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
@@ -63,10 +63,12 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
     ...(themeWorld ? { "--world-z": String(worldDepthZ(y)), "--world-depth-scale": String(worldDepthScale(y)) } : {}),
   } as CSSProperties;
   const strolling = themeWorld && enabled && visible && !active && wandering;
-  useWorldFixtureUse("pal:" + id, mode, strolling && "fixture" in pose && pose.action === "work" ? pose.fixture : null);
+  // In themed rooms the pose always comes from worldPose (office choreography has no actions or furniture).
+  const roomPose: WorldPose | null = themeWorld ? pose as WorldPose : null;
+  useWorldFixtureUse("pal:" + id, mode, strolling && roomPose?.action === "work" ? roomPose.fixture : null);
   useEffect(() => { if (themeWorld && enabled && visible) publishWorldPresence({ id: "pal:" + id, x, y, dwelling: !walking, at: Date.now() }); else clearWorldPresence("pal:" + id); }, [themeWorld, enabled, visible, id, x, y, walking, elapsed]);
   useEffect(() => () => clearWorldPresence("pal:" + id), [id]);
-  const worldAction = themeWorld && "action" in pose && pose.action !== "walk" && pose.action !== "idle" ? pose.action : null;
+  const worldAction: PalMotion | null = roomPose && roomPose.action !== "walk" && roomPose.action !== "idle" ? roomPose.action : null;
   return (
     <div
       style={position}

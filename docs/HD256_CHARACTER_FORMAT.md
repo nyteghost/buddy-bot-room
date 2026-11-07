@@ -104,3 +104,16 @@ it does not overwrite installed IDs or automatically enable them.
 
 Any future Visiting Pals integration must obtain separate sharing approval and
 respect Focus Mode. This format itself transfers no memories or tool permissions.
+
+## Converting designer animation prototypes
+
+`tools/characters/convert-hd256-animation-prototype.py` packages the Character Designer's
+multi-frame prototype layouts (`pixel-pals-hd256-character-pack`, `pixel-pals-hd-asset-prototype`,
+and per-direction `pixel-pals-hd-character-pack`) as one v3 ZIP per character. It reads the source
+archive in place, copies PNG bytes unchanged, keeps `prototype` status, never invents or mirrors
+frames, and refuses an existing output folder. Use `--ids ids.json` with the IDs already installed
+and a higher `--revision` so the Character Library offers a reviewed version update. Designer action
+names map to the closest Pixel Pals action (e.g. `laugh`/`roar` → celebrate, `heal`/`potion`/`ritual`
+→ interaction, `strike`/`pounce`/`takeoff` → signature, the manifest's `signatureAction` → signature);
+movers without `walk` use `roll`, `glide`, `fly` or `hover` as their walk clip. The conversion report
+lists unmapped and missing actions. Generated packs contain private art: keep them out of git.
