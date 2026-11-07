@@ -366,3 +366,19 @@ secret-safe Caddy integration, and test authenticated and unauthenticated
 requests through an isolated HTTP/Caddy fixture. Only after a full
 backup/restore rehearsal and owner approval should a controlled, rollback-
 capable deployment to the existing LAN/Tailscale address be considered.
+
+### Additional browser write-route defense
+
+The staged native inbox now **requires** `Sec-Fetch-Site: same-origin`
+for POST review and import requests, not merely accepting that header when
+present. This is an additional CSRF safeguard for the existing Caddy proxy,
+which may rewrite the upstream `Origin` and `Host` to loopback. A browser
+request with missing, cross-site, same-site or `none` fetch metadata is
+rejected even if the proxy makes its Origin and Host appear to match.
+The actual Origin/Host check, custom review header, JSON-only body, installed
+native local token and Caddy Basic Auth remain independently required.
+The strict check targets modern HTTPS browsers; unknown clients may be
+rejected rather than silently weakening the write permission. These are
+candidate routes only: live browser compatibility remains unverified.
+GitHub CI now runs both the synthetic proxy audit and native HTTP security
+tests. The live Unraid server, Caddy and native database remain unchanged.
