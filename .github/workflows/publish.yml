@@ -12,6 +12,7 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
+      - ".github/workflows/**" # Changes to automation alone must not publish Docker images
   workflow_dispatch:
 
 permissions:
