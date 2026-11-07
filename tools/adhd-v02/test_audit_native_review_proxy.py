@@ -174,8 +174,7 @@ class ProxyAuditTests(unittest.TestCase):
 
     def test_cli_returns_check_when_token_marker_missing(self):
         out, err = StringIO(), StringIO()
-        with patch("sys.stdin", StringIO(json.dumps(config()))), \\
-             patch("sys.stdout", out), patch("sys.stderr", err):
+        with patch("sys.stdin", StringIO(json.dumps(config()))),  patch("sys.stdout", out), patch("sys.stderr", err):
             self.assertEqual(main(["--host", HOST]), 3)
         report = json.loads(out.getvalue())
         self.assertTrue(report["route_coverage_verified"])
@@ -185,8 +184,7 @@ class ProxyAuditTests(unittest.TestCase):
 
     def test_cli_complete_static_markers_do_not_authorize_install(self):
         out, err = StringIO(), StringIO()
-        with patch("sys.stdin", StringIO(json.dumps(config(inject_token=True)))), \\
-             patch("sys.stdout", out), patch("sys.stderr", err):
+        with patch("sys.stdin", StringIO(json.dumps(config(inject_token=True)))),  patch("sys.stdout", out), patch("sys.stderr", err):
             self.assertEqual(main(["--host", HOST]), 0)
         report = json.loads(out.getvalue())
         self.assertTrue(report["static_control_markers_complete"])
