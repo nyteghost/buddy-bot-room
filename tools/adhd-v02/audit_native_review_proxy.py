@@ -20,7 +20,7 @@ PATHS = (
 )
 
 
-def _route_matches(route: dict, path: str, host: str) -> bool | None:
+def _route_matches(route: dict, path: str, host: str | None) -> bool | None:
     """True/False/unknown; only recognize simple host and path matchers."""
     rules = route.get("match")
     if rules is None:
@@ -41,7 +41,9 @@ def _route_matches(route: dict, path: str, host: str) -> bool | None:
         if paths is not None and (not isinstance(paths, list) or not paths or
                                   not all(isinstance(p, str) for p in paths)):
             return None
-        ok_host = hosts is None or any(
+        # None is used ONLY for a redacted, all-host diagnostic fallback.
+        # It must never be mistaken for verified access to the requested host.
+        ok_host = host is None or hosts is None or any(
             fnmatch.fnmatchcase(host.lower(), h.lower()) for h in hosts)
         ok_path = paths is None or any(
             fnmatch.fnmatchcase(path, p) for p in paths)
@@ -73,7 +75,7 @@ def _proxy_features(handler: dict) -> dict:
     }
 
 
-def _paths(routes: object, path: str, host: str, *,
+def _paths(routes: object, path: str, host: str | None, *,
            authenticated: bool = False, uncertain: bool = False,
            depth: int = 0) -> list[dict]:
     """Conservative structural route walk, not a full Caddy interpreter."""
@@ -131,12 +133,16 @@ def audit(config: object, host: str) -> dict:
     checks = {}
     for path in PATHS:
         matches = []
+        all_host_matches = []
         for server in servers.values():
             if not isinstance(server, dict):
                 matches.append({"unknown": True})
                 continue
             matches.extend(_paths(server.get("routes"), path, host))
+            all_host_matches.extend(_paths(server.get("routes"), path, None))
         checks[path] = {
+            "potential_hostname_mismatch": len(matches) == 0 and len(all_host_matches) > 0,
+            "any_host_proxy_route_candidates": len(all_host_matches),
             "candidate_upstreams": len(matches),
             "basic_auth_before_proxy": bool(matches) and all(
                 m.get("basic_auth_before_proxy") is True for m in matches),
@@ -151,8 +157,11 @@ def audit(config: object, host: str) -> dict:
             "route_structure_unambiguous": (
                 len(matches) == 1 and not matches[0].get("unknown")),
         }
+    no_match = any(value["candidate_upstreams"] == 0 for value in checks.values())
     return {
         "audit": "static_caddy_route_structure_only",
+        "status": "unverified_no_matching_route" if no_match else "static_routes_found_not_live_verified",
+        "route_coverage_verified": not no_match,
         "paths": checks,
         "secret_values_disclosed": False,
         "credential_validation_performed": False,
@@ -171,7 +180,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = audit(json.load(sys.stdin), args.host)
         print(json.dumps(result, sort_keys=True))
-        return 0
+        # Fail closed when the selected browser host has no matching route.
+        # Zero candidates is NOT a successful auth or proxy check.
+        return 0 if result["route_coverage_verified"] else 3
     except (ValueError, TypeError, KeyError, RecursionError, AttributeError):
         print("REFUSED: Caddy configuration could not be safely analyzed; no changes made.",
               file=sys.stderr)
