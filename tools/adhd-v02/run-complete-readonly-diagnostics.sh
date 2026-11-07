@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # One-pass diagnostic for Pixel Pals / ADHD Assistant on Unraid.
+# When launched via curl | bash, only the Caddy JSON audit may read stdin.
+# Every other docker -i invocation explicitly reads from /dev/null.
 # Live app code, databases, Caddy, containers and network are never changed.
 set -Eeuo pipefail
 set +x
@@ -7,7 +9,7 @@ export LC_ALL=C
 
 SOURCE_SHA='edae2e602489ff3dccf3dcfd567624b72b4dc31b'
 SOURCE_BASE="https://raw.githubusercontent.com/nyteghost/buddy-bot-room/$SOURCE_SHA/tools/adhd-v02"
-CODE_ROOT='/mnt/user/appdata/adhd-assistant/code'
+CODE_ROOT="${ADHD_AUDIT_CODE_ROOT:-/mnt/user/appdata/adhd-assistant/code}"
 IMAGE='python:3.12-alpine'
 AUDIT_HOST="$(printenv ADHD_AUDIT_HOST 2>/dev/null || true)"
 if [ -z "$AUDIT_HOST" ]; then AUDIT_HOST='tower.tarpon-drum.ts.net'; fi
@@ -106,7 +108,7 @@ isolated() {
 }
 
 printf '\n=== 3. Native server route compatibility / security preflight ===\n'
-if isolated python -B /checks/prepare-native-review-patch.py --source-root /opt/adhd; then
+if isolated python -B /checks/prepare-native-review-patch.py --source-root /opt/adhd </dev/null; then
   pass 'Native server layout inspected; compatibility is not deployment approval'
 else
   warn 'Native server layout/auth source inspection failed'
@@ -115,7 +117,7 @@ fi
 printf '\n=== 4. Synthetic inbox / Caddy security regression suite ===\n'
 if isolated python -B -m unittest -q \
   test_audit_native_review_proxy test_prepare_native_review_patch \
-  test_native_review_http test_native_review_inbox; then
+  test_native_review_http test_native_review_inbox </dev/null; then
   pass 'Offline unit tests passed; installed user data not mounted'
 else
   warn 'Offline security and inbox unit tests did not pass'
@@ -131,7 +133,7 @@ if docker run --rm --pull never --network none --read-only \
   --env ADHD_STAGING_ONLY=1 \
   --mount "type=bind,src=$CODE_ROOT,dst=/opt/adhd,readonly" \
   --mount "type=bind,src=$stage,dst=/checks,readonly" \
-  "$IMAGE" python -B /checks/stage_native_local_intake.py; then
+  "$IMAGE" python -B /checks/stage_native_local_intake.py </dev/null; then
   pass 'Native task audit, backup, and duplicate safeguards passed with test data'
 else
   warn 'Disposable native Store rehearsal failed'
