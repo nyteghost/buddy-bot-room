@@ -94,6 +94,39 @@ class ProxyAuditTests(unittest.TestCase):
         for path in PATHS:
             self.assertEqual(result["paths"][path]["candidate_upstreams"], 0)
 
+    def test_nonmatching_host_reports_possible_mismatch_without_leaking_host(self):
+        conf = config(inject_token=True)
+        report = audit(conf, "different-private.example")
+        self.assertEqual(report["status"], "unverified_no_matching_route")
+        self.assertFalse(report["route_coverage_verified"])
+        for item in report["paths"].values():
+            self.assertEqual(item["candidate_upstreams"], 0)
+            self.assertEqual(item["any_host_proxy_route_candidates"], 1)
+            self.assertTrue(item["potential_hostname_mismatch"])
+        output = json.dumps(report)
+        self.assertNotIn(HOST, output)
+        self.assertNotIn(TOKEN, output)
+        self.assertNotIn(HASH, output)
+
+    def test_cli_exits_nonzero_when_no_route_matches_requested_host(self):
+        source = json.dumps(config(inject_token=True))
+        out, err = StringIO(), StringIO()
+        with patch("sys.stdin", StringIO(source)), patch("sys.stdout", out), patch("sys.stderr", err):
+            self.assertEqual(main(["--host", "not-the-browser-host.example"]), 3)
+        data = json.loads(out.getvalue())
+        self.assertFalse(data["route_coverage_verified"])
+        self.assertNotIn(HOST, out.getvalue() + err.getvalue())
+
+    def test_no_proxy_candidates_at_any_host_is_inconclusive(self):
+        conf = config(inject_token=True)
+        conf["apps"]["http"]["servers"]["srv0"]["routes"] = []
+        report = audit(conf, HOST)
+        self.assertFalse(report["route_coverage_verified"])
+        for item in report["paths"].values():
+            self.assertEqual(item["candidate_upstreams"], 0)
+            self.assertEqual(item["any_host_proxy_route_candidates"], 0)
+            self.assertFalse(item["potential_hostname_mismatch"])
+
     def test_unknown_matcher_is_ambiguous(self):
         conf = config(inject_token=True)
         conf["apps"]["http"]["servers"]["srv0"]["routes"][0]["match"] = [
