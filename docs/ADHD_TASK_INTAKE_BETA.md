@@ -311,3 +311,58 @@ The existing Pixel Pals → sidecar handoff bridge is unaffected by this issue; 
 The report includes `native_auth_contract`, confirming whether the code contains the local token, loopback Host restriction and loopback Origin restriction. It explicitly marks `caddy_proxy_behavior_verified: false`, `browser_write_routes_ready_for_deployment: false` and `live_installation_authorized: false`. Source compatibility is **not** proof that the remote browser origin will work through Caddy.
 
 On a read-only preflight failure, leave all running apps untouched; the next step is source review, not force-applying a patch. On a passing preflight, the next step is a **redacted Caddy header and authentication inspection**, not installation. Do not disclose the native session token, Caddy Basic Auth hashes, private task titles or memory contents in diagnostic output.
+
+
+## Offline Caddy route-security audit (November 6, 2026)
+
+The first user-run source preflight confirmed that the installed native server's route
+parsing is compatible and its local authorization still requires the private
+X-ADHD-Local-Token, loopback Host, and loopback Origin. The prior Caddy check
+detected Basic Auth and Host/Origin-rewrite keywords, but **did not detect**
+the native token forwarding header. These keyword observations were not a
+runtime authentication test and did not authorize installing the inbox.
+
+The new beta source audit lives at
+\`tools/adhd-v02/audit_native_review_proxy.py\` with its 12 synthetic regression
+tests and the operator wrapper \`tools/adhd-v02/run-native-proxy-audit.sh\`.
+The wrapper asks the existing Caddy container to **adapt its current
+configuration into JSON** and streams it, without recording or printing it,
+into a disposable Python container with no network, no user-data mounts,
+dropped capabilities, a read-only root filesystem, and no image pull.
+Only the boolean **structure** of the four native inbox routes is printed:
+whether the expected native loopback upstream is targeted; whether basic
+authentication is ordered ahead of reverse proxying; whether Host, Origin and
+local-token header rewrites are configured; and whether there is ambiguous
+dispatch. Unknown matchers, alternative routes, middleware, and missing
+protection are flagged as unverified. The checker **never outputs configured
+header values, Caddy Basic Auth hashes, user names, private hostnames or
+upstream addresses**.
+
+On the Unraid host, this read-only command runs the wrapper (no restart,
+install, new port, change to Caddy, or access to the user's task database):
+
+\`\`\`bash
+bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/nyteghost/buddy-bot-room/beta/tools/adhd-v02/run-native-proxy-audit.sh | bash'
+\`\`\`
+
+The hostname defaults to the currently observed Tailscale HTTPS name.
+To use a different Caddy hostname, save the wrapper locally and pass only the
+hostname as its first argument. **Do not paste Caddy's adapted JSON into chat
+or a terminal transcript**: it may contain private password hashes and tokens.
+The wrapper intentionally suppresses Caddy adapter stderr and does not log or
+save raw JSON. Its analysis can report false negatives when Caddy's route
+structure is more complex than the small supported set; it must never be used
+to automatically relax an existing authorization policy.
+
+**Static structure is not live verification.** In particular, the audit does
+not verify the actual token value, Basic Auth coverage on the live request path,
+origin-rewrite safety, header injection behavior, proxy reachability, or
+browser request/CSRF behavior. Every report explicitly contains
+\`live_installation_authorized: false\`. Do not inject the native session
+token into Caddy or install the review UI merely because some flags are true.
+
+Next: review the redacted structure result, select an explicitly scoped,
+secret-safe Caddy integration, and test authenticated and unauthenticated
+requests through an isolated HTTP/Caddy fixture. Only after a full
+backup/restore rehearsal and owner approval should a controlled, rollback-
+capable deployment to the existing LAN/Tailscale address be considered.
