@@ -28,6 +28,7 @@ def _route_matches(route: dict, path: str, host: str | None) -> bool | None:
     if not isinstance(rules, list) or not rules:
         return None
     any_unknown = False
+    has_known_match = False
     for rule in rules:
         if not isinstance(rule, dict):
             return None
@@ -48,8 +49,10 @@ def _route_matches(route: dict, path: str, host: str | None) -> bool | None:
         ok_path = paths is None or any(
             fnmatch.fnmatchcase(path, p) for p in paths)
         if ok_host and ok_path:
-            return True
-    return None if any_unknown else False
+            has_known_match = True
+    # OR branches with unsupported matchers might match a different host/path.
+    # A recognized branch must not conceal that uncertainty.
+    return None if any_unknown else has_known_match
 
 
 def _proxy_features(handler: dict) -> dict:
@@ -144,6 +147,10 @@ def audit(config: object, host: str) -> dict:
             "potential_hostname_mismatch": len(matches) == 0 and len(all_host_matches) > 0,
             "any_host_proxy_route_candidates": len(all_host_matches),
             "candidate_upstreams": len(matches),
+            "certain_upstream_candidates": sum(
+                not candidate.get("unknown") for candidate in matches),
+            "ambiguous_match_candidates": sum(
+                bool(candidate.get("unknown")) for candidate in matches),
             "basic_auth_before_proxy": bool(matches) and all(
                 m.get("basic_auth_before_proxy") is True for m in matches),
             "native_loopback_upstream": bool(matches) and all(
@@ -158,10 +165,32 @@ def audit(config: object, host: str) -> dict:
                 len(matches) == 1 and not matches[0].get("unknown")),
         }
     no_match = any(value["candidate_upstreams"] == 0 for value in checks.values())
+    # A possible match through an unknown Caddy matcher does NOT prove that
+    # the requested browser host is routed here. A duplicate route may bypass
+    # the inspected authentication chain. Both fail closed.
+    unambiguous = all(
+        value["route_structure_unambiguous"] for value in checks.values())
+    controls = (
+        "basic_auth_before_proxy", "native_loopback_upstream",
+        "host_rewrite_present", "origin_rewrite_present",
+        "native_token_header_injection_present",
+    )
+    # Marker presence is not a runtime security test or proof of header values.
+    complete_markers = unambiguous and all(
+        all(value[key] for key in controls) for value in checks.values())
+    if no_match:
+        status = "unverified_no_matching_route"
+    elif not unambiguous:
+        status = "unverified_ambiguous_routes"
+    elif not complete_markers:
+        status = "unverified_missing_security_controls"
+    else:
+        status = "static_control_markers_present_not_live_verified"
     return {
         "audit": "static_caddy_route_structure_only",
-        "status": "unverified_no_matching_route" if no_match else "static_routes_found_not_live_verified",
-        "route_coverage_verified": not no_match,
+        "status": status,
+        "route_coverage_verified": unambiguous,
+        "static_control_markers_complete": complete_markers,
         "paths": checks,
         "secret_values_disclosed": False,
         "credential_validation_performed": False,
@@ -180,9 +209,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = audit(json.load(sys.stdin), args.host)
         print(json.dumps(result, sort_keys=True))
-        # Fail closed when the selected browser host has no matching route.
-        # Zero candidates is NOT a successful auth or proxy check.
-        return 0 if result["route_coverage_verified"] else 3
+        # Fail closed for unmatched, ambiguous OR missing-security-marker
+        # routes. A successful static scan never authorizes deployment.
+        return 0 if result["static_control_markers_complete"] else 3
     except (ValueError, TypeError, KeyError, RecursionError, AttributeError):
         print("REFUSED: Caddy configuration could not be safely analyzed; no changes made.",
               file=sys.stderr)
