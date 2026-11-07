@@ -3,7 +3,8 @@ import type { CSSProperties } from "react";
 import { agentName, type AgentId } from "@/lib/agents";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { officePose, officeStations, headingOf, type Heading } from "@/lib/office-motion";
-import { worldPose, worldRoomPlan } from "@/lib/world-navigation";
+import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan } from "@/lib/world-navigation";
+import { clearWorldPresence, publishWorldPresence, useWorldFixtureUse } from "@/lib/world-presence";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
 import { ambientMotion, advanceMotionClock, type PalMotion } from "@/lib/pal-motion";
@@ -55,15 +56,23 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   const heading = active && walking ? headingOf(sceneHome.x - pose.x, sceneHome.y - pose.y) : pose.heading;
   // Seated whenever the pal is parked at its own desk chair.
   const seated = !themeWorld && (active ? working : !walking && x === sceneHome.x && y === sceneHome.y);
+  // Themed Living World rooms place Pals by their feet on a calibrated floor, sorted by depth.
   const position = {
     "--office-x": `${x}%`,
     "--office-y": `${y}%`,
+    ...(themeWorld ? { "--world-z": String(worldDepthZ(y)), "--world-depth-scale": String(worldDepthScale(y)) } : {}),
   } as CSSProperties;
+  const strolling = themeWorld && enabled && visible && !active && wandering;
+  useWorldFixtureUse("pal:" + id, mode, strolling && "fixture" in pose && pose.action === "work" ? pose.fixture : null);
+  useEffect(() => { if (themeWorld && enabled && visible) publishWorldPresence({ id: "pal:" + id, x, y, dwelling: !walking, at: Date.now() }); else clearWorldPresence("pal:" + id); }, [themeWorld, enabled, visible, id, x, y, walking, elapsed]);
+  useEffect(() => () => clearWorldPresence("pal:" + id), [id]);
+  const worldAction = themeWorld && "action" in pose && pose.action !== "walk" && pose.action !== "idle" ? pose.action : null;
   return (
     <div
       style={position}
       className={cn("scene-pal office-pal", `agent-${id}`, active && "office-assigned", working && "office-working", seated && "office-seated", seated && `office-seated-${station.facing}`, station.facing === "toward" && "office-front", walking && "office-walking", walking && !directional && `office-dir-${heading}`, directional && "office-directional", enabled && !active && !walking && seated && station.facing === "toward" && "office-idle", !directional && (walking ? heading.includes("w") : !active && pose.facingLeft) && "office-facing-left", !enabled && "pal-away")}
       data-activity={working ? "working" : walking ? "walking" : "idle"}
+      data-world-floor={themeWorld ? "feet" : undefined}
       role={world && enabled ? "button" : undefined}
       tabIndex={world && enabled ? 0 : undefined}
       onClick={world && enabled ? onInteract : undefined}
@@ -72,7 +81,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
       aria-label={`${displayLabel}: ${working ? "working" : walking ? "walking around the room" : "at a station"}${world&&enabled?". Activate to wave.":""}`}
     >
       {working && <div className="office-task-cue"><ThinkingProp id={id} mode={mode} /><span>{station.activity}</span></div>}
-      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? themeWorld && "action" in pose && pose.action==="wave" ? "wave" : ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
+      <div className="office-character"><PixelCharacter id={id} mode={mode} walking={walking && !reduced} motion={cue ?? (enabled && visible ? working ? "work" : playful && !low && !reduced ? worldAction ?? ambientMotion(id, Math.floor(elapsed / 6500)) : undefined : undefined)} pixelWorld={world} walkFrame={Math.floor(elapsed / 180) % 4} back={!directional && seated && station.facing === "away"} facing={facingOf(directional, active, walking, seated, station.facing, heading)} />{seated && station.facing === "away" && <ChairBack />}</div>
       <span>{displayLabel}</span>
     </div>
   );

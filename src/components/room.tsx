@@ -2090,7 +2090,7 @@ export function Room() {
             )}
             <RoomLive active={roomOpen} running={running} theme={characterMode} onInspect={(target)=>{if(livingWorld && roomOpen)setWorldCue({action:"inspect-prop",targetId:target,at:Date.now()});}} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})} />}
-            {livingWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
+            {livingWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
             {livingWorld && worldUniverse.characters.filter(c=>enabledWorldPacks.includes(c.id)).map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
             <div className="scene-top">
               <span>

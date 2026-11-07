@@ -115,3 +115,14 @@ subagents ran for this follow-up. Next: desktop/mobile visual acceptance of the
 prototype packs, additional supplied animation artwork, and richer environmental
 interactions. Full wave/celebration artwork and species-specific rigs remain
 unfinished; this gesture release does not claim to complete those features.
+
+## Claude increment — calibrated floor and natural movement (2026-11-07)
+
+Branch `claude/living-universe-hd256`. See "Calibrated floor, natural wandering and furniture use"
+in [LIVING_WORLD_2_BETA.md](LIVING_WORLD_2_BETA.md) for behaviour. Summary: per-theme feet-anchored
+floor plans measured from each backdrop, a deterministic multi-stop wander engine for Pals and guests,
+depth sorting/perspective/shadows, function shelf always on top, furniture glows when used, guest
+greetings, nearest-direction HD fallback, Focus Mode for built-in guests. No artwork, IDs, storage
+format, imports or ADHD/infrastructure files changed. Remaining: species-specific rigs, dynamic
+character-to-character avoidance, Green Jacket recalibration, additional private walk/wave/celebrate
+art, and owner device acceptance. CI results are recorded on the draft PR and Issue #23.
