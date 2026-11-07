@@ -68,9 +68,12 @@ def _verify_post(handler) -> None:
         raise PermissionError("Review request missing required same-origin header")
     if handler.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
         raise ValueError("Review endpoint requires JSON")
+    # Require browser fetch metadata, even when Caddy rewrites Origin to
+    # localhost upstream. Missing metadata is NOT evidence of same-origin.
+    # The self-hosted HTTPS inbox uses same-origin fetch() for write actions.
     site = handler.headers.get("Sec-Fetch-Site", "")
-    if site and site != "same-origin":
-        raise PermissionError("Cross-site review request rejected")
+    if site != "same-origin":
+        raise PermissionError("Same-origin browser request metadata required")
     origin = handler.headers.get("Origin")
     host = handler.headers.get("Host", "")
     if not isinstance(origin, str) or not origin or not host:
