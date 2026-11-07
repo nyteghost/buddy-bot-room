@@ -22,6 +22,8 @@ jobs:
           bash -n tools/adhd-v02/install-bridge-overlay.sh
           bash -n tools/adhd-v02/install-unified-stack.sh
           bash tools/adhd-v02/test-unified-compose.sh
+      - name: ADHD proxy route audit (synthetic, offline)
+        run: python3 -B -m unittest discover -s tools/adhd-v02 -p 'test_audit_native_review_proxy.py' -v
       - name: High and critical dependency security gate
         run: bun audit --audit-level high
       - name: TypeScript
