@@ -342,7 +342,7 @@ On the Unraid host, this read-only command runs the wrapper (no restart,
 install, new port, change to Caddy, or access to the user's task database):
 
 ```bash
-bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/nyteghost/buddy-bot-room/beta/tools/adhd-v02/run-native-proxy-audit.sh | bash'
+bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/nyteghost/buddy-bot-room/24b295dfa8596b88f737b57f1aba301bccb292d2/tools/adhd-v02/run-native-proxy-audit.sh | bash'
 ```
 
 The hostname defaults to the currently observed Tailscale HTTPS name.
