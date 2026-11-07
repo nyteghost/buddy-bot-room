@@ -11,6 +11,8 @@ import { WORLD_HD_DIRECTIONS, type WorldHdAction, type WorldHdDirection } from "
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { lowPower, useTabHidden } from "@/lib/power";
 import { worldHdFrameAt, worldHdCoverage } from "@/lib/world-hd-animation";
+import { WORLD_SKIN_PALS, clearWorldPalSkins, publishWorldSkinCharacters, setWorldPalSkin, useWorldPalSkins } from "@/lib/world-pal-skins";
+import { agentName } from "@/lib/agents";
 import "./world-character-library.css";
 
 export function WorldPixelPreview({pixels,palette,name}:{pixels:readonly string[];palette:Record<string,string>;name:string}){
@@ -207,6 +209,8 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
   }catch(error){setMessage(error instanceof Error?error.message:"Character import failed.");}
   finally{setInstalling(false);}
  };
+ const palSkins=useWorldPalSkins();
+ useEffect(()=>{publishWorldSkinCharacters(customCharacters);},[customCharacters]);
  return <details className="world-character-library">
   <summary>Character Universe · {worldCharacterPacks.length} built-in visitors · {customCharacters.length} creations · {active} active</summary>
   <div className="world-library-body">
@@ -245,6 +249,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
      <Button type="button" size="sm" variant="outline" disabled={installing} onClick={()=>{requestNumber.current++;setZipPack(null);setSelected([]);setUpdates([]);setMessage("Import cancelled.");}}>Cancel</Button>
     </div>
    </section>}
+   {Object.keys(palSkins).length>0&&<p className="text-xs world-pal-skin-note" role="status">HD looks on {Object.keys(palSkins).length} Pal(s) in Living World on this device. Names, personalities and memories are unchanged. <Button type="button" size="sm" variant="outline" onClick={()=>{clearWorldPalSkins();setMessage("All Pals restored to their original look.");}}>Restore original Pal looks</Button></p>}
    {editor&&<CharacterEditor key={editor.id} initial={editor} onSave={onSave} onCancel={()=>setEditor(null)}/>}
    <div className="world-library-grid">
     {builtins.map(({pack,pixels,palette})=>{
@@ -265,6 +270,12 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
       <div className="world-library-card-controls">
        <Button size="sm" variant={on?"default":"outline"} aria-pressed={on} aria-label={(on?"Disable ":"Enable ")+character.name} onClick={()=>toggle(character.id)}>{on?"In room":"Add"}</Button>
        {hasSignature&&<Button type="button" size="sm" variant="outline" disabled={!on||actionsPaused} aria-label={"Signature action for "+character.name} onClick={()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:character.id,action:"signature"}}))}>Signature</Button>}
+       {(character.hd||character.hd3)&&<label className="world-pal-skin-select text-xs">Look for a Pal
+        <select aria-label={"Use "+character.name+" as the look for a Pal"} value={Object.entries(palSkins).find(([,value])=>value===character.id)?.[0]??""}
+         onChange={event=>{const pal=event.target.value;const current=Object.entries(palSkins).find(([,value])=>value===character.id)?.[0];if(current&&current!==pal)setWorldPalSkin(current,null);if(pal)setWorldPalSkin(pal,character.id);}}>
+         <option value="">None</option>
+         {WORLD_SKIN_PALS.map(pal=><option key={pal} value={pal}>{agentName(pal,false)}</option>)}
+        </select></label>}
        {!character.hd&&!character.hd3&&<Button size="sm" variant="ghost" aria-label={"Edit "+character.name} onClick={()=>setEditor(character)}><Pencil className="size-3.5"/></Button>}
        <Button size="sm" variant="ghost" aria-label={"Delete "+character.name} onClick={async()=>{
         if(window.confirm("Remove "+character.name+" from your Character Library? Export a backup first if you want to reinstall it later.")){

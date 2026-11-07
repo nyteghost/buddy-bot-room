@@ -2788,3 +2788,10 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
 .room-scene.living-world .world-guest:hover .world-label-hidden,.room-scene.living-world .world-guest:focus-within .world-label-hidden,
 .room-scene.living-world .office-pal:hover > .world-label-hidden,.room-scene.living-world .office-pal:focus-visible > .world-label-hidden{opacity:1;}
 @media(prefers-reduced-motion:reduce){.room-scene.living-world .world-guest-name,.room-scene.living-world .office-pal[data-world-floor] > span{transition:none;}}
+
+/* Opt-in HD256 looks for the original Pals (Living World only). */
+.room-scene.living-world .office-character.world-pal-hd,.room-scene.living-world .office-pal[data-world-floor] .office-character.world-pal-hd{width:auto;height:auto;display:flex;align-items:flex-end;justify-content:center;}
+.room-scene.living-world .world-pal-hd-art{display:block;object-fit:contain;object-position:50% 100%;}
+.room-scene.living-world .world-pal-hd-art.world-hd-crisp{image-rendering:pixelated;}
+.world-pal-skin-select{display:flex;align-items:center;gap:4px;}
+.world-pal-skin-select select{font-size:11px;max-width:110px;background:var(--background);color:var(--foreground);border:1px solid var(--border);border-radius:4px;}

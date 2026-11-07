@@ -52,3 +52,32 @@ describe("Living World calibrated floor in the room",()=>{
   expect(portal.getAttribute("data-active")).toBe("false");
  });
 });
+
+import {fireEvent} from "@testing-library/react";
+import {WorldCharacterLibrary} from "@/components/world-character-library";
+import {WorldHdSkin} from "@/components/world-hd-skin";
+import {clearWorldPalSkins,getWorldPalSkins,WORLD_PAL_SKINS_KEY} from "@/lib/world-pal-skins";
+import {starterCustomCharacter} from "@/lib/world-custom-packs";
+describe("reversible HD looks for the original Pals",()=>{
+ const look={...starterCustomCharacter(),id:"user-hdlook0002",name:"Test Look",hd3:{version:1,artStatus:"prototype" as const,movement:"humanoid" as const,directions:{s:{idle:{frames:[{src:"front-idle",durationMs:100}],loop:true}},e:{idle:{frames:[{src:"east-idle",durationMs:100}],loop:true},walk:{frames:[{src:"east-walk",durationMs:100}],loop:true}}}}};
+ const props={enabledIds:[],customCharacters:[look],syncStatus:"Saved",onToggle:()=>{},onSave:async()=>true,onDelete:async()=>true,onInstallPack:async()=>true};
+ it("assigns a look to a Pal from the Library, stores it on this device and restores in one click",()=>{
+  clearWorldPalSkins();
+  render(<WorldCharacterLibrary {...props}/>);
+  fireEvent.change(screen.getByLabelText("Use Test Look as the look for a Pal"),{target:{value:"nova"}});
+  expect(getWorldPalSkins()).toEqual({nova:"user-hdlook0002"});
+  expect(JSON.parse(localStorage.getItem(WORLD_PAL_SKINS_KEY)!)).toEqual({nova:"user-hdlook0002"});
+  fireEvent.click(screen.getByRole("button",{name:"Restore original Pal looks"}));
+  expect(getWorldPalSkins()).toEqual({});
+  expect(screen.getByLabelText("Use Test Look as the look for a Pal")).toHaveProperty("value","");
+ });
+ it("draws the Pal with the chosen look's supplied facing and clip, and marks fallbacks",()=>{
+  const walking=render(<WorldHdSkin character={look} name="Nova" facing="e" motion={undefined} walking elapsed={0}/>);
+  const art=walking.container.querySelector("img")!;
+  expect(art.getAttribute("src")).toBe("east-walk");expect(art.hasAttribute("data-hd-fallback")).toBe(false);
+  expect(art.getAttribute("alt")).toBe("Nova in Test Look look");
+  walking.unmount();
+  const borrowed=render(<WorldHdSkin character={look} name="Nova" facing="w" motion="wave" walking={false} elapsed={0}/>);
+  expect(borrowed.container.querySelector("img")?.getAttribute("data-hd-fallback")).toBe("facing+clip");
+ });
+});
