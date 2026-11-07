@@ -323,8 +323,8 @@ the native token forwarding header. These keyword observations were not a
 runtime authentication test and did not authorize installing the inbox.
 
 The new beta source audit lives at
-\`tools/adhd-v02/audit_native_review_proxy.py\` with its 12 synthetic regression
-tests and the operator wrapper \`tools/adhd-v02/run-native-proxy-audit.sh\`.
+`tools/adhd-v02/audit_native_review_proxy.py` with its 12 synthetic regression
+tests and the operator wrapper `tools/adhd-v02/run-native-proxy-audit.sh`.
 The wrapper asks the existing Caddy container to **adapt its current
 configuration into JSON** and streams it, without recording or printing it,
 into a disposable Python container with no network, no user-data mounts,
@@ -341,9 +341,9 @@ upstream addresses**.
 On the Unraid host, this read-only command runs the wrapper (no restart,
 install, new port, change to Caddy, or access to the user's task database):
 
-\`\`\`bash
+```bash
 bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/nyteghost/buddy-bot-room/beta/tools/adhd-v02/run-native-proxy-audit.sh | bash'
-\`\`\`
+```
 
 The hostname defaults to the currently observed Tailscale HTTPS name.
 To use a different Caddy hostname, save the wrapper locally and pass only the
@@ -358,7 +358,7 @@ to automatically relax an existing authorization policy.
 not verify the actual token value, Basic Auth coverage on the live request path,
 origin-rewrite safety, header injection behavior, proxy reachability, or
 browser request/CSRF behavior. Every report explicitly contains
-\`live_installation_authorized: false\`. Do not inject the native session
+`live_installation_authorized: false`. Do not inject the native session
 token into Caddy or install the review UI merely because some flags are true.
 
 Next: review the redacted structure result, select an explicitly scoped,
