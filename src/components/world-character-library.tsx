@@ -10,7 +10,7 @@ import { planCharacterAddonInstall } from "@/lib/character-addon";
 import { WORLD_HD_DIRECTIONS, type WorldHdAction, type WorldHdDirection } from "@/lib/world-hd";
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { lowPower, useTabHidden } from "@/lib/power";
-import { worldHdFrameAt } from "@/lib/world-hd-animation";
+import { worldHdFrameAt, worldHdCoverage } from "@/lib/world-hd-animation";
 import "./world-character-library.css";
 
 export function WorldPixelPreview({pixels,palette,name}:{pixels:readonly string[];palette:Record<string,string>;name:string}){
@@ -233,6 +233,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
         onChange={event=>setSelected(list=>event.target.checked?[...list,character.id]:list.filter(id=>id!==character.id))}/><strong>{character.name}</strong></label>
        {character.hd3?<HdCharacterPreview character={character} paused={paused}/>:<CharacterArt character={character}/>}
        <p className="text-xs">{existing?"Already installed":"Ready to install"}{character.hd3?" · Version "+character.hd3.version:""}</p>
+       {character.hd3&&<p className="text-xs text-muted-foreground world-hd-coverage" data-facings={worldHdCoverage(character.hd3).facings}>{worldHdCoverage(character.hd3).summary}</p>}
        {canUpdate&&<label className="world-import-selection"><input type="checkbox" aria-label={"Update "+character.name} checked={updates.includes(character.id)} disabled={installing}
         onChange={event=>setUpdates(list=>event.target.checked?[...list,character.id]:list.filter(id=>id!==character.id))}/>Update version {existing!.hd3?.version??0} to {character.hd3!.version}</label>}
       </article>;
@@ -259,7 +260,8 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
      const hasSignature=character.hd3&&Object.values(character.hd3.directions).some(actions=>actions?.signature);
      return <article className="world-library-card" key={character.id}>
       <CharacterArt character={character}/>
-      <div className="min-w-0 flex-1"><strong className="text-xs">{character.name}</strong><p className="text-xs text-muted-foreground">{character.hd3?"HD256 · v"+character.hd3.version+" · "+(character.hd3.artStatus==="prototype"?"Prototype":"Pack marked production-approved"):character.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p></div>
+      <div className="min-w-0 flex-1"><strong className="text-xs">{character.name}</strong><p className="text-xs text-muted-foreground">{character.hd3?"HD256 · v"+character.hd3.version+" · "+(character.hd3.artStatus==="prototype"?"Prototype":"Pack marked production-approved"):character.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p>
+       {character.hd3&&<details className="world-hd-coverage-details"><summary className="text-xs">What this pack includes</summary><p className="text-xs text-muted-foreground world-hd-coverage" data-facings={worldHdCoverage(character.hd3).facings}>{worldHdCoverage(character.hd3).summary}</p></details>}</div>
       <div className="world-library-card-controls">
        <Button size="sm" variant={on?"default":"outline"} aria-pressed={on} aria-label={(on?"Disable ":"Enable ")+character.name} onClick={()=>toggle(character.id)}>{on?"In room":"Add"}</Button>
        {hasSignature&&<Button type="button" size="sm" variant="outline" disabled={!on||actionsPaused} aria-label={"Signature action for "+character.name} onClick={()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:character.id,action:"signature"}}))}>Signature</Button>}

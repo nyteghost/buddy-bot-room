@@ -84,7 +84,8 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
   window.addEventListener("pixel-pals:hd-action", receive);
   return () => window.removeEventListener("pixel-pals:hd-action", receive);
  }, [animate, signature, character.id, character.hd3, facing, elapsed]);
- return <div className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? facing} data-movement={gait} data-paused={!animate}>
+ return <div className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? facing} data-movement={gait} data-paused={!animate}
+  data-hd-fallback={selected ? [selected.direction !== facing && "facing", selected.action !== kind && "clip"].filter(Boolean).join("+") || undefined : undefined}>
   <button type="button" className="world-custom-actor" aria-label={"Wave to " + character.name}
    title={signature ? "Tap to wave. Shift-click or press S for signature action." : "Tap to wave"}
    onClick={event => trigger(signature && event.shiftKey ? "signature" : "wave")}

@@ -83,6 +83,17 @@ describe("HD256 runtime",()=>{
   act(()=>vi.advanceTimersByTime(100));
   expect(parseFloat(actor.style.getPropertyValue("--world-guest-x"))-parseFloat(x)).toBeCloseTo(0.1);
  });
+ it("marks in the room when art is borrowed from another facing or clip, and not when it is supplied",()=>{
+  const full=render(<WorldCustomGuest character={character()} index={0} theme="normal" active/>);
+  expect(full.container.querySelector(".world-custom-guest")?.hasAttribute("data-hd-fallback")).toBe(false);
+  full.unmount();
+  const frontOnly={...character(),hd3:{...art,directions:{s:{idle:clip(["south"])}}}};
+  const view=render(<WorldCustomGuest character={frontOnly} index={0} theme="normal" active/>);
+  const actor=view.container.querySelector(".world-custom-guest")!;
+  expect(actor.getAttribute("data-hd-fallback")).toBe("facing+clip");
+  expect(actor.getAttribute("data-facing")).toBe("s");
+  expect(screen.getByRole("img").getAttribute("src")).toBe("south");
+ });
  it("previews directions and timed actions, preserving the frame on pause",()=>{
   vi.useFakeTimers();render(<HdCharacterPreview character={character()}/>);
   fireEvent.change(screen.getByLabelText("Test Hero preview facing"),{target:{value:"e"}});
