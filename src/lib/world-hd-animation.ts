@@ -12,7 +12,8 @@ export function worldHdNeighbours(direction: WorldHdDirection): WorldHdDirection
  * Pick supplied artwork for a facing and action. Directional art is never synthesized or mirrored:
  * 1. that direction's own clip; 2. if the pack has no art at all for that direction, the same action
  * from a direction 45° away (e.g. east walk for a south-east step); 3. that direction's idle;
- * 4. a 45°-neighbour's idle; 5. south idle.
+ * 4. a 45°-neighbour's idle; 5. if the pack has no art near that facing, the south clip for the
+ * same action (front-only packs keep walking instead of sliding); 6. south idle.
  */
 export function selectWorldHdClip(character: WorldHdCharacter, direction: WorldHdDirection, action: WorldHdAction) {
  const facing = character.directions[direction];
@@ -27,6 +28,10 @@ export function selectWorldHdClip(character: WorldHdCharacter, direction: WorldH
   const clip = character.directions[other]?.idle;
   if (clip) return { clip, direction: other, action: "idle" as const };
  }
+ // Front-only packs: keep the supplied front-facing motion (e.g. a south walk while crossing the room)
+ // rather than sliding a frozen idle.
+ const front = facing ? undefined : character.directions.s?.[action];
+ if (front) return { clip: front, direction: "s" as const, action };
  return { clip: character.directions.s!.idle!, direction: "s" as const, action: "idle" as const };
 }
 

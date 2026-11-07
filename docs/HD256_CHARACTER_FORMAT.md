@@ -56,6 +56,8 @@ The production-approved label additionally requires idle for all eight direction
 Missing action artwork falls back to that direction's idle, then south idle.
 When a pack has no art at all for a facing, the room first borrows the same action
 from a supplied direction 45° away (nearer the front first), then that neighbour's idle.
+A pack with no art near that facing (e.g. front-only) uses its south clip for the same action
+before south idle, so a front-only walk keeps stepping instead of sliding.
 The renderer does not mirror or invent directional frames. Supporting an action
 in the format does not mean every room behavior currently triggers it.
 

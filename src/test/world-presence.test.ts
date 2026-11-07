@@ -52,6 +52,9 @@ describe("HD256 nearest supplied direction",()=>{
   expect(selectWorldHdClip(art,"n","walk")).toMatchObject({direction:"n",action:"idle"});
   expect(selectWorldHdClip(art,"w","walk").clip.frames[0]!.src).toBe("s-idle");
   expect(worldHdNeighbours("se")).toEqual(["s","e"]);
+  const frontOnly:WorldHdCharacter={version:1,artStatus:"prototype",movement:"humanoid",directions:{s:{idle:clip("s-idle"),walk:clip("s-walk")}}};
+  expect(selectWorldHdClip(frontOnly,"e","walk")).toMatchObject({direction:"s",action:"walk"});
+  expect(selectWorldHdClip(frontOnly,"e","wave")).toMatchObject({direction:"s",action:"idle"});
   expect(worldHdNeighbours("n")).toHaveLength(2);
  });
 });
