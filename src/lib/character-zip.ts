@@ -130,7 +130,7 @@ function hdCharacter(raw:unknown,files:Map<string,Uint8Array>):WorldCustomCharac
 function directionalCharacter(raw:unknown,files:Map<string,Uint8Array>,cache:Map<string,string>):WorldCustomCharacter{
  if(!raw||typeof raw!=="object"||Array.isArray(raw))throw Error("Invalid HD character definition.");
  const c=raw as Record<string,unknown>;
- if(Object.keys(c).some(key=>!["id","name","resolution","revision","artStatus","description","movement","directions"].includes(key))||c["resolution"]!==256)
+ if(Object.keys(c).some(key=>!["id","name","resolution","revision","artStatus","description","movement","height","directions"].includes(key))||c["resolution"]!==256)
   throw Error("Unsupported HD character metadata or resolution.");
  if(!c["directions"]||typeof c["directions"]!=="object"||Array.isArray(c["directions"]))throw Error("HD character directions are required.");
  const directions:Record<string,unknown>={};
@@ -162,7 +162,7 @@ function directionalCharacter(raw:unknown,files:Map<string,Uint8Array>,cache:Map
   }
   directions[direction]=actions;
  }
- const candidate={...starterCustomCharacter(),id:c["id"],name:c["name"],hd3:{version:c["revision"],artStatus:c["artStatus"],movement:c["movement"],directions,...(c["description"]===undefined?{}:{description:c["description"]})}};
+ const candidate={...starterCustomCharacter(),id:c["id"],name:c["name"],hd3:{version:c["revision"],artStatus:c["artStatus"],movement:c["movement"],...(c["height"]===undefined?{}:{height:c["height"]}),directions,...(c["description"]===undefined?{}:{description:c["description"]})}};
  const validated=validateCustomCharacter(candidate);
  if(!validated)throw Error("Invalid HD character metadata, missing front idle, or excessive animation data.");
  return validated;

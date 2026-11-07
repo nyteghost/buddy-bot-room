@@ -2795,3 +2795,28 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
 .room-scene.living-world .world-pal-hd-art.world-hd-crisp{image-rendering:pixelated;}
 .world-pal-skin-select{display:flex;align-items:center;gap:4px;}
 .world-pal-skin-select select{font-size:11px;max-width:110px;background:var(--background);color:var(--foreground);border:1px solid var(--border);border-radius:4px;}
+
+/* One in-room scale for the whole cast (src/lib/world-scale.ts, owner/PM feedback 2026-11-07).
+   Every native sprite pixel is one --world-pixel in every room (office included), an adult stands
+   35 world pixels tall, and every actor's lowest foot pixel touches its floor anchor. */
+.room-scene.living-world .office-pal:not([data-world-floor]) .office-character:not(.world-pal-hd){width:calc(32 * var(--world-pixel));height:calc(38 * var(--world-pixel));}
+.room-scene.living-world .office-pal .office-character > .pixel-character.world-native-sprite{width:100%;height:100%;}
+/* Directional frames already animate the legs; replace the classic stride tilt (which blurs square
+   pixels) with a one-world-pixel step. Low power / hidden tab / reduced motion rules still win. */
+.room-scene.living-world .office-walking .office-character > svg.world-native-sprite{animation:world-pal-step .36s steps(2) infinite;}
+@keyframes world-pal-step{50%{transform:translateY(calc(-1 * var(--world-pixel, 2px)))}}
+.room-scene.living-world .world-visitor-sprite{width:calc(32 * var(--world-pixel));height:calc(38 * var(--world-pixel));}
+/* HD canvas lowered by its measured transparent margin so the feet, not the canvas edge, meet the floor. */
+.room-scene.living-world .world-custom-guest .world-guest-hd-pixels,.room-scene.living-world .world-pal-hd-art{margin-bottom:calc(-1 * var(--world-hd-foot, 0px));}
+/* Quieter name tags: small, borderless, translucent; full strength on hover or keyboard focus. */
+.room-scene.living-world .office-pal > span,.room-scene.living-world .world-guest-name,.room-scene.living-world .world-visitor-label{
+ font:7px/1.25 "Silkscreen",monospace;padding:1px 3px;border:0;border-radius:2px;background:rgb(10 13 20 / .58);opacity:.82;max-width:96px;overflow:hidden;text-overflow:ellipsis;}
+.room-scene.living-world .office-pal > span{color:color-mix(in srgb,var(--agent-color) 78%,#fff);}
+.room-scene.living-world .world-guest-name,.room-scene.living-world .world-visitor-label{color:#ecebf3;}
+.room-scene.living-world .office-pal:hover > span:not(.world-label-hidden),.room-scene.living-world .office-pal:focus-visible > span:not(.world-label-hidden),
+.room-scene.living-world .world-guest:hover .world-guest-name:not(.world-label-hidden),.room-scene.living-world .world-guest:focus-within .world-guest-name:not(.world-label-hidden){opacity:1;background:rgb(10 13 20 / .86);}
+@media(max-width:700px){.room-scene.living-world .office-pal > span,.room-scene.living-world .world-guest-name,.room-scene.living-world .world-visitor-label{font-size:6px;max-width:72px;padding:1px 2px;}}
+/* Covered labels stay hidden (world-presence.ts) unless their own actor is hovered or focused. */
+.room-scene.living-world .office-pal > span.world-label-hidden,.room-scene.living-world .world-guest .world-guest-name.world-label-hidden{opacity:0;}
+.room-scene.living-world .office-pal:hover > span.world-label-hidden,.room-scene.living-world .office-pal:focus-visible > span.world-label-hidden,
+.room-scene.living-world .world-guest:hover .world-guest-name.world-label-hidden,.room-scene.living-world .world-guest:focus-within .world-guest-name.world-label-hidden{opacity:1;}

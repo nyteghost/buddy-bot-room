@@ -1,3 +1,4 @@
+import type { WorldHeightClass } from "@/lib/world-scale";
 import type { WorldHdAction, WorldHdCharacter, WorldHdClip, WorldHdDirection } from "./world-hd";
 
 const COMPASS: readonly WorldHdDirection[] = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
@@ -67,6 +68,9 @@ export type WorldHdCoverage = {
  poses: WorldHdAction[];
  /** Room actions with no art at all (the room shows idle instead). */
  missing: WorldHdAction[];
+ /** Declared in-room height class, or "adult" by default. */
+ height: WorldHeightClass;
+ heightDeclared: boolean;
  summary: string;
 };
 /** Honest, owner-facing description of what an HD256 pack actually contains. */
@@ -85,5 +89,7 @@ export function worldHdCoverage(character: WorldHdCharacter): WorldHdCoverage {
  if (animated.length) parts.push("animated: " + animated.join(", "));
  if (poses.length) parts.push("single poses: " + poses.join(", "));
  if (missing.length) parts.push("missing: " + missing.join(", ") + " (room uses idle or a nearby facing)");
- return { status: character.artStatus, facings, walkingFacings, animated, poses, missing, summary: parts.join(" · ") };
+ const height = character.height ?? "adult";
+ parts.push(character.height ? `in-room height: ${height}` : "in-room height: adult (default)");
+ return { status: character.artStatus, facings, walkingFacings, animated, poses, missing, height, heightDeclared: !!character.height, summary: parts.join(" · ") };
 }

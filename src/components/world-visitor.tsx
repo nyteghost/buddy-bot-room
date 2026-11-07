@@ -7,9 +7,14 @@ import { worldFacingSprite } from "@/lib/world-facing-sprites";
 import { worldReactionFrame } from "@/lib/world-animation";
 import type { CharacterMode } from "@/lib/hellraiser";
 import { worldDepthZ } from "@/lib/world-floor";
+import { WORLD_LEG_EXTENSION, worldLegStart, worldTallSprite } from "@/lib/world-proportions";
+import { worldGridFoot, worldGroundGrid } from "@/lib/world-scale";
 import { greenJacketPalette, greenJacketPose, greenJacketSprite, worldHideoutForTheme, worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs";
 
 const originalArt=greenJacketSprite();
+const visitorLegRow=worldLegStart(originalArt);
+const tallVisitor=(grid:readonly string[])=>worldTallSprite(grid,WORLD_LEG_EXTENSION.humanoid,visitorLegRow);
+const standingFoot=worldGridFoot(tallVisitor(originalArt));
 /** Purely visual visitor, independent from AI-agent identities and permissions. */
 export function GreenJacketVisitor({ active, theme, cue }: { active:boolean; theme:CharacterMode; cue?:WorldRoomCue }) {
   const [elapsed,setElapsed]=useState(0);
@@ -28,13 +33,15 @@ export function GreenJacketVisitor({ active, theme, cue }: { active:boolean; the
   const pose=greenJacketPose(time);
   const frame=pose.walking?Math.floor(time/150)%4:0;
   const reaction=worldCueReaction(cue,"green-jacket",Date.now(),reduced||low);
-  const runs=useMemo(()=>spriteRuns(reaction?worldReactionFrame(originalArt,pose.facing,reaction):worldFacingSprite(originalArt,pose.facing,frame),(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[pose.facing,frame,reaction?.action,reaction?.frame]);
+  // Same in-room scale as the Pals (world-scale.ts): adult legs, feet on the bottom edge, one world pixel per art pixel.
+  const grid=useMemo(()=>worldGroundGrid(tallVisitor(reaction?worldReactionFrame(originalArt,pose.facing,reaction):worldFacingSprite(originalArt,pose.facing,frame)),standingFoot),[pose.facing,frame,reaction?.action,reaction?.frame]); // eslint-disable-line react-hooks/exhaustive-deps
+  const runs=useMemo(()=>spriteRuns(grid,(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[grid]);
   // Center-anchored sprite: its feet sit roughly 8% lower than its position, which sets its depth.
   const style={"--world-visitor-x":pose.x+"%","--world-visitor-y":pose.y+"%","--world-visitor-scale":String(pose.scale),"--world-z":String(worldDepthZ(pose.y+8)),opacity:pose.opacity} as CSSProperties;
   return <>
     <div className={"world-visitor-hideout world-hideout-"+worldHideoutForTheme(theme)} style={{"--world-z":String(worldDepthZ(76))} as CSSProperties} aria-hidden="true"/>
     <div className="world-visitor" style={style} data-action={reaction?.action??pose.action} role="img" aria-label="Green Jacket Guy, an animated visual room visitor">
-      <svg className="world-visitor-sprite" viewBox="0 0 32 32" shapeRendering="crispEdges" aria-hidden="true">
+      <svg className="world-visitor-sprite" viewBox={"0 0 32 "+grid.length} preserveAspectRatio="xMidYMax meet" shapeRendering="crispEdges" aria-hidden="true">
         {runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={greenJacketPalette[r.c]??"transparent"}/>)}
       </svg>
       <span className="world-visitor-label">Green Jacket</span>

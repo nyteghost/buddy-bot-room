@@ -345,7 +345,7 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   const rig = page.locator('.room-scene .world-native-sprite').first();
   await rig.waitFor({ state: "visible" });
   // Native 32px-wide models; Living World may add whole leg rows for adult proportions (e.g. 32×38).
-  if (!/^0 0 32 (3[2-9]|4[0-4])$/.test(await rig.getAttribute("viewBox") ?? "")) throw Error("Living World lost native 32px pixel models");
+  if (!/^0 0 32 (2[4-9]|3[0-9]|4[0-4])$/.test(await rig.getAttribute("viewBox") ?? "")) throw Error("Living World lost native 32px pixel models");
   const animated = await rig.evaluate(e => e.getAnimations({ subtree: true }).some(animation => animation.playState === "running"));
   if (!animated) throw Error("Playful Living World poses are not animating");
   await page.emulateMedia({ reducedMotion: "reduce" });

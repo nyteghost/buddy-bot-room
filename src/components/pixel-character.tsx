@@ -6,6 +6,7 @@ import type { AgentId } from "@/lib/agents";
 import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
 import { WORLD_LEG_EXTENSION, worldLegRow, worldPalBody, worldTallSprite } from "@/lib/world-proportions";
+import { worldGroundGrid, worldStandingFoot } from "@/lib/world-scale";
 import { spriteRuns, to128 } from "@/lib/sprite-upscale";
 import { facingArt, hasFacingArt, palArt, type Facing } from "@/lib/pal-art";
 import { worldAnimatedFrame } from "@/lib/world-animation";
@@ -47,7 +48,9 @@ export function PixelCharacter({
     const front = characterSprite(id, mode);
     const source = pixelWorld ? worldAnimatedFrame(front, facing ?? (back ? "n" : "s"), pose ?? "idle", walkFrame, id === "mimic") : back ? backView(front) : front;
     // Living World only: adult proportions by lengthening legs with the sprite's own leg row (square pixels kept).
-    const grid = pixelWorld ? worldTallSprite(source, WORLD_LEG_EXTENSION[worldPalBody(id)], worldLegRow(mode + ":" + id, () => front)) : to128(source);
+    // Feet on the floor anchor: drop transparent rows under the standing foot line (world-scale.ts).
+    const tall = (grid: readonly string[]) => worldTallSprite(grid, WORLD_LEG_EXTENSION[worldPalBody(id)], worldLegRow(mode + ":" + id, () => front));
+    const grid = pixelWorld ? worldGroundGrid(tall(source), worldStandingFoot(mode + ":" + id, () => tall(front))) : to128(source);
     const feetY = pixelWorld ? 24 : 96;
     const middleX = pixelWorld ? 16 : 64;
     return { runs: spriteRuns(grid, (x, y) => y < feetY ? "body" : x < middleX ? "left-leg" : "right-leg"), rows: grid.length };

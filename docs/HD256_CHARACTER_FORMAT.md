@@ -47,6 +47,7 @@ select one individual pack in Character Universe.
 | `artStatus` | `prototype` or `production-approved`. The latter is the pack author's label, not independent app certification. |
 | `description` | Optional, up to 1200 characters; no controls or angle brackets. |
 | `movement` | `humanoid`, `quadruped`, `flying`, `floating`, `rolling`. Currently descriptive; species-specific route rigs are unfinished. |
+| `height` | Optional in-room height: `tiny` (0.4×), `small` (0.6×), `child` (0.8×), `adult` (default, 1×), `tall` (1.15×), `huge` (1.5×) of a standard adult. Use it for intentional exceptions (pets, spirits, dragons). Needs the app build from PR #24 or later; older builds reject unknown fields. |
 | Directions | `s`, `se`, `e`, `ne`, `n`, `nw`, `w`, `sw`. South is front-facing. |
 | Actions | `idle`, `walk`, `run`, `turn`, `talk`, `wave`, `celebrate`, `emote`, `signature`, `rest`, `interaction`. |
 | Clip | Nonempty `frames` plus a boolean `loop`. Each frame has only `file` and integer `durationMs` (40–10,000ms). |
@@ -120,26 +121,48 @@ names map to the closest Pixel Pals action (e.g. `laugh`/`roar` → celebrate, `
 movers without `walk` use `roll`, `glide`, `fly` or `hover` as their walk clip. The conversion report
 lists unmapped and missing actions. Generated packs contain private art: keep them out of git.
 
-## Render-scale rules for crisp pixel art (owner art direction, 2026-11-07)
+## In-room scale: one height, one foot line, one pixel density (owner/PM feedback, 2026-11-07)
 
-The approved style is crisp, visibly square pixels. Packs stay 256×256 PNGs, but the room only
-keeps pixels crisp when each art pixel covers a whole number of screen (device) pixels:
+Every Living World actor shares one scale (`src/lib/world-scale.ts`). The unit is the **world
+pixel**: one native Pal sprite pixel, drawn at 2 css px on desktop (1.6 at 1.25×), 1.5 css px on 2×
+phones and 1.333 css px on 3× phones. A **standard adult stands 35 world pixels tall** (top of head
+to lowest foot pixel): 70 css px on desktop, ≈47 css px on a 3× iPhone. Native Pals already measure
+35. The room never stretches one axis, never picks a per-character fudge factor and never hides a
+character's declared size.
 
-- **Draw on a coarser master grid and enlarge by an integer with nearest-neighbour.** Recommended:
-  a 64×64 master enlarged 4× (also accepted: 128×128 at 2×, 32×32 at 8×, 16×16 at 16×). No
-  smoothing, anti-aliased resize, sub-pixel offset or soft shadow on the 256 canvas, otherwise the
-  block grid breaks and the room falls back to smooth scaling.
-- **The room detects the grid automatically** from the pack's south idle frame (blocks of 16, 8, 4
-  or 2 pixels; fully transparent pixels match each other). Grid art is drawn with
-  `image-rendering: pixelated` at the size closest to the room target (≈76 css px desktop, ≈48 css
-  px phone) that gives whole device pixels per art pixel. For a 64×64 master: 64 px on 1× and 2×
-  screens, ≈85 px on 3× iPhones (desktop); ≈43 px on 3× iPhones (phone layout). Painted art
-  (grid 1) is scaled smoothly and is not "crisp pixel" art.
-- **Feet on row 248 ±4** of the 256 canvas (row 62 of a 64 master), figure horizontally centred,
-  transparent margin above the head. Humanoids should fill about 85–92% of the canvas height so
-  mixed casts stand at similar heights.
-- Native 32px fallbacks use the same idea: one sprite pixel = 2 css px on desktop (1.6 at 1.25×),
-  1.5 css px on 2× phones and 1.333 css px on 3× phones.
+How HD256 art is placed:
+
+- **Measured, not guessed.** The room reads the pack's south idle frame once: pixel grid (blocks of
+  16, 8, 4 or 2), top opaque row, lowest opaque row (alpha > 16).
+- **Height.** The canvas is sized so the measured figure is `35 world px × height class` tall. Only
+  `height` (above) changes this; artwork whose figure fills more or less of the canvas still ends up
+  the standard height.
+- **Feet.** The canvas is lowered by its measured transparent margin under the feet, so the lowest
+  foot pixel touches the floor anchor exactly like a native Pal. Keep the baseline identical in every
+  frame and facing; walk bob belongs in the art, not in a shifting baseline.
+- **Crisp pixels.** Grid art snaps to a whole number of device pixels per art pixel when that keeps the
+  figure within 12.5% of its intended height; otherwise the exact height wins and the pack is drawn
+  pixelated at a non-integer size (slightly uneven pixel widths). Painted art (grid 1) is scaled
+  smoothly and will always read as a different, illustrated style next to pixel sprites.
+- **Perspective.** Floor rooms (control room, mansion, …) shrink everyone toward the back
+  (0.86–1.0×). Office rooms draw Pals at one fixed size, so visitors there do too.
+
+**Recommended authoring target (exact and crisp on 1×/2× desktops and 3× iPhones):** a 128×128
+master enlarged 2× (nearest-neighbour) to 256, an adult figure **70 master pixels tall** (twice the
+native Pals' 35, so HD art carries exactly 2× the native detail), feet on master row 123 (canvas rows
+246–247, bottom edge 248), head below master row 50 so hops, hair and raised arms have room.
+Smaller or larger figures still work but are rounded to the nearest crisp size or drawn at a
+non-integer scale, and the room reports the difference.
+
+| Master grid | Adult figure height | Result at standard height |
+| --- | --- | --- |
+| 128×128 (2×) | 70 px | exact, crisp everywhere (recommended) |
+| 64×64 (4×) | 62 px (e.g. Nova prototype) | crisp, 11% shorter than standard |
+| 64×64 (4×) | 35 px | exact, crisp, same chunky density as native Pals (no extra detail) |
+| painted 256 | any | exact height, smooth (not crisp pixel art) |
+
+Owner review shows these values per character (grid, figure rows, canvas size, % of target, crisp or
+not) in the private comparison page; they are a technical check, not art approval.
 
 ## HD looks for the original Pals
 

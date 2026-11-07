@@ -7,6 +7,8 @@
  * nearest-neighbour drop or double pixels unevenly. Painted (non-grid) art has no grid and is scaled
  * smoothly instead, and is labelled as such.
  */
+import type { WorldFrameMetrics } from "@/lib/world-scale";
+
 export const WORLD_HD_CANVAS = 256;
 const GRIDS = [16, 8, 4, 2] as const;
 
@@ -43,29 +45,45 @@ export function worldHdDisplaySize(target: number, devicePixelRatio: number, gri
  return Math.round((multiple * master / dpr) * 1000) / 1000;
 }
 
-const grids = new Map<string, Promise<number>>();
-/** Browser-only: detect (and cache) the pixel grid of one HD frame. Resolves 1 when it cannot decode. */
-export function worldHdFrameGrid(src: string): Promise<number> {
- let found = grids.get(src);
+/** Top and lowest opaque rows (alpha > 16) of an RGBA image; null when fully transparent. */
+export function worldAlphaBounds(data: ArrayLike<number>, width: number, height = width): { top: number; foot: number } | null {
+ if (width <= 0 || height <= 0 || data.length < width * height * 4) return null;
+ const row = (y: number) => { for (let x = 0; x < width; x++) if (data[(y * width + x) * 4 + 3]! > 16) return true; return false; };
+ let top = 0; while (top < height && !row(top)) top++;
+ if (top === height) return null;
+ let foot = height - 1; while (foot > top && !row(foot)) foot--;
+ return { top, foot };
+}
+
+const metrics = new Map<string, Promise<WorldFrameMetrics | null>>();
+/** Browser-only: pixel grid and figure bounds of one HD frame (decoded once, cached). Null when it cannot decode. */
+export function worldHdFrameMetrics(src: string): Promise<WorldFrameMetrics | null> {
+ let found = metrics.get(src);
  if (found) return found;
- found = new Promise<number>(resolve => {
-  if (typeof Image === "undefined" || typeof document === "undefined") { resolve(1); return; }
+ found = new Promise<WorldFrameMetrics | null>(resolve => {
+  if (typeof Image === "undefined" || typeof document === "undefined") { resolve(null); return; }
   const image = new Image();
   image.onload = () => {
    try {
     const canvas = document.createElement("canvas");
     canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
     const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) { resolve(1); return; }
+    if (!context) { resolve(null); return; }
     context.imageSmoothingEnabled = false;
     context.drawImage(image, 0, 0);
-    resolve(worldPixelGrid(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height));
-   } catch { resolve(1); }
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const bounds = worldAlphaBounds(data, canvas.width, canvas.height);
+    resolve(bounds ? { grid: worldPixelGrid(data, canvas.width, canvas.height), ...bounds } : null);
+   } catch { resolve(null); }
   };
-  image.onerror = () => resolve(1);
+  image.onerror = () => resolve(null);
   image.src = src;
  });
- if (grids.size > 200) grids.clear();
- grids.set(src, found);
+ if (metrics.size > 200) metrics.clear();
+ metrics.set(src, found);
  return found;
+}
+/** Browser-only: detect (and cache) the pixel grid of one HD frame. Resolves 1 when it cannot decode. */
+export function worldHdFrameGrid(src: string): Promise<number> {
+ return worldHdFrameMetrics(src).then(found => found?.grid ?? 1);
 }

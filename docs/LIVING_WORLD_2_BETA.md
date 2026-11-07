@@ -71,3 +71,24 @@ Only the five built-in room targets are allowed; unrecognized object names are r
 ## Character proportions (Issue #23 visual QA: "why are the characters fat?")
 
 Native 32px Pals and built-in guests were chibi-proportioned (head ≈ 43% of the figure, legs ≈ 5 rows), which read as short and wide against the detailed backdrops. In Living World, `src/lib/world-proportions.ts` now lengthens legs by repeating each sprite's own topmost leg row — whole rows, so every pixel stays square; no horizontal squeeze, and heads, faces and outfits are untouched. The leg row is found once from the front view and reused for every facing and walk frame. Body types: humanoids +6 rows (32×38), compact/robot +4, creatures +2, floating ghosts and the Mimic chest unchanged. Sprites are bottom-aligned (`xMidYMax`) so feet sit on the floor point (previously Pals floated ~10px above it). Built-in guests now use the Pals' pixel scale (1.875px per sprite pixel) and HD256 frames display at 76px, because HD humanoids fill ~90% of their 256px frame; mixed casts now stand at similar heights. Classic mode, the stored 32px art, user-drawn custom 32px characters and Green Jacket are unchanged. Before/after harness renders of the control-room, mansion and office themes were shared with the owner during development. True HD256 art for the nine Pals and built-in guests would need new artwork from the Character Designer.
+
+## One in-room scale (2026-11-07)
+
+After the owner's "they look kinda silly" review, every Living World actor follows one scale
+(`src/lib/world-scale.ts`, details in `HD256_CHARACTER_FORMAT.md`):
+
+- One world pixel per native sprite pixel in every room, including the office (office Pals were
+  previously drawn at 1.875 css px per pixel and Green Jacket at 1.69, both uneven); Green Jacket
+  gains the same adult legs as the Pals.
+- A standard adult stands 35 world pixels tall; HD256 art is sized from its measured figure to the same
+  height, times an optional declared `height` class for pets, spirits and large creatures.
+- Feet on the anchor: native sprites drop transparent rows under the standing foot line; HD canvases
+  are lowered by their measured margin under the feet.
+- Office rooms keep one fixed size for everyone (no perspective for visitors either); floor rooms keep
+  the shared 0.86–1.0 perspective.
+- Walking native sprites take a one-world-pixel step instead of the classic 2° stride tilt, which
+  blurred square pixels.
+- Name tags are smaller, borderless and translucent, full strength on hover/focus; covered tags still hide.
+
+This is runtime consistency. It does not make painted HD art look like pixel art; that needs art at
+the documented grid and height.

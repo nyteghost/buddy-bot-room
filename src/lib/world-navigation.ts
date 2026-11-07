@@ -1,7 +1,7 @@
 import type { AgentId } from "./agents";
 import type { CharacterMode } from "./hellraiser";
 import { officePose, type Heading } from "./office-motion";
-import { worldPath, worldRoomPlan, type WorldPoint } from "./world-floor";
+import { worldDepthScale, worldPath, worldRoomPlan, type WorldPoint } from "./world-floor";
 import { worldWanderPlan, worldWanderPose } from "./world-wander";
 
 export {
@@ -13,6 +13,11 @@ export type { WorldBounds, WorldFixture, WorldFixtureKind, WorldObstacle, WorldP
 const aIds: AgentId[] = ["nova", "byte", "sage", "pip", "echo", "rune", "claude", "saiyan", "mimic"];
 /** Office-style themes keep the original desk choreography for the nine Pals. */
 export const worldUsesOfficeChoreography = (theme: CharacterMode) => theme === "linux" || theme === "assistant" || theme === "devteam";
+/**
+ * Perspective scale for a visitor at floor depth y. Office-choreography rooms draw their Pals at one
+ * fixed size (no perspective), so visitors there use the same size instead of shrinking toward the back.
+ */
+export const worldActorDepthScale = (theme: CharacterMode, y: number) => worldUsesOfficeChoreography(theme) ? 1 : worldDepthScale(y);
 
 const routeCache = new Map<string, readonly WorldPoint[]>();
 /** A Pal's home → visit foot path (kept for compatibility and tests). */
