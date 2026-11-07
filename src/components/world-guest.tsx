@@ -8,6 +8,7 @@ import { worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs
 import { spriteRuns } from "@/lib/sprite-upscale";
 import { guestIds,guestName,guestPalette,guestSprite,guestWanderPose,type GuestId } from "@/lib/world-guest-packs";
 import { worldDepthScale,worldDepthZ } from "@/lib/world-floor";
+import { WORLD_LEG_EXTENSION,worldGuestBody,worldLegRow,worldTallSprite } from "@/lib/world-proportions";
 import { worldStepFrame,type WorldGait,type WorldWanderAction } from "@/lib/world-wander";
 import { clearWorldPresence,publishWorldPresence,useWorldFixtureUse,worldGreeting,worldPresenceSnapshot } from "@/lib/world-presence";
 
@@ -51,10 +52,12 @@ export function WorldGuest({id,theme,active,cue,paused=false}:{id:GuestId;theme:
  const action=reaction?.action??fallbackAction;
  const step=fallbackAction==="walk"?worldStepFrame(pose,gait):Math.floor(elapsed/180)%4;
  const frame=reaction?.frame??step;
- const runs=useMemo(()=>spriteRuns(worldReactionFrame(getArt(id),facing,reaction,fallbackAction,step),(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[id,facing,action,frame]); // eslint-disable-line react-hooks/exhaustive-deps
+ // Adult proportions for the room: legs lengthened by body type, pixels stay square (see world-proportions).
+ const grid=useMemo(()=>worldTallSprite(worldReactionFrame(getArt(id),facing,reaction,fallbackAction,step),WORLD_LEG_EXTENSION[worldGuestBody(id)],worldLegRow("guest:"+id,()=>getArt(id))),[id,facing,action,frame]); // eslint-disable-line react-hooks/exhaustive-deps
+ const runs=useMemo(()=>spriteRuns(grid,(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[grid]);
  const style={"--world-guest-x":pose.x+"%","--world-guest-y":pose.y+"%","--world-z":String(worldDepthZ(pose.y)),"--world-depth-scale":String(worldDepthScale(pose.y))} as CSSProperties;
  return <button type="button" style={style} className="world-guest" data-action={action} data-facing={facing} data-movement={gait} data-paused={!animate} aria-label={"Wave to "+guestName(id)} title={"Wave to "+guestName(id)+" · visual only"} onClick={()=>setGreet(true)}>
-   <svg viewBox="0 0 32 32" className="world-guest-pixels" shapeRendering="crispEdges" role="img" aria-label={guestName(id)+" animated pixel character"}>{runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={guestPalette[r.c]??"transparent"}/>)}</svg>
+   <svg viewBox={"0 0 32 "+grid.length} preserveAspectRatio="xMidYMax meet" className="world-guest-pixels" shapeRendering="crispEdges" role="img" aria-label={guestName(id)+" animated pixel character"}>{runs.map(r=><rect key={r.x+"-"+r.y} x={r.x} y={r.y} width={r.w} height="1" fill={guestPalette[r.c]??"transparent"}/>)}</svg>
    <span className="world-guest-name">{guestName(id)}</span>
    {(action==="wave"||action==="celebrate")&&<span className="world-guest-spark" aria-hidden="true">✦</span>}
    {action==="talk"&&<span className="world-guest-chat" aria-hidden="true">…</span>}
