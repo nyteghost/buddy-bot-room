@@ -104,6 +104,24 @@ class InboxHttpTests(LocalIntakeTests):
             state=db.execute("SELECT state FROM handoffs").fetchone()[0]
         self.assertEqual(state,"pending")
 
+    def test_proxy_origin_rewrite_does_not_hide_missing_fetch_metadata(self):
+        self.handoff("pending000001", approved=False, event=False)
+        for site in ("cross-site", "same-site", "none", ""):
+            with self.subTest(site=site):
+                # Proxy-rewritten Origin and Host appear local and matching.
+                # Browser fetch metadata must independently reject the write.
+                h=MockHandler(REVIEW, payload={"id":"pending000001",
+                                               "decision":"approve"},
+                              origin="http://127.0.0.1:8765",
+                              host="127.0.0.1:8765", site=site)
+                with self.assertRaises(PermissionError):
+                    handle_post(h, bridge_db=self.bridge, store=self.store)
+                self.assertEqual(h.wfile.getvalue(), b"")
+        with sqlite3.connect(self.bridge) as db:
+            self.assertEqual(db.execute("SELECT state FROM handoffs").fetchone()[0],
+                             "pending")
+        self.assertEqual(self.native_count("tasks"), 0)
+
     def test_custom_header_and_content_type_required(self):
         self.handoff("pending000001",approved=False,event=False)
         h=MockHandler(REVIEW,payload={"id":"pending000001","decision":"approve"})
