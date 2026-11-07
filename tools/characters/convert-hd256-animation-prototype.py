@@ -34,13 +34,28 @@ ACTION_MAP = {
     'celebrate': 'celebrate', 'laugh': 'celebrate', 'roar': 'celebrate', 'shout': 'celebrate', 'bounce': 'emote',
     'heal': 'interaction', 'potion': 'interaction', 'ritual': 'interaction',
     'strike': 'signature', 'pounce': 'signature', 'takeoff': 'signature', 'emote': 'emote', 'signature': 'signature',
+    'signature_fx': 'signature', 'signature_prototype': 'signature', 'morph': 'signature', 'ability': 'signature',
 }
+DIRECTION_NAMES = {d: d for d in DIRECTIONS} | {'front': 's', 'front_right': 'se', 'right': 'e', 'back_right': 'ne',
+                                                 'back': 'n', 'back_left': 'nw', 'left': 'w', 'front_left': 'sw'}
+_D = '|'.join(sorted(DIRECTION_NAMES, key=len, reverse=True))
+# Folder layouts relative to a character folder. Front-only clips (no direction in the path) are south-facing.
+FOLDER_PATTERNS = [re.compile(x) for x in (
+    rf'^(?:frames/)?(?P<a>[a-z_]+)/(?P<d>{_D})/(?P<i>\d+)\.png$',
+    rf'^directions/(?P<d>{_D})/(?P<a>[a-z_]+?)_(?P<i>\d+)\.png$',
+    rf'^(?P<a>[a-z_]+)/(?P<d>{_D})_(?P<i>\d+)\.png$',
+    r'^actions/(?P<a>[a-z_]+?)_(?P<i>\d+)\.png$',
+    r'^animations/(?P<a>[a-z_]+)/(?P<i>\d+)\.png$',
+    r'^(?P<a>[a-z_]+?)_(?P<i>\d+)\.png$',
+)]
+FOLDER_PARENTS = re.compile(r'^(?:.*/)?(?:characters|resident_evil|silent_hill|sprites)/([a-z0-9_-]+)/$')
 # How non-walking movers travel: used as the walk clip only when no walk is supplied.
 WALK_FALLBACK = ('roll', 'glide', 'fly', 'hover')
 DEFAULT_MS = {'idle': 300, 'walk': 140, 'run': 95}
 LOOPING = {'idle', 'walk', 'run', 'talk', 'rest'}
 MOVEMENT = {'samantha': 'rolling', 'tairn': 'quadruped', 'dcc-mongo': 'quadruped', 'mongo': 'quadruped',
-            'imani': 'flying', 'dcc-imani-obsidian-butterfly': 'flying', 'donut': 'quadruped', 'princess-donut': 'quadruped'}
+            'imani': 'flying', 'dcc-imani-obsidian-butterfly': 'flying', 'orthos': 'quadruped', 'cradle-orthos': 'quadruped',
+            'dross': 'floating', 'little-blue': 'floating', 'cradle-dross': 'floating', 'cradle-little-blue': 'floating', 'donut': 'quadruped', 'princess-donut': 'quadruped'}
 MAX_PNG = 520_000
 MAX_CLIP = 32
 MAX_FRAMES = 512
@@ -82,12 +97,33 @@ def frame_lists(manifest, base):
     return out
 
 
-def convert(archive, member, ids, revision):
-    manifest = json.loads(archive.read(member))
-    base = member.rsplit('/', 1)[0] + '/' if '/' in member else ''
-    source_id = str(manifest.get('characterId') or base.strip('/'))
-    name = str(manifest.get('name') or source_id)[:40]
-    lists = frame_lists(manifest, base)
+def folder_lists(archive, root):
+    """Infer {action: {direction: ([paths], None)}} from a character folder's file layout."""
+    found = {}
+    for name in archive.namelist():
+        if not name.startswith(root) or not name.endswith('.png'):
+            continue
+        rest = name[len(root):]
+        for pattern in FOLDER_PATTERNS:
+            match = pattern.match(rest)
+            if match:
+                direction = DIRECTION_NAMES.get(match.groupdict().get('d') or 's')
+                found.setdefault(match['a'], {}).setdefault(direction, []).append((int(match['i']), name))
+                break
+    return {a: {d: ([p for _, p in sorted(frames)], None) for d, frames in per.items()} for a, per in found.items()}
+
+
+def convert(archive, member, ids, revision, folder=None):
+    if folder:
+        manifest = {'name': folder[1]}
+        base, source_id, name = folder[0], folder[0].rstrip('/').rsplit('/', 1)[-1], folder[1][:40]
+        lists = folder_lists(archive, base)
+    else:
+        manifest = json.loads(archive.read(member))
+        base = member.rsplit('/', 1)[0] + '/' if '/' in member else ''
+        source_id = str(manifest.get('characterId') or base.strip('/'))
+        name = str(manifest.get('name') or source_id)[:40]
+        lists = frame_lists(manifest, base)
     names = set(archive.namelist())
     signature_source = manifest.get('signatureAction')
     report = {'source': source_id, 'name': name, 'mapped': {}, 'unmapped': [], 'problems': []}
@@ -168,6 +204,7 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--ids', type=Path)
     parser.add_argument('--revision', type=int, default=2)
+    parser.add_argument('--folders', action='store_true', help='also convert character folders without a supported manifest (inferred layouts)')
     args = parser.parse_args()
     if args.output.exists():
         sys.exit(f'{args.output} already exists; choose a new folder (earlier deliveries are never overwritten).')
@@ -194,6 +231,24 @@ def main():
                 slug = re.sub(r'[^a-z0-9-]+', '-', report['source'].lower())
                 write_pack(args.output / f'{slug}-hd256-v3-r{args.revision}.zip', character, files)
                 reports.append({**report, 'archive': source.name})
+            if args.folders:
+                ancestors = {'/'.join(n.split('/')[:k]) + '/' for n in archive.namelist() for k in range(1, n.count('/') + 1)}
+                roots = sorted(m.group(0) for m in map(FOLDER_PARENTS.match, ancestors) if m)
+                for root in roots:
+                    slug = root.rstrip('/').rsplit('/', 1)[-1]
+                    if any(r.get('source') == slug for r in reports) or not folder_lists(archive, root):
+                        continue
+                    title = ' '.join(part.capitalize() for part in re.split(r'[_-]', slug))
+                    try:
+                        character, files, report = convert(archive, None, ids, args.revision, (root, title))
+                    except ValueError as error:
+                        reports.append({'source': slug, 'archive': source.name, 'skipped': str(error), 'mapped': {}, 'unmapped': [], 'problems': []})
+                        continue
+                    if character['id'] in seen:
+                        continue
+                    seen.add(character['id'])
+                    write_pack(args.output / f"{re.sub(r'[^a-z0-9-]+', '-', slug.lower())}-hd256-v3-r{args.revision}.zip", character, files)
+                    reports.append({**report, 'archive': source.name})
     (args.output / 'conversion-report.json').write_text(json.dumps(reports, indent=1) + '\n')
     for report in reports:
         print(f"{report['source']:14} {report.get('skipped') or ''} frames={report.get('frames')} mapped={sorted(report['mapped'])} "
