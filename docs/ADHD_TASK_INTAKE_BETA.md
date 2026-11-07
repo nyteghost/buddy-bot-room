@@ -382,3 +382,16 @@ rejected rather than silently weakening the write permission. These are
 candidate routes only: live browser compatibility remains unverified.
 GitHub CI now runs both the synthetic proxy audit and native HTTP security
 tests. The live Unraid server, Caddy and native database remain unchanged.
+
+
+## One-pass Unraid diagnostic completed; Caddy routing remains unverified (2026-11-07)
+
+The owner ran the fixed one-pass read-only diagnostic on Unraid. All four expected containers reported running; the first three reported healthy, while Caddy had no Docker health check configured. Installed native source compatibility passed (four candidate routes, **not deployed**). The isolated inbox/security suite passed **92 tests**. A disposable rehearsal using the actual installed native Store source passed backup, audit, idempotency and no-network-peer checks, without mounting or accessing the real user database.
+
+**The static Caddy route audit returned zero candidate upstreams for all four inbox paths** using its configured audit hostname. Its historical summary said "0 checks requiring attention" because the parser returned a successful process status even with no matching route; that was an audit-reporting bug. Zero candidates does **not** prove an authentication vulnerability, and it also does **not** verify existing Caddy Basic Auth or header rewrites. A mismatch between the hardcoded audit hostname and the actual proxy site name, or an unsupported route/matcher shape, is possible.
+
+The source audit has now been corrected to report a redacted count of candidate proxy routes across all hostnames and whether a possible host-scope mismatch exists, without printing the Caddyfile, hostname, Basic Auth hash, token, private task records, or header values. Zero matching routes now cause a nonzero diagnostic exit so the one-pass report marks **CHECK** rather than **PASS**. Synthetic regressions cover missing host routes, an alternate-site match, and no routes at all. The one-pass wrapper now pins its diagnostic source to the corrected audit implementation.
+
+**Deployment hold remains active:** `native_auth_contract.browser_write_routes_ready_for_deployment` and `live_installation_authorized` remain false. Do not alter native `_local()`, remove the local token requirement, assume the Caddy proxy is broken, or add an exposed port to work around a zero-match audit. Next development should verify the correct browser-facing authority and actual proxy behavior with a redacted, non-mutating method and use an isolated HTTP fixture before any owner-approved backup-first installation.
+
+This checkpoint was posted to coordination Issue #23 so the Claude Living Universe workstream need not duplicate ADHD/Unraid debugging.
