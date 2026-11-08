@@ -136,6 +136,9 @@ CADDY
 } > "$TEMP/Caddyfile"
 unset HASH
 chmod 0600 "$TEMP/Caddyfile"
+# Disposable validator runs as UID 99 and must be able to read the mounted file.
+# Keep its contents private from other users on the Unraid host.
+chown 99:100 "$TEMP/Caddyfile"
 
 # A locally pinned, additive Compose service definition (does not include hashes).
 SOURCE_SHA=050e28cc63562da87d0558c019434c04c3c8081d
