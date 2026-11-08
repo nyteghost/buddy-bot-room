@@ -14,25 +14,29 @@ This change is a **staging service within the existing Pixel Pals beta Compose p
 - Existing gaming-PC Ollama is `http://10.200.1.149:11434` and already serves Pixel Pals. Owner successfully installed `qwen3-vl:4b` on Ollama 0.40.13. Do not create another Ollama container and do not change Pixel Pals' default `gemma2:9b`.
 - Photo staging backend uses its own `ADHD_OLLAMA_URL` (only explicitly approved private IPs, without redirects) and its native server binds to `127.0.0.1`. It is **not** ready for direct LAN/iPhone access without a separately reviewed authenticated HTTPS reverse-proxy route.
 
+## Live port finding (2026-11-08)
+
+Owner executed `ss -ltnp '( sport = :18765 )'` on Unraid and confirmed **Caddy** is listening on `*:18765`. **Do not touch, stop or replace this listener.** The proposed staging port is now **18767**, but this is **not yet confirmed free**. Verify read-only with `ss -ltnp '( sport = :18767 )'` before staging; if occupied, choose another verified-free port using the `ADHD_PHOTO_BETA_PORT` override. Never stop an existing service to make room.
+
 ## First action — safe read-only preflight on Unraid
 
 The repo includes a self-contained Bash script `tools/adhd-v02/photo-beta-readonly-preflight.sh`. It **does not** run `docker compose up/down`, start/stop/restart containers, read database contents, expose secrets, change networks or write to appdata. It reads Docker project labels/status, checks for the proposed staging container/port, and performs a GET to the existing gaming-PC Ollama `/api/tags`.
 
-From the Unraid terminal, review the [pinned script source](https://github.com/nyteghost/buddy-bot-room/blob/5b677e0559aa3f1fb50b5502d0417148cdbef7c6/tools/adhd-v02/photo-beta-readonly-preflight.sh), then run:
+From the Unraid terminal, review the [pinned script source](https://github.com/nyteghost/buddy-bot-room/blob/0b0800b63e5ce0f10b00663a20a727308b973548/tools/adhd-v02/photo-beta-readonly-preflight.sh), then run:
 
 ```bash
 curl -fsSL --retry 2 -o /tmp/adhd-photo-preflight.sh \
-  https://raw.githubusercontent.com/nyteghost/buddy-bot-room/5b677e0559aa3f1fb50b5502d0417148cdbef7c6/tools/adhd-v02/photo-beta-readonly-preflight.sh
+  https://raw.githubusercontent.com/nyteghost/buddy-bot-room/0b0800b63e5ce0f10b00663a20a727308b973548/tools/adhd-v02/photo-beta-readonly-preflight.sh
 bash -n /tmp/adhd-photo-preflight.sh
 bash /tmp/adhd-photo-preflight.sh
 ```
 
-This downloads a **version-pinned** script only to temporary storage; it leaves the current Compose project and appdata untouched. Share only the status summary; if anything unexpected or sensitive appears, redact it. **Do not run a full-stack Compose Up.** A passing static preflight still does not authorize activation or prove authenticated iPhone HTTPS behavior. Version 5b677e05 fixes an earlier contradictory port message and fails closed if socket inspection fails.
+This downloads a **version-pinned** script only to temporary storage; it leaves the current Compose project and appdata untouched. Share only the status summary; if anything unexpected or sensitive appears, redact it. **Do not run a full-stack Compose Up.** A passing static preflight still does not authorize activation or prove authenticated iPhone HTTPS behavior. Version 0b0800b6 fixes an earlier contradictory port message and fails closed if socket inspection fails.
 
 ## Additive Compose overlay
 
 `tools/adhd-v02/photo-beta-service.yml` defines one extra service:
-`adhd-assistant-photo-beta`, with a deliberately opt-in profile `adhd-photo-beta`, a separate container name, host-loopback port 18765 (proposed/unverified), isolated code and data paths, read-only root FS, no privilege escalation, no host-published port, and no automatic restart.
+`adhd-assistant-photo-beta`, with a deliberately opt-in profile `adhd-photo-beta`, a separate container name, host-loopback port 18767 (proposed/unverified), isolated code and data paths, read-only root FS, no privilege escalation, no host-published port, and no automatic restart.
 
 The overlay should be **composed with the exact active Pixel Pals Compose configuration** under the same `pixelpals` project. Do not substitute the unrelated `pixelpals-beta` sample. The overlay alone is NOT a complete stack.
 
@@ -62,7 +66,7 @@ docker compose -p pixelpals \
 ```env
 ADHD_PHOTO_BETA_CODE_PATH=/mnt/user/appdata/adhd-assistant-photo-beta/code
 ADHD_PHOTO_BETA_DATA_PATH=/mnt/user/appdata/adhd-assistant-photo-beta/data
-ADHD_PHOTO_BETA_PORT=18765
+ADHD_PHOTO_BETA_PORT=18767
 ADHD_PHOTO_BETA_OLLAMA_URL=http://10.200.1.149:11434
 ```
 
@@ -75,7 +79,7 @@ The current native ADHD Assistant server validates loopback **Host**, **Origin**
 ## Acceptance gates and rollback
 
 1. PR #7 automated tests pass; review against actual image upload and model response.
-2. Current Compose project/config labels, port 18765, and volume paths verified. No production data or secret files mounted.
+2. Current Compose project/config labels, port 18767, and volume paths verified. No production data or secret files mounted.
 3. Only `adhd-assistant-photo-beta` starts. Existing `buddy-bot-room`, `adhd-assistant`, `adhd-assistant-bridge` remain on their prior images/ports/mounts and uninterrupted.
 4. Staging can reach `10.200.1.149:11434` and run `qwen3-vl:4b` without changing Pixel Pals models.
 5. Private authenticated iPhone access is verified end-to-end before a real room photo is submitted.
