@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Living Universe HD — camera lab (placeholder art)</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0b0d12;color:#e9e9f1;font:14px/1.4 system-ui,sans-serif}
+.lab{max-width:1400px;margin:0 auto;padding:10px}
+header h1{font-size:16px;margin:0 0 2px}
+.note{color:#9aa3b5;font-size:12.5px;margin:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;align-items:center}
+.toolbar button,.toolbar select{background:#1b2030;color:#fff;border:1px solid #39415c;border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;min-height:36px;min-width:36px}
+.toolbar button[aria-pressed="true"]{background:#3b5bdb;border-color:#5c7cfa}
+.toolbar label{display:flex;gap:4px;align-items:center;font-size:13px}
+#zoomlabel{min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
+.viewport{position:relative;width:100%;aspect-ratio:1.72;overflow:hidden;border-radius:12px;background:#111;touch-action:none;cursor:grab;outline:none;user-select:none;-webkit-user-select:none}
+.viewport:focus-visible{box-shadow:0 0 0 3px #5c7cfa}
+.viewport.dragging{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.world > .env{position:absolute;left:0;top:0;display:block}
+.prop{position:absolute;display:block;overflow:visible}
+.actor{position:absolute;width:192px;height:192px;transform:translate(-50%,-100%);cursor:pointer}
+.actor canvas{width:100%;height:100%;display:block}
+.actor.pixel canvas{image-rendering:pixelated}
+.labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.tag{position:absolute;transform:translate(-50%,3px);font:600 11px/1.2 system-ui,sans-serif;background:rgb(10 13 20/.62);color:#eee;padding:1px 6px;border-radius:5px;white-space:nowrap}
+.tag.followed{background:#3b5bdb}
+.hud{position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);font:11px/1.35 ui-monospace,monospace;background:rgb(0 0 0/.58);padding:4px 7px;border-radius:6px;pointer-events:none;white-space:pre-wrap}
+.watermark{position:absolute;right:8px;top:8px;font:600 11px system-ui;background:rgb(130 20 45/.8);padding:3px 8px;border-radius:6px;pointer-events:none}
+.help{color:#9aa3b5;font-size:12px;margin:6px 0 0}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+@media (max-width:700px){.lab{padding:6px}.toolbar{gap:4px}.toolbar button,.toolbar select{padding:6px 8px;font-size:12px;min-height:40px;min-width:40px}.tag{font-size:10px}.hud{font-size:9.5px}header h1{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.world{will-change:auto}}
+</style>
+</head>
+<body>
+<div class="lab">
+ <header>
+  <h1>Living Universe HD — camera lab</h1>
+  <p class="note">Isolated prototype for PR #24. <b>Placeholder art drawn in code</b>; the real Pixel Pals floor, wander and crowd code moves the characters around a larger virtual room viewed through a camera. Not the app: no saved data, no AI, no private art.</p>
+ </header>
+ <div class="toolbar" role="toolbar" aria-label="Camera controls">
+  <button id="fit" type="button">Fit room</button>
+  <button id="out" type="button" aria-label="Zoom out">−</button>
+  <span id="zoomlabel">—</span>
+  <button id="in" type="button" aria-label="Zoom in">+</button>
+  <label>Follow <select id="follow"><option value="">Nobody</option></select></label>
+  <label>Look <select id="presentation"><option value="auto">Auto</option><option value="hd">HD</option><option value="pixel">Pixel (fallback)</option></select></label>
+  <button id="labels" type="button" aria-pressed="true">Names</button>
+  <button id="pause" type="button" aria-pressed="false">Pause</button>
+ </div>
+ <div class="viewport" id="viewport" tabindex="0" role="application"
+  aria-label="Room view. Drag or use arrow keys to pan, plus and minus to zoom, 0 to fit the room, F to follow the next character, Escape to stop following.">
+  <div class="world" id="world"></div>
+  <div class="labels" id="labels-layer"></div>
+  <div class="watermark">Placeholder art</div>
+  <div class="hud" id="hud" aria-hidden="true"></div>
+ </div>
+ <p class="help">Desktop: drag to pan, mouse wheel or trackpad pinch to zoom at the cursor, double-click to zoom in, click a character to follow it. Phone: one finger pans, two fingers pinch-zoom, tap a character to follow. Keyboard (focus the room): arrows or WASD, + and −, 0, F, Escape.</p>
+ <div id="sr" class="sr" aria-live="polite"></div>
+</div>
+<script>/*__MODULES__*/</script>
+<script>/*__LAB__*/</script>
+</body>
+</html>

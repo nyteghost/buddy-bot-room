@@ -169,6 +169,16 @@ function gridOf(theme:CharacterMode):Grid{
  const grid={plan,width,height,blocked};grids.set(theme,grid);return grid;
 }
 export function worldRoomPlan(theme:CharacterMode):WorldRoomPlan{return gridOf(theme).plan;}
+/**
+ * Register an extra floor plan under a key no room theme uses (prototypes such as the Living Universe HD camera lab).
+ * Existing themes cannot be replaced, so the app's rooms are never affected.
+ */
+export function worldRegisterLabPlan(key:string,plan:WorldRoomPlan):CharacterMode{
+ if(!/^lab-[a-z0-9-]{1,32}$/.test(key))throw new Error("Lab plan keys start with lab-");
+ const table=plans as Record<string,WorldRoomPlan>;
+ table[key]=plan;grids.delete(key as CharacterMode);
+ return key as CharacterMode;
+}
 export function worldPointIsWalkable(point:WorldPoint,theme:CharacterMode):boolean{
  const plan=worldRoomPlan(theme);
  return Number.isFinite(point.x)&&Number.isFinite(point.y)&&!outside(point,plan.bounds)&&!inObstacle(point,plan);
