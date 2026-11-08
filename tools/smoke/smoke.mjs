@@ -1314,7 +1314,7 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
 // movable window; phone-width devices continue to see controls directly below the room.
 await step("Immersive desktop Pal Room popup and unchanged phone controls", async () => {
   await page.setViewportSize({width:1500,height:900});
-  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\\s*Pal Room\\s*$/i});
+  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
   if(await entry.getAttribute("aria-pressed")!=="true")await entry.click();
   const room=page.locator('[data-window-id="room"]');
   const trigger=room.getByRole("button",{name:"Room settings",exact:true});
