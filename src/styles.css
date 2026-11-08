@@ -2864,3 +2864,16 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
  .hd-office[data-controls="open"] .hd-office-toolbar{right:48px;}
  .hd-office-toolbar button,.hd-office-toolbar select{min-height:40px;min-width:40px;}}
 @media (max-width:700px){.room-scene.hd-world .hd-office-toolbar{top:28px;bottom:auto;}.room-scene.hd-world .hd-office-badge{top:66px;left:4px;}.room-scene.hd-world .live-progress{display:none;}}
+
+/* HD Office: use the Pal Room window's usable height instead of allowing the
+   wide desktop scene's fixed image aspect ratio to push controls below the fold.
+   Size containment is on the already flex-sized, scrollable window body, so the
+   cqh unit follows resizing/maximizing the window rather than the browser.
+   Keep Classic/Pixel image proportions and the phone layout unchanged. */
+@media (min-width: 701px) {
+  .window-room > .window-body { container-type: size; }
+  .window-room .room-scene.hd-world {
+    aspect-ratio: auto;
+    height: clamp(260px, 72cqh, 760px);
+  }
+}
