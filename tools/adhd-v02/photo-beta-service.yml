@@ -40,9 +40,9 @@ services:
       # Missing values must make Compose fail instead of mounting production.
       - ${ADHD_PHOTO_BETA_CODE_PATH:?Isolated private ADHD source checkout required}:/opt/adhd:ro
       - ${ADHD_PHOTO_BETA_DATA_PATH:?Independent empty test data directory required}:/data:rw
-    command: [python, -B, launch.py, --host, "127.0.0.1", --port, "${ADHD_PHOTO_BETA_PORT:-18765}", --data-dir, /data, --no-browser]
+    command: [python, -B, launch.py, --host, "127.0.0.1", --port, "${ADHD_PHOTO_BETA_PORT:-18767}", --data-dir, /data, --no-browser]
     healthcheck:
-      test: [CMD, python, -B, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${ADHD_PHOTO_BETA_PORT:-18765}/health', timeout=3).read()"]
+      test: [CMD, python, -B, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${ADHD_PHOTO_BETA_PORT:-18767}/health', timeout=3).read()"]
       interval: 30s
       timeout: 6s
       retries: 3
