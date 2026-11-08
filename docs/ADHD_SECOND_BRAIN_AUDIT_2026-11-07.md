@@ -188,3 +188,7 @@ record_id, security_domain, owner_id, project_id, kind, title, body_ref, source_
 - Next smallest verifiable assignment:
 
 **Current milestone:** Audit/documentation only. No native app source changes, no production migration, no live Caddy change and no new external integration.  
+
+## 11. Tracked environment-file hygiene check (redacted, source-only)
+
+The public Pixel Pals repository's beta branch contains a tracked root .env file (361 bytes). A redacted source check found six nonempty configuration assignments. None had an obviously credential-labeled variable name or matched the limited token/opaque-secret patterns checked. **This is not a comprehensive secret scan and does not prove values are safe to publish.** A maintainer should review this committed file and relevant history privately before adding provider credentials or new integration secrets. Never add live tokens to tracked files; prefer ignored local configuration, runtime secrets and documented redacted examples. No environment values were printed, changed, or copied into this report.
