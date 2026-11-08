@@ -2910,9 +2910,9 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
   }
   .workspace-window.window-room-settings:not(.window-sized):not(.window-expanded) {
     left: var(--window-x, 12px);
-    top: var(--window-y, 0px);
+    top: var(--window-y, 50px);
     width: min(520px, 95%);
-    height: 100%;
+    height: calc(100% - 50px);
   }
   .window-room-settings .room-settings-content {
     padding: 12px;
