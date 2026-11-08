@@ -6,6 +6,7 @@ import { officePose, officeStations, headingOf, type Heading } from "@/lib/offic
 import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan, type WorldPose } from "@/lib/world-navigation";
 import { useWorldActor, useWorldFixtureUse } from "@/lib/world-presence";
 import { useWorldPalLook } from "@/lib/world-pal-skins";
+import { useWorldPresentation } from "@/lib/world-presentation-react";
 import { WorldHdSkin } from "./world-hd-skin";
 import { WORLD_CROWD_PRIORITY, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
 import { useWorldCrowd } from "@/lib/world-crowd-react";
@@ -82,7 +83,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   useWorldFixtureUse("pal:" + id, mode, strolling && roomPose?.action === "work" ? roomPose.fixture : null);
   const { rootRef, labelRef, labelHidden } = useWorldActor("pal:" + id, x, y, !walking, world && enabled && visible, elapsed);
   // Opt-in HD256 look (Living World only; Classic mode and identity unaffected).
-  const skin = useWorldPalLook(id, "pixel");
+  const skin = useWorldPalLook(id, useWorldPresentation()); // one Pal: HD look on HD devices, Pixel look on Pixel devices
   const hdLook = world && enabled && skin ? skin : undefined;
   const worldAction: PalMotion | null = roomPose && roomPose.action !== "walk" && roomPose.action !== "idle" ? roomPose.action : null;
   return (

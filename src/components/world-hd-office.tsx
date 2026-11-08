@@ -7,7 +7,7 @@ import { WorldCrowd, worldCrowdTieBreak, WORLD_CROWD_PRIORITY } from "@/lib/worl
 import { screenToWorld, worldCameraClamp, worldCameraFit, worldCameraFollow, worldCameraPan, worldCameraPinch, worldCameraTransform, worldCameraVisible, worldCameraZoomAt, worldToScreen, type WorldCamera, type WorldSize } from "@/lib/world-camera";
 import { AMBIENT_PERIOD, ambientDescription, ambientPose, ambientSchedule, type AmbientActor, type AmbientPose } from "@/lib/world-ambient";
 import { HD_OFFICE_ACTOR_PX, HD_OFFICE_CHAT_PAIRS, HD_OFFICE_FOOTPRINT, HD_OFFICE_MAX_ZOOM, HD_OFFICE_PROPS, HD_OFFICE_SPOTS, HD_OFFICE_WALL, HD_OFFICE_WORLD, hdOfficeFloor, type HdOfficeProp } from "@/lib/world-hd-office";
-import { selectWorldHdClip, worldHdAction, worldHdFrameAt } from "@/lib/world-hd-animation";
+import { selectWorldHdClip, worldHdAction, worldHdFrameAt, worldLookArtNote } from "@/lib/world-hd-animation";
 import { worldHdFrameMetrics } from "@/lib/world-hd-render";
 import { WORLD_HEIGHT_CLASSES } from "@/lib/world-scale";
 import { drawSyntheticCharacter, syntheticPalette } from "@/lib/world-synthetic-art";
@@ -362,7 +362,7 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
     <option value="">Nobody</option>{actors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
   </div>
   <ul className="sr-only" aria-label="Who is in the room">
-   {actors.map(a => <li key={a.id}>{a.name}: {describe[a.id] ?? ""}</li>)}
+   {actors.map(a => <li key={a.id}>{a.name}: {describe[a.id] ?? ""}{a.art.kind === "hd" ? ` · art: ${worldLookArtNote(a.art.character)}` : a.art.kind === "synthetic" && synthetic ? " · art: synthetic placeholder" : ""}</li>)}
   </ul>
   <div className="sr-only" aria-live="polite">{followName ? `Following ${followName}` : ""}</div>
  </div>;

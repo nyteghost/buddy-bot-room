@@ -2,7 +2,7 @@
 // any uncaught page error or console error. CI runs it against a fresh production build (see .github/workflows/ci.yml).
 // Run it yourself:  PW_PATH=/path/to/node_modules/playwright SMOKE_URL=http://localhost:8090 node tools/smoke/smoke.mjs
 import { createRequire } from "node:module";
-import { hdCharacterSmokeZip } from "./hd-character-zip.mjs";
+import { hdCharacterSmokeZip, idleOnlySmokeZip } from "./hd-character-zip.mjs";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PW_PATH || "playwright");
 
@@ -1369,6 +1369,86 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
   await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
   }
   if (!restored) throw Error("Turning the HD office preview off did not restore the Living World office");
+  await roomItem.click();
+});
+
+// One Pal, two appearances: synthetic idle-only packs shaped like the private Nova Desktop HD / Mobile Pixel samples.
+await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cosmetic and reversible", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  const appearance = mood.getByRole("group", { name: "Room appearance" });
+  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  await library.waitFor({ state: "visible" });
+  if (await library.getAttribute("open") === null) await library.locator("summary").click();
+  const ids = ["user-smokenovahd1", "user-smokenovapx1"];
+  const identity = () => page.evaluate(() => Object.fromEntries(Object.entries(localStorage).filter(([k]) => !/pal-skins|presentation|character-mode|room-playful|world|character|universe|library|window|layout|sidebar/i.test(k))));
+  const before = { local: await identity(), universe: await (await page.request.get(URL_ + "/api/character-universe")).json() };
+  if (before.universe.characters?.some(c => ids.includes(c.id))) throw Error("Synthetic dual-style characters already existed");
+  try {
+    for (const [id, name, revision, tint] of [[ids[0], "Smoke Nova HD", 3, 0], [ids[1], "Smoke Nova Pixel", 1, 90]]) {
+      await library.getByLabel("Choose character ZIP file").setInputFiles({ name: id + ".zip", mimeType: "application/zip", buffer: idleOnlySmokeZip(id, name, revision, tint) });
+      await library.getByText(name + " pack · 256×256 character preview", { exact: true }).waitFor({ timeout: 12000 });
+      await library.getByRole("button", { name: "Approve & install 1 character(s)" }).click();
+      await library.getByRole("status").filter({ hasText: "1 character(s) installed." }).waitFor({ timeout: 15000 });
+    }
+    const installed = await (await page.request.get(URL_ + "/api/character-universe")).json();
+    if (JSON.stringify(installed.enabled) !== JSON.stringify(before.universe.enabled)) throw Error("Installing a look enabled it as a visitor");
+    await library.getByLabel("Use Smoke Nova HD as the look for a Pal").selectOption("nova");
+    await library.getByLabel("Use Smoke Nova Pixel as the Pixel look for a Pal").selectOption("nova");
+    const row = appearance.getByRole("group", { name: "Pal appearances" }).locator('li[data-pal="nova"]');
+    await row.waitFor();
+    if (await row.getAttribute("data-showing") !== "hd") throw Error("Desktop did not choose Nova's Desktop HD look");
+    if (!/front idle only/.test(await row.textContent() ?? "")) throw Error("Single-frame art was not labelled honestly");
+    // Living World (Normal theme) on desktop: Nova wears the HD look.
+    await page.locator('.room-scene .agent-nova img[alt*="Smoke Nova HD look"]').first().waitFor({ state: "visible", timeout: 8000 });
+    await page.locator(".room-scene").scrollIntoViewIfNeeded();
+    gallery.push({ label: "Running app (CI) · desktop · Living World · Nova wearing the synthetic 'Desktop HD' look", png: await page.locator(".room-scene").screenshot() });
+    // HD office: Nova's HD look, honest art note.
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+    await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+    await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+    await page.locator('.room-scene.hd-world .hd-actor[data-actor="pal:nova"][data-art="hd"]').waitFor({ timeout: 8000 });
+    const who = await page.getByRole("list", { name: "Who is in the room" }).textContent();
+    if (!/front idle only/.test(who ?? "")) throw Error("HD office did not describe Nova's single-frame art: " + who);
+    await page.getByRole("combobox", { name: "Follow a character" }).selectOption({ index: 1 });
+    await page.waitForTimeout(1500);
+    gallery.push({ label: "Running app (CI) · desktop · HD office · Nova in synthetic 'Desktop HD' look (single idle frame)", png: await page.locator(".room-scene").screenshot() });
+    // Same Nova, Pixel look.
+    await appearance.getByRole("radio", { name: "Pixel", exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"));
+    await page.locator('.room-scene .agent-nova img[alt*="Smoke Nova Pixel look"]').first().waitFor({ state: "visible", timeout: 8000 });
+    if (await row.getAttribute("data-showing") !== "pixel") throw Error("Pixel look not reported for Nova");
+    gallery.push({ label: "Running app (CI) · desktop · look switched to Pixel · same Nova in synthetic 'Mobile Pixel' look", png: await page.locator(".room-scene").screenshot() });
+    try {
+      await appearance.getByRole("radio", { name: /^Auto/ }).click();
+      await page.setViewportSize({ width: 390, height: 844 });
+      const phoneNova = page.locator('.room-scene .agent-nova img[alt*="Smoke Nova Pixel look"]').first();
+      if (await phoneNova.isVisible().catch(() => false)) gallery.push({ label: "Running app (CI) · iPhone width 390px · Auto → Pixel · Nova in synthetic 'Mobile Pixel' look", png: await page.locator(".room-scene").screenshot() });
+      else notes.push("Dual appearance: phone-width capture skipped (room not on screen in the mobile shell)");
+    } finally { await page.setViewportSize({ width: 1500, height: 900 }); }
+    // Restore the original Nova; nothing else changed.
+    await appearance.getByRole("button", { name: "Restore Nova's original look" }).click();
+    await page.locator('.room-scene .agent-nova img[alt$=" look"]').first().waitFor({ state: "detached", timeout: 8000 });
+    gallery.push({ label: "Running app (CI) · desktop · original Nova restored", png: await page.locator(".room-scene").screenshot() });
+    const after = await identity();
+    if (JSON.stringify(after) !== JSON.stringify(before.local)) throw Error("Switching looks changed other saved data");
+  } finally {
+    await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+    await appearance.getByRole("button", { name: "Restore Nova's original look" }).click().catch(() => undefined);
+    for (const name of ["Smoke Nova HD", "Smoke Nova Pixel"]) {
+      const del = library.getByRole("button", { name: "Delete " + name });
+      if (await del.count()) { page.once("dialog", d => d.accept()); await del.click(); }
+    }
+    await page.waitForFunction(async ids => { const r = await fetch("/api/character-universe", { credentials: "same-origin" }); return r.ok && !((await r.json()).characters ?? []).some(c => ids.includes(c.id)); }, ids, { timeout: 15000 }).catch(() => undefined);
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+    await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+  const final = await (await page.request.get(URL_ + "/api/character-universe")).json();
+  if (final.characters?.some(c => ids.includes(c.id))) throw Error("Synthetic dual-style characters were not removed");
+  if (JSON.stringify(final.enabled) !== JSON.stringify(before.universe.enabled)) throw Error("Visitor selection changed");
   await roomItem.click();
 });
 

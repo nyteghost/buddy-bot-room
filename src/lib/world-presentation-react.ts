@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { WORLD_ROOM_APPEARANCE_DEFAULT, getWorldRoomAppearance, subscribeWorldRoomAppearance, worldDeviceHints, type WorldDeviceHints, type WorldRoomAppearance } from "./world-presentation";
+import { WORLD_ROOM_APPEARANCE_DEFAULT, getWorldRoomAppearance, subscribeWorldRoomAppearance, worldDeviceHints, worldPresentation, type WorldDeviceHints, type WorldPresentation, type WorldRoomAppearance } from "./world-presentation";
 
 /** Room Appearance preferences for this device (live across tabs). */
 export function useWorldRoomAppearance(): WorldRoomAppearance {
@@ -22,4 +22,8 @@ function subscribeHints(listener: () => void): () => void {
  */
 export function useWorldDeviceHints(): WorldDeviceHints {
  return useSyncExternalStore(subscribeHints, hintsSnapshot, () => SERVER_HINTS);
+}
+/** The look this device shows right now (Room Appearance choice, else the device default). */
+export function useWorldPresentation(): WorldPresentation {
+ return worldPresentation(useWorldRoomAppearance().look, useWorldDeviceHints());
 }

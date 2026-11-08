@@ -1,5 +1,10 @@
 import { setWorldRoomAppearance, worldPresentation, worldPresentationDefault, type WorldPresentationChoice } from "@/lib/world-presentation";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
+import { clearWorldPalLook, useWorldPalPixelSkins, useWorldPalSkins, useWorldSkinCharacters, worldPalAppearances } from "@/lib/world-pal-skins";
+import { worldLookArtNote } from "@/lib/world-hd-animation";
+import { agentName, type AgentId } from "@/lib/agents";
+
+
 
 const LOOKS: Array<{ value: WorldPresentationChoice; label: string; hint: string }> = [
  { value: "auto", label: "Auto", hint: "HD on larger screens, Pixel on phones" },
@@ -30,8 +35,29 @@ export function WorldRoomAppearance() {
    <input type="checkbox" checked={appearance.synthetic} disabled={!appearance.hdOffice} onChange={e => setWorldRoomAppearance({ synthetic: e.target.checked })} />
    <span><span className="font-semibold">Synthetic HD placeholders</span> <span className="text-muted-foreground">— code-drawn stand-ins to preview HD scale for Pals without approved HD art.</span></span>
   </label>
+  <PalAppearances showing={resolved} />
   <p className="mt-1 text-[11px] text-muted-foreground" role="status">
    This device shows {resolved === "hd" ? "HD" : "Pixel"}{appearance.hdOffice && resolved === "hd" ? " (HD office preview in the Office theme)" : ""}. Saved on this device only; your Pals, memories and tasks are the same in every look.
   </p>
  </fieldset>;
+}
+
+/** One Pal, two appearances: the Desktop HD and Mobile Pixel looks of each Pal that has any. */
+function PalAppearances({ showing }: { showing: "hd" | "pixel" }) {
+ const list = worldPalAppearances(useWorldPalSkins(), useWorldPalPixelSkins(), useWorldSkinCharacters());
+ if (!list.length) return null;
+ return <div className="world-pal-appearances mt-2 text-xs" role="group" aria-label="Pal appearances">
+  <p className="font-semibold">Pal appearances <span className="font-normal text-muted-foreground">— cosmetic only; each Pal stays one Pal with the same memories, chats, tasks and permissions.</span></p>
+  <ul className="mt-1 space-y-1">
+   {list.map(a => {
+    const shown = showing === "hd" ? a.hd ?? a.pixel : a.pixel ?? a.hd;
+    const name = agentName(a.pal as AgentId, false);
+    return <li key={a.pal} data-pal={a.pal} data-showing={shown === a.hd ? "hd" : "pixel"}>
+     <strong>{name}</strong>: Desktop HD — {a.hd ? a.hd.name : "original"} · Mobile Pixel — {a.pixel ? a.pixel.name : "original"}
+     <span className="text-muted-foreground"> · this device shows {shown ? shown.name : "the original " + name}{shown ? " (" + worldLookArtNote(shown) + ")" : ""}</span>
+     {" "}<button type="button" className="world-look-option" onClick={() => clearWorldPalLook(a.pal)} aria-label={"Restore " + name + "'s original look"}>Restore original</button>
+    </li>;
+   })}
+  </ul>
+ </div>;
 }

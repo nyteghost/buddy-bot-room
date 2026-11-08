@@ -45,6 +45,7 @@ import { OfficePal } from "./office-pal";
 import { WorldHdOffice } from "./world-hd-office";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
 import { worldUsesHdOffice } from "@/lib/world-presentation";
+import { useWorldPalLookIds } from "@/lib/world-pal-skins";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
@@ -400,7 +401,7 @@ export function Room() {
   }, []);
   useCalmInterval(() => setPalRoomPhase(n => (n + 1) % 300), 8000, roomOpen && palRoomPlayful);
   // Living Universe HD office preview (per-device Room Appearance; falls back to the current Living World).
-  const roomAppearance = useWorldRoomAppearance(), deviceHints = useWorldDeviceHints();
+  const roomAppearance = useWorldRoomAppearance(), deviceHints = useWorldDeviceHints(), palLookIds = useWorldPalLookIds();
   const changeLivingWorld = (next:boolean) => {setLivingWorld(next);try{localStorage.setItem(LIVING_WORLD_KEY,next?"living":"classic");}catch{/* optional */}};
   const changePalRoomMood = (next: boolean) => {
     setPalRoomPlayful(next);
@@ -1911,7 +1912,8 @@ export function Room() {
   const hdPals = agents.map(a => ({ id: a.id, name: agentName(a.id, hell, characterMode === "horror", characterMode),
     enabled: enabled.includes(a.id) || focusCompanion?.pal === a.id,
     real: running && speaking === a.id ? "responding" as const : focusCompanion && !focusBreak && focusCompanion.pal === a.id ? "focus" as const : null }));
-  const hdVisitors = worldUniverse.characters.filter(c => enabledWorldPacks.includes(c.id));
+  // A character used as a Pal's look is drawn as that Pal, never as a second visitor.
+  const hdVisitors = worldUniverse.characters.filter(c => enabledWorldPacks.includes(c.id) && !palLookIds.has(c.id));
   return (
     <div aria-busy={!ready} className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
@@ -2103,7 +2105,7 @@ export function Room() {
             <RoomLive active={roomOpen} running={running} theme={characterMode} onInspect={(target)=>{if(livingWorld && roomOpen)setWorldCue({action:"inspect-prop",targetId:target,at:Date.now()});}} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && !hdWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})} />}
             {livingWorld && !hdWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
-            {livingWorld && !hdWorld && worldUniverse.characters.filter(c=>enabledWorldPacks.includes(c.id)).map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
+            {livingWorld && !hdWorld && hdVisitors.map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />

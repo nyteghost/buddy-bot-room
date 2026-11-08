@@ -93,3 +93,12 @@ export function worldHdCoverage(character: WorldHdCharacter): WorldHdCoverage {
  parts.push(character.height ? `in-room height: ${height}` : "in-room height: adult (default)");
  return { status: character.artStatus, facings, walkingFacings, animated, poses, missing, height, heightDeclared: !!character.height, summary: parts.join(" · ") };
 }
+
+/** Honest one-line art coverage: a single front idle frame is never described as animation. */
+export function worldLookArtNote(character: { hd3?: WorldHdCharacter | undefined }): string {
+ if (!character.hd3) return "single HD idle set";
+ const c = worldHdCoverage(character.hd3);
+ if (c.facings <= 1 && !c.walkingFacings && !c.animated.length && !c.poses.length)
+  return "front idle only — walking, sitting, desk work and greetings reuse this one frame (not animated)";
+ return `${c.facings}/8 facings${c.walkingFacings ? "" : ", no walk cycle"}`;
+}

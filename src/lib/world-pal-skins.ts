@@ -48,6 +48,22 @@ export function worldPalLookCharacter(presentation: "hd" | "pixel", hd: WorldPal
  return own ?? worldPalSkinCharacter(presentation === "hd" ? pixel : hd, list, pal);
 }
 
+/** One Pal, two appearances: which character dresses a Pal in each presentation (cosmetic only). */
+export type WorldPalAppearance = { pal: string; hd?: WorldCustomCharacter; pixel?: WorldCustomCharacter };
+/** Pure: every Pal with at least one installed look, in roster order. Missing characters are left out (native fallback). */
+export function worldPalAppearances(hd: WorldPalSkins, pixel: WorldPalSkins, list: readonly WorldCustomCharacter[]): WorldPalAppearance[] {
+ const out: WorldPalAppearance[] = [];
+ for (const pal of WORLD_SKIN_PALS) {
+  const h = worldPalSkinCharacter(hd, list, pal), p = worldPalSkinCharacter(pixel, list, pal);
+  if (h || p) out.push({ pal, ...(h ? { hd: h } : {}), ...(p ? { pixel: p } : {}) });
+ }
+ return out;
+}
+/** Pure: character ids used as a Pal's look (they are drawn as that Pal, never as a second visitor). */
+export function worldPalLookIds(hd: WorldPalSkins, pixel: WorldPalSkins): ReadonlySet<string> {
+ return new Set([...Object.values(hd), ...Object.values(pixel)]);
+}
+
 const EMPTY: WorldPalSkins = Object.freeze({});
 let skins: WorldPalSkins = EMPTY;
 let pixelSkins: WorldPalSkins = EMPTY;
@@ -69,6 +85,8 @@ export function getWorldPalSkins(): WorldPalSkins { load(); return skins; }
 export function getWorldPalPixelSkins(): WorldPalSkins { load(); return pixelSkins; }
 export function setWorldPalSkin(pal: string, id: string | null): void { load(); skins = withWorldPalSkin(skins, pal, id); save(); emit(); }
 export function setWorldPalPixelSkin(pal: string, id: string | null): void { load(); pixelSkins = withWorldPalSkin(pixelSkins, pal, id); save(); emit(); }
+/** Restore one Pal's original look in both presentations. */
+export function clearWorldPalLook(pal: string): void { load(); skins = withWorldPalSkin(skins, pal, null); pixelSkins = withWorldPalSkin(pixelSkins, pal, null); save(); emit(); }
 /** One-click revert: every Pal back to its native look (both HD and Pixel looks). */
 export function clearWorldPalSkins(): void { load(); skins = {}; pixelSkins = {}; save(); emit(); }
 /** The Character Library shares the installed characters so Pals can find their look. */
@@ -89,3 +107,10 @@ export function useWorldPalLook(pal: string, presentation: "hd" | "pixel"): Worl
 }
 /** Installed characters as published by the Character Library (used to resolve looks). */
 export function useWorldSkinCharacters(): readonly WorldCustomCharacter[] { return useSyncExternalStore(subscribe, () => characters, () => characters); }
+/** Character ids currently used as Pal looks (stable while the mappings do not change). */
+let lookIdsCache: { hd: WorldPalSkins; pixel: WorldPalSkins; ids: ReadonlySet<string> } | null = null;
+export function useWorldPalLookIds(): ReadonlySet<string> {
+ const hd = useWorldPalSkins(), pixel = useWorldPalPixelSkins();
+ if (!lookIdsCache || lookIdsCache.hd !== hd || lookIdsCache.pixel !== pixel) lookIdsCache = { hd, pixel, ids: worldPalLookIds(hd, pixel) };
+ return lookIdsCache.ids;
+}
