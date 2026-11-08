@@ -94,7 +94,7 @@ function candidates(theme: CharacterMode): Candidate[] {
   seen.add(id); out.push(fixture ? { point, fixture } : { point });
  };
  for (const fixture of plan.fixtures) add(fixture.stand, { id: fixture.id, facing: fixture.facing });
- for (const point of [...plan.visits, ...plan.homes]) add(point);
+ for (const point of [...plan.visits, ...plan.homes, ...(plan.entries ?? [])]) add(point);
  return out;
 }
 

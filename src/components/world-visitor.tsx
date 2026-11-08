@@ -9,6 +9,7 @@ import type { CharacterMode } from "@/lib/hellraiser";
 import { worldDepthZ } from "@/lib/world-floor";
 import { WORLD_LEG_EXTENSION, worldLegStart, worldTallSprite } from "@/lib/world-proportions";
 import { worldGridFoot, worldGroundGrid } from "@/lib/world-scale";
+import { WORLD_CROWD_PRIORITY, useWorldCrowd } from "@/lib/world-crowd";
 import { greenJacketPalette, greenJacketPose, greenJacketSprite, worldHideoutForTheme, worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs";
 
 const originalArt=greenJacketSprite();
@@ -37,6 +38,9 @@ export function GreenJacketVisitor({ active, theme, cue }: { active:boolean; the
   const grid=useMemo(()=>worldGroundGrid(tallVisitor(reaction?worldReactionFrame(originalArt,pose.facing,reaction):worldFacingSprite(originalArt,pose.facing,frame)),standingFoot),[pose.facing,frame,reaction?.action,reaction?.frame]); // eslint-disable-line react-hooks/exhaustive-deps
   const runs=useMemo(()=>spriteRuns(grid,(x,y)=>y<24?"body":x<16?"left-leg":"right-leg"),[grid]);
   // Center-anchored sprite: its feet sit roughly 8% lower than its position, which sets its depth.
+  // Scripted route: other actors treat Green Jacket as a fixed obstacle at its feet while it is visible (world-crowd.ts).
+  const visible=(pose.opacity??1)>0.3;
+  useWorldCrowd({theme,time:0,active:running,member:visible?{id:"visitor:green-jacket",priority:WORLD_CROWD_PRIORITY.fixed,speed:0}:null,fixedAt:visible?{x:pose.x,y:pose.y+8,facing:pose.facing}:null});
   const style={"--world-visitor-x":pose.x+"%","--world-visitor-y":pose.y+"%","--world-visitor-scale":String(pose.scale),"--world-z":String(worldDepthZ(pose.y+8)),opacity:pose.opacity} as CSSProperties;
   return <>
     <div className={"world-visitor-hideout world-hideout-"+worldHideoutForTheme(theme)} style={{"--world-z":String(worldDepthZ(76))} as CSSProperties} aria-hidden="true"/>

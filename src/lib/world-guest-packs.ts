@@ -72,9 +72,18 @@ export function guestRoute(id:GuestId,theme:CharacterMode):readonly WorldPoint[]
  cached.set(key,route);return route;
 }
 /** Where each visitor starts its itinerary: spread over visit spots so guests don't spawn on top of Pals. */
+/**
+ * Where a guest starts. Built-in guests (slots 0–7) take visit spots in order; imported visitors (slot 8+)
+ * use the room's `entries` when it has them, otherwise the odd visit spots first, then the even ones, so they spread across the room instead of starting
+ * on a Pal's home spot (which made crowds pile up, worst in the horror mansion's separate pockets).
+ */
 export function guestStart(slot:number,theme:CharacterMode):WorldPoint{
- const plan=worldRoomPlan(theme),spots=[...plan.visits,...plan.homes];
- return spots[((Math.floor(slot)%spots.length)+spots.length)%spots.length]!;
+ const plan=worldRoomPlan(theme),n=Math.floor(Number.isFinite(slot)?slot:0);
+ if(n>=8&&plan.entries?.length)return plan.entries[(n-8)%plan.entries.length]!;
+ const spots=plan.visits.length?plan.visits:plan.homes;
+ if(!spots.length)return {x:50,y:76};
+ const index=n<8?n:2*(n-8)+1;
+ return spots[((index%spots.length)+spots.length)%spots.length]!;
 }
 /**
  * Natural multi-stop wandering for a visual guest: steady gait, turns, look-arounds and furniture use.

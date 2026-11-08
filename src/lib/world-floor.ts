@@ -14,7 +14,9 @@ export const WORLD_FIXTURE_KINDS = ["screen","lamp","flame","crystal","portal","
 export type WorldFixtureKind = typeof WORLD_FIXTURE_KINDS[number];
 /** A piece of furniture a character can walk up to and use. `glow` is the art position that lights up. */
 export type WorldFixture = Readonly<{id:string;label:string;kind:WorldFixtureKind;glow:WorldPoint;stand:WorldPoint;facing:Heading}>;
-export type WorldRoomPlan = Readonly<{bounds:WorldBounds;obstacles:readonly WorldObstacle[];homes:readonly WorldPoint[];visits:readonly WorldPoint[];fixtures:readonly WorldFixture[]}>;
+export type WorldRoomPlan = Readonly<{bounds:WorldBounds;obstacles:readonly WorldObstacle[];homes:readonly WorldPoint[];visits:readonly WorldPoint[];fixtures:readonly WorldFixture[];
+ /** Optional start spots for imported visitors (also wander stops), to spread a full room. */
+ entries?:readonly WorldPoint[]}>;
 
 /** Scene height divided by width (.window-room .room-scene uses aspect-ratio 1.72). */
 export const WORLD_SCENE_ASPECT = 1 / 1.72;
@@ -49,11 +51,16 @@ const plans:Record<CharacterMode,WorldRoomPlan>={
   f("pillars","rune pillars","flame",p(50,20),p(51,35),"n"),
  ],[r(0,50,10,70,"left cabinet")]),
  horror:{
-  bounds:{x1:20,y1:49,x2:92,y2:95},
+  // x2 reaches the visible floor right of the front armchair (beside the TV): a third pocket for crowds.
+  bounds:{x1:20,y1:49,x2:96,y2:95},
   obstacles:[r(0,30,24,72,"fireplace"),r(25,44,37,70,"back left armchair"),r(59,44,71,68,"back right armchair"),
    r(9,56,37,100,"front left armchair"),r(62,56,89,100,"front right armchair"),r(30,56,66,86,"seance table"),r(86,48,100,72,"television")],
   homes:[p(41,52),p(53,52),p(77,52),p(83,52),p(44,89),p(56,89),p(50,92),p(47,52),p(74,52)],
-  visits:[p(56,52),p(38,52),p(83,52),p(74,52),p(53,92),p(41,89),p(59,92),p(50,52),p(80,52)],
+  // Each visit stays in its Pal home's pocket; back-row visits sit at y 49 so they are not on top of a Pal home.
+  visits:[p(56,49),p(41,49),p(83,49),p(74,49),p(53,92),p(41,89),p(59,92),p(50,49),p(80,49)],
+  // Imported visitors start spread over all four separate floor pockets (incl. right of the front armchair),
+  // so a full room does not pile up behind the armchairs.
+  entries:[p(41,89),p(92,79),p(59,92),p(95,88),p(74,49),p(50,49),p(92,94)],
   fixtures:[
    f("ouija","ouija board","candle",p(48,60),p(47,52),"s"),
    f("tv","static television","tv",p(92,45),p(83,52),"e"),
@@ -183,8 +190,11 @@ export function worldSnap(target:WorldPoint,theme:CharacterMode):WorldPoint|null
  return id<0?null:pointOf(g,id);
 }
 const STEPS=[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]] as const;
-/** A* eight-direction foot path on the theme grid; diagonal moves cannot cut furniture corners. Empty when unreachable. */
-export function worldPath(from:WorldPoint,to:WorldPoint,theme:CharacterMode):WorldPoint[]{
+/**
+ * A* eight-direction foot path on the theme grid; diagonal moves cannot cut furniture corners. Empty when unreachable.
+ * `avoid` marks extra temporarily blocked cells (other characters) for crowd detours; the goal cell is never avoided.
+ */
+export function worldPath(from:WorldPoint,to:WorldPoint,theme:CharacterMode,avoid?:(point:WorldPoint)=>boolean):WorldPoint[]{
  const g=gridOf(theme),start=nearestFree(g,from),end=nearestFree(g,to);
  if(start<0||end<0)return [];
  if(start===end)return [pointOf(g,start)];
@@ -204,6 +214,7 @@ export function worldPath(from:WorldPoint,to:WorldPoint,theme:CharacterMode):Wor
   for(const [dc,dr] of STEPS){
    const nc=c+dc,nr=row+dr;
    if(nc<0||nr<0||nc>=g.width||nr>=g.height||g.blocked[nr*g.width+nc])continue;
+   if(avoid&&nr*g.width+nc!==end&&avoid(pointOf(g,nr*g.width+nc)))continue;
    if(dc&&dr&&(g.blocked[row*g.width+nc]||g.blocked[nr*g.width+c]))continue;
    const next=nr*g.width+nc,total=cost[current]!+(dc&&dr?Math.SQRT2:1);
    if(total<cost[next]!){prev[next]=current;cost[next]=total;score[next]=total+guess(next);open.add(next);}

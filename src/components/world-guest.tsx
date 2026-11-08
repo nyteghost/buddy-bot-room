@@ -11,7 +11,8 @@ import { worldDepthZ } from "@/lib/world-floor";
 import { worldActorDepthScale } from "@/lib/world-navigation";
 import { WORLD_LEG_EXTENSION,worldGuestBody,worldLegRow,worldTallSprite } from "@/lib/world-proportions";
 import { worldGroundGrid,worldStandingFoot } from "@/lib/world-scale";
-import { worldStepFrame,type WorldGait,type WorldWanderAction } from "@/lib/world-wander";
+import { WORLD_GAITS,worldStepFrame,type WorldGait,type WorldWanderAction } from "@/lib/world-wander";
+import { WORLD_CROWD_PRIORITY,useWorldCrowd,worldCrowdTieBreak,worldCrowdView } from "@/lib/world-crowd";
 import { useWorldActor,useWorldFixtureUse,worldGreeting,worldPresenceSnapshot } from "@/lib/world-presence";
 
 const artById=new Map<GuestId,string[]>();
@@ -31,6 +32,8 @@ export function worldMotionFor(action:WorldWanderAction|"talk"):PalMotion{
   default:return "idle";
  }
 }
+/** Crowd footprint scale by body type (1 = adult human). */
+const GUEST_CROWD_SCALE={humanoid:1,compact:1.1,robot:1,creature:0.8,floating:0.9,object:0.9} as const;
 /** A display-only character; click to wave, never sends a chat or tool request. */
 export function WorldGuest({id,theme,active,cue,paused=false}:{id:GuestId;theme:CharacterMode;active:boolean;cue?:WorldRoomCue;paused?:boolean}){
  const [elapsed,setElapsed]=useState(0),[greet,setGreet]=useState(false);
@@ -38,11 +41,14 @@ export function WorldGuest({id,theme,active,cue,paused=false}:{id:GuestId;theme:
  const animate=active&&!paused&&!reduced&&!low&&!hidden;
  const reacting=!!cue&&!paused&&!reduced&&!low&&!hidden;
  useEffect(()=>{prev.current=performance.now();},[animate,reacting]);
- useCalmInterval(()=>{const now=performance.now(),delta=now-prev.current;prev.current=now;setElapsed(t=>advanceMotionClock(t,delta));},100,animate||reacting);
+ const gait=guestGait(id),actor="guest:"+id,slot=guestIds.indexOf(id);
+ // Shared room crowd: guests give way to Pals and visitors and never walk through anyone (world-crowd.ts).
+ const crowd=useWorldCrowd({theme,time:elapsed,active:animate,member:{id:actor,priority:WORLD_CROWD_PRIORITY.guest+worldCrowdTieBreak(actor),speed:WORLD_GAITS[gait].speed,scale:GUEST_CROWD_SCALE[worldGuestBody(id)],
+  plan:t=>{const p=guestWanderPose(id,slot,theme,t,gait);return {x:p.x,y:p.y,walking:p.walking,facing:p.facing};}}});
+ useCalmInterval(()=>{const now=performance.now(),delta=now-prev.current;prev.current=now;if(animate)crowd.advance(delta);setElapsed(t=>advanceMotionClock(t,delta));},100,animate||reacting);
  useEffect(()=>{if(!greet)return;const timeout=window.setTimeout(()=>setGreet(false),2000);return()=>window.clearTimeout(timeout);},[greet]);
- const gait=guestGait(id),actor="guest:"+id;
  // Paused guests keep their last position (the clock simply stops) instead of snapping back to the start.
- const pose=guestWanderPose(id,guestIds.indexOf(id),theme,elapsed,gait);
+ const pose=worldCrowdView(guestWanderPose(id,slot,theme,crowd.pose?.time??elapsed,gait),crowd.pose,"facing");
  const standing=pose.dwelling&&(pose.action==="idle"||pose.action==="look");
  const {rootRef,labelRef,labelHidden}=useWorldActor(actor,pose.x,pose.y,animate&&standing,true,elapsed);
  const greeting=animate&&standing?worldGreeting({id:actor,x:pose.x,y:pose.y,dwelling:true,at:Date.now()},worldPresenceSnapshot(),Date.now()):null;

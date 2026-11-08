@@ -15,6 +15,8 @@ import { WORLD_GAITS, worldGaitOf, worldStepFrame } from "@/lib/world-wander";
 import { useWorldActor, useWorldFixtureUse, worldGreeting, worldPresenceSnapshot } from "@/lib/world-presence";
 import { worldMotionFor } from "./world-guest";
 import { useWorldHdScale, worldHdScaleStyle } from "./world-hd-skin";
+import { WORLD_CROWD_PRIORITY, useWorldCrowd, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { WORLD_HEIGHT_CLASSES } from "@/lib/world-scale";
 
 /** Cosmetic animation only, using the existing obstacle-aware room route. */
 export function WorldCustomGuest({ character, index, theme, active, cue, paused = false }: {
@@ -26,10 +28,18 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
  const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
  const animate = active && !paused && !reduced && !low && !hidden;
  useEffect(() => { previous.current = performance.now(); }, [animate]);
+ const gait = worldGaitOf(character.hd3?.movement), actor = "custom:" + character.id;
+ // Shared room crowd (world-crowd.ts): visitors give way to Pals, keep right, wait or detour; never walk through anyone.
+ const crowd = useWorldCrowd({ theme, time: routeElapsed, active: animate, member: { id: actor, priority: WORLD_CROWD_PRIORITY.visitor + worldCrowdTieBreak(actor),
+  speed: WORLD_GAITS[gait].speed, scale: WORLD_HEIGHT_CLASSES[character.hd3?.height ?? "adult"],
+  plan: t => { const p = guestWanderPose(character.id, index + 8, theme, t, gait); return { x: p.x, y: p.y, walking: p.walking, facing: p.facing }; } } });
+ const clockRef = useRef({ elapsed, routeElapsed }); clockRef.current = { elapsed, routeElapsed };
  useCalmInterval(() => {
   const now = performance.now();
   const delta = now - previous.current;
   previous.current = now;
+  const step = Math.max(0, Math.min(250, Number.isFinite(delta) ? delta : 0)), at = clockRef.current.elapsed;
+  crowd.advance(step - (gesture ? Math.max(0, Math.min(step, gesture.start + gesture.duration - at)) : 0));
   setClock(clock => {
    const next = advanceMotionClock(clock.elapsed, delta);
    const step = next - clock.elapsed;
@@ -37,9 +47,8 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
    return {elapsed:next, routeElapsed:clock.routeElapsed + (step - held)};
   });
  }, 50, animate);
- const gait = worldGaitOf(character.hd3?.movement), actor = "custom:" + character.id;
  // Keep the last route position while paused instead of returning to the start. Custom guests start after the built-in spots.
- const pose = guestWanderPose(character.id, index + 8, theme, routeElapsed, gait);
+ const pose = worldCrowdView(guestWanderPose(character.id, index + 8, theme, crowd.pose?.time ?? routeElapsed, gait), crowd.pose, "facing");
  const gestureActive = gesture !== null && elapsed - gesture.start < gesture.duration;
  const standing = !gestureActive && pose.dwelling && (pose.action === "idle" || pose.action === "look");
  const { rootRef, labelRef, labelHidden } = useWorldActor(actor, pose.x, pose.y, animate && standing, true, elapsed);

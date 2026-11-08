@@ -7,6 +7,9 @@ import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan, type WorldPose 
 import { useWorldActor, useWorldFixtureUse } from "@/lib/world-presence";
 import { useWorldPalSkin } from "@/lib/world-pal-skins";
 import { WorldHdSkin } from "./world-hd-skin";
+import { WORLD_CROWD_PRIORITY, useWorldCrowd, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { worldPalBody } from "@/lib/world-proportions";
+import { WORLD_GAITS } from "@/lib/world-wander";
 import { hasFacingArt } from "@/lib/pal-art";
 import { cn } from "@/lib/utils";
 import { ambientMotion, advanceMotionClock, type PalMotion } from "@/lib/pal-motion";
@@ -28,10 +31,21 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
   const wandering = visible && enabled && (playful || (world && active)) && !reduced && !low;
   // The walk is redrawn 10 times a second; it pauses in hidden windows, hidden tabs, low-power mode, or reduced motion.
   useEffect(() => { lastTick.current = performance.now(); }, [wandering]);
+  const station = officeStations[id];
+  const themeWorld=world && mode!=="linux" && mode!=="assistant" && mode!=="devteam";
+  const sceneHome=themeWorld ? worldRoomPlan(mode).homes[index]! : {x:station.home[0],y:station.home[1]};
+  // Living World crowd (world-crowd.ts): strolling Pals have right of way; Pals at a desk or in office choreography are fixed obstacles.
+  const crowdMember = world && enabled && visible;
+  const planned = crowdMember && themeWorld && !active && playful;
+  const officeAt = !themeWorld && crowdMember && playful && !active ? officePose(id,index,elapsed) : null;
+  const crowd = useWorldCrowd({ theme: mode, time: elapsed, active: wandering, fixedAt: planned || !crowdMember ? null : officeAt ? { x: officeAt.x, y: officeAt.y } : sceneHome,
+    member: crowdMember ? { id: "pal:" + id, priority: WORLD_CROWD_PRIORITY.pal + worldCrowdTieBreak("pal:" + id), speed: WORLD_GAITS.humanoid.speed, scale: worldPalBody(id) === "object" ? 0.9 : 1,
+      ...(planned ? { plan: (t: number) => { const p = worldPose(id, index, t, mode); return { x: p.x, y: p.y, walking: p.walking, facing: p.heading }; } } : {}) } : null });
   useCalmInterval(() => {
     const now = performance.now();
     const delta = now - lastTick.current;
     lastTick.current = now;
+    if (planned) crowd.advance(delta);
     setElapsed(value => advanceMotionClock(value, delta));
   }, 100, wandering);
   useEffect(() => {
@@ -44,10 +58,7 @@ export function OfficePal({ id, index, mode, active, enabled, playful = false, v
     const timer = window.setTimeout(() => setArrived(true), 1000);
     return () => window.clearTimeout(timer);
   }, [active]);
-  const station = officeStations[id];
-  const themeWorld=world && mode!=="linux" && mode!=="assistant" && mode!=="devteam";
-  const sceneHome=themeWorld ? worldRoomPlan(mode).homes[index]! : {x:station.home[0],y:station.home[1]};
-  const pose = themeWorld ? worldPose(id,index,elapsed,mode) : officePose(id,index,elapsed);
+  const pose = themeWorld ? worldCrowdView(worldPose(id,index,crowd.pose?.time ?? elapsed,mode), planned ? crowd.pose : null, "heading") : officePose(id,index,elapsed);
   const directional = world || hasFacingArt(id);
   const displayLabel=world && mode!=="linux" && mode!=="assistant" && mode!=="devteam" ? agentName(id,mode==="hellraiser",mode==="horror",mode) : station.label;
   const atDesk = Math.hypot(pose.x - sceneHome.x, pose.y - sceneHome.y) < .2;

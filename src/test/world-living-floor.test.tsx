@@ -81,3 +81,33 @@ describe("reversible HD looks for the original Pals",()=>{
   expect(borrowed.container.querySelector("img")?.getAttribute("data-hd-fallback")).toBe("facing+clip");
  });
 });
+
+import {OfficePal} from "@/components/office-pal";
+import {WorldCustomGuest} from "@/components/world-custom-guest";
+import {worldCrowd} from "@/lib/world-crowd";
+describe("Living World crowd wiring",()=>{
+ it("guests and imported visitors join the room crowd and leave it on unmount",()=>{
+  const guest=render(<WorldGuest id="arcade-ghost" theme="normal" active/>);
+  const visitor=render(<WorldCustomGuest character={starterCustomCharacter()} index={0} theme="normal" active/>);
+  expect(worldCrowd("normal").has("guest:arcade-ghost")).toBe(true);
+  expect(worldCrowd("normal").has("custom:"+starterCustomCharacter().id)).toBe(true);
+  guest.unmount();visitor.unmount();
+  expect(worldCrowd("normal").size).toBe(0);
+ });
+ it("Classic Pals never join; Living World desk-choreography Pals are fixed obstacles; strolling Pals follow the crowd",()=>{
+  const classic=render(<OfficePal id="nova" index={0} mode="linux" active={false} enabled/>);
+  expect(worldCrowd("linux").has("pal:nova")).toBe(false);
+  classic.unmount();
+  const desk=render(<OfficePal id="byte" index={1} mode="linux" active={false} enabled world playful/>);
+  expect(worldCrowd("linux").pose("pal:byte")?.mode).toBe("fixed");
+  desk.unmount();
+  expect(worldCrowd("linux").has("pal:byte")).toBe(false);
+  vi.useFakeTimers();
+  const strolling=render(<OfficePal id="sage" index={2} mode="matrix" active={false} enabled world playful/>);
+  act(()=>vi.advanceTimersByTime(3000));
+  const pose=worldCrowd("matrix").pose("pal:sage");
+  expect(pose?.mode).not.toBe("fixed");
+  expect(pose!.time).toBeGreaterThan(0);
+  strolling.unmount();
+ });
+});

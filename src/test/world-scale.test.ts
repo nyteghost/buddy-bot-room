@@ -111,3 +111,25 @@ describe("perspective is shared per room", () => {
   expect(worldActorDepthScale("horror", 40)).toBeLessThan(1);
  });
 });
+
+describe("smooth HD illustrated art stays smooth (owner direction 2026-11-07)", () => {
+ it("only grid-aligned art marked crisp is drawn with nearest-neighbour pixels", () => {
+  const css = readFileSync("src/styles.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ selector: m[1]!.trim(), body: m[2]! }));
+  const hdPixelated = rules.filter(r => /image-rendering\s*:\s*pixelated/.test(r.body) && /world-pal-hd-art|world-custom-guest|world-guest-hd-pixels/.test(r.selector));
+  // The generic built-in-guest rule is overridden for imported (custom) visitors below.
+  for (const rule of hdPixelated) for (const part of rule.selector.split(",")) {
+   if (part.trim() === ".world-guest-hd-pixels") continue;
+   expect(part).toContain("world-hd-crisp");
+  }
+  expect(rules.some(r => r.selector === ".world-custom-guest .world-guest-hd-pixels" && /image-rendering\s*:\s*auto/.test(r.body))).toBe(true);
+ });
+ it("never snaps painted art to pixel multiples or enlarges it past the measured height", () => {
+  for (const dpr of [1, 2, 3]) for (const phone of [false, true]) {
+   const r = worldHdScale({ metrics: { grid: 1, top: 20, foot: 247 }, worldPixel: worldPixelSize(phone, dpr), devicePixelRatio: dpr });
+   expect(r.crisp).toBe(false);
+   expect(r.heightRatio).toBeCloseTo(1, 3);
+   expect(r.size).toBeCloseTo(worldHumanHeight(worldPixelSize(phone, dpr)) * 256 / 228, 2);
+  }
+ });
+});
