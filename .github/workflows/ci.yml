@@ -27,6 +27,8 @@ jobs:
           ADHD_PHOTO_BETA_CODE_PATH=/tmp/adhd-photo-code-fixture ADHD_PHOTO_BETA_DATA_PATH=/tmp/adhd-photo-data-fixture \
             docker compose -f tools/adhd-v02/photo-beta-service.yml --profile adhd-photo-beta config --quiet
           bash tools/adhd-v02/test-unified-compose.sh
+      - name: ADHD photo beta preflight regression (mocked Unraid)
+        run: python3 -B tools/adhd-v02/test_photo_beta_readonly_preflight.py
       - name: ADHD piped Unraid diagnostic regression (mocked Docker)
         run: python3 -B tools/adhd-v02/test_complete_readonly_diagnostics.py
       - name: ADHD proxy route audit (synthetic, offline)
