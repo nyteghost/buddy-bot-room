@@ -43,6 +43,21 @@ async function step(name, fn) {
   catch (e) { await page.screenshot({path:"/tmp/pixel-smoke-failure.png"}).catch(()=>undefined); problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); console.log(`FAIL ${name}: ${e.message}`); }
 }
 
+
+// Desktop controls live in a separate draggable window. Reopen it before
+// a control-focused step to guarantee it is on top of the Pal Room canvas.
+async function showRoomSettings() {
+  const toggle=page.getByRole("button",{name:"Room settings",exact:true});
+  if(!await toggle.isVisible().catch(()=>false))return;
+  if(await toggle.getAttribute("aria-expanded")==="true")await toggle.click();
+  await toggle.click();
+  await page.locator('[data-window-id="room-settings"]').waitFor({state:"visible"});
+}
+async function hideRoomSettings() {
+  const toggle=page.getByRole("button",{name:"Room settings",exact:true});
+  if(await toggle.isVisible().catch(()=>false)&&await toggle.getAttribute("aria-expanded")==="true")await toggle.click();
+}
+
 await step("home page loads", async () => {
   const r = await page.goto(URL_, { waitUntil: "domcontentloaded", timeout: 60000 });
   // The sign-in page is served with 401 before the first login; anything else that isn't OK is a real failure.
@@ -274,6 +289,7 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   const minimizeCompanion = companion.getByRole("button", { name: "Minimize Focus Assist" });
   if (await minimizeCompanion.count()) await minimizeCompanion.click();
   await companion.getByRole("button", { name: "Expand Focus Assist" }).waitFor();
+  await showRoomSettings();
   const activity = page.getByRole("region", { name: "Pal Room activities" });
   await activity.getByText(/Byte is working beside you/).waitFor();
   const quest = page.getByRole("region", { name: "Tiny Quest Corner" });
@@ -313,6 +329,7 @@ await step("Focus Assist body double and saved checkpoint", async () => {
 await step("Living Pal Room task board, quick start, and calm/playful controls", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const board = page.getByRole("region", { name: "Living Task Board" });
   await board.getByRole("button", { name: "Add a thought" }).click();
@@ -1194,14 +1211,14 @@ await step("Character Universe custom art, guest roster and interaction controls
   await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
   const roomEntry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
   if(await roomEntry.getAttribute("aria-pressed")!=="true")await roomEntry.click();
-  const room=page.locator('[data-window-id="room"]');
-  const activities=room.getByRole("region",{name:"Pal Room activities"});
+  await showRoomSettings();
+  const activities=page.getByRole("region",{name:"Pal Room activities"});
   const mood=activities.getByRole("button",{name:/^Switch Pal Room to (Calm|Playful)$/});
   if(await mood.getAttribute("aria-pressed")!=="true")await mood.click();
   await activities.getByRole("button",{name:"Wave to all Pals"}).waitFor();
   await activities.getByRole("button",{name:"Wave to all Pals"}).click();
   await page.locator('.room-scene .office-pal[data-world-cue="wave"]').first().waitFor({state:"visible"});
-  const library=room.locator("details.world-character-library");
+  const library=page.locator(".room-settings-content details.world-character-library");
   await library.locator("summary").click();
   await library.getByText("Goku · Fan Tribute",{exact:true}).waitFor();
   await library.getByText("Homer · Fan Tribute",{exact:true}).waitFor();
@@ -1212,7 +1229,7 @@ await step("Character Universe custom art, guest roster and interaction controls
   await editor.getByRole("button",{name:"Close editor"}).click();
 });
 for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, approve, render, and clean up`,async()=>{
-  const library=page.locator('[data-window-id="room"] details.world-character-library');
+  const library=page.locator(".room-settings-content details.world-character-library");
   await library.waitFor({state:"visible"});
   if(await library.getAttribute("open")===null)await library.locator("summary").click();
   const pack=hdCharacterSmokeZip(version);
@@ -1297,6 +1314,7 @@ const gallery = [];
 await step("HD office keeps enabled built-in guests (no disappearing, no duplicates) and restores them", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const appearance = mood.getByRole("group", { name: "Room appearance" });
   const library = page.locator('[data-window-id="room"] details.world-character-library');
@@ -1341,6 +1359,7 @@ await step("HD office keeps enabled built-in guests (no disappearing, no duplica
 await step("Living Universe HD office preview: Room Appearance flag, camera, honest ambient life, fallback", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   await page.getByRole("combobox", { name: "Theme", exact: true }).click();
   await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
@@ -1420,6 +1439,7 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
 await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cosmetic and reversible", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const appearance = mood.getByRole("group", { name: "Room appearance" });
   const library = page.locator('[data-window-id="room"] details.world-character-library');
