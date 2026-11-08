@@ -18,16 +18,16 @@ This change is a **staging service within the existing Pixel Pals beta Compose p
 
 The repo includes a self-contained Bash script `tools/adhd-v02/photo-beta-readonly-preflight.sh`. It **does not** run `docker compose up/down`, start/stop/restart containers, read database contents, expose secrets, change networks or write to appdata. It reads Docker project labels/status, checks for the proposed staging container/port, and performs a GET to the existing gaming-PC Ollama `/api/tags`.
 
-From the Unraid terminal, review the [pinned script source](https://github.com/nyteghost/buddy-bot-room/blob/ad3222269f7cce1e0f324b161ea66eab2cadcdb3/tools/adhd-v02/photo-beta-readonly-preflight.sh), then run:
+From the Unraid terminal, review the [pinned script source](https://github.com/nyteghost/buddy-bot-room/blob/5b677e0559aa3f1fb50b5502d0417148cdbef7c6/tools/adhd-v02/photo-beta-readonly-preflight.sh), then run:
 
 ```bash
 curl -fsSL --retry 2 -o /tmp/adhd-photo-preflight.sh \
-  https://raw.githubusercontent.com/nyteghost/buddy-bot-room/ad3222269f7cce1e0f324b161ea66eab2cadcdb3/tools/adhd-v02/photo-beta-readonly-preflight.sh
+  https://raw.githubusercontent.com/nyteghost/buddy-bot-room/5b677e0559aa3f1fb50b5502d0417148cdbef7c6/tools/adhd-v02/photo-beta-readonly-preflight.sh
 bash -n /tmp/adhd-photo-preflight.sh
 bash /tmp/adhd-photo-preflight.sh
 ```
 
-This downloads a **version-pinned** script only to temporary storage; it leaves the current Compose project and appdata untouched. Share only the status summary; if anything unexpected or sensitive appears, redact it. **Do not run a full-stack Compose Up.** A passing static preflight still does not authorize activation or prove authenticated iPhone HTTPS behavior.
+This downloads a **version-pinned** script only to temporary storage; it leaves the current Compose project and appdata untouched. Share only the status summary; if anything unexpected or sensitive appears, redact it. **Do not run a full-stack Compose Up.** A passing static preflight still does not authorize activation or prove authenticated iPhone HTTPS behavior. Version 5b677e05 fixes an earlier contradictory port message and fails closed if socket inspection fails.
 
 ## Additive Compose overlay
 
