@@ -2852,3 +2852,9 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
  .hd-office-toolbar button,.hd-office-toolbar select{min-height:34px;min-width:34px;padding:0 6px;}.hd-office-toolbar select{max-width:92px;}
  .hd-follow-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}.hd-zoom{min-width:30px;}.hd-tag{font-size:10px;}.hd-office-badge{top:28px;}}
 @media (prefers-reduced-motion:reduce){.hd-office-env .hd-screen-busy{filter:none;}}
+/* The room's own overlays (status bar, XP, ticker, quick launchers) stay usable above the HD office. */
+.room-scene.hd-world .scene-top,.room-scene.hd-world .live-progress,.room-scene.hd-world .live-ticker,.room-scene.hd-world .live-shelf{z-index:150;}
+.room-scene.hd-world .live-shelf,.room-scene.hd-world .live-ticker,.room-scene.hd-world .scene-top{pointer-events:none;}
+.room-scene.hd-world .live-obj,.room-scene.hd-world .scene-top button{pointer-events:auto;}
+.room-scene.hd-world .live-progress{right:auto;left:8px;top:54px;}
+@media (max-width:700px){.room-scene.hd-world .hd-office-toolbar{top:28px;bottom:auto;}.room-scene.hd-world .hd-office-badge{top:66px;left:4px;}.room-scene.hd-world .live-progress{display:none;}}

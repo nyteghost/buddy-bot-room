@@ -1907,7 +1907,7 @@ export function Room() {
     );
   }
   // Living Universe HD office preview: only real agent state (an active reply or a focus session) can show a Pal working.
-  const hdWorld = livingWorld && !assistantOn && worldUsesHdOffice(roomAppearance, characterMode, deviceHints);
+  const hdWorld = livingWorld && worldUsesHdOffice(roomAppearance, characterMode, deviceHints); // the Linux theme is the assistant-family office
   const hdPals = agents.map(a => ({ id: a.id, name: agentName(a.id, hell, characterMode === "horror", characterMode),
     enabled: enabled.includes(a.id) || focusCompanion?.pal === a.id,
     real: running && speaking === a.id ? "responding" as const : focusCompanion && !focusBreak && focusCompanion.pal === a.id ? "focus" as const : null }));
