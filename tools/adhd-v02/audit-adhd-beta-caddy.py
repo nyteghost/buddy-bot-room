@@ -125,11 +125,34 @@ def inspect(data: object) -> dict:
                 listener_types.add("other")
         walk(server.get("routes", []))
 
+    # Certificate type is reported only as booleans. Never print paths, names,
+    # raw policies, secret credentials or issuer account configuration.
+    tls = apps.get("tls")
+    tls = tls if isinstance(tls, dict) else {}
+    certs = tls.get("certificates")
+    certs = certs if isinstance(certs, dict) else {}
+    explicit_certificates = bool(certs.get("load_files"))
+    automation = tls.get("automation")
+    automation = automation if isinstance(automation, dict) else {}
+    policies = automation.get("policies")
+    policies = policies if isinstance(policies, list) else []
+    issuer_types = set()
+    for policy in policies:
+        issuers = policy.get("issuers") if isinstance(policy, dict) else None
+        if isinstance(issuers, list):
+            for issuer in issuers:
+                if isinstance(issuer, dict) and isinstance(issuer.get("module"), str):
+                    issuer_types.add(issuer["module"].lower())
+
     return {
         "audit": "read_only_structure_no_credentials",
         "caddy_servers": counters["servers"],
         "listener_classes": sorted(listener_types),
         "https_policy_servers": counters["https_policy_servers"],
+        "existing_explicit_tls_certificate_files": explicit_certificates,
+        "existing_internal_ca_issuer": "internal" in issuer_types,
+        "existing_acme_issuer": "acme" in issuer_types,
+        "existing_tailscale_issuer": "tailscale" in issuer_types,
         "production_adhd_loopback_routes": counters["localhost_native_routes"],
         "production_adhd_routes_with_basic_auth_before_proxy":
             counters["native_routes_with_prior_basic_auth"],
