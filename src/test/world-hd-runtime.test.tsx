@@ -8,7 +8,7 @@ import {lowPower} from "@/lib/power";
 import {parseCharacterZip} from "@/lib/character-zip";
 import type {WorldHdCharacter,WorldHdClip} from "@/lib/world-hd";
 vi.mock("@/lib/character-zip",()=>({CHARACTER_ZIP_MAX_BYTES:8000000,parseCharacterZip:vi.fn()}));
-vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestPose:(_id:unknown,_theme:unknown,elapsed:number)=>({x:30+elapsed/1000,y:40,facing:"e",action:"walking"})}));
+vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestWanderPose:(_seed:unknown,_slot:unknown,_theme:unknown,elapsed:number)=>({x:30+elapsed/200,y:80,facing:"e",action:"walking",walking:true,travelled:elapsed/200,dwelling:false})}));
 const clip=(names:string[],loop=true):WorldHdClip=>({frames:names.map((src,i)=>({src,durationMs:i?300:100})),loop});
 const art:WorldHdCharacter={version:2,artStatus:"prototype",movement:"humanoid",directions:{s:{idle:clip(["south"]),signature:clip(["signature"])},e:{idle:clip(["east"]),walk:clip(["walk1","walk2"]),signature:clip(["sig-east"])}}};
 const character=()=>({...starterCustomCharacter(),name:"Test Hero",hd3:art});
@@ -81,7 +81,18 @@ describe("HD256 runtime",()=>{
   expect(actor.style.getPropertyValue("--world-guest-x")).toBe(x);
   expect(actor.getAttribute("data-action")).toBe("walking");
   act(()=>vi.advanceTimersByTime(100));
-  expect(parseFloat(actor.style.getPropertyValue("--world-guest-x"))-parseFloat(x)).toBeCloseTo(0.1);
+  expect(parseFloat(actor.style.getPropertyValue("--world-guest-x"))-parseFloat(x)).toBeCloseTo(0.5); // mock route walks 5%/s
+ });
+ it("marks in the room when art is borrowed from another facing or clip, and not when it is supplied",()=>{
+  const full=render(<WorldCustomGuest character={character()} index={0} theme="normal" active/>);
+  expect(full.container.querySelector(".world-custom-guest")?.hasAttribute("data-hd-fallback")).toBe(false);
+  full.unmount();
+  const frontOnly={...character(),hd3:{...art,directions:{s:{idle:clip(["south"])}}}};
+  const view=render(<WorldCustomGuest character={frontOnly} index={0} theme="normal" active/>);
+  const actor=view.container.querySelector(".world-custom-guest")!;
+  expect(actor.getAttribute("data-hd-fallback")).toBe("facing+clip");
+  expect(actor.getAttribute("data-facing")).toBe("s");
+  expect(screen.getByRole("img").getAttribute("src")).toBe("south");
  });
  it("previews directions and timed actions, preserving the frame on pause",()=>{
   vi.useFakeTimers();render(<HdCharacterPreview character={character()}/>);

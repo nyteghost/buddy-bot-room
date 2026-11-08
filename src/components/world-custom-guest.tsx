@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { WorldCustomCharacter } from "@/lib/world-custom-packs";
-import { guestIds, guestPose } from "@/lib/world-guest-packs";
+import { guestWanderPose } from "@/lib/world-guest-packs";
 import { useCalmInterval, lowPower, useTabHidden } from "@/lib/power";
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { advanceMotionClock } from "@/lib/pal-motion";
@@ -9,6 +9,15 @@ import { worldReactionFrame } from "@/lib/world-animation";
 import { worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs";
 import { spriteRuns } from "@/lib/sprite-upscale";
 import { selectWorldHdClip, worldHdAction, worldHdFrameAt } from "@/lib/world-hd-animation";
+import { worldDepthZ } from "@/lib/world-floor";
+import { worldActorDepthScale } from "@/lib/world-navigation";
+import { WORLD_GAITS, worldGaitOf, worldStepFrame } from "@/lib/world-wander";
+import { useWorldActor, useWorldFixtureUse, worldGreeting, worldPresenceSnapshot } from "@/lib/world-presence";
+import { worldMotionFor } from "./world-guest";
+import { useWorldHdScale, worldHdScaleStyle } from "./world-hd-skin";
+import { WORLD_CROWD_PRIORITY, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { useWorldCrowd } from "@/lib/world-crowd-react";
+import { WORLD_HEIGHT_CLASSES } from "@/lib/world-scale";
 
 /** Cosmetic animation only, using the existing obstacle-aware room route. */
 export function WorldCustomGuest({ character, index, theme, active, cue, paused = false }: {
@@ -20,10 +29,18 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
  const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
  const animate = active && !paused && !reduced && !low && !hidden;
  useEffect(() => { previous.current = performance.now(); }, [animate]);
+ const gait = worldGaitOf(character.hd3?.movement), actor = "custom:" + character.id;
+ // Shared room crowd (world-crowd.ts): visitors give way to Pals, keep right, wait or detour; never walk through anyone.
+ const crowd = useWorldCrowd({ theme, time: routeElapsed, active: animate, member: { id: actor, priority: WORLD_CROWD_PRIORITY.visitor + worldCrowdTieBreak(actor),
+  speed: WORLD_GAITS[gait].speed, scale: WORLD_HEIGHT_CLASSES[character.hd3?.height ?? "adult"],
+  plan: t => { const p = guestWanderPose(character.id, index + 8, theme, t, gait); return { x: p.x, y: p.y, walking: p.walking, facing: p.facing }; } } });
+ const clockRef = useRef({ elapsed, routeElapsed }); clockRef.current = { elapsed, routeElapsed };
  useCalmInterval(() => {
   const now = performance.now();
   const delta = now - previous.current;
   previous.current = now;
+  const step = Math.max(0, Math.min(250, Number.isFinite(delta) ? delta : 0)), at = clockRef.current.elapsed;
+  crowd.advance(step - (gesture ? Math.max(0, Math.min(step, gesture.start + gesture.duration - at)) : 0));
   setClock(clock => {
    const next = advanceMotionClock(clock.elapsed, delta);
    const step = next - clock.elapsed;
@@ -31,31 +48,44 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
    return {elapsed:next, routeElapsed:clock.routeElapsed + (step - held)};
   });
  }, 50, animate);
- const routeId = guestIds[index % guestIds.length]!;
- // Keep the last route position while paused instead of returning to the start.
- const pose = guestPose(routeId, theme, routeElapsed + index * 2200);
- const reaction = worldCueReaction(cue, character.id, Date.now(), paused || reduced || low || hidden);
+ // Keep the last route position while paused instead of returning to the start. Custom guests start after the built-in spots.
+ const pose = worldCrowdView(guestWanderPose(character.id, index + 8, theme, crowd.pose?.time ?? routeElapsed, gait), crowd.pose, "facing");
  const gestureActive = gesture !== null && elapsed - gesture.start < gesture.duration;
- const fallbackAction = gestureActive && gesture.action === "wave" ? "wave" : pose.action;
+ const standing = !gestureActive && pose.dwelling && (pose.action === "idle" || pose.action === "look");
+ const { rootRef, labelRef, labelHidden } = useWorldActor(actor, pose.x, pose.y, animate && standing, true, elapsed);
+ const greeting = animate && standing ? worldGreeting({ id: actor, x: pose.x, y: pose.y, dwelling: true, at: Date.now() }, worldPresenceSnapshot(), Date.now()) : null;
+ useWorldFixtureUse(actor, theme, animate && !gestureActive && pose.action === "interaction" ? pose.fixture : null);
+ const reaction = worldCueReaction(cue, character.id, Date.now(), paused || reduced || low || hidden);
+ const routeAction = greeting ? "talk" : pose.action;
+ const facing = greeting && !gestureActive ? greeting.facing : pose.facing;
+ const fallbackAction = gestureActive && gesture.action === "wave" ? "wave" : routeAction;
  const action = gestureActive ? gesture.action : reaction?.action ?? fallbackAction;
+ const walking = !gestureActive && !reaction && worldHdAction(fallbackAction) === "walk";
+ const step = walking ? worldStepFrame(pose, gait) : Math.floor(elapsed / 175) % 4;
+ const motion = worldMotionFor(fallbackAction);
  const runs = useMemo(() => character.hd || character.hd3 ? [] : spriteRuns(
-  worldReactionFrame(character.pixels, pose.facing, reaction, fallbackAction, Math.floor(elapsed / 175) % 4),
+  worldReactionFrame(character.pixels, facing, reaction, motion, step),
   (x, y) => y < 24 ? "body" : x < 16 ? "left-leg" : "right-leg"
- ), [character.pixels, character.hd, character.hd3, pose.facing, reaction, fallbackAction, elapsed]);
+ ), [character.pixels, character.hd, character.hd3, facing, reaction, motion, step]);
  const kind = worldHdAction(action);
  const art = character.hd;
  const frames = art ? (kind === "wave" ? art.wave : kind === "celebrate" ? art.celebrate : kind === "walk" ? art.walk : art.idle) ?? art.idle : undefined;
- const selected = character.hd3 ? selectWorldHdClip(character.hd3, pose.facing, kind) : undefined;
+ const selected = character.hd3 ? selectWorldHdClip(character.hd3, facing, kind) : undefined;
  const clipKey = `${character.id}:${character.hd3?.version}:${selected?.direction}:${selected?.action}:${gestureActive ? gesture?.start : "route"}`;
  const [clipClock, setClipClock] = useState({ key: clipKey, start: elapsed });
  if (clipClock.key !== clipKey) setClipClock({ key: clipKey, start: elapsed });
- const clipElapsed = clipClock.key === clipKey ? elapsed - clipClock.start : 0;
+ // Walk clips follow distance travelled (authored durations = cruising speed) so feet don't slide while easing.
+ const clipElapsed = walking && selected?.action === "walk" ? pose.travelled / WORLD_GAITS[gait].speed * 1000 :
+  clipClock.key === clipKey ? elapsed - clipClock.start : 0;
  const image = selected ? worldHdFrameAt(selected.clip, clipElapsed) : frames?.[Math.floor(elapsed / 175) % frames.length];
- const style = { "--world-guest-x": pose.x + "%", "--world-guest-y": pose.y + "%" } as CSSProperties;
+ // One in-room scale for the cast (world-scale.ts): standard adult height, feet on the anchor, crisp when possible.
+ const scale = useWorldHdScale(character);
+ const style = { "--world-guest-x": pose.x + "%", "--world-guest-y": pose.y + "%", "--world-z": String(worldDepthZ(pose.y)), "--world-depth-scale": String(worldActorDepthScale(theme, pose.y)),
+  ...(image ? worldHdScaleStyle(scale) : {}) } as CSSProperties;
  const signature = !!character.hd3 && Object.values(character.hd3.directions).some(actions => actions?.signature);
  const trigger = (action: "wave" | "signature") => {
   if (!animate) return;
-  const clip = character.hd3 ? selectWorldHdClip(character.hd3, pose.facing, action).clip : undefined;
+  const clip = character.hd3 ? selectWorldHdClip(character.hd3, facing, action).clip : undefined;
   // Hold a static pose long enough to read it; never truncate supplied animation.
   const duration = Math.max(1700, clip?.frames.reduce((sum, frame) => sum + frame.durationMs, 0) ?? 0);
   setGesture({ action, start: elapsed, duration });
@@ -67,18 +97,20 @@ export function WorldCustomGuest({ character, index, theme, active, cue, paused 
   };
   window.addEventListener("pixel-pals:hd-action", receive);
   return () => window.removeEventListener("pixel-pals:hd-action", receive);
- }, [animate, signature, character.id, character.hd3, pose.facing, elapsed]);
- return <div className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? pose.facing} data-paused={!animate}>
+ }, [animate, signature, character.id, character.hd3, facing, elapsed]);
+ return <div ref={el => { rootRef.current = el; }} className="world-guest world-custom-guest" style={style} data-action={action} data-facing={selected?.direction ?? facing} data-movement={gait} data-paused={!animate}
+  data-hd-fallback={selected ? [selected.direction !== facing && "facing", selected.action !== kind && "clip"].filter(Boolean).join("+") || undefined : undefined}>
   <button type="button" className="world-custom-actor" aria-label={"Wave to " + character.name}
    title={signature ? "Tap to wave. Shift-click or press S for signature action." : "Tap to wave"}
    onClick={event => trigger(signature && event.shiftKey ? "signature" : "wave")}
    onKeyDown={event => { if (signature && event.key.toLowerCase() === "s") { event.preventDefault(); trigger("signature"); } }}>
-   {image ? <img className="world-guest-pixels world-guest-hd-pixels" src={image} width={256} height={256} draggable={false} alt={character.name + " 256 pixel character"}/> :
+   {image ? <img className={"world-guest-pixels world-guest-hd-pixels" + (scale.grid > 1 ? " world-hd-crisp" : "")} data-hd-grid={scale.grid} data-hd-crisp={scale.crisp} data-hd-height={scale.heightRatio} src={image} width={256} height={256} draggable={false} alt={character.name + " 256 pixel character"}/> :
     <svg viewBox="0 0 32 32" className="world-guest-pixels" role="img" shapeRendering="crispEdges" aria-label={character.name + " custom pixel character"}>
      {runs.map(run => <rect key={run.x + "-" + run.y} x={run.x} y={run.y} width={run.w} height="1" fill={character.palette[run.c] ?? "transparent"}/>)}
     </svg>}
-   <span className="world-guest-name">{character.name}</span>
+   <span ref={el => { labelRef.current = el; }} className={"world-guest-name" + (labelHidden ? " world-label-hidden" : "")}>{character.name}</span>
    {animate && (action === "wave" || action === "celebrate" || action === "signature") && <span className="world-guest-spark" aria-hidden="true">✦</span>}
+  {animate && action === "talk" && <span className="world-guest-chat" aria-hidden="true">…</span>}
   </button>
   {signature && <button type="button" className="world-signature-button" aria-label={"Signature action for " + character.name} disabled={!animate} onClick={() => trigger("signature")}>✦</button>}
  </div>;

@@ -8,6 +8,7 @@ import { palActivity } from "@/lib/pal-room-life";
 import { companionActivity, type FocusSession } from "@/lib/focus-companion";
 import { useCharacterMode } from "@/lib/hellraiser";
 import { WorldCharacterLibrary } from "./world-character-library";
+import { WorldRoomAppearance } from "./world-room-appearance";
 import { AdhdHandoffPanel } from "./adhd-handoff-panel";
 import type { WorldCustomCharacter } from "@/lib/world-custom-packs";
 import "./pal-room-activities.css";
@@ -100,6 +101,7 @@ export function PalRoomActivities({ session, onStart, onPauseChange, paused, pla
             {playful ? "Calm" : "Playful"}
           </Button>
         </div>
+        {livingWorld && <WorldRoomAppearance />}
         {livingWorld && <div className="mb-2 flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="outline" aria-label="Wave to all Pals" onClick={onWaveAll}><Sparkles className="size-3.5"/>Wave to everyone</Button>
           <Button type="button" size="sm" variant="outline" aria-label="Celebrate with Pals" onClick={onCelebrateWorld}><PartyPopper className="size-3.5"/>Celebrate together</Button>

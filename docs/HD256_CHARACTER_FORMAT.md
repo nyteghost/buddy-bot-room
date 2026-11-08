@@ -47,6 +47,7 @@ select one individual pack in Character Universe.
 | `artStatus` | `prototype` or `production-approved`. The latter is the pack author's label, not independent app certification. |
 | `description` | Optional, up to 1200 characters; no controls or angle brackets. |
 | `movement` | `humanoid`, `quadruped`, `flying`, `floating`, `rolling`. Currently descriptive; species-specific route rigs are unfinished. |
+| `height` | Optional in-room height: `tiny` (0.4×), `small` (0.6×), `child` (0.8×), `adult` (default, 1×), `tall` (1.15×), `huge` (1.5×) of a standard adult. Use it for intentional exceptions (pets, spirits, dragons). Needs the app build from PR #24 or later; older builds reject unknown fields. |
 | Directions | `s`, `se`, `e`, `ne`, `n`, `nw`, `w`, `sw`. South is front-facing. |
 | Actions | `idle`, `walk`, `run`, `turn`, `talk`, `wave`, `celebrate`, `emote`, `signature`, `rest`, `interaction`. |
 | Clip | Nonempty `frames` plus a boolean `loop`. Each frame has only `file` and integer `durationMs` (40–10,000ms). |
@@ -54,6 +55,10 @@ select one individual pack in Character Universe.
 South idle is mandatory. Each provided direction must include its own idle.
 The production-approved label additionally requires idle for all eight directions.
 Missing action artwork falls back to that direction's idle, then south idle.
+When a pack has no art at all for a facing, the room first borrows the same action
+from a supplied direction 45° away (nearer the front first), then that neighbour's idle.
+A pack with no art near that facing (e.g. front-only) uses its south clip for the same action
+before south idle, so a front-only walk keeps stepping instead of sliding.
 The renderer does not mirror or invent directional frames. Supporting an action
 in the format does not mean every room behavior currently triggers it.
 
@@ -102,3 +107,67 @@ it does not overwrite installed IDs or automatically enable them.
 
 Any future Visiting Pals integration must obtain separate sharing approval and
 respect Focus Mode. This format itself transfers no memories or tool permissions.
+
+## Converting designer animation prototypes
+
+`tools/characters/convert-hd256-animation-prototype.py` packages the Character Designer's
+multi-frame prototype layouts (`pixel-pals-hd256-character-pack`, `pixel-pals-hd-asset-prototype`,
+and per-direction `pixel-pals-hd-character-pack`) as one v3 ZIP per character. It reads the source
+archive in place, copies PNG bytes unchanged, keeps `prototype` status, never invents or mirrors
+frames, and refuses an existing output folder. Use `--ids ids.json` with the IDs already installed
+and a higher `--revision` so the Character Library offers a reviewed version update. Designer action
+names map to the closest Pixel Pals action (e.g. `laugh`/`roar` → celebrate, `heal`/`potion`/`ritual`
+→ interaction, `strike`/`pounce`/`takeoff` → signature, the manifest's `signatureAction` → signature);
+movers without `walk` use `roll`, `glide`, `fly` or `hover` as their walk clip. The conversion report
+lists unmapped and missing actions. Generated packs contain private art: keep them out of git.
+
+## In-room scale: one height, one foot line, one pixel density (owner/PM feedback, 2026-11-07)
+
+Every Living World actor shares one scale (`src/lib/world-scale.ts`). The unit is the **world
+pixel**: one native Pal sprite pixel, drawn at 2 css px on desktop (1.6 at 1.25×), 1.5 css px on 2×
+phones and 1.333 css px on 3× phones. A **standard adult stands 35 world pixels tall** (top of head
+to lowest foot pixel): 70 css px on desktop, ≈47 css px on a 3× iPhone. Native Pals already measure
+35. The room never stretches one axis, never picks a per-character fudge factor and never hides a
+character's declared size.
+
+How HD256 art is placed:
+
+- **Measured, not guessed.** The room reads the pack's south idle frame once: pixel grid (blocks of
+  16, 8, 4 or 2), top opaque row, lowest opaque row (alpha > 16).
+- **Height.** The canvas is sized so the measured figure is `35 world px × height class` tall. Only
+  `height` (above) changes this; artwork whose figure fills more or less of the canvas still ends up
+  the standard height.
+- **Feet.** The canvas is lowered by its measured transparent margin under the feet, so the lowest
+  foot pixel touches the floor anchor exactly like a native Pal. Keep the baseline identical in every
+  frame and facing; walk bob belongs in the art, not in a shifting baseline.
+- **Crisp pixels.** Grid art snaps to a whole number of device pixels per art pixel when that keeps the
+  figure within 12.5% of its intended height; otherwise the exact height wins and the pack is drawn
+  pixelated at a non-integer size (slightly uneven pixel widths). Painted art (grid 1) is scaled
+  smoothly and will always read as a different, illustrated style next to pixel sprites.
+- **Perspective.** Floor rooms (control room, mansion, …) shrink everyone toward the back
+  (0.86–1.0×). Office rooms draw Pals at one fixed size, so visitors there do too.
+
+**Recommended authoring target (exact and crisp on 1×/2× desktops and 3× iPhones):** a 128×128
+master enlarged 2× (nearest-neighbour) to 256, an adult figure **70 master pixels tall** (twice the
+native Pals' 35, so HD art carries exactly 2× the native detail), feet on master row 123 (canvas rows
+246–247, bottom edge 248), head below master row 50 so hops, hair and raised arms have room.
+Smaller or larger figures still work but are rounded to the nearest crisp size or drawn at a
+non-integer scale, and the room reports the difference.
+
+| Master grid | Adult figure height | Result at standard height |
+| --- | --- | --- |
+| 128×128 (2×) | 70 px | exact, crisp everywhere (recommended) |
+| 64×64 (4×) | 62 px (e.g. Nova prototype) | crisp, 11% shorter than standard |
+| 64×64 (4×) | 35 px | exact, crisp, same chunky density as native Pals (no extra detail) |
+| painted 256 | any | exact height, smooth (not crisp pixel art) |
+
+Owner review shows these values per character (grid, figure rows, canvas size, % of target, crisp or
+not) in the private comparison page; they are a technical check, not art approval.
+
+## HD looks for the original Pals
+
+In Living World, the Character Library's **Look for a Pal** selector lets the owner dress one of the
+nine original Pals with an imported HD256 character. It is visual only and saved on that device.
+The Pal's name, personality, memories, voice, tasks and permissions do not change, and Classic mode
+is unaffected. **Restore original Pal looks** removes every mapping. If the chosen character is
+removed, or has no HD art, the Pal shows its native sprite again.

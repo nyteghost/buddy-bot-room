@@ -17,7 +17,7 @@ function pngChunk(name,bytes){
  check.writeUInt32BE(crc32(Buffer.concat([kind,bytes])));
  return Buffer.concat([length,kind,bytes,check]);
 }
-function png256(pose){
+function png256(pose,tint=0){
  const width=256,height=256,raw=Buffer.alloc(height*(1+width*4));
  for(let y=0;y<height;y++){
   const start=y*(1+width*4);
@@ -28,8 +28,8 @@ function png256(pose){
    const wave=pose==="wave"&&x>=177&&x<208&&y>=84&&y<148;
    if(!head&&!torso&&!leg&&!wave)continue;
    const at=start+1+4*x;
-   raw[at]=head?243:50;raw[at+1]=wave?195:head?177:132;
-   raw[at+2]=head?90:232;raw[at+3]=255;
+   raw[at]=head?243:50+tint;raw[at+1]=wave?195:head?177:132;
+   raw[at+2]=head?90:232-tint;raw[at+3]=255;
   }
  }
  const ihdr=Buffer.alloc(13);
@@ -60,6 +60,10 @@ export function hdCharacterSmokeZip(version=2){
   {name:"smoke/walk.png",data:png256("walk")},
   {name:"smoke/wave.png",data:png256("wave")},
  ];
+ return zipOf(entries);
+
+}
+function zipOf(entries){
  const localParts=[],centralParts=[];let offset=0;
  for(const {name,data} of entries){
   const label=Buffer.from(name),compressed=deflateRawSync(data);
@@ -84,4 +88,10 @@ export function hdCharacterSmokeZip(version=2){
  eocd.writeUInt16LE(entries.length,8);eocd.writeUInt16LE(entries.length,10);
  eocd.writeUInt32LE(size,12);eocd.writeUInt32LE(offset,16);
  return Buffer.concat([...localParts,...centralParts,eocd]);
+}
+/** Synthetic idle-only v3 pack (one front frame), shaped like the private Nova Desktop HD / Mobile Pixel samples. */
+export function idleOnlySmokeZip(id,name,revision,tint){
+ const manifest={format:"pixel-pals-character-addon",version:3,name:name+" pack",characters:[{id,name,resolution:256,revision,artStatus:"prototype",movement:"humanoid",height:"adult",
+  directions:{s:{idle:{frames:[{file:"art/idle-s.png",durationMs:1200}],loop:true}}}}]};
+ return zipOf([{name:"character-pack.json",data:Buffer.from(JSON.stringify(manifest))},{name:"art/idle-s.png",data:png256("idle",tint)}]);
 }

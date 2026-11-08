@@ -1,3 +1,4 @@
+import { isWorldHeightClass, type WorldHeightClass } from "@/lib/world-scale";
 /** Cosmetic HD animation data. These records carry no executable or AI permissions. */
 export const WORLD_HD_DIRECTIONS = ["s", "se", "e", "ne", "n", "nw", "w", "sw"] as const;
 export const WORLD_HD_ACTIONS = ["idle", "walk", "run", "turn", "talk", "wave", "celebrate", "emote", "signature", "rest", "interaction"] as const;
@@ -15,6 +16,8 @@ export type WorldHdCharacter = {
  artStatus: "prototype" | "production-approved";
  description?: string;
  movement: typeof WORLD_HD_MOVEMENTS[number];
+ /** Optional declared in-room height (world-scale.ts); absent = standard adult. */
+ height?: WorldHeightClass;
  directions: Partial<Record<WorldHdDirection, Partial<Record<WorldHdAction, WorldHdClip>>>>;
 };
 export const worldHdAssetReference = (value: unknown): value is string =>
@@ -80,10 +83,11 @@ export function worldHdPngBytes(value: unknown): Uint8Array | null {
  } catch { return null; }
 }
 export function validateWorldHdCharacter(raw: unknown): WorldHdCharacter | null {
- if (!record(raw) || !keys(raw, ["version", "artStatus", "description", "movement", "directions"]) ||
+ if (!record(raw) || !keys(raw, ["version", "artStatus", "description", "movement", "height", "directions"]) ||
   !Number.isSafeInteger(raw["version"]) || Number(raw["version"]) < 1 || Number(raw["version"]) > 1_000_000 ||
   !["prototype", "production-approved"].includes(String(raw["artStatus"])) ||
   !WORLD_HD_MOVEMENTS.includes(raw["movement"] as WorldHdCharacter["movement"]) ||
+  (raw["height"] !== undefined && !isWorldHeightClass(raw["height"])) ||
   (raw["description"] !== undefined && (typeof raw["description"] !== "string" || raw["description"].length > 1200 || /[\x00-\x1f<>]/.test(raw["description"]))) ||
   !record(raw["directions"]) || !keys(raw["directions"], WORLD_HD_DIRECTIONS)) return null;
  const directions: WorldHdCharacter["directions"] = {};
@@ -116,5 +120,6 @@ export function validateWorldHdCharacter(raw: unknown): WorldHdCharacter | null 
  if (raw["artStatus"] === "production-approved" && WORLD_HD_DIRECTIONS.some(direction => !directions[direction]?.idle)) return null;
  return { version: Number(raw["version"]), artStatus: raw["artStatus"] as WorldHdCharacter["artStatus"],
   movement: raw["movement"] as WorldHdCharacter["movement"], directions,
+  ...(raw["height"] === undefined ? {} : { height: raw["height"] as WorldHeightClass }),
   ...(raw["description"] === undefined ? {} : { description: raw["description"] as string }) };
 }

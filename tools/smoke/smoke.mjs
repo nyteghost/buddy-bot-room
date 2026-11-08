@@ -2,7 +2,7 @@
 // any uncaught page error or console error. CI runs it against a fresh production build (see .github/workflows/ci.yml).
 // Run it yourself:  PW_PATH=/path/to/node_modules/playwright SMOKE_URL=http://localhost:8090 node tools/smoke/smoke.mjs
 import { createRequire } from "node:module";
-import { hdCharacterSmokeZip } from "./hd-character-zip.mjs";
+import { hdCharacterSmokeZip, idleOnlySmokeZip } from "./hd-character-zip.mjs";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PW_PATH || "playwright");
 
@@ -344,7 +344,8 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   if (await page.evaluate(() => localStorage.getItem("pixel-pals-room-playful-v1")) !== "1") throw Error("Playful preference wasn't saved");
   const rig = page.locator('.room-scene .world-native-sprite').first();
   await rig.waitFor({ state: "visible" });
-  if (await rig.getAttribute("viewBox") !== "0 0 32 32") throw Error("Living World lost native 32px pixel models");
+  // Native 32px-wide models; Living World may add whole leg rows for adult proportions (e.g. 32×38).
+  if (!/^0 0 32 (2[4-9]|3[0-9]|4[0-4])$/.test(await rig.getAttribute("viewBox") ?? "")) throw Error("Living World lost native 32px pixel models");
   const animated = await rig.evaluate(e => e.getAnimations({ subtree: true }).some(animation => animation.playState === "running"));
   if (!animated) throw Error("Playful Living World poses are not animating");
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -1260,6 +1261,28 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
     if(held.action!=="signature"||held.before!==held.after)throw Error("Signature action did not hold the visitor in place: "+JSON.stringify(held));
     const exported=await page.request.get(URL_+"/api/character-universe?export=1");
     if(!exported.ok())throw Error("HD256 backup export failed");
+    // Living World rollout (#26): the imported HD actor walks the calibrated floor, turns to
+    // several facings, stands with its feet on its floor point, and can be removed and restored
+    // from the Library without deleting it.
+    const seen=await guest.evaluate(async img=>{
+      const actor=img.closest(".world-custom-guest"),scene=actor.closest(".room-scene"),facings=new Set(),actions=new Set();let worstFeet=0;
+      for(let i=0;i<64;i++){
+        facings.add(actor.getAttribute("data-facing"));actions.add(actor.getAttribute("data-action"));
+        // Measured while standing: positions ease over 0.1s while walking.
+        if(actor.getAttribute("data-action")!=="walk"){
+          const box=scene.getBoundingClientRect(),feetY=box.top+box.height*parseFloat(actor.style.getPropertyValue("--world-guest-y"))/100;
+          worstFeet=Math.max(worstFeet,Math.abs(actor.getBoundingClientRect().bottom-feetY));
+        }
+        await new Promise(resolve=>setTimeout(resolve,250));
+      }
+      return {facings:[...facings],actions:[...actions],worstFeet};
+    });
+    if(!seen.actions.includes("walk")||seen.facings.length<2)throw Error("Imported HD actor did not walk and turn in the room: "+JSON.stringify(seen));
+    if(seen.worstFeet>3)throw Error("Imported HD actor is not standing on its floor point: "+JSON.stringify(seen));
+    await library.getByRole("button",{name:"Disable Smoke HD Bot"}).click();
+    await guest.waitFor({state:"detached",timeout:5000});
+    await library.getByRole("button",{name:"Enable Smoke HD Bot"}).click();
+    await guest.waitFor({state:"visible",timeout:5000});
   }
   page.once("dialog",dialog=>dialog.accept());
   await library.getByRole("button",{name:"Delete Smoke HD Bot"}).click();
@@ -1269,11 +1292,239 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
   },undefined,{timeout:15000});
 });
 
+const gallery = [];
+// P1 regression guard: built-in guests (Green Jacket, Moon Mage, …) must stay in the room when the HD office is on.
+await step("HD office keeps enabled built-in guests (no disappearing, no duplicates) and restores them", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  const appearance = mood.getByRole("group", { name: "Room appearance" });
+  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  await library.waitFor({ state: "visible" });
+  if (await library.getAttribute("open") === null) await library.locator("summary").click();
+  const guests = ["Green Jacket Guy", "Moon Mage"];
+  const was = {};
+  try {
+    for (const name of guests) {
+      const toggle = library.getByRole("button", { name: new RegExp("^(Enable|Disable) " + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$") });
+      was[name] = await toggle.getAttribute("aria-pressed") === "true";
+      if (!was[name]) { await toggle.click(); await library.getByRole("button", { name: "Disable " + name }).waitFor({ timeout: 10000 }); }
+    }
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+    await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+    // Living World first: both built-in guests are drawn.
+    await page.locator(".room-scene .world-visitor").first().waitFor({ state: "attached", timeout: 8000 });
+    await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+    await page.locator(".room-scene.hd-world .hd-office").waitFor({ state: "visible", timeout: 8000 });
+    const who = (await page.getByRole("list", { name: "Who is in the room" }).locator("li").allTextContents()).join(" | ");
+    for (const name of guests) if (!who.includes(name)) throw Error(`Built-in guest "${name}" disappeared in the HD office: ${who}`);
+    if (await page.locator(".room-scene .world-visitor, .room-scene .world-guest").count()) throw Error("Built-in guests were drawn twice (Living World copy under the HD office)");
+    for (const id of ["green-jacket", "moon-mage"]) if (await page.locator(`.room-scene .hd-actor[data-actor="custom:${id}"][data-art="pixels"]`).count() !== 1) throw Error("Built-in guest " + id + " is not drawn exactly once in the HD office");
+    const actors = await page.locator('.room-scene .hd-actor[data-actor^="custom:"]').count();
+    if (actors > 6) throw Error("More than six visitors in the HD office: " + actors);
+    gallery.push({ label: "Running app (CI) · desktop · HD office with built-in guests (Green Jacket Guy, Moon Mage)", png: await page.locator(".room-scene").screenshot() });
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck();
+    await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"));
+    await page.locator(".room-scene .world-visitor").first().waitFor({ state: "attached", timeout: 8000 });
+  } finally {
+    await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+    for (const name of guests) if (was[name] === false) await library.getByRole("button", { name: "Disable " + name }).click().catch(() => undefined);
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+    await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+  await roomItem.click();
+});
+
+// Living Universe HD office preview (feature flag via Room Appearance). Captures go into the CI gallery image.
+await step("Living Universe HD office preview: Room Appearance flag, camera, honest ambient life, fallback", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+  await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+  const moodToggle = mood.getByRole("button", { name: /^Switch Pal Room to (Calm|Playful)$/ });
+  if (await moodToggle.getAttribute("aria-pressed") !== "true") await moodToggle.click();
+  const appearance = mood.getByRole("group", { name: "Room appearance" });
+  let restored = 0;
+  try {
+  await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+  await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+  const office = page.locator(".room-scene.hd-world .hd-office");
+  await office.waitFor({ state: "visible", timeout: 8000 }).catch(async e => {
+    const why = await page.evaluate(() => ({ html: document.documentElement.className, scenes: [...document.querySelectorAll(".room-scene")].map(s => s.className + " " + s.getBoundingClientRect().width + "x" + s.getBoundingClientRect().height), look: localStorage.getItem("pixel-pals-presentation-v1"), mode: localStorage.getItem("pixel-pals-character-mode-v1"), radios: [...document.querySelectorAll('.world-room-appearance [role="radio"]')].map(r => r.textContent + "=" + r.getAttribute("aria-checked")), boxes: [...document.querySelectorAll(".world-room-appearance input")].map(i => i.checked), width: innerWidth }));
+    throw Error("HD office did not appear: " + JSON.stringify(why) + " / " + String(e).slice(0, 120));
+  });
+  if (!await page.locator(".room-scene.hd-world .hd-actor").count()) throw Error("HD office did not show the Pals");
+  if (await page.locator(".room-scene.hd-world .office-pal").count()) throw Error("Classic/Living World Pals were still drawn under the HD office");
+  const lines = await page.getByRole("list", { name: "Who is in the room" }).locator("li").allTextContents();
+  if (!lines.length || lines.some(l => !/\((ambient animation|real activity)/.test(l))) throw Error("HD office activity descriptions missing: " + lines.join(" | "));
+  if (lines.some(l => /real activity/.test(l))) throw Error("A Pal was shown working with no real activity: " + lines.join(" | "));
+  const zoom = page.locator(".hd-office .hd-zoom");
+  const z0 = await zoom.textContent();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  if (await zoom.textContent() === z0) throw Error("HD camera zoom did not change");
+  await page.waitForTimeout(2500);
+  await page.locator(".room-scene").scrollIntoViewIfNeeded();
+  if (await office.getAttribute("data-running") !== "true") throw Error("HD office is not animating in Playful mode");
+  gallery.push({ label: "Running app (CI) · desktop 1500px · HD office preview · Office theme · native Pal sprites", png: await page.locator(".room-scene").screenshot() });
+  await page.getByRole("button", { name: "Fit room" }).click();
+  await page.waitForTimeout(800);
+  gallery.push({ label: "Running app (CI) · desktop · Fit room", png: await page.locator(".room-scene").screenshot() });
+  const follow = page.getByRole("combobox", { name: "Follow a character" });
+  const followNames = await follow.locator("option").allTextContents();
+  const followed = followNames.includes("Nova") ? "Nova" : followNames[1];
+  await follow.selectOption({ label: followed });
+  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.waitForTimeout(3000);
+  gallery.push({ label: `Running app (CI) · desktop · following ${followed}, zoomed in`, png: await page.locator(".room-scene").screenshot() });
+  await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).check();
+  await page.locator('.hd-actor[data-art="synthetic"]').first().waitFor();
+  await page.waitForTimeout(2000);
+  gallery.push({ label: "Running app (CI) · desktop · SYNTHETIC placeholder bodies (not real art)", png: await page.locator(".room-scene").screenshot() });
+  await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).uncheck();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForFunction(() => document.querySelector(".hd-office")?.getAttribute("data-running") === "false");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  // Phone captures are evidence only: the mobile shell may move the room behind a tab, so a miss is a note, not a failure.
+  try {
+   await page.setViewportSize({ width: 390, height: 844 });
+   if (await page.locator(".room-scene.hd-world .hd-office").isVisible()) {
+    await page.waitForTimeout(1500);
+    gallery.push({ label: "Running app (CI) · iPhone width 390px · look forced to HD", png: await page.locator(".room-scene").screenshot() });
+    await appearance.getByRole("radio", { name: /^Auto/ }).click();
+    await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"));
+    await page.locator(".room-scene .world-native-sprite").first().waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(800);
+    gallery.push({ label: "Running app (CI) · iPhone width 390px · Auto → Pixel (today's Living World)", png: await page.locator(".room-scene").screenshot() });
+   } else notes.push("HD office: phone-width capture skipped (room not on screen in the mobile shell)");
+  } catch (e) { notes.push("HD office: phone-width capture skipped: " + String(e).slice(0, 160)); }
+  finally { await page.setViewportSize({ width: 1500, height: 900 }); }
+  } finally {
+  // Restore defaults so later steps see today's Living World and Normal Mode.
+  const appearanceNow = page.getByRole("group", { name: "Room appearance" });
+  await appearanceNow.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+  await appearanceNow.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).uncheck().catch(() => undefined);
+  await appearanceNow.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+  await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"), undefined, { timeout: 5000 }).catch(() => undefined);
+  restored = await page.locator(".room-scene .office-pal").count();
+  await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+  await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+  if (!restored) throw Error("Turning the HD office preview off did not restore the Living World office");
+  await roomItem.click();
+});
+
+// One Pal, two appearances: synthetic idle-only packs shaped like the private Nova Desktop HD / Mobile Pixel samples.
+await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cosmetic and reversible", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  const appearance = mood.getByRole("group", { name: "Room appearance" });
+  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  await library.waitFor({ state: "visible" });
+  if (await library.getAttribute("open") === null) await library.locator("summary").click();
+  const ids = ["user-smokenovahd1", "user-smokenovapx1"];
+  const identity = () => page.evaluate(() => Object.fromEntries(Object.entries(localStorage).filter(([k]) => !/pal-skins|presentation|character-mode|room-playful|world|character|universe|library|window|layout|sidebar/i.test(k))));
+  const before = { local: await identity(), universe: await (await page.request.get(URL_ + "/api/character-universe")).json() };
+  if (before.universe.characters?.some(c => ids.includes(c.id))) throw Error("Synthetic dual-style characters already existed");
+  try {
+    for (const [id, name, revision, tint] of [[ids[0], "Smoke Nova HD", 3, 0], [ids[1], "Smoke Nova Pixel", 1, 90]]) {
+      await library.getByLabel("Choose character ZIP file").setInputFiles({ name: id + ".zip", mimeType: "application/zip", buffer: idleOnlySmokeZip(id, name, revision, tint) });
+      await library.getByText(name + " pack · 256×256 character preview", { exact: true }).waitFor({ timeout: 12000 });
+      await library.getByRole("button", { name: "Approve & install 1 character(s)" }).click();
+      await library.getByRole("status").filter({ hasText: "1 character(s) installed." }).waitFor({ timeout: 15000 });
+    }
+    const installed = await (await page.request.get(URL_ + "/api/character-universe")).json();
+    if (JSON.stringify(installed.enabled) !== JSON.stringify(before.universe.enabled)) throw Error("Installing a look enabled it as a visitor");
+    await library.getByLabel("Use Smoke Nova HD as the look for a Pal").selectOption("nova");
+    await library.getByLabel("Use Smoke Nova Pixel as the Pixel look for a Pal").selectOption("nova");
+    // Reviewed revision updates (like Nova HD r3 → r4, Pixel r1 → r2) keep the same IDs and the Pal mapping.
+    for (const [id, name, revision, tint] of [[ids[0], "Smoke Nova HD", 4, 40], [ids[1], "Smoke Nova Pixel", 2, 130]]) {
+      await library.getByLabel("Choose character ZIP file").setInputFiles({ name: id + "-r" + revision + ".zip", mimeType: "application/zip", buffer: idleOnlySmokeZip(id, name, revision, tint) });
+      await library.getByText(name + " pack · 256×256 character preview", { exact: true }).waitFor({ timeout: 12000 });
+      if (!await library.getByRole("checkbox", { name: "Select " + name }).isDisabled()) throw Error("A newer revision of an installed ID was offered as a new install");
+      await library.getByRole("checkbox", { name: "Update " + name }).check();
+      await library.getByRole("button", { name: "Approve version update for 1 character(s)" }).click();
+      await library.getByRole("status").filter({ hasText: "1 character(s) updated." }).waitFor({ timeout: 15000 });
+    }
+    const updated = await (await page.request.get(URL_ + "/api/character-universe")).json();
+    const versions = Object.fromEntries(updated.characters.filter(c => ids.includes(c.id)).map(c => [c.id, c.hd3?.version]));
+    if (versions[ids[0]] !== 4 || versions[ids[1]] !== 2 || updated.characters.filter(c => ids.includes(c.id)).length !== 2) throw Error("Reviewed updates did not keep one character per ID: " + JSON.stringify(versions));
+    if (await library.getByLabel("Use Smoke Nova HD as the look for a Pal").inputValue() !== "nova") throw Error("Nova's HD look mapping was lost by the update");
+    const row = appearance.getByRole("group", { name: "Pal appearances" }).locator('li[data-pal="nova"]');
+    await row.waitFor();
+    if (await row.getAttribute("data-showing") !== "hd") throw Error("Desktop did not choose Nova's Desktop HD look");
+    if (!/front idle only/.test(await row.textContent() ?? "")) throw Error("Single-frame art was not labelled honestly");
+    // Living World (Normal theme) on desktop: Nova wears the HD look.
+    await page.locator('.room-scene .agent-nova img[alt*="Smoke Nova HD look"]').first().waitFor({ state: "visible", timeout: 8000 });
+    await page.locator(".room-scene").scrollIntoViewIfNeeded();
+    gallery.push({ label: "Running app (CI) · desktop · Living World · Nova wearing the synthetic 'Desktop HD' look", png: await page.locator(".room-scene").screenshot() });
+    // HD office: Nova's HD look, honest art note.
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+    await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+    await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+    // Attached, not necessarily on screen: the camera may have Nova outside the current view until we follow her.
+    await page.locator('.room-scene.hd-world .hd-actor[data-actor="pal:nova"][data-art="hd"]').waitFor({ state: "attached", timeout: 8000 });
+    const who = await page.getByRole("list", { name: "Who is in the room" }).textContent();
+    if (!/front idle only/.test(who ?? "")) throw Error("HD office did not describe Nova's single-frame art: " + who);
+    const followBox = page.getByRole("combobox", { name: "Follow a character" });
+    const novaLabel = (await followBox.locator("option").allTextContents()).find(t => /nova/i.test(t));
+    if (novaLabel) await followBox.selectOption({ label: novaLabel }); else await followBox.selectOption({ index: 1 });
+    await page.waitForTimeout(2000);
+    gallery.push({ label: "Running app (CI) · desktop · HD office · Nova in synthetic 'Desktop HD' look (single idle frame)", png: await page.locator(".room-scene").screenshot() });
+    // Same Nova, Pixel look.
+    await appearance.getByRole("radio", { name: "Pixel", exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"));
+    await page.locator('.room-scene .agent-nova img[alt*="Smoke Nova Pixel look"]').first().waitFor({ state: "visible", timeout: 8000 });
+    if (await row.getAttribute("data-showing") !== "pixel") throw Error("Pixel look not reported for Nova");
+    gallery.push({ label: "Running app (CI) · desktop · look switched to Pixel · same Nova in synthetic 'Mobile Pixel' look", png: await page.locator(".room-scene").screenshot() });
+    try {
+      await appearance.getByRole("radio", { name: /^Auto/ }).click();
+      await page.setViewportSize({ width: 390, height: 844 });
+      const phoneNova = page.locator('.room-scene .agent-nova img[alt*="Smoke Nova Pixel look"]').first();
+      if (await phoneNova.isVisible().catch(() => false)) gallery.push({ label: "Running app (CI) · iPhone width 390px · Auto → Pixel · Nova in synthetic 'Mobile Pixel' look", png: await page.locator(".room-scene").screenshot() });
+      else notes.push("Dual appearance: phone-width capture skipped (room not on screen in the mobile shell)");
+    } finally { await page.setViewportSize({ width: 1500, height: 900 }); }
+    // Restore the original Nova; nothing else changed.
+    await appearance.getByRole("button", { name: "Restore Nova's original look" }).click();
+    await page.locator('.room-scene .agent-nova img[alt$=" look"]').first().waitFor({ state: "detached", timeout: 8000 });
+    gallery.push({ label: "Running app (CI) · desktop · original Nova restored", png: await page.locator(".room-scene").screenshot() });
+    const after = await identity();
+    if (JSON.stringify(after) !== JSON.stringify(before.local)) throw Error("Switching looks changed other saved data");
+  } finally {
+    await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+    await appearance.getByRole("button", { name: "Restore Nova's original look" }).click().catch(() => undefined);
+    for (const name of ["Smoke Nova HD", "Smoke Nova Pixel"]) {
+      const del = library.getByRole("button", { name: "Delete " + name });
+      if (await del.count()) { page.once("dialog", d => d.accept()); await del.click(); }
+    }
+    await page.waitForFunction(async ids => { const r = await fetch("/api/character-universe", { credentials: "same-origin" }); return r.ok && !((await r.json()).characters ?? []).some(c => ids.includes(c.id)); }, ids, { timeout: 15000 }).catch(() => undefined);
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+    await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+  const final = await (await page.request.get(URL_ + "/api/character-universe")).json();
+  if (final.characters?.some(c => ids.includes(c.id))) throw Error("Synthetic dual-style characters were not removed");
+  if (JSON.stringify(final.enabled) !== JSON.stringify(before.universe.enabled)) throw Error("Visitor selection changed");
+  await roomItem.click();
+});
+
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
 });
-await page.screenshot({ path: process.env.SMOKE_SHOT || "smoke.png", fullPage: false }).catch(() => undefined);
+const finalShot = await page.screenshot({ fullPage: false }).catch(() => null);
+// CI keeps one image: the final page plus the Living Universe captures above, labelled, in one gallery.
+try {
+  const tiles = [...(finalShot ? [{ label: "Running app (CI) · final page", png: finalShot }] : []), ...gallery];
+  const sheet = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await sheet.setContent(`<body style="margin:0;background:#0d0f14;color:#e8e8ef;font:14px system-ui"><h1 style="font-size:16px;margin:10px">Pixel Pals smoke — running app captures (CI)</h1><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:10px">${tiles.map(t => `<figure style="margin:0"><figcaption style="margin:0 0 4px">${t.label}</figcaption><img style="width:100%;border:1px solid #333" src="data:image/png;base64,${t.png.toString("base64")}"></figure>`).join("")}</div></body>`);
+  await sheet.screenshot({ path: process.env.SMOKE_SHOT || "smoke.png", fullPage: true });
+  await sheet.close();
+} catch { if (finalShot) await import("node:fs").then(fs => fs.writeFileSync(process.env.SMOKE_SHOT || "smoke.png", finalShot)).catch(() => undefined); }
 if (process.env.SMOKE_STORAGE_STATE) await page.context().storageState({path:process.env.SMOKE_STORAGE_STATE});
 await browser.close();
 

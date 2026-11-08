@@ -10,7 +10,9 @@ import { planCharacterAddonInstall } from "@/lib/character-addon";
 import { WORLD_HD_DIRECTIONS, type WorldHdAction, type WorldHdDirection } from "@/lib/world-hd";
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { lowPower, useTabHidden } from "@/lib/power";
-import { worldHdFrameAt } from "@/lib/world-hd-animation";
+import { worldHdFrameAt, worldHdCoverage } from "@/lib/world-hd-animation";
+import { WORLD_SKIN_PALS, clearWorldPalSkins, forgetWorldLookCharacter, publishWorldSkinCharacters, setWorldPalPixelSkin, setWorldPalSkin, useWorldPalPixelSkins, useWorldPalSkins } from "@/lib/world-pal-skins";
+import { agentName } from "@/lib/agents";
 import "./world-character-library.css";
 
 export function WorldPixelPreview({pixels,palette,name}:{pixels:readonly string[];palette:Record<string,string>;name:string}){
@@ -207,6 +209,9 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
   }catch(error){setMessage(error instanceof Error?error.message:"Character import failed.");}
   finally{setInstalling(false);}
  };
+ const palSkins=useWorldPalSkins(),palPixelSkins=useWorldPalPixelSkins();
+ const lookPals=new Set([...Object.keys(palSkins),...Object.keys(palPixelSkins)]);
+ useEffect(()=>{publishWorldSkinCharacters(customCharacters);},[customCharacters]);
  return <details className="world-character-library">
   <summary>Character Universe · {worldCharacterPacks.length} built-in visitors · {customCharacters.length} creations · {active} active</summary>
   <div className="world-library-body">
@@ -233,6 +238,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
         onChange={event=>setSelected(list=>event.target.checked?[...list,character.id]:list.filter(id=>id!==character.id))}/><strong>{character.name}</strong></label>
        {character.hd3?<HdCharacterPreview character={character} paused={paused}/>:<CharacterArt character={character}/>}
        <p className="text-xs">{existing?"Already installed":"Ready to install"}{character.hd3?" · Version "+character.hd3.version:""}</p>
+       {character.hd3&&<p className="text-xs text-muted-foreground world-hd-coverage" data-facings={worldHdCoverage(character.hd3).facings}>{worldHdCoverage(character.hd3).summary}</p>}
        {canUpdate&&<label className="world-import-selection"><input type="checkbox" aria-label={"Update "+character.name} checked={updates.includes(character.id)} disabled={installing}
         onChange={event=>setUpdates(list=>event.target.checked?[...list,character.id]:list.filter(id=>id!==character.id))}/>Update version {existing!.hd3?.version??0} to {character.hd3!.version}</label>}
       </article>;
@@ -244,6 +250,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
      <Button type="button" size="sm" variant="outline" disabled={installing} onClick={()=>{requestNumber.current++;setZipPack(null);setSelected([]);setUpdates([]);setMessage("Import cancelled.");}}>Cancel</Button>
     </div>
    </section>}
+   {lookPals.size>0&&<p className="text-xs world-pal-skin-note" role="status">New looks on {lookPals.size} Pal(s) on this device (Desktop HD and/or Mobile Pixel). Names, personalities, memories, chats, tasks and permissions are unchanged. <Button type="button" size="sm" variant="outline" onClick={()=>{clearWorldPalSkins();setMessage("All Pals restored to their original look.");}}>Restore original Pal looks</Button></p>}
    {editor&&<CharacterEditor key={editor.id} initial={editor} onSave={onSave} onCancel={()=>setEditor(null)}/>}
    <div className="world-library-grid">
     {builtins.map(({pack,pixels,palette})=>{
@@ -259,14 +266,27 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
      const hasSignature=character.hd3&&Object.values(character.hd3.directions).some(actions=>actions?.signature);
      return <article className="world-library-card" key={character.id}>
       <CharacterArt character={character}/>
-      <div className="min-w-0 flex-1"><strong className="text-xs">{character.name}</strong><p className="text-xs text-muted-foreground">{character.hd3?"HD256 · v"+character.hd3.version+" · "+(character.hd3.artStatus==="prototype"?"Prototype":"Pack marked production-approved"):character.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p></div>
+      <div className="min-w-0 flex-1"><strong className="text-xs">{character.name}</strong><p className="text-xs text-muted-foreground">{character.hd3?"HD256 · v"+character.hd3.version+" · "+(character.hd3.artStatus==="prototype"?"Prototype":"Pack marked production-approved"):character.hd?"Imported HD · 256×256 PNG":"Your original pixel character"}</p>
+       {character.hd3&&<details className="world-hd-coverage-details"><summary className="text-xs">What this pack includes</summary><p className="text-xs text-muted-foreground world-hd-coverage" data-facings={worldHdCoverage(character.hd3).facings}>{worldHdCoverage(character.hd3).summary}</p></details>}</div>
       <div className="world-library-card-controls">
        <Button size="sm" variant={on?"default":"outline"} aria-pressed={on} aria-label={(on?"Disable ":"Enable ")+character.name} onClick={()=>toggle(character.id)}>{on?"In room":"Add"}</Button>
        {hasSignature&&<Button type="button" size="sm" variant="outline" disabled={!on||actionsPaused} aria-label={"Signature action for "+character.name} onClick={()=>window.dispatchEvent(new CustomEvent("pixel-pals:hd-action",{detail:{id:character.id,action:"signature"}}))}>Signature</Button>}
+       {(character.hd||character.hd3)&&<label className="world-pal-skin-select text-xs">Desktop HD look for
+        <select aria-label={"Use "+character.name+" as the look for a Pal"} value={Object.entries(palSkins).find(([,value])=>value===character.id)?.[0]??""}
+         onChange={event=>{const pal=event.target.value;const current=Object.entries(palSkins).find(([,value])=>value===character.id)?.[0];if(current&&current!==pal)setWorldPalSkin(current,null);if(pal)setWorldPalSkin(pal,character.id);}}>
+         <option value="">None</option>
+         {WORLD_SKIN_PALS.map(pal=><option key={pal} value={pal}>{agentName(pal,false)}</option>)}
+        </select></label>}
+       {(character.hd||character.hd3)&&<label className="world-pal-skin-select text-xs">Mobile Pixel look for
+        <select aria-label={"Use "+character.name+" as the Pixel look for a Pal"} value={Object.entries(palPixelSkins).find(([,value])=>value===character.id)?.[0]??""}
+         onChange={event=>{const pal=event.target.value;const current=Object.entries(palPixelSkins).find(([,value])=>value===character.id)?.[0];if(current&&current!==pal)setWorldPalPixelSkin(current,null);if(pal)setWorldPalPixelSkin(pal,character.id);}}>
+         <option value="">None</option>
+         {WORLD_SKIN_PALS.map(pal=><option key={pal} value={pal}>{agentName(pal,false)}</option>)}
+        </select></label>}
        {!character.hd&&!character.hd3&&<Button size="sm" variant="ghost" aria-label={"Edit "+character.name} onClick={()=>setEditor(character)}><Pencil className="size-3.5"/></Button>}
        <Button size="sm" variant="ghost" aria-label={"Delete "+character.name} onClick={async()=>{
         if(window.confirm("Remove "+character.name+" from your Character Library? Export a backup first if you want to reinstall it later.")){
-         const ok=await onDelete(character.id);setMessage(ok?"Character removed from Library.":"Could not remove character.");
+         const ok=await onDelete(character.id);if(ok)forgetWorldLookCharacter(character.id);setMessage(ok?"Character removed from Library.":"Could not remove character.");
         }
        }}><Trash2 className="size-3.5"/></Button>
       </div>

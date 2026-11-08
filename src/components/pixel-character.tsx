@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import type { AgentId } from "@/lib/agents";
 import { useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import { characterSprite } from "@/lib/character-sprites";
+import { WORLD_LEG_EXTENSION, worldLegRow, worldPalBody, worldTallSprite } from "@/lib/world-proportions";
+import { worldGroundGrid, worldStandingFoot } from "@/lib/world-scale";
 import { spriteRuns, to128 } from "@/lib/sprite-upscale";
 import { facingArt, hasFacingArt, palArt, type Facing } from "@/lib/pal-art";
 import { worldAnimatedFrame } from "@/lib/world-animation";
@@ -41,14 +43,17 @@ export function PixelCharacter({
   const pose = walking ? "walk" : animated ? "talk" : motion;
   // Preserve the original portrait path while caching the much smaller native
   // 32px walking art. No 128px grid regeneration on every movement tick.
-  const runs = useMemo(() => {
-    if (art) return [];
+  const { runs, rows } = useMemo(() => {
+    if (art) return { runs: [], rows: 32 };
     const front = characterSprite(id, mode);
     const source = pixelWorld ? worldAnimatedFrame(front, facing ?? (back ? "n" : "s"), pose ?? "idle", walkFrame, id === "mimic") : back ? backView(front) : front;
-    const grid = pixelWorld ? source : to128(source);
+    // Living World only: adult proportions by lengthening legs with the sprite's own leg row (square pixels kept).
+    // Feet on the floor anchor: drop transparent rows under the standing foot line (world-scale.ts).
+    const tall = (grid: readonly string[]) => worldTallSprite(grid, WORLD_LEG_EXTENSION[worldPalBody(id)], worldLegRow(mode + ":" + id, () => front));
+    const grid = pixelWorld ? worldGroundGrid(tall(source), worldStandingFoot(mode + ":" + id, () => tall(front))) : to128(source);
     const feetY = pixelWorld ? 24 : 96;
     const middleX = pixelWorld ? 16 : 64;
-    return spriteRuns(grid, (x, y) => y < feetY ? "body" : x < middleX ? "left-leg" : "right-leg");
+    return { runs: spriteRuns(grid, (x, y) => y < feetY ? "body" : x < middleX ? "left-leg" : "right-leg"), rows: grid.length };
   }, [art, id, mode, pixelWorld, facing, back, pose, walkFrame]);
   if (art && pose) return <PalArtRig id={id} art={art} motion={pose} className={cn("pixel-character native-sprite pal-art", directional && "pal-directional", `agent-${id}`, className)} />;
   if (art) {
@@ -65,7 +70,8 @@ export function PixelCharacter({
   }
   return (
     <svg
-      viewBox={pixelWorld ? "0 0 32 32" : "0 0 128 128"}
+      viewBox={pixelWorld ? `0 0 32 ${rows}` : "0 0 128 128"}
+      preserveAspectRatio={pixelWorld ? "xMidYMax meet" : undefined}
       role="img"
       data-world-motion={pixelWorld ? pose ?? "idle" : undefined}
       aria-label={`${id} pixel character`}

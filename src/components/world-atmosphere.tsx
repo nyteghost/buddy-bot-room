@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useCalmInterval } from "@/lib/power";
 import type { CharacterMode } from "@/lib/hellraiser";
 import type { Sky } from "@/lib/live-room";
+import { worldRoomPlan } from "@/lib/world-floor";
+import { useWorldFixtureVersion, worldFixtureInUse } from "@/lib/world-presence";
 
 export type WorldTime = "morning" | "day" | "evening" | "night";
 /** Browser-local scene lighting; no tracking, geolocation or external request. */
@@ -35,6 +37,8 @@ export function WorldAtmosphere({ theme, active = true, sky = "clear" }: { theme
   const prop = worldPropForTheme(theme);
   const [time,setTime]=useState<WorldTime>(()=>worldTimeForHour(new Date().getHours()));
   useCalmInterval(()=>setTime(worldTimeForHour(new Date().getHours())),60_000,active);
+  useWorldFixtureVersion();
+  const fixtures=worldRoomPlan(theme).fixtures;
   return <div aria-hidden="true" className={`world-atmosphere world-atmosphere-${theme}`} data-world-prop={prop} data-world-time={time} data-world-weather={sky}>
     <span className="world-light"/>
     <span className="world-specks"/>
@@ -47,5 +51,6 @@ export function WorldAtmosphere({ theme, active = true, sky = "clear" }: { theme
     <span className="world-prop-a"/>
     <span className="world-prop-b"/>
     <span className="world-prop-c"/>
+    {fixtures.map(fixture=><span key={fixture.id} className="world-fixture" data-kind={fixture.kind} data-fixture={fixture.id} data-active={worldFixtureInUse(theme,fixture.id)} style={{left:fixture.glow.x+"%",top:fixture.glow.y+"%"}}/>)}
   </div>;
 }

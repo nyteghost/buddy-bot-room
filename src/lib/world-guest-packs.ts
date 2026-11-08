@@ -2,7 +2,8 @@ import { easeWalk } from "./pal-motion";
 import type { Facing } from "./pal-art";
 import type { CharacterMode } from "./hellraiser";
 import { worldCharacterPacks, type WorldPackId } from "./world-character-packs";
-import { worldPath, worldPointIsWalkable, type WorldPoint } from "./world-navigation";
+import { worldPath, worldRoomPlan, type WorldPoint } from "./world-floor";
+import { worldWanderPlan, worldWanderPose, type WorldGait, type WorldWanderPose } from "./world-wander";
 
 export type GuestId = Exclude<WorldPackId, "green-jacket">;
 export const guestIds: readonly GuestId[] = ["goku","homer","moon-mage","arcade-ghost","space-ranger","pixel-robot","tiny-dragon","dungeon-knight"];
@@ -62,20 +63,35 @@ export function guestSprite(id:GuestId):string[]{
  }
  return g.map(row=>row.join(""));
 }
-const anchors=[{home:{x:15,y:67},visit:{x:30,y:70}},
- {home:{x:85,y:67},visit:{x:70,y:70}},
- {home:{x:29,y:73},visit:{x:33,y:60}},
- {home:{x:70,y:74},visit:{x:67,y:60}},
- {home:{x:48,y:80},visit:{x:60,y:72}},
- {home:{x:58,y:80},visit:{x:41,y:70}},
- {home:{x:15,y:82},visit:{x:26,y:72}},
- {home:{x:84,y:81},visit:{x:74,y:72}}];
 const cached=new Map<string,readonly WorldPoint[]>();
+/** Legacy single-route loop (kept for compatibility); calibrated per theme from that room's own floor plan. */
 export function guestRoute(id:GuestId,theme:CharacterMode):readonly WorldPoint[]{
  const key=theme+":"+id,found=cached.get(key);if(found)return found;
- const layout=anchors[guestIds.indexOf(id)]!;
- const route=worldPath(layout.home,layout.visit,theme);
+ const plan=worldRoomPlan(theme),slot=Math.max(0,guestIds.indexOf(id));
+ const route=worldPath(plan.visits[slot]!,plan.homes[slot]!,theme);
  cached.set(key,route);return route;
+}
+/** Where each visitor starts its itinerary: spread over visit spots so guests don't spawn on top of Pals. */
+/**
+ * Where a guest starts. Built-in guests (slots 0–7) take visit spots in order; imported visitors (slot 8+)
+ * use the room's `entries` when it has them, otherwise the odd visit spots first, then the even ones, so they spread across the room instead of starting
+ * on a Pal's home spot (which made crowds pile up, worst in the horror mansion's separate pockets).
+ */
+export function guestStart(slot:number,theme:CharacterMode):WorldPoint{
+ const plan=worldRoomPlan(theme),n=Math.floor(Number.isFinite(slot)?slot:0);
+ if(n>=8&&plan.entries?.length)return plan.entries[(n-8)%plan.entries.length]!;
+ const spots=plan.visits.length?plan.visits:plan.homes;
+ if(!spots.length)return {x:50,y:76};
+ const index=n<8?n:2*(n-8)+1;
+ return spots[((index%spots.length)+spots.length)%spots.length]!;
+}
+/**
+ * Natural multi-stop wandering for a visual guest: steady gait, turns, look-arounds and furniture use.
+ * `seed` keeps each character's itinerary unique; `slot` picks its starting spot.
+ */
+export function guestWanderPose(seed:string,slot:number,theme:CharacterMode,elapsed:number,gait:WorldGait="humanoid"):WorldWanderPose{
+ const plan=worldWanderPlan({theme,seed:"guest:"+seed,start:guestStart(slot,theme),gait,legs:7});
+ return worldWanderPose(plan,elapsed);
 }
 function follow(path:readonly WorldPoint[],fraction:number,reverse:boolean){
  const points=reverse?[...path].reverse():path;
