@@ -43,7 +43,7 @@ import os, sys
 if os.environ.get("SIMULATE_SS_ERROR") == "1":
     sys.exit(2)
 if os.environ.get("SIMULATE_PORT_IN_USE") == "1":
-    print("LISTEN 0 64 127.0.0.1:18765 0.0.0.0:*")
+    print("LISTEN 0 64 127.0.0.1:18767 0.0.0.0:*")
 else:
     print("LISTEN 0 64 127.0.0.1:8765 0.0.0.0:*")
 '''
@@ -57,7 +57,7 @@ print('{"models":[{"name":"qwen3-vl:4b"}]}')
 
 
 class ReadOnlyPreflightRegression(unittest.TestCase):
-    def run_fake_preflight(self, *, occupied=False, ss_error=False):
+    def run_fake_preflight(self, *, occupied=False, ss_error=False, port=None):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td)
             for name, src in (("docker", DOCKER_STUB), ("ss", SS_STUB), ("curl", CURL_STUB)):
@@ -69,6 +69,7 @@ class ReadOnlyPreflightRegression(unittest.TestCase):
                 PATH=str(path) + os.pathsep + os.environ.get("PATH", ""),
                 SIMULATE_PORT_IN_USE="1" if occupied else "0",
                 SIMULATE_SS_ERROR="1" if ss_error else "0",
+                ADHD_PHOTO_BETA_PORT=port or "18767",
             )
             return subprocess.run(
                 ["bash", str(SCRIPT)], env=env, text=True,
@@ -80,15 +81,22 @@ class ReadOnlyPreflightRegression(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("STATIC PREFLIGHT PASSED", result.stdout)
         self.assertIn("no listener shown by ss", result.stdout)
-        self.assertNotIn("port 18765 is already listening", result.stdout)
+        self.assertNotIn("port 18767 is already listening", result.stdout)
 
     def test_occupied_port_fails_and_never_reports_free(self):
         result = self.run_fake_preflight(occupied=True)
         self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
-        self.assertIn("port 18765 is already listening", result.stdout)
+        self.assertIn("port 18767 is already listening", result.stdout)
         self.assertNotIn("no listener shown by ss", result.stdout)
         self.assertIn("PREFLIGHT INCOMPLETE", result.stdout)
         self.assertNotIn("STATIC PREFLIGHT PASSED", result.stdout)
+
+    def test_invalid_port_fails_before_inspection(self):
+        for value in ("abc", "1", "65536", "18767;rm", "0"):
+            with self.subTest(value=value):
+                result = self.run_fake_preflight(port=value)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("BLOCKED: staging TCP port", result.stdout)
 
     def test_socket_inspection_failure_does_not_pass(self):
         result = self.run_fake_preflight(ss_error=True)
