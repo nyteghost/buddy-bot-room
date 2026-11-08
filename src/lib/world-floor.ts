@@ -170,11 +170,11 @@ function gridOf(theme:CharacterMode):Grid{
 }
 export function worldRoomPlan(theme:CharacterMode):WorldRoomPlan{return gridOf(theme).plan;}
 /**
- * Register an extra floor plan under a key no room theme uses (prototypes such as the Living Universe HD camera lab).
+ * Register an extra floor plan under a key no room theme uses (lab- prototypes, hd- Living Universe HD worlds).
  * Existing themes cannot be replaced, so the app's rooms are never affected.
  */
 export function worldRegisterLabPlan(key:string,plan:WorldRoomPlan):CharacterMode{
- if(!/^lab-[a-z0-9-]{1,32}$/.test(key))throw new Error("Lab plan keys start with lab-");
+ if(!/^(lab|hd)-[a-z0-9-]{1,32}$/.test(key))throw new Error("Extra floor plan keys start with lab- or hd-");
  const table=plans as Record<string,WorldRoomPlan>;
  table[key]=plan;grids.delete(key as CharacterMode);
  return key as CharacterMode;

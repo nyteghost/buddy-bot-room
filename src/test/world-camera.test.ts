@@ -73,3 +73,51 @@ describe("Living Universe presentation defaults (planning groundwork)", () => {
   expect(worldArtSource("pixel", { hd: true, mini: true, native: true })).toBe("mini");
  });
 });
+
+import { WORLD_PRESENTATION_KEY, cleanWorldRoomAppearance, getWorldRoomAppearance, setWorldRoomAppearance, worldUsesHdOffice } from "@/lib/world-presentation";
+import { WORLD_PAL_PIXEL_SKINS_KEY, WORLD_PAL_SKINS_KEY, clearWorldPalSkins, getWorldPalPixelSkins, getWorldPalSkins, setWorldPalPixelSkin, setWorldPalSkin, worldPalLookCharacter } from "@/lib/world-pal-skins";
+
+describe("Room Appearance preferences (per device, separate from Pal data)", () => {
+ it("stores Auto/HD/Pixel, the HD office flag and synthetic placeholders under their own key", () => {
+  const store = new Map<string, string>();
+  const g = globalThis as unknown as { localStorage?: Storage };
+  const before = g.localStorage;
+  g.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => void store.set(k, v), removeItem: k => void store.delete(k), clear: () => store.clear(), key: () => null, length: 0 } as Storage;
+  try {
+   expect(getWorldRoomAppearance()).toEqual({ look: "auto", hdOffice: false, synthetic: false });
+   setWorldRoomAppearance({ look: "hd", hdOffice: true });
+   expect(JSON.parse(store.get(WORLD_PRESENTATION_KEY)!)).toEqual({ look: "hd", hdOffice: true, synthetic: false });
+   expect([...store.keys()]).toEqual([WORLD_PRESENTATION_KEY]);
+   expect(cleanWorldRoomAppearance({ look: "4k", hdOffice: "yes" })).toEqual({ look: "auto", hdOffice: false, synthetic: false });
+  } finally { g.localStorage = before as Storage; }
+ });
+ it("uses the HD office only with the flag on, in the Office theme, when the look resolves to HD", () => {
+  const desk = { width: 1440, coarse: false }, phone = { width: 390, coarse: true };
+  expect(worldUsesHdOffice({ look: "auto", hdOffice: false, synthetic: false }, "linux", desk)).toBe(false);
+  expect(worldUsesHdOffice({ look: "auto", hdOffice: true, synthetic: false }, "linux", desk)).toBe(true);
+  expect(worldUsesHdOffice({ look: "auto", hdOffice: true, synthetic: false }, "matrix", desk)).toBe(false);
+  expect(worldUsesHdOffice({ look: "auto", hdOffice: true, synthetic: false }, "linux", phone)).toBe(false);
+  expect(worldUsesHdOffice({ look: "hd", hdOffice: true, synthetic: false }, "linux", phone)).toBe(true);
+  expect(worldUsesHdOffice({ look: "pixel", hdOffice: true, synthetic: false }, "linux", desk)).toBe(false);
+ });
+});
+
+describe("HD and Pixel looks for the same Pal", () => {
+ const hd = { id: "user-hdlook0001", name: "HD", pixels: [], palette: {}, hd3: {} } as never;
+ const px = { id: "user-pxlook0001", name: "PX", pixels: [], palette: {}, hd3: {} } as never;
+ it("each presentation prefers its own look, then the other, then the native sprite", () => {
+  const list = [hd, px];
+  expect(worldPalLookCharacter("hd", { nova: "user-hdlook0001" }, { nova: "user-pxlook0001" }, list, "nova")).toBe(hd);
+  expect(worldPalLookCharacter("pixel", { nova: "user-hdlook0001" }, { nova: "user-pxlook0001" }, list, "nova")).toBe(px);
+  expect(worldPalLookCharacter("pixel", { nova: "user-hdlook0001" }, {}, list, "nova")).toBe(hd);
+  expect(worldPalLookCharacter("hd", {}, {}, list, "nova")).toBeUndefined();
+ });
+ it("keeps the two mappings separate and Restore clears both", () => {
+  setWorldPalSkin("nova", "user-hdlook0001"); setWorldPalPixelSkin("nova", "user-pxlook0001");
+  expect(getWorldPalSkins()).toEqual({ nova: "user-hdlook0001" });
+  expect(getWorldPalPixelSkins()).toEqual({ nova: "user-pxlook0001" });
+  expect(WORLD_PAL_SKINS_KEY).not.toBe(WORLD_PAL_PIXEL_SKINS_KEY);
+  clearWorldPalSkins();
+  expect(getWorldPalSkins()).toEqual({}); expect(getWorldPalPixelSkins()).toEqual({});
+ });
+});

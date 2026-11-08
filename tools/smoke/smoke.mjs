@@ -1292,11 +1292,96 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
   },undefined,{timeout:15000});
 });
 
+// Living Universe HD office preview (feature flag via Room Appearance). Captures go into the CI gallery image.
+const gallery = [];
+await step("Living Universe HD office preview: Room Appearance flag, camera, honest ambient life, fallback", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+  await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+  const moodToggle = mood.getByRole("button", { name: /^Switch Pal Room to (Calm|Playful)$/ });
+  if (await moodToggle.getAttribute("aria-pressed") !== "true") await moodToggle.click();
+  const appearance = mood.getByRole("group", { name: "Room appearance" });
+  let restored = 0;
+  try {
+  await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+  await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+  const office = page.locator(".room-scene.hd-world .hd-office");
+  await office.waitFor({ state: "visible" });
+  if (!await page.locator(".room-scene.hd-world .hd-actor").count()) throw Error("HD office did not show the Pals");
+  if (await page.locator(".room-scene.hd-world .office-pal").count()) throw Error("Classic/Living World Pals were still drawn under the HD office");
+  const lines = await page.getByRole("list", { name: "Who is in the room" }).locator("li").allTextContents();
+  if (!lines.length || lines.some(l => !/\((ambient animation|real activity)/.test(l))) throw Error("HD office activity descriptions missing: " + lines.join(" | "));
+  if (lines.some(l => /real activity/.test(l))) throw Error("A Pal was shown working with no real activity: " + lines.join(" | "));
+  const zoom = page.locator(".hd-office .hd-zoom");
+  const z0 = await zoom.textContent();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  if (await zoom.textContent() === z0) throw Error("HD camera zoom did not change");
+  await page.waitForTimeout(2500);
+  await page.locator(".room-scene").scrollIntoViewIfNeeded();
+  if (await office.getAttribute("data-running") !== "true") throw Error("HD office is not animating in Playful mode");
+  gallery.push({ label: "Running app (CI) · desktop 1500px · HD office preview · Office theme · native Pal sprites", png: await page.locator(".room-scene").screenshot() });
+  await page.getByRole("button", { name: "Fit room" }).click();
+  await page.waitForTimeout(800);
+  gallery.push({ label: "Running app (CI) · desktop · Fit room", png: await page.locator(".room-scene").screenshot() });
+  const follow = page.getByRole("combobox", { name: "Follow a character" });
+  const followNames = await follow.locator("option").allTextContents();
+  const followed = followNames.includes("Nova") ? "Nova" : followNames[1];
+  await follow.selectOption({ label: followed });
+  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.waitForTimeout(3000);
+  gallery.push({ label: `Running app (CI) · desktop · following ${followed}, zoomed in`, png: await page.locator(".room-scene").screenshot() });
+  await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).check();
+  await page.locator('.hd-actor[data-art="synthetic"]').first().waitFor();
+  await page.waitForTimeout(2000);
+  gallery.push({ label: "Running app (CI) · desktop · SYNTHETIC placeholder bodies (not real art)", png: await page.locator(".room-scene").screenshot() });
+  await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).uncheck();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForFunction(() => document.querySelector(".hd-office")?.getAttribute("data-running") === "false");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  // Phone captures are evidence only: the mobile shell may move the room behind a tab, so a miss is a note, not a failure.
+  try {
+   await page.setViewportSize({ width: 390, height: 844 });
+   if (await page.locator(".room-scene.hd-world .hd-office").isVisible()) {
+    await page.waitForTimeout(1500);
+    gallery.push({ label: "Running app (CI) · iPhone width 390px · look forced to HD", png: await page.locator(".room-scene").screenshot() });
+    await appearance.getByRole("radio", { name: /^Auto/ }).click();
+    await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"));
+    await page.locator(".room-scene .world-native-sprite").first().waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(800);
+    gallery.push({ label: "Running app (CI) · iPhone width 390px · Auto → Pixel (today's Living World)", png: await page.locator(".room-scene").screenshot() });
+   } else notes.push("HD office: phone-width capture skipped (room not on screen in the mobile shell)");
+  } catch (e) { notes.push("HD office: phone-width capture skipped: " + String(e).slice(0, 160)); }
+  finally { await page.setViewportSize({ width: 1500, height: 900 }); }
+  } finally {
+  // Restore defaults so later steps see today's Living World and Normal Mode.
+  const appearanceNow = page.getByRole("group", { name: "Room appearance" });
+  await appearanceNow.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+  await appearanceNow.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).uncheck().catch(() => undefined);
+  await appearanceNow.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+  await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"), undefined, { timeout: 5000 }).catch(() => undefined);
+  restored = await page.locator(".room-scene .office-pal").count();
+  await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+  await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+  if (!restored) throw Error("Turning the HD office preview off did not restore the Living World office");
+  await roomItem.click();
+});
+
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);
 });
-await page.screenshot({ path: process.env.SMOKE_SHOT || "smoke.png", fullPage: false }).catch(() => undefined);
+const finalShot = await page.screenshot({ fullPage: false }).catch(() => null);
+// CI keeps one image: the final page plus the Living Universe captures above, labelled, in one gallery.
+try {
+  const tiles = [...(finalShot ? [{ label: "Running app (CI) · final page", png: finalShot }] : []), ...gallery];
+  const sheet = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  await sheet.setContent(`<body style="margin:0;background:#0d0f14;color:#e8e8ef;font:14px system-ui"><h1 style="font-size:16px;margin:10px">Pixel Pals smoke — running app captures (CI)</h1><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:10px">${tiles.map(t => `<figure style="margin:0"><figcaption style="margin:0 0 4px">${t.label}</figcaption><img style="width:100%;border:1px solid #333" src="data:image/png;base64,${t.png.toString("base64")}"></figure>`).join("")}</div></body>`);
+  await sheet.screenshot({ path: process.env.SMOKE_SHOT || "smoke.png", fullPage: true });
+  await sheet.close();
+} catch { if (finalShot) await import("node:fs").then(fs => fs.writeFileSync(process.env.SMOKE_SHOT || "smoke.png", finalShot)).catch(() => undefined); }
 if (process.env.SMOKE_STORAGE_STATE) await page.context().storageState({path:process.env.SMOKE_STORAGE_STATE});
 await browser.close();
 
