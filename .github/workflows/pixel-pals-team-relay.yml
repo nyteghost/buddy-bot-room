@@ -1,0 +1,50 @@
+name: Pixel Pals Team Relay (free)
+
+# All code comes from the trusted default branch, not from comments or untrusted PR heads.
+# Creates or updates ONE informational comment in Issue #23. No AI provider or deploy.
+on:
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  schedule:
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: pixel-pals-team-relay
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: >-
+      github.repository == 'nyteghost/buddy-bot-room' &&
+      (github.event_name != 'issue_comment' ||
+        ((github.event.issue.number == 23 || github.event.issue.number == 26) &&
+          (github.actor == 'nyteghost' ||
+            github.event.comment.author_association == 'COLLABORATOR' ||
+            github.event.comment.author_association == 'MEMBER' ||
+            github.event.comment.author_association == 'OWNER')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read only trusted default-branch code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Test relay parser and report rendering
+        run: node --test tools/team-relay/relay.test.mjs
+
+      - name: Update the Issue #23 team inbox
+        run: node tools/team-relay/relay.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
