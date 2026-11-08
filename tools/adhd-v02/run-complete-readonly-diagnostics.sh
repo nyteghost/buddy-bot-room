@@ -7,7 +7,7 @@ set -Eeuo pipefail
 set +x
 export LC_ALL=C
 
-SOURCE_SHA='dc90a55bfc120cd00ed9de4e44f211973de4deea'
+SOURCE_SHA='294892e68edfeb6b6abc798f952f9284f8e0d622'
 SOURCE_BASE="https://raw.githubusercontent.com/nyteghost/buddy-bot-room/$SOURCE_SHA/tools/adhd-v02"
 CODE_ROOT="${ADHD_AUDIT_CODE_ROOT:-/mnt/user/appdata/adhd-assistant/code}"
 IMAGE='python:3.12-alpine'

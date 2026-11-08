@@ -6,7 +6,7 @@ set -Eeuo pipefail
 HOST="tower.tarpon-drum.ts.net"
 if [ "$#" -ge 1 ]; then HOST="$1"; fi
 IMAGE="python:3.12-alpine"
-SOURCE_SHA="3bc95671723616aee98252ed0f5379f139d96dd7"
+SOURCE_SHA="294892e68edfeb6b6abc798f952f9284f8e0d622"
 SOURCE="https://raw.githubusercontent.com/nyteghost/buddy-bot-room/$SOURCE_SHA/tools/adhd-v02/audit_native_review_proxy.py"
 
 if [[ "$HOST" == *"/"* || "$HOST" == *":"* || -z "$HOST" ]]; then

@@ -142,6 +142,55 @@ class ProxyAuditTests(unittest.TestCase):
         self.check_all(result, "basic_auth_before_proxy", False)
         self.check_all(result, "route_structure_unambiguous", False)
 
+    def test_unknown_host_matcher_is_not_verified_route_coverage(self):
+        conf = config(inject_token=True)
+        conf["apps"]["http"]["servers"]["srv0"]["routes"][0]["match"] = [
+            {"expression": "unsupported_secret_expression()"}]
+        report = audit(conf, HOST)
+        self.check_all(report, "candidate_upstreams", 1)
+        self.check_all(report, "ambiguous_match_candidates", 1)
+        self.check_all(report, "certain_upstream_candidates", 0)
+        self.assertFalse(report["route_coverage_verified"])
+        self.assertFalse(report["static_control_markers_complete"])
+        self.assertEqual(report["status"], "unverified_ambiguous_routes")
+
+    def test_known_or_unknown_matchers_still_fail_closed(self):
+        conf = config(inject_token=True)
+        conf["apps"]["http"]["servers"]["srv0"]["routes"][0]["match"] = [
+            {"host": [HOST]}, {"expression": "unsupported_match()"}]
+        report = audit(conf, HOST)
+        self.assertFalse(report["route_coverage_verified"])
+        self.check_all(report, "route_structure_unambiguous", False)
+
+    def test_two_complete_routes_cannot_masquerade_as_single_safe_route(self):
+        import copy
+        conf = config(inject_token=True)
+        routes = conf["apps"]["http"]["servers"]["srv0"]["routes"]
+        routes.append(copy.deepcopy(routes[0]))
+        report = audit(conf, HOST)
+        self.check_all(report, "candidate_upstreams", 2)
+        self.assertFalse(report["route_coverage_verified"])
+        self.assertFalse(report["static_control_markers_complete"])
+
+    def test_cli_returns_check_when_token_marker_missing(self):
+        out, err = StringIO(), StringIO()
+        with patch("sys.stdin", StringIO(json.dumps(config()))),  patch("sys.stdout", out), patch("sys.stderr", err):
+            self.assertEqual(main(["--host", HOST]), 3)
+        report = json.loads(out.getvalue())
+        self.assertTrue(report["route_coverage_verified"])
+        self.assertFalse(report["static_control_markers_complete"])
+        self.assertEqual(report["status"], "unverified_missing_security_controls")
+        self.assertNotIn(HOST, out.getvalue() + err.getvalue())
+
+    def test_cli_complete_static_markers_do_not_authorize_install(self):
+        out, err = StringIO(), StringIO()
+        with patch("sys.stdin", StringIO(json.dumps(config(inject_token=True)))),  patch("sys.stdout", out), patch("sys.stderr", err):
+            self.assertEqual(main(["--host", HOST]), 0)
+        report = json.loads(out.getvalue())
+        self.assertTrue(report["static_control_markers_complete"])
+        self.assertFalse(report["actual_browser_request_tested"])
+        self.assertFalse(report["live_installation_authorized"])
+
     def test_stdout_never_contains_private_config_values(self):
         source = json.dumps(config(inject_token=True))
         out, err = StringIO(), StringIO()
