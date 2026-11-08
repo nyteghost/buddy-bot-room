@@ -1349,7 +1349,7 @@ await step("HD office keeps enabled built-in guests (no disappearing, no duplica
   await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const appearance = mood.getByRole("group", { name: "Room appearance" });
-  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  const library = page.locator(".room-settings-content details.world-character-library");
   await library.waitFor({ state: "visible" });
   if (await library.getAttribute("open") === null) await library.locator("summary").click();
   const guests = ["Green Jacket Guy", "Moon Mage"];
@@ -1474,7 +1474,7 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
   await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const appearance = mood.getByRole("group", { name: "Room appearance" });
-  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  const library = page.locator(".room-settings-content details.world-character-library");
   await library.waitFor({ state: "visible" });
   if (await library.getAttribute("open") === null) await library.locator("summary").click();
   const ids = ["user-smokenovahd1", "user-smokenovapx1"];
