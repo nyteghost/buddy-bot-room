@@ -3,6 +3,7 @@
 # Does not create files, start containers, print environment variables or read secrets.
 set -u
 
+result=0
 echo '== Pixel Pals / ADHD photo beta read-only preflight =='
 echo 'No Docker or Compose changes are performed by this script.'
 echo
@@ -48,26 +49,30 @@ echo 'Staging container name: unused.'
 if command -v ss >/dev/null 2>&1; then
   if ss -ltnH | awk '$4 ~ /:18765$/ {found=1} END {exit !found}'; then
     echo 'BLOCKED: proposed host loopback port 18765 is already listening.'
-    exit 1
+    result=1
   fi
   echo 'Proposed staging TCP port 18765: no listener shown by ss.'
 else
   echo 'UNVERIFIED: ss unavailable; check TCP port 18765 on Unraid manually.'
+  result=1
 fi
 
 echo
 echo '== Gaming-PC Ollama connectivity =='
 if ! command -v curl >/dev/null 2>&1; then
   echo 'UNVERIFIED: curl unavailable; cannot check gaming-PC Ollama.'
+  result=1
 else
   # Non-mutating GET, responses are not printed (may reveal local model metadata).
   tags="$(curl -fsS --connect-timeout 3 --max-time 8 http://10.200.1.149:11434/api/tags 2>/dev/null)" || tags=""
   if [[ -z "$tags" ]]; then
     echo 'BLOCKED: Unraid host cannot retrieve model tags from 10.200.1.149:11434.'
+    result=1
   elif [[ "$tags" == *'qwen3-vl:4b'* ]]; then
     echo 'Gaming-PC Ollama reachable; qwen3-vl:4b appears in /api/tags.'
   else
     echo 'UNVERIFIED: Ollama reachable but qwen3-vl:4b is not in the returned tags.'
+    result=1
   fi
 fi
 
@@ -88,3 +93,8 @@ echo
 echo 'NEXT GATES: inspect actual active Compose file and native Caddy/HTTPS/auth.'
 echo 'The iPhone photo upload is NOT safe to expose directly from this loopback-only app.'
 echo 'No production container has been stopped, restarted, created or changed.'
+if (( result != 0 )); then
+  echo 'PREFLIGHT INCOMPLETE: resolve blocked/unverified checks before staging.'
+  exit 1
+fi
+echo 'STATIC PREFLIGHT PASSED. Deployment and iPhone proxy remain unapproved/unverified.'
