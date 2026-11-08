@@ -25,7 +25,7 @@ cleanup(){ unset PASS PASS2 HASH || :; if [[ -n "$TEMP" ]]; then rm -rf -- "$TEM
 trap cleanup EXIT
 
 [[ "$EUID" -eq 0 ]] || fail 'Use the Unraid root terminal.'
-for tool in docker curl ip ss grep mktemp install awk cp chmod chown; do
+for tool in docker curl ip ss grep mktemp install awk cp chmod chown cmp find wc; do
   command -v "$tool" >/dev/null 2>&1 || fail "Missing $tool"
 done
 for path in "$PROJECT/docker-compose.yml" "$PROJECT/docker-compose.override.yml" "$PHOTO_OVERLAY"; do
@@ -51,6 +51,22 @@ curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$BETA_PORT/heal
   fail 'Existing photo beta backend health unavailable.'
 [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$ORIGINAL_PROXY")" == host ]] ||
   fail 'Production Caddy is not host network: review required.'
+# Previous HTTPS installer failed its reload. Require its saved original
+# config and current Caddyfile to match before touching a new gateway.
+PROD_CADDY_DIR=/mnt/user/appdata/adhd-assistant/lan-proxy/conf
+if [[ -d "$PROD_CADDY_DIR" ]]; then
+  shopt -s nullglob
+  backups=("$PROD_CADDY_DIR"/Caddyfile.before-photo-beta-*)
+  if (( ${#backups[@]} > 0 )); then
+    newest="${backups[0]}"
+    for file in "${backups[@]}"; do
+      [[ "$file" > "$newest" ]] && newest="$file"
+    done
+    cmp -s "$PROD_CADDY_DIR/Caddyfile" "$newest" ||
+      fail 'Production Caddyfile differs from the most recent backup. Review manually.'
+    echo 'Production Caddyfile matches its most recent pre-beta backup.'
+  fi
+fi
 IMAGE="$(docker inspect -f '{{.Config.Image}}' "$ORIGINAL_PROXY")"
 [[ "$IMAGE" =~ ^[a-zA-Z0-9./:@_-]+$ ]] ||
   fail 'Existing Caddy image reference is unfamiliar.'
