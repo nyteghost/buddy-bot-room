@@ -6,7 +6,7 @@ set +x
 umask 077
 
 fail(){ printf 'BLOCKED: %s\n' "$*" >&2; exit 1; }
-[[ "\${EUID:-1}" == 0 ]] || fail 'Run from the Unraid root terminal.'
+[[ "${EUID:-1}" == 0 ]] || fail 'Run from the Unraid root terminal.'
 for cmd in docker mktemp chown chmod grep; do
   command -v "$cmd" >/dev/null 2>&1 || fail "Missing $cmd"
 done
@@ -105,7 +105,7 @@ common=(
   --env XDG_DATA_HOME=/data
   --env XDG_CONFIG_HOME=/config
 )
-if run_check 'current_validator_settings' "\${common[@]}"; then
+if run_check 'current_validator_settings' "${common[@]}"; then
   echo 'Result: current validator succeeded with synthetic data; inspect other differences.'
 else
   improved=(
@@ -116,7 +116,7 @@ else
     --env XDG_CONFIG_HOME=/config
     --env HOME=/tmp
   )
-  if run_check 'writable_private_storage' "\${improved[@]}"; then
+  if run_check 'writable_private_storage' "${improved[@]}"; then
     echo 'Result: missing writable Caddy temp/CA storage is the likely cause.'
   else
     echo 'Result: validation still fails. Do NOT run the gateway installer.'
