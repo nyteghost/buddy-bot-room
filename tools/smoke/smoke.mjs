@@ -1292,8 +1292,51 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
   },undefined,{timeout:15000});
 });
 
-// Living Universe HD office preview (feature flag via Room Appearance). Captures go into the CI gallery image.
 const gallery = [];
+// P1 regression guard: built-in guests (Green Jacket, Moon Mage, …) must stay in the room when the HD office is on.
+await step("HD office keeps enabled built-in guests (no disappearing, no duplicates) and restores them", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  const mood = page.getByRole("region", { name: "Pal Room activities" });
+  const appearance = mood.getByRole("group", { name: "Room appearance" });
+  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  await library.waitFor({ state: "visible" });
+  if (await library.getAttribute("open") === null) await library.locator("summary").click();
+  const guests = ["Green Jacket Guy", "Moon Mage"];
+  const was = {};
+  try {
+    for (const name of guests) {
+      const toggle = library.getByRole("button", { name: new RegExp("^(Enable|Disable) " + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$") });
+      was[name] = await toggle.getAttribute("aria-pressed") === "true";
+      if (!was[name]) { await toggle.click(); await library.getByRole("button", { name: "Disable " + name }).waitFor({ timeout: 10000 }); }
+    }
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+    await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+    // Living World first: both built-in guests are drawn.
+    await page.locator(".room-scene .world-visitor").first().waitFor({ state: "attached", timeout: 8000 });
+    await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+    await page.locator(".room-scene.hd-world .hd-office").waitFor({ state: "visible", timeout: 8000 });
+    const who = (await page.getByRole("list", { name: "Who is in the room" }).locator("li").allTextContents()).join(" | ");
+    for (const name of guests) if (!who.includes(name)) throw Error(`Built-in guest "${name}" disappeared in the HD office: ${who}`);
+    if (await page.locator(".room-scene .world-visitor, .room-scene .world-guest").count()) throw Error("Built-in guests were drawn twice (Living World copy under the HD office)");
+    const actors = await page.locator('.room-scene .hd-actor[data-actor^="visitor:"]').count();
+    if (actors > 6) throw Error("More than six visitors in the HD office: " + actors);
+    gallery.push({ label: "Running app (CI) · desktop · HD office with built-in guests (Green Jacket Guy, Moon Mage)", png: await page.locator(".room-scene").screenshot() });
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck();
+    await page.waitForFunction(() => !document.querySelector(".room-scene.hd-world"));
+    await page.locator(".room-scene .world-visitor").first().waitFor({ state: "attached", timeout: 8000 });
+  } finally {
+    await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+    for (const name of guests) if (was[name] === false) await library.getByRole("button", { name: "Disable " + name }).click().catch(() => undefined);
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+    await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+  await roomItem.click();
+});
+
+// Living Universe HD office preview (feature flag via Room Appearance). Captures go into the CI gallery image.
 await step("Living Universe HD office preview: Room Appearance flag, camera, honest ambient life, fallback", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
