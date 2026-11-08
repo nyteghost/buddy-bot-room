@@ -54,17 +54,17 @@ echo 'Staging container name: unused.'
 if command -v ss >/dev/null 2>&1; then
   if listeners="$(ss -ltnH 2>/dev/null)"; then
     if printf '%s\n' "$listeners" | awk -v port=":${PHOTO_BETA_PORT}" 'index($4, port) && substr($4, length($4)-length(port)+1)==port {found=1} END {exit !found}'; then
-      echo 'BLOCKED: proposed host loopback port ${PHOTO_BETA_PORT} is already listening.'
+      echo "BLOCKED: proposed host loopback port ${PHOTO_BETA_PORT} is already listening."
       result=1
     else
-      echo 'Proposed staging TCP port ${PHOTO_BETA_PORT}: no listener shown by ss.'
+      echo "Proposed staging TCP port ${PHOTO_BETA_PORT}: no listener shown by ss."
     fi
   else
     echo 'UNVERIFIED: ss failed to inspect local TCP sockets.'
     result=1
   fi
 else
-  echo 'UNVERIFIED: ss unavailable; check TCP port ${PHOTO_BETA_PORT} on Unraid manually.'
+  echo "UNVERIFIED: ss unavailable; check TCP port ${PHOTO_BETA_PORT} on Unraid manually."
   result=1
 fi
 
