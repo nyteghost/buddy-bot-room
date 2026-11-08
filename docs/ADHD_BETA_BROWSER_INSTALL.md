@@ -1,75 +1,62 @@
-# One-site browser access for ADHD Assistant Photo Beta
+# ADHD Assistant Photo Beta — safe direct browser access
 
-## Status and verified environment
+## Status — 2026-11-08
 
-The owner approved a direct browser path on **CachyOS and iPhone**. The beta service is already healthy on Unraid loopback at `127.0.0.1:18767`. Pixel Pals, production ADHD Assistant and their bridge are healthy. The existing `adhd-assistant-lan` Caddy v2.11.8 is running on host-network `*:18765` and has an authenticated existing production ADHD route with upstream Host/Origin rewriting. Its certificate issuer is **Caddy's internal CA** and trust on either client is **not yet verified**. Owner verified port **18768** was free. The existing AI model `qwen3-vl:4b` is installed on the gaming PC.
+**Independent HTTPS gateway draft prepared, not yet installed.**
 
-**This beta gateway is LAN-only at first.** It does not automatically provide remote cellular access; remote use requires a separately verified private VPN / Tailscale path.
+The owner ran the initial HTTPS installer which attempted to append a site to the *existing* `adhd-assistant-lan` production Caddy container. Although Caddy `adapt` and `validate` passed, `caddy reload` failed. The installer reported restoring its original Caddyfile from its timestamped backup. Root cause not yet confirmed; Caddy may have its admin API disabled or inaccessible. Never repeat the old `/tmp/install-adhd-beta-https.sh` or restart production Caddy to fix this. Its public branch entrypoint `install-adhd-beta-browser-gateway.sh` is now retired and fails closed.
 
-## Additional beta route
+**Verified live:** Pixel Pals `buddy-bot-room`, native `adhd-assistant`, the bridge and photo-beta service are running. The photo beta responds `{"ok":true}` at host-loopback `127.0.0.1:18767`. Caddy serves existing ADHD on port 18765. Port 18768 was unused at last check. The owner's phone and desktop clients are **iPhone Safari and CachyOS**, not Windows.
 
-The installer `tools/adhd-v02/install-adhd-beta-browser-gateway.sh` adds one **separately authenticated HTTPS** site:
+## Safer architecture
+
+Use **one new isolated Caddy container** `adhd-assistant-photo-gateway` in the **SAME existing Compose project `pixelpals`**, with its own Caddyfile, TLS internal CA, config/data mounts and LAN-only listener. It does not edit, reload, stop, mount volumes from or share certificates with the production Caddy.
 
 ```text
-CachyOS / iPhone Safari
-        ↓ HTTPS, Caddy internal certificate, Basic Authentication
-https://10.200.1.30:18768
-        ↓ existing Caddy container (bind 10.200.1.30, not 0.0.0.0)
-http://127.0.0.1:18767
-        ↓ existing beta container
-ADHD Assistant — Do It With Me Photo Guidance
-        ↓ opt-in image request to approved gaming-PC LAN IP
-Ollama qwen3-vl:4b
+CachyOS or iPhone on private home LAN
+         HTTPS and unique Basic Auth
+         https://10.200.1.30:18768
+                  |
+         NEW beta-only Caddy
+                  |
+        localhost 127.0.0.1:18767
+                  |
+        ADHD Assistant Photo Beta
+                  |
+        gaming PC Ollama qwen3-vl:4b
 ```
 
-The beta backend stays on loopback. The installer verifies live Caddy layout, beta health, production containers and ports, then asks for a new **unique** username/password, hashes the password through Caddy's stdin (password never appears in the command line), and writes a candidate Caddyfile. It verifies `caddy adapt` and `caddy validate` against the *existing Caddy binary and same relative file directory* before applying. It requires explicitly typing **`ADD ADHD HTTPS BETA`**, saves a timestamped **private** backup of the original Caddyfile, atomically installs the candidate, and hot-reloads Caddy (no restart). If reload or unauthenticated route verification fails, the script restores the original file and reloads the original configuration.
+The gateway sets `admin off` and `auto_https disable_redirects` so it does not conflict with other host ports 2019, 80, or 443. It binds only `10.200.1.30:18768`. The beta backend stays bound to loopback, not LAN or WAN. Caddy Basic Auth guards every path, including `/api/bootstrap`, `/api/settings` and photo uploads; cross-origin browser requests are denied; `/bridge/v1/*` is unavailable from the beta public route; internal Host/Origin rewrites preserve native checks.
 
-The site uses `tls internal`, `basic_auth` before every reverse-proxied request, blocks browser requests from other Origin values and blocks `/bridge/v1/*` externally. It forwards required upstream Host and Origin to the localhost-only native server, and removes `Authorization` upstream. **Never expose or forward port 18767 publicly**, and do not disable the native local-token check.
+## Exact installation / safety
 
-## Installation
+The new owner-run installer is `tools/adhd-v02/install-adhd-photo-independent-gateway.sh` on draft PR #39. It must be downloaded **pinned to a reviewed commit**, syntax checked and run interactively. It fails closed if the production Caddyfile differs from the most recent pre-beta backup, existing containers are not running, beta health fails, LAN IP or port 18768 is unavailable, an existing gateway is already present, or existing Docker Caddy image is absent.
 
-Read the [installer](../tools/adhd-v02/install-adhd-beta-browser-gateway.sh) before running. From **Unraid Terminal**, download an **exact pinned, reviewed commit**, run `bash -n`, then run the installer. Its interactive prompts are not suitable for `curl | bash`. Never paste the chosen password in ChatGPT or GitHub.
+The installer uses the same Caddy image already locally present on Unraid; it validates an independent candidate Caddyfile with a disposable, no-network, read-only Caddy container using only temporary data/config. It then validates combined Compose **without starting** existing services, and asks the owner to enter `INSTALL INDEPENDENT BETA GATEWAY`. Only after that does it create:
 
-### After installer reports success
+- `/mnt/user/appdata/adhd-assistant-photo-beta/gateway/conf/Caddyfile` (contains hashed, non-plaintext Basic Auth credentials);
+- `/mnt/user/appdata/adhd-assistant-photo-beta/gateway/data` (independent private CA; NEVER share `root.key`);
+- `/mnt/user/appdata/adhd-assistant-photo-beta/gateway/config`;
+- `/boot/config/plugins/compose.manager/projects/pixelpals/docker-compose.photo-gateway.yml` (additional service overlay).
 
-1. First verify the **401 Unauthorized** response for an unauthenticated request. From Unraid:
+It starts **ONLY** the new `adhd-assistant-photo-gateway` with `docker compose ... --no-deps`, never touches the production Caddyfile or existing containers, and checks that an unauthenticated `/api/bootstrap` returns **401** (using `curl -k` solely for this local negative test). The overlay file is additional to the existing Compose Manager base, override and photo-beta files; **avoid full-stack Compose Up/Down**, as Compose Manager's stored set may omit optional overlays.
 
-   ```bash
-   curl -ksS --max-time 5 -o /dev/null -w '%{http_code}\n' \
-     https://10.200.1.30:18768/api/bootstrap
-   ```
+## Certificate trust on both devices (required before sending photos)
 
-   Expect `401`. The `-k` above is ONLY for a local **negative auth test**. **Do not** turn off certificate verification in normal browser use.
+This new gateway has its **OWN** internal CA, distinct from production Caddy. The **public** root certificate is expected after successful startup at:
 
-2. Verify the public root CA certificate path in the existing Caddy container (do NOT access/export any private key):
+`/mnt/user/appdata/adhd-assistant-photo-beta/gateway/data/caddy/pki/authorities/local/root.crt`
 
-   ```bash
-   docker exec adhd-assistant-lan test -f /data/caddy/pki/authorities/local/root.crt
-   ```
+Verify its SHA-256 fingerprint on the Unraid server before transferring. Do **not** copy `root.key` or any private CA key.
 
-   From **CachyOS Konsole**, obtain the public certificate, using your authenticated SSH access:
+- **CachyOS:** via Konsole `scp` transfer the public certificate securely to your computer, compare fingerprints, then explicitly trust it in the relevant browser or OS certificate store. Firefox and Chromium may use different trust sources on Linux; verify with each browser used. No "Proceed anyway" shortcuts.
+- **iPhone:** transfer the verified public root certificate through a private method, install under **Settings → General → VPN & Device Management**, then enable full trust under **Settings → General → About → Certificate Trust Settings**. Only trust a root CA you control and have fingerprint-verified. See [Apple support](https://support.apple.com/en-us/102390).
+- **Network:** first pilot supports private home LAN only. **Do not port-forward 18768**. Cellular/Tailscale access requires a separately reviewed private remote-access route.
 
-   ```bash
-   scp root@10.200.1.30:/mnt/user/appdata/adhd-assistant/lan-proxy/data/caddy/pki/authorities/local/root.crt \
-     ~/Downloads/adhd-caddy-local-root.crt
-   ```
+## Acceptance and rollback
 
-   Check the file with `openssl x509 -in ~/Downloads/adhd-caddy-local-root.crt -noout -subject -fingerprint -sha256`. Verify its fingerprint against a read-only check on Unraid or the Caddy container using `openssl` before trusting it. **Only the public `.crt` file should be transferred. Do not share `root.key` or other private keys.**
+After verified trust, browse `https://10.200.1.30:18768` from CachyOS and iPhone. Confirm an unauthenticated browser receives a login challenge; authenticated access displays the correct native beta (including **Do It With Me**). In beta Settings use `Local Ollama` and vision model `qwen3-vl:4b`. Test Start Without Photo, then choose a non-sensitive room photograph and request one actionable cleaning suggestion. No progress persistence across refresh yet, no conversational voice body doubling.
 
-3. On **CachyOS**, trust the root CA only if you explicitly accept the implications (a trusted CA can issue other TLS certificates). You may import it into your specific browser's certificate authorities, or use the operating-system's certificate store after verifying it is your own Caddy CA. Browser-specific trust behavior varies; **do not bypass certificate warnings**.
+On any failure, inspect **only** `adhd-assistant-photo-gateway` logs, container status and the new gateway files. To roll back, stop only the new gateway container with the targeted Compose command; do not remove unrelated services or production data. Preserve files for inspection until the owner authorizes cleanup. Continue to verify the production Caddy 18765 listener, Pixel Pals and ADHD Assistant health.
 
-4. On **iPhone**, securely transfer the same **public** `adhd-caddy-local-root.crt` (e.g., through your private Files/iCloud Drive workflow), open it, install the downloaded profile under **Settings → General → VPN & Device Management**, then enable **Settings → General → About → Certificate Trust Settings → Full Trust** for that root. Only do this for a verified CA certificate you control. Apple instructions: https://support.apple.com/en-us/102390
-
-5. On both devices while connected to the same private LAN, open **https://10.200.1.30:18768**. The browser should show a trusted HTTPS connection and prompt for the beta credentials. Open **Do It With Me**. In **Settings**, select `Local Ollama` and enter **`qwen3-vl:4b`** as the vision model. Test **Start without photo**, then explicitly choose a non-sensitive room photo and select **Analyze photo for tiny steps**. Ask for one smaller step, mark Done, verify calm/no-shame guidance.
-
-## Non-destructive verification and rollback
-
-- The existing Caddy config backup is stored under `/mnt/user/appdata/adhd-assistant/lan-proxy/conf/Caddyfile.before-photo-beta-<UTC timestamp>`. This contains existing production config and may include credential hashes. Never post it publicly.
-- On unexpected errors, **do not** run `docker compose down`, stop the existing Caddy, stop `buddy-bot-room`, or delete any SQLite database. If the installer reports a rollback failure, stop and inspect the Caddy state before changing anything.
-- No production route, original 18765 listener, Pixel Pals, native ADHD Assistant or bridge should change. Verify they remain healthy after a reload.
-- Do not enable access from the public internet merely by forwarding 18768. A separate security review is needed for Tailscale/WAN access, mobile phone on cellular data, rate limiting, and continued certificate/credential protections.
-- The early photo beta still does **not** persist companion sessions across reload or implement conversational voice body doubling.
-
-## Testing limitations
-
-Automated Bash syntax / synthetic Caddy structure and redaction checks are necessary but **cannot prove the actual live Caddyfile will validate or reload**, that the iPhone trusts the internal CA, or that the Qwen model yields useful photo guidance. The installer fails closed on unrecognized layouts and prompts; acceptance requires a successful live browser test. No password, credential hash, certificate private key, user photo or app database belongs in GitHub issues or PRs.
+**This documentation and draft PR are not deployment proof.** Only the owner can run the installer on live Unraid. Never post credentials, CA private keys, config bodies, personal photos or real database contents in GitHub or this chat.
