@@ -17,10 +17,10 @@ function readSize(raw: string | null): Size | null {
   } catch { return null; }
 }
 
-export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className, focusVersion }: {
+export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className, focusVersion, titleActions }: {
   className?: string;
   id: string; title: string; icon: ReactNode; open: boolean; onClose: () => void;
-  children: ReactNode; resetVersion: number; focusVersion?: number;
+  children: ReactNode; resetVersion: number; focusVersion?: number; titleActions?: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
   const drag = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
@@ -220,6 +220,7 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
       <span className="window-title">{icon}{title}</span>
       <GripHorizontal className="window-grip size-4" aria-hidden />
       <div className="window-actions">
+        {titleActions}
         <Button variant="ghost" size="icon" title={expanded || snapped ? `Restore ${title}` : `Maximize ${title}`} aria-label={expanded || snapped ? `Restore ${title}` : `Maximize ${title}`} onClick={() => {
           if (snapped && restoreRef.current) {
             const next = restoreRef.current;
