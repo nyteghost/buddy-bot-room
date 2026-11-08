@@ -1309,6 +1309,38 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
   },undefined,{timeout:15000});
 });
 
+// Pal Room window remains scene-first on desktop, while controls live in their own
+// movable window; phone-width devices continue to see controls directly below the room.
+await step("Immersive desktop Pal Room popup and unchanged phone controls", async () => {
+  await page.setViewportSize({width:1500,height:900});
+  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\\s*Pal Room\\s*$/i});
+  if(await entry.getAttribute("aria-pressed")!=="true")await entry.click();
+  const room=page.locator('[data-window-id="room"]');
+  const trigger=room.getByRole("button",{name:"Room settings",exact:true});
+  await trigger.waitFor({state:"visible"});
+  await showRoomSettings();
+  const popup=page.locator('[data-window-id="room-settings"]');
+  await popup.waitFor({state:"visible"});
+  await popup.getByRole("region",{name:"Pal Room activities"}).waitFor();
+  await popup.locator("details.world-character-library").waitFor({state:"visible"});
+  if(await room.locator(".room-settings-content").count())throw Error("Desktop room duplicated its controls under the scene");
+  const geometry=await room.evaluate(el=>{
+    const body=el.querySelector(".window-body"),scene=el.querySelector(".room-scene");
+    return {bodyH:body.clientHeight,bodyScroll:body.scrollHeight,sceneH:scene.getBoundingClientRect().height};
+  });
+  if(geometry.bodyScroll>geometry.bodyH+3||geometry.sceneH>geometry.bodyH+3)
+    throw Error("Desktop room still overflows instead of fitting its window: "+JSON.stringify(geometry));
+  await hideRoomSettings();
+  await popup.waitFor({state:"hidden"});
+  if(!await room.locator(".room-scene").isVisible())throw Error("Closing Room Settings hid the room");
+  await page.setViewportSize({width:390,height:844});
+  await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')!==null);
+  if(await page.locator('[data-window-id="room-settings"]').count())
+    throw Error("Separate Room Settings popup appeared in phone layout");
+  await page.setViewportSize({width:1500,height:900});
+  await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')===null);
+});
+
 const gallery = [];
 // P1 regression guard: built-in guests (Green Jacket, Moon Mage, …) must stay in the room when the HD office is on.
 await step("HD office keeps enabled built-in guests (no disappearing, no duplicates) and restores them", async () => {
