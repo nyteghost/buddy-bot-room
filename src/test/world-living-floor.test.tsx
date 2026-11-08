@@ -87,10 +87,11 @@ import {WorldCustomGuest} from "@/components/world-custom-guest";
 import {worldCrowd} from "@/lib/world-crowd";
 describe("Living World crowd wiring",()=>{
  it("guests and imported visitors join the room crowd and leave it on unmount",()=>{
+  const character=starterCustomCharacter();
   const guest=render(<WorldGuest id="arcade-ghost" theme="normal" active/>);
-  const visitor=render(<WorldCustomGuest character={starterCustomCharacter()} index={0} theme="normal" active/>);
+  const visitor=render(<WorldCustomGuest character={character} index={0} theme="normal" active/>);
   expect(worldCrowd("normal").has("guest:arcade-ghost")).toBe(true);
-  expect(worldCrowd("normal").has("custom:"+starterCustomCharacter().id)).toBe(true);
+  expect(worldCrowd("normal").has("custom:"+character.id)).toBe(true);
   guest.unmount();visitor.unmount();
   expect(worldCrowd("normal").size).toBe(0);
  });

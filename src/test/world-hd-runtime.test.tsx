@@ -8,7 +8,7 @@ import {lowPower} from "@/lib/power";
 import {parseCharacterZip} from "@/lib/character-zip";
 import type {WorldHdCharacter,WorldHdClip} from "@/lib/world-hd";
 vi.mock("@/lib/character-zip",()=>({CHARACTER_ZIP_MAX_BYTES:8000000,parseCharacterZip:vi.fn()}));
-vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestWanderPose:(_seed:unknown,_slot:unknown,_theme:unknown,elapsed:number)=>({x:30+elapsed/1000,y:40,facing:"e",action:"walking",walking:true,travelled:elapsed/200,dwelling:false})}));
+vi.mock("@/lib/world-guest-packs",async importOriginal=>({...await importOriginal<typeof import("@/lib/world-guest-packs")>(),guestWanderPose:(_seed:unknown,_slot:unknown,_theme:unknown,elapsed:number)=>({x:30+elapsed/200,y:80,facing:"e",action:"walking",walking:true,travelled:elapsed/200,dwelling:false})}));
 const clip=(names:string[],loop=true):WorldHdClip=>({frames:names.map((src,i)=>({src,durationMs:i?300:100})),loop});
 const art:WorldHdCharacter={version:2,artStatus:"prototype",movement:"humanoid",directions:{s:{idle:clip(["south"]),signature:clip(["signature"])},e:{idle:clip(["east"]),walk:clip(["walk1","walk2"]),signature:clip(["sig-east"])}}};
 const character=()=>({...starterCustomCharacter(),name:"Test Hero",hd3:art});
