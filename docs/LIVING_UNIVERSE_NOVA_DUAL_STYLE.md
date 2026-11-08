@@ -139,3 +139,43 @@ At room size (about 41–70 CSS px figure at desktop, and on a 390 px phone at 3
 - **Height:** in-room height matches the native Pals within about 10 %. Nova is slimmer, because the illustrated proportions differ from the chunky native sprites.
 - **Themed names:** in Horror and Matrix, Nova's look carries that theme's name tag (Ghostface or Neo), because looks apply in every theme. The owner needs to decide whether looks should apply in themed worlds.
 - **Phone labels:** at 390 px in the Horror room, the name tags of neighbouring Pals can overlap (Ghostface and The Slasher Fan). This is an existing Living World label-crowding issue, not specific to Nova.
+
+## 8. Desktop HD r5 (2026-11-08)
+
+### Art: verified independently
+- r4 → r5 changes **exactly 36 pixels**. All of them lie inside the two cuff boxes (x98–103 and x153–157, y108–112), all were transparent in r4, and all now match r3 exactly at full opacity.
+- Every other pixel is identical to r4, so the arm-gap clean-up is preserved.
+- The figure is one connected shape and its feet are on row 247.
+- The only see-through areas left inside the outline are the intended arm-to-torso gaps (106 px, 81 px and small gap continuations).
+- About 450 ghost pixels at alpha ≤ 26 remain (contrast ≤ 13/255). They are not visible in any room.
+- Mobile Pixel r2 is byte-identical to the previous r2 and was not reinstalled.
+
+### Import and update
+This used the real importer and server store in a fresh temporary data folder; 19/19 checks passed.
+- The seeded state was HD r4 plus Pixel r2.
+- Refused, as intended:
+  - installing r5 as a new character;
+  - an update against stale r3;
+  - re-applying Pixel r2;
+  - a downgrade from r5 to r4.
+- The reviewed update **r4 → r5** was accepted. One history snapshot was written first, and r5 persisted after a re-read.
+- Pixel r2 was untouched.
+- There are still exactly two cosmetic characters and no visitor.
+- A rollback to r4 from the export, followed by the update to r5 again, gives an identical r5.
+- The stand-in user, settings, chat, memory, task and permission files are byte-identical. The character store wrote only its own files.
+
+### In-room inspection
+These are component-harness captures at 3× device pixels, not the deployed app.
+- **The cuffs are solid** in every render: HD office at full zoom, the Office Living World, Horror Mansion and Matrix, on a 1280 px desktop and in a 390 px phone viewport.
+- The arm gaps show the room behind them.
+- No halos, fragments or low-alpha ghosts are visible.
+- Feet sit on the floor point.
+- Nova is 61–70 CSS px in Living World rooms on desktop and 41–47 CSS px at 390 px. That is within about 10 % of the native Pals.
+
+### Defects found this round
+- **Fixed (functional):** in a calm or still HD office (Calm, Focus, reduced motion, hidden or low power), *Follow* eased by one frame and then stopped, so a followed Pal could stay off screen. This was most visible at 390 px with HD forced. Following now snaps to the Pal when nothing animates, and a unit test covers it.
+- **Open (not art):**
+  - Nova's station in the Office Living World is a seated desk. The chair and monitor hide most of the standing-only frame; this needs the sit-at-workstation pilot.
+  - When HD is forced on a phone, the HD office toolbar covers the top of the scene at high zoom.
+  - With 6 visitors, the HD office and the 390 px Horror room get crowded: overlapping visitors and colliding name tags. This existed before and is not specific to Nova.
+  - In themed rooms, Nova's look carries the theme's name tag (Ghostface, Neo). This needs an owner decision.

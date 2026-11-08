@@ -135,6 +135,7 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
  const floor = hdOfficeFloor();
  const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
  const running = visible && playful && !paused && !reduced && !low && !hidden;
+ const runningRef = useRef(running); runningRef.current = running;
  const hdSkins = useWorldPalSkins(), pixelSkins = useWorldPalPixelSkins();
  // Looks resolve against every installed character (published by the Character Library), not only visitors in the room.
  const installed = useWorldSkinCharacters();
@@ -210,7 +211,8 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
   const vp = size.current;
   if (followRef.current) {
    const p = pose(actors.find(a => a.id === followRef.current) ?? actors[0]!);
-   camera.current = worldCameraFollow(camera.current, { x: p.x / 100 * W, y: p.y / 100 * H - FIGURE / 2 }, dt, WORLD, vp, { reduced, max: MAX_ZOOM });
+   // When nothing animates (Calm, Focus, reduced motion, hidden, low power) there is no next frame to ease into, so snap.
+   camera.current = worldCameraFollow(camera.current, { x: p.x / 100 * W, y: p.y / 100 * H - FIGURE / 2 }, dt, WORLD, vp, { reduced: reduced || !runningRef.current, max: MAX_ZOOM });
   }
   if (worldLayer.current) worldLayer.current.style.transform = worldCameraTransform(camera.current, vp);
   const vis = worldCameraVisible(camera.current, vp, ACTOR);
@@ -315,6 +317,8 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
   else return;
   e.preventDefault();
  };
+ // Static room: draw the new framing right away when following starts or changes.
+ useEffect(() => { if (!runningRef.current && follow) paint(16); }, [follow, paint]);
  const followName = actors.find(a => a.id === follow)?.name;
  const zoomPct = Math.round(zoom * 100);
 

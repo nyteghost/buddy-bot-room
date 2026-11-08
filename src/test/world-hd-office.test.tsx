@@ -48,6 +48,14 @@ describe("Living Universe HD office (feature-flagged preview)", () => {
   fireEvent.keyDown(room, { key: "+" });
   expect(screen.getByText("41%")).toBeInTheDocument();
  });
+ it("following a character brings them on screen even when the room is calm (no animation frames)", () => {
+  const { container } = render(<WorldHdOffice pals={pals()} visitors={[]} visible playful={false} paused={false} synthetic={false} />);
+  for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+  for (const id of IDS) {
+   fireEvent.change(screen.getByRole("combobox", { name: "Follow a character" }), { target: { value: "pal:" + id } });
+   expect((container.querySelector(`.hd-actor[data-actor="pal:${id}"]`) as HTMLElement).style.visibility).toBe("visible");
+  }
+ });
  it("does not animate when the room is calm, paused (Focus Mode) or hidden", () => {
   const { container, rerender } = render(<WorldHdOffice pals={pals()} visitors={[]} visible playful={false} paused={false} synthetic={false} />);
   expect(container.querySelector(".hd-office")?.getAttribute("data-running")).toBe("false");
