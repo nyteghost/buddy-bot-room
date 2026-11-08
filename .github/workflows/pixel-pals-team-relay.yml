@@ -28,7 +28,10 @@ jobs:
       github.repository == 'nyteghost/buddy-bot-room' &&
       (github.event_name != 'issue_comment' ||
         ((github.event.issue.number == 23 || github.event.issue.number == 26) &&
-          github.actor != 'github-actions[bot]'))
+          (github.actor == 'nyteghost' ||
+            github.event.comment.author_association == 'COLLABORATOR' ||
+            github.event.comment.author_association == 'MEMBER' ||
+            github.event.comment.author_association == 'OWNER')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
