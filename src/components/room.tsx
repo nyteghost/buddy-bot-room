@@ -2105,7 +2105,7 @@ export function Room() {
       <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} initialQuestion={compareQuestion} />
       <SeerrDialog query={seerrQuery} onClose={() => setSeerrQuery(null)} onConfigure={() => { setSetupTarget(previous => ({ id: "seerr", request: (previous?.request ?? 0) + 1 })); if (window.matchMedia("(max-width: 700px)").matches) mobileTab("setup"); else setSetupOpen(true); }} onRequested={(summary) => say(`@seerr ${seerrQuery?.title ?? ""}${seerrQuery?.is4k ? " 4k" : ""}`.trim(), summary)} />
       <div className="workspace-frame">
-        <nav className="workspace-sidebar" aria-label="Workspace">
+        <nav className="workspace-sidebar" aria-label="Workspace" onClickCapture={event => { if ((event.target as HTMLElement).closest(".sidebar-item")) setRoomSettingsOpen(false); }}>
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
           <Button variant="ghost" className="sidebar-item" aria-pressed={captureOpen} onClick={()=>captureOpen?setCaptureOpen(false):window.dispatchEvent(new Event("pixelpals:inbox"))}><Mic /><span>Capture Inbox</span></Button>
           <Button variant="ghost" className="sidebar-item" aria-pressed={generalOpen} onClick={() => generalOpen ? closeGeneral() : openGeneral()}><MessageSquare /><span>General Chat · Ask Anything</span></Button>
