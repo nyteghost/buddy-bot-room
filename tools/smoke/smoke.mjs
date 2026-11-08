@@ -1409,11 +1409,14 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
     await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
     await appearance.getByRole("radio", { name: "HD", exact: true }).click();
     await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
-    await page.locator('.room-scene.hd-world .hd-actor[data-actor="pal:nova"][data-art="hd"]').waitFor({ timeout: 8000 });
+    // Attached, not necessarily on screen: the camera may have Nova outside the current view until we follow her.
+    await page.locator('.room-scene.hd-world .hd-actor[data-actor="pal:nova"][data-art="hd"]').waitFor({ state: "attached", timeout: 8000 });
     const who = await page.getByRole("list", { name: "Who is in the room" }).textContent();
     if (!/front idle only/.test(who ?? "")) throw Error("HD office did not describe Nova's single-frame art: " + who);
-    await page.getByRole("combobox", { name: "Follow a character" }).selectOption({ index: 1 });
-    await page.waitForTimeout(1500);
+    const followBox = page.getByRole("combobox", { name: "Follow a character" });
+    const novaLabel = (await followBox.locator("option").allTextContents()).find(t => /nova/i.test(t));
+    if (novaLabel) await followBox.selectOption({ label: novaLabel }); else await followBox.selectOption({ index: 1 });
+    await page.waitForTimeout(2000);
     gallery.push({ label: "Running app (CI) · desktop · HD office · Nova in synthetic 'Desktop HD' look (single idle frame)", png: await page.locator(".room-scene").screenshot() });
     // Same Nova, Pixel look.
     await appearance.getByRole("radio", { name: "Pixel", exact: true }).click();
