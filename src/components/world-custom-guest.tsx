@@ -15,7 +15,8 @@ import { WORLD_GAITS, worldGaitOf, worldStepFrame } from "@/lib/world-wander";
 import { useWorldActor, useWorldFixtureUse, worldGreeting, worldPresenceSnapshot } from "@/lib/world-presence";
 import { worldMotionFor } from "./world-guest";
 import { useWorldHdScale, worldHdScaleStyle } from "./world-hd-skin";
-import { WORLD_CROWD_PRIORITY, useWorldCrowd, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { WORLD_CROWD_PRIORITY, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { useWorldCrowd } from "@/lib/world-crowd-react";
 import { WORLD_HEIGHT_CLASSES } from "@/lib/world-scale";
 
 /** Cosmetic animation only, using the existing obstacle-aware room route. */

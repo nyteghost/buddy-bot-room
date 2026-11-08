@@ -12,7 +12,8 @@ import { worldActorDepthScale } from "@/lib/world-navigation";
 import { WORLD_LEG_EXTENSION,worldGuestBody,worldLegRow,worldTallSprite } from "@/lib/world-proportions";
 import { worldGroundGrid,worldStandingFoot } from "@/lib/world-scale";
 import { WORLD_GAITS,worldStepFrame,type WorldGait,type WorldWanderAction } from "@/lib/world-wander";
-import { WORLD_CROWD_PRIORITY,useWorldCrowd,worldCrowdTieBreak,worldCrowdView } from "@/lib/world-crowd";
+import { WORLD_CROWD_PRIORITY,worldCrowdTieBreak,worldCrowdView } from "@/lib/world-crowd";
+import { useWorldCrowd } from "@/lib/world-crowd-react";
 import { useWorldActor,useWorldFixtureUse,worldGreeting,worldPresenceSnapshot } from "@/lib/world-presence";
 
 const artById=new Map<GuestId,string[]>();

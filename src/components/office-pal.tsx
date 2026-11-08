@@ -7,7 +7,8 @@ import { worldDepthScale, worldDepthZ, worldPose, worldRoomPlan, type WorldPose 
 import { useWorldActor, useWorldFixtureUse } from "@/lib/world-presence";
 import { useWorldPalSkin } from "@/lib/world-pal-skins";
 import { WorldHdSkin } from "./world-hd-skin";
-import { WORLD_CROWD_PRIORITY, useWorldCrowd, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { WORLD_CROWD_PRIORITY, worldCrowdTieBreak, worldCrowdView } from "@/lib/world-crowd";
+import { useWorldCrowd } from "@/lib/world-crowd-react";
 import { worldPalBody } from "@/lib/world-proportions";
 import { WORLD_GAITS } from "@/lib/world-wander";
 import { hasFacingArt } from "@/lib/pal-art";

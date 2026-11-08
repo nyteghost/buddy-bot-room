@@ -81,7 +81,7 @@ describe("HD256 runtime",()=>{
   expect(actor.style.getPropertyValue("--world-guest-x")).toBe(x);
   expect(actor.getAttribute("data-action")).toBe("walking");
   act(()=>vi.advanceTimersByTime(100));
-  expect(parseFloat(actor.style.getPropertyValue("--world-guest-x"))-parseFloat(x)).toBeCloseTo(0.1);
+  expect(parseFloat(actor.style.getPropertyValue("--world-guest-x"))-parseFloat(x)).toBeCloseTo(0.5); // mock route walks 5%/s
  });
  it("marks in the room when art is borrowed from another facing or clip, and not when it is supplied",()=>{
   const full=render(<WorldCustomGuest character={character()} index={0} theme="normal" active/>);

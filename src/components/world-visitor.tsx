@@ -9,7 +9,8 @@ import type { CharacterMode } from "@/lib/hellraiser";
 import { worldDepthZ } from "@/lib/world-floor";
 import { WORLD_LEG_EXTENSION, worldLegStart, worldTallSprite } from "@/lib/world-proportions";
 import { worldGridFoot, worldGroundGrid } from "@/lib/world-scale";
-import { WORLD_CROWD_PRIORITY, useWorldCrowd } from "@/lib/world-crowd";
+import { WORLD_CROWD_PRIORITY } from "@/lib/world-crowd";
+import { useWorldCrowd } from "@/lib/world-crowd-react";
 import { greenJacketPalette, greenJacketPose, greenJacketSprite, worldHideoutForTheme, worldCueReaction, type WorldRoomCue } from "@/lib/world-character-packs";
 
 const originalArt=greenJacketSprite();
