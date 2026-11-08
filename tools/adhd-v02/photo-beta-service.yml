@@ -1,0 +1,52 @@
+# Optional ADHD Assistant "Do It With Me" beta test service.
+#
+# This is an additive service definition for the EXISTING Compose Manager
+# project "pixelpals" (the one with buddy-bot-room:beta), NOT a new stack.
+# Paste the service subtree under the current stack's services:, or combine
+# Compose files under the same explicit -p pixelpals project.
+#
+# DO NOT run "Compose Up" on the whole existing stack to activate it.
+# Startup requires an explicit --profile adhd-photo-beta selection and a
+# single-service --no-deps command after owner approval and preflight.
+#
+# The native server only listens on Unraid loopback. An iPhone HTTPS route
+# is NOT supplied by this file; review active Caddy/auth separately.
+services:
+  adhd-assistant-photo-beta:
+    profiles: ["adhd-photo-beta"]
+    image: python:3.12-alpine
+    container_name: adhd-assistant-photo-beta
+    restart: "no"
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 384m
+    cpus: 1.5
+    user: "99:100"
+    working_dir: /opt/adhd
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      HOME: /data
+      ADHD_DATA_DIR: /data
+      # Uses the exact private LAN service already working for Pixel Pals.
+      # This only affects this beta test service, NOT buddy-bot-room.
+      ADHD_OLLAMA_URL: ${ADHD_PHOTO_BETA_OLLAMA_URL:-http://10.200.1.149:11434}
+    volumes:
+      # Required independent feature-checkout and disposable data paths.
+      # Missing values must make Compose fail instead of mounting production.
+      - ${ADHD_PHOTO_BETA_CODE_PATH:?Isolated private ADHD source checkout required}:/opt/adhd:ro
+      - ${ADHD_PHOTO_BETA_DATA_PATH:?Independent empty test data directory required}:/data:rw
+    command: [python, -B, launch.py, --host, "127.0.0.1", --port, "${ADHD_PHOTO_BETA_PORT:-18765}", --data-dir, /data, --no-browser]
+    healthcheck:
+      test: [CMD, python, -B, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${ADHD_PHOTO_BETA_PORT:-18765}/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 20s
+    labels:
+      com.nyteghost.pixelpals.component: adhd-photo-beta
+      com.nyteghost.pixelpals.staging: "true"
