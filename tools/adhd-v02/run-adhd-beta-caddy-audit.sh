@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 set +x
 
-PINNED="6b0f0d106211930ed2fc68cac243326a2ce6fb8c"
+PINNED="8d9c06cd99daba2f83b1b1e0db1faffeeb493ac1"
 SOURCE="https://raw.githubusercontent.com/nyteghost/buddy-bot-room/$PINNED/tools/adhd-v02/audit-adhd-beta-caddy.py"
 IMAGE="python:3.12-alpine"
 STAGE=''
@@ -24,6 +24,8 @@ docker image inspect "$IMAGE" >/dev/null 2>&1 ||
 
 echo 'Read-only Caddy proxy inventory: names/credentials/certificates remain hidden.'
 echo 'No routes, listeners, Docker containers, services or secrets are changed.'
+printf 'Caddy version: '
+docker exec adhd-assistant-lan caddy version | head -n 1
 
 STAGE="$(mktemp -d /tmp/adhd-beta-caddy-audit.XXXXXXXX)"
 chmod 755 "$STAGE"
