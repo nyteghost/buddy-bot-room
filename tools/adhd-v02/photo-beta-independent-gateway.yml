@@ -1,0 +1,31 @@
+# Additive gateway SERVICE within existing 'pixelpals' Compose project.
+# Operates independently of production adhd-assistant-lan Caddy on :18765.
+# Used only with the already installed photo-beta service. NO full-stack Up.
+services:
+  adhd-assistant-photo-gateway:
+    profiles: ["adhd-photo-beta"]
+    image: ${ADHD_PHOTO_GATEWAY_IMAGE:?Use the verified existing Caddy image}
+    container_name: adhd-assistant-photo-gateway
+    restart: "no"
+    network_mode: host
+    user: "99:100"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 256m
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m,mode=1777
+    environment:
+      XDG_DATA_HOME: /data
+      XDG_CONFIG_HOME: /config
+      HOME: /tmp
+    volumes:
+      - ${ADHD_PHOTO_GATEWAY_CONF:?New private gateway configuration directory}:/etc/caddy:ro
+      - ${ADHD_PHOTO_GATEWAY_DATA:?New private gateway data directory}:/data:rw
+      - ${ADHD_PHOTO_GATEWAY_XDG_CONFIG:?New private gateway config directory}:/config:rw
+    entrypoint: ["caddy"]
+    command: ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    labels:
+      com.nyteghost.pixelpals.component: adhd-photo-gateway
+      com.nyteghost.pixelpals.staging: "true"
