@@ -50,8 +50,9 @@ if command -v ss >/dev/null 2>&1; then
   if ss -ltnH | awk '$4 ~ /:18765$/ {found=1} END {exit !found}'; then
     echo 'BLOCKED: proposed host loopback port 18765 is already listening.'
     result=1
+  else
+    echo 'Proposed staging TCP port 18765: no listener shown by ss.'
   fi
-  echo 'Proposed staging TCP port 18765: no listener shown by ss.'
 else
   echo 'UNVERIFIED: ss unavailable; check TCP port 18765 on Unraid manually.'
   result=1
