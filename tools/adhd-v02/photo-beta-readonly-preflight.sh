@@ -4,6 +4,11 @@
 set -u
 
 result=0
+PHOTO_BETA_PORT="${ADHD_PHOTO_BETA_PORT:-18767}"
+if [[ ! "$PHOTO_BETA_PORT" =~ ^[1-9][0-9]{3,4}$ ]] || (( PHOTO_BETA_PORT < 1024 || PHOTO_BETA_PORT > 65535 )); then
+  echo 'BLOCKED: staging TCP port must be an integer in the 1024–65535 range.'
+  exit 1
+fi
 echo '== Pixel Pals / ADHD photo beta read-only preflight =='
 echo 'No Docker or Compose changes are performed by this script.'
 echo
@@ -48,18 +53,18 @@ fi
 echo 'Staging container name: unused.'
 if command -v ss >/dev/null 2>&1; then
   if listeners="$(ss -ltnH 2>/dev/null)"; then
-    if printf '%s\n' "$listeners" | awk '$4 ~ /:18765$/ {found=1} END {exit !found}'; then
-      echo 'BLOCKED: proposed host loopback port 18765 is already listening.'
+    if printf '%s\n' "$listeners" | awk -v port=":${PHOTO_BETA_PORT}" 'index($4, port) && substr($4, length($4)-length(port)+1)==port {found=1} END {exit !found}'; then
+      echo 'BLOCKED: proposed host loopback port ${PHOTO_BETA_PORT} is already listening.'
       result=1
     else
-      echo 'Proposed staging TCP port 18765: no listener shown by ss.'
+      echo 'Proposed staging TCP port ${PHOTO_BETA_PORT}: no listener shown by ss.'
     fi
   else
     echo 'UNVERIFIED: ss failed to inspect local TCP sockets.'
     result=1
   fi
 else
-  echo 'UNVERIFIED: ss unavailable; check TCP port 18765 on Unraid manually.'
+  echo 'UNVERIFIED: ss unavailable; check TCP port ${PHOTO_BETA_PORT} on Unraid manually.'
   result=1
 fi
 
