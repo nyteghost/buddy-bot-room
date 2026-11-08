@@ -168,7 +168,7 @@ else
   echo 'docker logs --tail 80 adhd-assistant-photo-beta'
 fi
 echo
-echo 'For your WINDOWS desktop PowerShell, create an SSH tunnel:'
+echo 'For your CachyOS terminal, create an SSH tunnel:'
 echo "ssh -N -L $PORT:127.0.0.1:$PORT root@10.200.1.30"
 echo "Then open http://127.0.0.1:$PORT on your Windows PC."
 echo 'In the test app, set AI provider to Local Ollama and vision model to qwen3-vl:4b.'
