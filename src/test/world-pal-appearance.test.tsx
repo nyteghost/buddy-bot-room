@@ -54,6 +54,14 @@ describe("one Nova, two appearances (cosmetic only)", () => {
   for (const [k, v] of Object.entries(unrelated)) expect(localStorage.getItem(k)).toBe(v);
   expect(agentName("nova", false)).toBe(name);
  });
+ it("keeps Nova's look through a reviewed revision update (same ID, new art)", () => {
+  const r4 = idleOnly("user-novahd256", "Nova - Desktop HD", 4, "data:image/png;base64,hd-r4");
+  act(() => { publishWorldSkinCharacters([HD, PX]); setWorldPalSkin("nova", HD.id); setWorldPalPixelSkin("nova", PX.id); setWorldRoomAppearance({ look: "hd" }); });
+  const pal = render(<OfficePal id="nova" index={0} mode="matrix" active={false} enabled world playful={false} />);
+  act(() => publishWorldSkinCharacters([r4, PX]));
+  expect(pal.container.querySelector('img[alt$=" look"]')?.getAttribute("src")).toBe("data:image/png;base64,hd-r4");
+  expect(getWorldPalSkins()).toEqual({ nova: "user-novahd256" });
+ });
  it("falls back to the other look when one presentation has none", () => {
   act(() => { publishWorldSkinCharacters([HD]); setWorldPalSkin("nova", HD.id); setWorldRoomAppearance({ look: "pixel" }); });
   const pal = render(<OfficePal id="nova" index={0} mode="matrix" active={false} enabled world playful={false} />);

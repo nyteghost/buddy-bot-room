@@ -1396,6 +1396,19 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
     if (JSON.stringify(installed.enabled) !== JSON.stringify(before.universe.enabled)) throw Error("Installing a look enabled it as a visitor");
     await library.getByLabel("Use Smoke Nova HD as the look for a Pal").selectOption("nova");
     await library.getByLabel("Use Smoke Nova Pixel as the Pixel look for a Pal").selectOption("nova");
+    // Reviewed revision updates (like Nova HD r3 → r4, Pixel r1 → r2) keep the same IDs and the Pal mapping.
+    for (const [id, name, revision, tint] of [[ids[0], "Smoke Nova HD", 4, 40], [ids[1], "Smoke Nova Pixel", 2, 130]]) {
+      await library.getByLabel("Choose character ZIP file").setInputFiles({ name: id + "-r" + revision + ".zip", mimeType: "application/zip", buffer: idleOnlySmokeZip(id, name, revision, tint) });
+      await library.getByText(name + " pack · 256×256 character preview", { exact: true }).waitFor({ timeout: 12000 });
+      if (!await library.getByRole("checkbox", { name: "Select " + name }).isDisabled()) throw Error("A newer revision of an installed ID was offered as a new install");
+      await library.getByRole("checkbox", { name: "Update " + name }).check();
+      await library.getByRole("button", { name: "Approve version update for 1 character(s)" }).click();
+      await library.getByRole("status").filter({ hasText: "1 character(s) updated." }).waitFor({ timeout: 15000 });
+    }
+    const updated = await (await page.request.get(URL_ + "/api/character-universe")).json();
+    const versions = Object.fromEntries(updated.characters.filter(c => ids.includes(c.id)).map(c => [c.id, c.hd3?.version]));
+    if (versions[ids[0]] !== 4 || versions[ids[1]] !== 2 || updated.characters.filter(c => ids.includes(c.id)).length !== 2) throw Error("Reviewed updates did not keep one character per ID: " + JSON.stringify(versions));
+    if (await library.getByLabel("Use Smoke Nova HD as the look for a Pal").inputValue() !== "nova") throw Error("Nova's HD look mapping was lost by the update");
     const row = appearance.getByRole("group", { name: "Pal appearances" }).locator('li[data-pal="nova"]');
     await row.waitFor();
     if (await row.getAttribute("data-showing") !== "hd") throw Error("Desktop did not choose Nova's Desktop HD look");

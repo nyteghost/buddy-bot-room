@@ -103,3 +103,39 @@ Fixes for the next revision:
 - remove the enclosed background patches (section 3);
 - remove the specks (HD);
 - deliver true-alpha layered or flat masters instead of RGB checkerboard.
+
+## 7. Corrected art: Desktop HD r4 and Mobile Pixel r2 (2026-11-08)
+
+### Import and update
+These checks used the real importer and server store against a new, empty temporary data folder. All passed:
+- IDs are unchanged (`user-novahd256` r4, `user-novapixel01` r2). Each pack has one south idle frame and stays `prototype`.
+- Installing r4 as a new character over r3 is refused (409). A stale expected revision is refused.
+- The reviewed updates **HD r3 → r4** and **Pixel r1 → r2** are accepted.
+- A same-revision overwrite (r4 → r4, r2 → r2) and a downgrade (r4 → r3) are refused.
+- Exactly two cosmetic characters remain, and neither is enabled as a visitor.
+- A history snapshot is written before each change. Rolling back from the pre-update export brings back r3 and r1, and both can then be updated again.
+- Stand-in users, settings, and Nova chat, memory, task and permission files are byte-identical afterwards. The character store wrote only to `character-universe.json`, `character-assets/` and `character-history/`.
+- The CI smoke repeats the update in the running app with synthetic packs: the same ID is kept, the update needs separate approval, and Nova's look mapping survives the update.
+
+### Edge QA on the supplied PNGs (not modified)
+The repair only removed pixels. No pixels were recoloured or added: 451 HD pixels and 168 Pixel pixels were made fully transparent.
+
+| | Desktop HD r4 | Mobile Pixel r2 |
+|---|---|---|
+| Checkerboard between arms and torso | **fixed**: background now shows through (106 px and 81 px gaps) | **fixed** (68 px and 56 px gaps) |
+| Detached specks | **fixed**: 1 component (was 92) | none |
+| Feet and box | row 247, x90–165, y28–247 (unchanged) | row 247, x88–165, y28–247 (unchanged) |
+| **New defect** | **two see-through notches punched into the grey rolled sleeve cuffs** (x98–103 and x153–157, y108–112; 20 px and 16 px). Cuff pixels were mistaken for checkerboard. You see black, white or cyan through the sleeves at 2× and above. | none |
+| Remaining minor | about 450 near-invisible ghost pixels (alpha ≤ 26, contrast ≤ 13/255); the hard-cut gap edges are slightly jagged on cyan at 4× | about 120 faint white 2×2 blocks (alpha 27) along the hair and left-leg outline; a faint dotted outline on pure black at ≥ 2×, invisible at room size |
+
+At room size (about 41–70 CSS px figure at desktop, and on a 390 px phone at 3×), neither style shows a halo or fragment in Office, Horror Mansion or Matrix. When the HD office is zoomed in, the HD sleeve notches are just visible.
+
+**Requests for the Artistic Designer:**
+- **HD r5:** restore the two cuff areas from r3 (just those pixels).
+- **Optionally, Pixel r3:** clear the alpha-27 white blocks. Pixel art should have no partly transparent pixels.
+
+### Integration observations (not art defects)
+- **Seated stations:** in the existing Office room, Nova's station is a seated desk. With only a standing frame, the chair back covers most of her body. This is the expected single-frame limitation, and the planned sit-at-workstation pilot solves it.
+- **Height:** in-room height matches the native Pals within about 10 %. Nova is slimmer, because the illustrated proportions differ from the chunky native sprites.
+- **Themed names:** in Horror and Matrix, Nova's look carries that theme's name tag (Ghostface or Neo), because looks apply in every theme. The owner needs to decide whether looks should apply in themed worlds.
+- **Phone labels:** at 390 px in the Horror room, the name tags of neighbouring Pals can overlap (Ghostface and The Slasher Fan). This is an existing Living World label-crowding issue, not specific to Nova.
