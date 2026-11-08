@@ -2909,7 +2909,7 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
     flex: 1 1 auto;
   }
   .workspace-window.window-room-settings:not(.window-sized):not(.window-expanded) {
-    left: var(--window-x, calc(100% - min(520px, 95%)));
+    left: var(--window-x, 12px);
     top: var(--window-y, 0px);
     width: min(520px, 95%);
     height: 100%;
