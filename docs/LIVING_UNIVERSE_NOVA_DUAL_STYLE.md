@@ -179,3 +179,39 @@ These are component-harness captures at 3× device pixels, not the deployed app.
   - When HD is forced on a phone, the HD office toolbar covers the top of the scene at high zoom.
   - With 6 visitors, the HD office and the 390 px Horror room get crowded: overlapping visitors and colliding name tags. This existed before and is not specific to Nova.
   - In themed rooms, Nova's look carries the theme's name tag (Ghostface, Neo). This needs an owner decision.
+
+## 9. Regression fixes before acceptance testing (2026-11-08)
+
+### P1 — Built-in guests disappeared in the HD office (fixed)
+- **Reproduced in the running app:** CI run 42493630876 at `6036e79`. The smoke step that turns on the HD office with Green Jacket Guy and Moon Mage enabled failed, because neither guest was drawn.
+- **Cause:** `room.tsx` hid the Living World guests whenever `hdWorld` was on, but the HD office was only given *custom* characters.
+- **Fix:** `src/lib/world-hd-visitors.ts` now builds the HD office's visitor list. It works as follows:
+  - every enabled visitor is included, built-in or custom, in the order it was enabled;
+  - the list stops at six, the existing limit;
+  - each visitor appears once, even if its ID is listed twice;
+  - unknown or deleted IDs are skipped;
+  - a character used as a Pal's look is never listed as a visitor.
+- Built-in guests keep their own pixel art and name and are described as ambient. They have no identity, memory or permissions.
+- The Living World, Pixel and Classic code paths are unchanged.
+- **Tests:**
+  - a unit test of the list rules;
+  - an HD office render test;
+  - a smoke test in the running app. It checks that each built-in guest is drawn exactly once, that the Living World copies are not drawn underneath, and that the guests come back when the HD office is turned off.
+
+### P2 — Appearance mapping reliability
+- **Two tabs:** look maps now follow the other tab through `storage` events. That includes another tab clearing everything.
+- **One character, one Pal:** a character dresses at most one Pal, across both Desktop HD and Mobile Pixel. Giving it to another Pal removes it from the first. It can still be the same Pal's look in both presentations. Stored conflicts are repaired on load, and the Desktop HD map wins.
+- **Removed art:** if a look's character is missing, the Pal uses its other look, and then the original. Deleting a character in the Library also removes its mappings.
+- Switching between HD, Pixel and the original, then back again, leaves other saved data byte-identical.
+
+### P3 — Usability
+- **Phones with HD forced:** the camera toolbar folds behind one 40 px button, labelled, with `aria-expanded` and `aria-controls`. When open, its targets are 40 px. Pinch, drag and tap-to-follow work without it.
+- **HD office name tags:** tags no longer overlap. The followed Pal or a Pal doing real work is placed first, then others from front to back. A tag that overlaps is stacked, and hidden after four attempts.
+- **Earlier fix (`c0d936e`):** Follow snaps to the Pal in a calm or reduced-motion room.
+- **Not changed (outside this scope):** name-tag crowding in the existing Living World rooms on phones (Horror with six visitors). The tag in Horror and Matrix that names the theme persona (Ghostface, Neo) over Nova's look needs an owner decision.
+
+### P4 — Nova r5/r2 on the current code
+- The disposable real-importer run, with the private r5/r2 ZIPs, was repeated at `23de27d`: 19/19 checks passed.
+- The art files are unchanged since the §8 check (36 cuff pixels, no checkerboard).
+- Private-art captures come from the component harness: real components, CSS and backdrops. They are not the deployed app, and the 390 px views are a browser viewport, not a physical iPhone.
+- Running-app CI evidence uses synthetic stand-in packs only.
