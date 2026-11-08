@@ -2874,6 +2874,6 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
   .window-room > .window-body { container-type: size; }
   .window-room .room-scene.hd-world {
     aspect-ratio: auto;
-    height: min(clamp(260px, 72cqh, 760px), calc(100cqw / 1.72));
+    height: min(clamp(260px, 72cqh, 760px), 58.14cqw);
   }
 }
