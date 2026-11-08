@@ -44,18 +44,19 @@ async function step(name, fn) {
 }
 
 
-// Desktop controls live in a separate draggable window. Reopen it before
-// a control-focused step to guarantee it is on top of the Pal Room canvas.
+// Desktop controls live in a separate draggable window. The settings popup
+// can cover the room titlebar, so once open use its own X rather than clicking
+// through the popup to the room button. Phones keep their inline controls.
 async function showRoomSettings() {
   const toggle=page.getByRole("button",{name:"Room settings",exact:true});
   if(!await toggle.isVisible().catch(()=>false))return;
-  if(await toggle.getAttribute("aria-expanded")==="true")await toggle.click();
-  await toggle.click();
+  if(await toggle.getAttribute("aria-expanded")!=="true")await toggle.click();
   await page.locator('[data-window-id="room-settings"]').waitFor({state:"visible"});
 }
 async function hideRoomSettings() {
-  const toggle=page.getByRole("button",{name:"Room settings",exact:true});
-  if(await toggle.isVisible().catch(()=>false)&&await toggle.getAttribute("aria-expanded")==="true")await toggle.click();
+  const popup=page.locator('[data-window-id="room-settings"]');
+  if(await popup.isVisible().catch(()=>false))
+    await popup.getByRole("button",{name:"Hide Room Settings"}).click();
 }
 
 await step("home page loads", async () => {
