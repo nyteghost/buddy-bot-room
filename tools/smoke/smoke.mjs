@@ -1308,7 +1308,10 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
   await appearance.getByRole("radio", { name: "HD", exact: true }).click();
   await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
   const office = page.locator(".room-scene.hd-world .hd-office");
-  await office.waitFor({ state: "visible" });
+  await office.waitFor({ state: "visible", timeout: 8000 }).catch(async e => {
+    const why = await page.evaluate(() => ({ html: document.documentElement.className, scenes: [...document.querySelectorAll(".room-scene")].map(s => s.className + " " + s.getBoundingClientRect().width + "x" + s.getBoundingClientRect().height), look: localStorage.getItem("pixel-pals-presentation-v1"), mode: localStorage.getItem("pixel-pals-character-mode-v1"), radios: [...document.querySelectorAll('.world-room-appearance [role="radio"]')].map(r => r.textContent + "=" + r.getAttribute("aria-checked")), boxes: [...document.querySelectorAll(".world-room-appearance input")].map(i => i.checked), width: innerWidth }));
+    throw Error("HD office did not appear: " + JSON.stringify(why) + " / " + String(e).slice(0, 120));
+  });
   if (!await page.locator(".room-scene.hd-world .hd-actor").count()) throw Error("HD office did not show the Pals");
   if (await page.locator(".room-scene.hd-world .office-pal").count()) throw Error("Classic/Living World Pals were still drawn under the HD office");
   const lines = await page.getByRole("list", { name: "Who is in the room" }).locator("li").allTextContents();
