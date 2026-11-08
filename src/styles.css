@@ -2857,4 +2857,10 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
 .room-scene.hd-world .live-shelf,.room-scene.hd-world .live-ticker,.room-scene.hd-world .scene-top{pointer-events:none;}
 .room-scene.hd-world .live-obj,.room-scene.hd-world .scene-top button{pointer-events:auto;}
 .room-scene.hd-world .live-progress{right:auto;left:8px;top:54px;}
+.hd-camera-toggle{display:none;}
+/* Phones: the camera toolbar folds into one 40px button so the room stays visible; targets are 40px when open. */
+@media (max-width:700px){.hd-camera-toggle{display:flex;align-items:center;justify-content:center;position:absolute;right:4px;top:28px;z-index:141;width:40px;height:40px;border-radius:10px;border:1px solid #3a4560;background:rgb(10 13 20/.78);color:#fff;font:600 20px/1 system-ui,sans-serif;}
+ .hd-office[data-controls="closed"] .hd-office-toolbar{display:none;}
+ .hd-office[data-controls="open"] .hd-office-toolbar{right:48px;}
+ .hd-office-toolbar button,.hd-office-toolbar select{min-height:40px;min-width:40px;}}
 @media (max-width:700px){.room-scene.hd-world .hd-office-toolbar{top:28px;bottom:auto;}.room-scene.hd-world .hd-office-badge{top:66px;left:4px;}.room-scene.hd-world .live-progress{display:none;}}

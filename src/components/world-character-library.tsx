@@ -11,7 +11,7 @@ import { WORLD_HD_DIRECTIONS, type WorldHdAction, type WorldHdDirection } from "
 import { useReducedMotion } from "@/lib/reduced-motion";
 import { lowPower, useTabHidden } from "@/lib/power";
 import { worldHdFrameAt, worldHdCoverage } from "@/lib/world-hd-animation";
-import { WORLD_SKIN_PALS, clearWorldPalSkins, publishWorldSkinCharacters, setWorldPalPixelSkin, setWorldPalSkin, useWorldPalPixelSkins, useWorldPalSkins } from "@/lib/world-pal-skins";
+import { WORLD_SKIN_PALS, clearWorldPalSkins, forgetWorldLookCharacter, publishWorldSkinCharacters, setWorldPalPixelSkin, setWorldPalSkin, useWorldPalPixelSkins, useWorldPalSkins } from "@/lib/world-pal-skins";
 import { agentName } from "@/lib/agents";
 import "./world-character-library.css";
 
@@ -286,7 +286,7 @@ export function WorldCharacterLibrary({enabledIds,customCharacters,syncStatus,on
        {!character.hd&&!character.hd3&&<Button size="sm" variant="ghost" aria-label={"Edit "+character.name} onClick={()=>setEditor(character)}><Pencil className="size-3.5"/></Button>}
        <Button size="sm" variant="ghost" aria-label={"Delete "+character.name} onClick={async()=>{
         if(window.confirm("Remove "+character.name+" from your Character Library? Export a backup first if you want to reinstall it later.")){
-         const ok=await onDelete(character.id);setMessage(ok?"Character removed from Library.":"Could not remove character.");
+         const ok=await onDelete(character.id);if(ok)forgetWorldLookCharacter(character.id);setMessage(ok?"Character removed from Library.":"Could not remove character.");
         }
        }}><Trash2 className="size-3.5"/></Button>
       </div>

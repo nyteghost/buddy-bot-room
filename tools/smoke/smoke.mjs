@@ -1320,7 +1320,8 @@ await step("HD office keeps enabled built-in guests (no disappearing, no duplica
     const who = (await page.getByRole("list", { name: "Who is in the room" }).locator("li").allTextContents()).join(" | ");
     for (const name of guests) if (!who.includes(name)) throw Error(`Built-in guest "${name}" disappeared in the HD office: ${who}`);
     if (await page.locator(".room-scene .world-visitor, .room-scene .world-guest").count()) throw Error("Built-in guests were drawn twice (Living World copy under the HD office)");
-    const actors = await page.locator('.room-scene .hd-actor[data-actor^="visitor:"]').count();
+    for (const id of ["green-jacket", "moon-mage"]) if (await page.locator(`.room-scene .hd-actor[data-actor="custom:${id}"][data-art="pixels"]`).count() !== 1) throw Error("Built-in guest " + id + " is not drawn exactly once in the HD office");
+    const actors = await page.locator('.room-scene .hd-actor[data-actor^="custom:"]').count();
     if (actors > 6) throw Error("More than six visitors in the HD office: " + actors);
     gallery.push({ label: "Running app (CI) · desktop · HD office with built-in guests (Green Jacket Guy, Moon Mage)", png: await page.locator(".room-scene").screenshot() });
     await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck();

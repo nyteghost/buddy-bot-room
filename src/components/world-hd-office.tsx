@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { X, ZoomIn } from "lucide-react";
 import type { AgentId } from "@/lib/agents";
 import type { Heading } from "@/lib/office-motion";
 import type { PalMotion } from "@/lib/pal-motion";
@@ -183,6 +184,9 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
  const camera = useRef<WorldCamera>({ x: W * 0.5, y: H * 0.6, zoom: 0.5 });
  const [zoom, setZoom] = useState(0.5);
  const [follow, setFollow] = useState<string | null>(null);
+ // Phones: the camera toolbar folds away so it does not cover the room (pinch, drag and tap-to-follow still work).
+ const [controls, setControls] = useState(false);
+ const toolbarId = useId();
  const followRef = useRef<string | null>(null); followRef.current = follow;
  const waves = useRef(new Map<string, number>());
  const [visuals, setVisuals] = useState<Record<string, Visual>>({});
@@ -207,6 +211,26 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
   const facing = cp?.walking || cp?.waiting ? cp.facing : real.current.get(a.id) ? "n" : ambient?.facing ?? "s";
   return { x: cp?.x ?? ambient?.x ?? 50, y: cp?.y ?? ambient?.y ?? 70, ambient, walking: !!cp?.walking, facing, lag: cp?.lag ?? 0, walked: cp?.walked ?? 0 };
  }, [crowd, plans]);
+ const tagSize = useRef(new Map<string, { w: number; h: number }>());
+ const placeTags = useCallback(() => {
+  const placed: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  const shown = actors.map(a => ({ a, el: tagEls.current.get(a.id) })).filter((t): t is { a: ActorInfo; el: HTMLDivElement } => !!t.el && t.el.style.display !== "none")
+   .map(t => ({ ...t, key: Number(t.el.dataset["x"]), y: Number(t.el.dataset["y"]), first: followRef.current === t.a.id || !!real.current.get(t.a.id) }))
+   .sort((p, q) => Number(q.first) - Number(p.first) || q.y - p.y);
+  for (const t of shown) {
+   let size = tagSize.current.get(t.a.id);
+   if (!size || !size.w) { size = { w: t.el.offsetWidth || t.a.name.length * 6 + 12, h: t.el.offsetHeight || 16 }; tagSize.current.set(t.a.id, size); }
+   const x1 = t.key - size.w / 2, x2 = t.key + size.w / 2;
+   let y = t.y, ok = false;
+   for (let tries = 0; tries < 4 && !ok; tries++) {
+    ok = !placed.some(r => x1 < r.x2 && x2 > r.x1 && y < r.y2 && y + size!.h > r.y1);
+    if (!ok) y += size.h + 2;
+   }
+   if (!ok && !t.first) { t.el.style.display = "none"; continue; }
+   placed.push({ x1, y1: y, x2, y2: y + size.h });
+   t.el.style.transform = `translate(${Math.round(t.key)}px, ${Math.round(y)}px) translateX(-50%)`;
+  }
+ }, [actors]);
  const paint = useCallback((dt: number) => {
   const vp = size.current;
   if (followRef.current) {
@@ -237,9 +261,12 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
     const s = worldToScreen(camera.current, vp, { x: wx, y: wy });
     const show = on && (camera.current.zoom >= 0.34 || followRef.current === a.id || !!r);
     tag.style.display = show ? "flex" : "none";
+    tag.dataset["x"] = String(s.x); tag.dataset["y"] = String(s.y + 4);
     tag.style.transform = `translate(${Math.round(s.x)}px, ${Math.round(s.y + 4)}px) translateX(-50%)`;
    }
   }
+  // Name tags must not pile up on each other: the followed / really-working Pal first, then front to back.
+  placeTags();
   // Desk screens light up only for genuine work at that desk.
   const host = worldLayer.current;
   if (host) for (const a of actors) if (a.desk) {
@@ -249,7 +276,7 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
    screen?.classList.toggle("hd-screen-busy", !!real.current.get(a.id) && p.lag < 1 && !p.walking);
   }
   if (changed) setVisuals(nextVisuals);
- }, [actors, pose, reduced]);
+ }, [actors, pose, reduced, placeTags]);
 
  // Simulation loop (rAF; pauses with hidden tabs, low power, reduced motion, Focus Mode and calm mood).
  useEffect(() => {
@@ -322,7 +349,7 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
  const followName = actors.find(a => a.id === follow)?.name;
  const zoomPct = Math.round(zoom * 100);
 
- return <div className="hd-office" data-running={running} data-reduced={reduced || undefined}>
+ return <div className="hd-office" data-running={running} data-reduced={reduced || undefined} data-controls={controls ? "open" : "closed"}>
   <div ref={viewport} className="hd-office-viewport" tabIndex={0} role="application"
    aria-label="Living Universe HD office preview. Drag or use arrow keys to pan, plus and minus to zoom, 0 to fit the room, F to follow the next character, Escape to stop following."
    onKeyDown={onKey}
@@ -357,7 +384,8 @@ export function WorldHdOffice({ pals: palsProp, visitors: visitorsProp, visible,
    </div>
    <div className="hd-office-badge" aria-hidden="true">HD preview{synthetic ? " · synthetic placeholders" : ""}</div>
   </div>
-  <div className="hd-office-toolbar" role="toolbar" aria-label="Room camera">
+  <button type="button" className="hd-camera-toggle" aria-expanded={controls} aria-controls={toolbarId} aria-label={controls ? "Hide camera controls" : "Show camera controls"} onClick={() => setControls(v => !v)}>{controls ? <X className="size-5" aria-hidden="true" /> : <ZoomIn className="size-5" aria-hidden="true" />}</button>
+  <div className="hd-office-toolbar" id={toolbarId} role="toolbar" aria-label="Room camera">
    <button type="button" onClick={fit}>Fit room</button>
    <button type="button" onClick={() => zoomBy(0.8)} aria-label="Zoom out">−</button>
    <span className="hd-zoom" aria-live="off">{zoomPct}%</span>

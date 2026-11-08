@@ -56,6 +56,16 @@ describe("Living Universe HD office (feature-flagged preview)", () => {
    expect((container.querySelector(`.hd-actor[data-actor="pal:${id}"]`) as HTMLElement).style.visibility).toBe("visible");
   }
  });
+ it("folds the camera toolbar behind one button on phones (open / close, labelled, linked)", () => {
+  const { container } = render(<WorldHdOffice pals={pals()} visitors={[]} visible playful={false} paused={false} synthetic={false} />);
+  const show = screen.getByRole("button", { name: "Show camera controls" });
+  expect(show.getAttribute("aria-expanded")).toBe("false");
+  expect(document.getElementById(show.getAttribute("aria-controls")!)?.getAttribute("aria-label")).toBe("Room camera");
+  expect(container.querySelector(".hd-office")?.getAttribute("data-controls")).toBe("closed");
+  fireEvent.click(show);
+  expect(screen.getByRole("button", { name: "Hide camera controls" }).getAttribute("aria-expanded")).toBe("true");
+  expect(container.querySelector(".hd-office")?.getAttribute("data-controls")).toBe("open");
+ });
  it("does not animate when the room is calm, paused (Focus Mode) or hidden", () => {
   const { container, rerender } = render(<WorldHdOffice pals={pals()} visitors={[]} visible playful={false} paused={false} synthetic={false} />);
   expect(container.querySelector(".hd-office")?.getAttribute("data-running")).toBe("false");

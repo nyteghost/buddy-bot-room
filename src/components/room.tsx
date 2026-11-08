@@ -46,6 +46,7 @@ import { WorldHdOffice } from "./world-hd-office";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
 import { worldUsesHdOffice } from "@/lib/world-presentation";
 import { useWorldPalLookIds } from "@/lib/world-pal-skins";
+import { worldHdVisitors } from "@/lib/world-hd-visitors";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
 import {
   agents,
@@ -1913,7 +1914,9 @@ export function Room() {
     enabled: enabled.includes(a.id) || focusCompanion?.pal === a.id,
     real: running && speaking === a.id ? "responding" as const : focusCompanion && !focusBreak && focusCompanion.pal === a.id ? "focus" as const : null }));
   // A character used as a Pal's look is drawn as that Pal, never as a second visitor.
-  const hdVisitors = worldUniverse.characters.filter(c => enabledWorldPacks.includes(c.id) && !palLookIds.has(c.id));
+  const customVisitors = worldUniverse.characters.filter(c => enabledWorldPacks.includes(c.id) && !palLookIds.has(c.id));
+  // The HD office draws built-in guests (Green Jacket, Goku, …) as well as custom ones; one actor per enabled visitor.
+  const hdVisitors = worldHdVisitors(enabledWorldPacks, worldUniverse.characters, palLookIds);
   return (
     <div aria-busy={!ready} className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
@@ -2105,7 +2108,7 @@ export function Room() {
             <RoomLive active={roomOpen} running={running} theme={characterMode} onInspect={(target)=>{if(livingWorld && roomOpen)setWorldCue({action:"inspect-prop",targetId:target,at:Date.now()});}} onSkyChange={setWorldSky} onChatter={setChatter} onOpen={(t) => { if (t === "today") setTodayOpen(true); else if (t === "mail") setMailOpen(true); else if (t === "calendar") setCalendarOpen(true); else if (t === "tasks") setTasksOpen(true); else setSetupOpen(true); }} />
             {livingWorld && !hdWorld && enabledWorldPacks.includes("green-jacket") && <GreenJacketVisitor active={roomOpen && palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})} />}
             {livingWorld && !hdWorld && guestIds.filter(id=>enabledWorldPacks.includes(id)).map(id=><WorldGuest key={id} id={id} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
-            {livingWorld && !hdWorld && hdVisitors.map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
+            {livingWorld && !hdWorld && customVisitors.map((character,index)=><WorldCustomGuest key={character.id} character={character} index={index} paused={focusMode} active={roomOpen&&palRoomPlayful} theme={characterMode} {...(worldCue && !worldCue.id ? { cue: worldCue } : {})}/>)}
             <div className="scene-top">
               <span>
                 <span className={cn("status-dot", running && "pulse-dot")} />

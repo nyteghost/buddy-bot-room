@@ -42,6 +42,28 @@ export function withWorldPalSkin(skins: WorldPalSkins, pal: string, id: string |
  return cleanWorldPalSkins(next);
 }
 
+/**
+ * Pure: assign (or clear, id null) one Pal's look in one presentation. A character dresses at most one Pal:
+ * giving it to this Pal removes it from any other Pal in BOTH presentations (it may still be this Pal's
+ * look in the other presentation).
+ */
+export function assignWorldPalLook(hd: WorldPalSkins, pixel: WorldPalSkins, style: "hd" | "pixel", pal: string, id: string | null): { hd: WorldPalSkins; pixel: WorldPalSkins } {
+ if (!(WORLD_SKIN_PALS as readonly string[]).includes(pal)) return { hd, pixel };
+ const release = (skins: WorldPalSkins): WorldPalSkins => id ? Object.fromEntries(Object.entries(skins).filter(([key, value]) => key === pal || value !== id)) : skins;
+ const nextHd = style === "hd" ? withWorldPalSkin(hd, pal, id) : cleanWorldPalSkins(release(hd));
+ const nextPixel = style === "pixel" ? withWorldPalSkin(pixel, pal, id) : cleanWorldPalSkins(release(pixel));
+ return { hd: nextHd, pixel: nextPixel };
+}
+/** Pure: repair stored maps so a character dresses one Pal only (the HD map wins a conflict). */
+export function cleanWorldPalLooks(hd: unknown, pixel: unknown): { hd: WorldPalSkins; pixel: WorldPalSkins } {
+ const h = cleanWorldPalSkins(hd), p = cleanWorldPalSkins(pixel);
+ const owner = new Map(Object.entries(h).map(([pal, id]) => [id, pal]));
+ return { hd: h, pixel: cleanWorldPalSkins(Object.fromEntries(Object.entries(p).filter(([pal, id]) => (owner.get(id) ?? pal) === pal))) };
+}
+/** Pure: forget a deleted character in both maps (its Pal falls back to the other look, then the original). */
+export function withoutWorldLookCharacter(skins: WorldPalSkins, id: string): WorldPalSkins {
+ return Object.values(skins).includes(id) ? cleanWorldPalSkins(Object.fromEntries(Object.entries(skins).filter(([, value]) => value !== id))) : skins;
+}
 /** Pure: the look a Pal uses in a presentation (its own look first, then the other one). */
 export function worldPalLookCharacter(presentation: "hd" | "pixel", hd: WorldPalSkins, pixel: WorldPalSkins, list: readonly WorldCustomCharacter[], pal: string): WorldCustomCharacter | undefined {
  const own = worldPalSkinCharacter(presentation === "hd" ? hd : pixel, list, pal);
@@ -71,11 +93,15 @@ let characters: readonly WorldCustomCharacter[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach(listener => listener());
-function load() {
- if (loaded) return;
+const readJson = (key: string): unknown => { try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; } };
+/** Keep the previous object when nothing changed, so React does not re-render for an unrelated storage event. */
+const same = (a: WorldPalSkins, b: WorldPalSkins) => JSON.stringify(a) === JSON.stringify(b);
+function load(force = false) {
+ if (loaded && !force) return;
  loaded = true;
- try { skins = cleanWorldPalSkins(JSON.parse(localStorage.getItem(WORLD_PAL_SKINS_KEY) ?? "{}")); } catch { skins = {}; }
- try { pixelSkins = cleanWorldPalSkins(JSON.parse(localStorage.getItem(WORLD_PAL_PIXEL_SKINS_KEY) ?? "{}")); } catch { pixelSkins = {}; }
+ const next = cleanWorldPalLooks(readJson(WORLD_PAL_SKINS_KEY), readJson(WORLD_PAL_PIXEL_SKINS_KEY));
+ if (!same(skins, next.hd)) skins = next.hd;
+ if (!same(pixelSkins, next.pixel)) pixelSkins = next.pixel;
 }
 function save() {
  try { localStorage.setItem(WORLD_PAL_SKINS_KEY, JSON.stringify(skins)); } catch { /* optional storage */ }
@@ -83,15 +109,29 @@ function save() {
 }
 export function getWorldPalSkins(): WorldPalSkins { load(); return skins; }
 export function getWorldPalPixelSkins(): WorldPalSkins { load(); return pixelSkins; }
-export function setWorldPalSkin(pal: string, id: string | null): void { load(); skins = withWorldPalSkin(skins, pal, id); save(); emit(); }
-export function setWorldPalPixelSkin(pal: string, id: string | null): void { load(); pixelSkins = withWorldPalSkin(pixelSkins, pal, id); save(); emit(); }
+function assign(style: "hd" | "pixel", pal: string, id: string | null) { load(true); const next = assignWorldPalLook(skins, pixelSkins, style, pal, id); skins = next.hd; pixelSkins = next.pixel; save(); emit(); }
+export function setWorldPalSkin(pal: string, id: string | null): void { assign("hd", pal, id); }
+export function setWorldPalPixelSkin(pal: string, id: string | null): void { assign("pixel", pal, id); }
+/** A character was removed from the library: no Pal keeps pointing at it. */
+export function forgetWorldLookCharacter(id: string): void { load(true); const hd = withoutWorldLookCharacter(skins, id), px = withoutWorldLookCharacter(pixelSkins, id); if (hd !== skins || px !== pixelSkins) { skins = hd; pixelSkins = px; save(); emit(); } }
 /** Restore one Pal's original look in both presentations. */
-export function clearWorldPalLook(pal: string): void { load(); skins = withWorldPalSkin(skins, pal, null); pixelSkins = withWorldPalSkin(pixelSkins, pal, null); save(); emit(); }
+export function clearWorldPalLook(pal: string): void { load(true); skins = withWorldPalSkin(skins, pal, null); pixelSkins = withWorldPalSkin(pixelSkins, pal, null); save(); emit(); }
 /** One-click revert: every Pal back to its native look (both HD and Pixel looks). */
 export function clearWorldPalSkins(): void { load(); skins = {}; pixelSkins = {}; save(); emit(); }
 /** The Character Library shares the installed characters so Pals can find their look. */
 export function publishWorldSkinCharacters(next: readonly WorldCustomCharacter[]): void { if (next !== characters) { characters = next; emit(); } }
-const subscribe = (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); };
+// Other tabs and windows: follow their look changes (the storage event fires only in the *other* tabs).
+const onStorage = (event: StorageEvent) => {
+ if (event.key !== null && event.key !== WORLD_PAL_SKINS_KEY && event.key !== WORLD_PAL_PIXEL_SKINS_KEY) return;
+ const before = [skins, pixelSkins];
+ load(true);
+ if (before[0] !== skins || before[1] !== pixelSkins) emit();
+};
+const subscribe = (listener: () => void) => {
+ if (!listeners.size && typeof window !== "undefined") window.addEventListener("storage", onStorage);
+ listeners.add(listener);
+ return () => { listeners.delete(listener); if (!listeners.size && typeof window !== "undefined") window.removeEventListener("storage", onStorage); };
+};
 export function useWorldPalSkins(): WorldPalSkins { return useSyncExternalStore(subscribe, getWorldPalSkins, () => EMPTY); }
 export function useWorldPalSkin(pal: string): WorldCustomCharacter | undefined {
  const current = useWorldPalSkins();
