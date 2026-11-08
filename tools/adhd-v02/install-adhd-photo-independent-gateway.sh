@@ -169,10 +169,11 @@ phase 'Validate standalone gateway without accessing production Caddy configurat
 # Isolated disposable Caddy validation: fresh tmpfs data/config and no network.
 docker run --rm --pull never --network none --read-only \
   --user 99:100 --cap-drop ALL --security-opt no-new-privileges \
-  --tmpfs /tmp:rw,nosuid,nodev,size=16m \
-  --tmpfs /data:rw,nosuid,nodev,size=16m \
-  --tmpfs /config:rw,nosuid,nodev,size=16m \
+  --tmpfs /tmp:rw,nosuid,nodev,size=16m,mode=1777 \
+  --tmpfs /data:rw,nosuid,nodev,size=16m,uid=99,gid=100,mode=0700 \
+  --tmpfs /config:rw,nosuid,nodev,size=16m,uid=99,gid=100,mode=0700 \
   --env XDG_DATA_HOME=/data --env XDG_CONFIG_HOME=/config \
+  --env HOME=/tmp \
   --mount "type=bind,src=$TEMP/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
   --entrypoint caddy "$IMAGE" validate --config /etc/caddy/Caddyfile \
   --adapter caddyfile >/dev/null 2>&1 ||
