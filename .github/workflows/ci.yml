@@ -40,6 +40,8 @@ jobs:
         run: python3 -B tools/adhd-v02/test_photo_beta_readonly_preflight.py
       - name: ADHD beta Caddy audit redaction regression (synthetic)
         run: python3 -B tools/adhd-v02/test_audit_adhd_beta_caddy.py
+      - name: ADHD independent photo gateway static security checks
+        run: python3 -B tools/adhd-v02/test_photo_independent_gateway_static.py
       - name: ADHD piped Unraid diagnostic regression (mocked Docker)
         run: python3 -B tools/adhd-v02/test_complete_readonly_diagnostics.py
       - name: ADHD proxy route audit (synthetic, offline)
