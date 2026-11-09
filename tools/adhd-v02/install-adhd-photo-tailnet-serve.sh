@@ -161,6 +161,15 @@ if [[ "$STATUS" != 401 ]]; then
   docker restart "$PROXY" >/dev/null 2>&1 || :
   fail "Beta loopback route did not return 401 (status $STATUS); restored prior gateway."
 fi
+# Confirm the original LAN beta HTTPS endpoint remains functional after the
+# scoped beta-gateway restart, still using the SAME private CA certificate.
+LAN_STATUS="$(curl -sS --cacert "$CA" --connect-timeout 2 --max-time 6 \
+  -o /dev/null -w '%{http_code}' https://10.200.1.30:18768/api/bootstrap 2>/dev/null || :)"
+if [[ "$LAN_STATUS" != 401 ]]; then
+  cp -p -- "$BACKUP" "$CFILE"
+  docker restart "$PROXY" >/dev/null 2>&1 || :
+  fail "Prior LAN beta HTTPS route no longer returns verified 401; restored gateway."
+fi
 
 notice 'Add ONLY new Tailscale Serve HTTPS 8444 listener'
 if ! tailscale serve --bg --https=8444 http://127.0.0.1:18769 >/dev/null; then
