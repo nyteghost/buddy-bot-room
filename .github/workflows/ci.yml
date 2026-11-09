@@ -25,11 +25,27 @@ jobs:
           bash -n tools/adhd-v02/run-complete-readonly-diagnostics.sh
           bash -n tools/adhd-v02/photo-beta-readonly-preflight.sh
           bash -n tools/adhd-v02/install-photo-beta-existing-stack.sh
+          bash -n tools/adhd-v02/run-adhd-beta-caddy-audit.sh
+          bash -n tools/adhd-v02/install-adhd-beta-browser-gateway.sh
+          bash -n tools/adhd-v02/install-adhd-photo-independent-gateway.sh
+          bash -n tools/adhd-v02/diagnose-photo-beta-caddy-validation.sh
+          bash -n tools/adhd-v02/install-adhd-photo-tailnet-serve.sh
+          ADHD_PHOTO_GATEWAY_IMAGE=caddy:2.11.8-alpine \
+            ADHD_PHOTO_GATEWAY_CONF=/tmp/photo-beta-gateway-conf \
+            ADHD_PHOTO_GATEWAY_DATA=/tmp/photo-beta-gateway-data \
+            ADHD_PHOTO_GATEWAY_XDG_CONFIG=/tmp/photo-beta-gateway-xdg \
+            docker compose -f tools/adhd-v02/photo-beta-independent-gateway.yml --profile adhd-photo-beta config --quiet
           ADHD_PHOTO_BETA_CODE_PATH=/tmp/adhd-photo-code-fixture ADHD_PHOTO_BETA_DATA_PATH=/tmp/adhd-photo-data-fixture \
             docker compose -f tools/adhd-v02/photo-beta-service.yml --profile adhd-photo-beta config --quiet
           bash tools/adhd-v02/test-unified-compose.sh
       - name: ADHD photo beta preflight regression (mocked Unraid)
         run: python3 -B tools/adhd-v02/test_photo_beta_readonly_preflight.py
+      - name: ADHD beta Caddy audit redaction regression (synthetic)
+        run: python3 -B tools/adhd-v02/test_audit_adhd_beta_caddy.py
+      - name: ADHD independent photo gateway static security checks
+        run: python3 -B tools/adhd-v02/test_photo_independent_gateway_static.py
+      - name: ADHD tailnet authenticated gateway static security checks
+        run: python3 -B tools/adhd-v02/test_adhd_photo_tailnet_static.py
       - name: ADHD piped Unraid diagnostic regression (mocked Docker)
         run: python3 -B tools/adhd-v02/test_complete_readonly_diagnostics.py
       - name: ADHD proxy route audit (synthetic, offline)
