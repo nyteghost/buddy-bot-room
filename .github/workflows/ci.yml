@@ -29,6 +29,7 @@ jobs:
           bash -n tools/adhd-v02/install-adhd-beta-browser-gateway.sh
           bash -n tools/adhd-v02/install-adhd-photo-independent-gateway.sh
           bash -n tools/adhd-v02/diagnose-photo-beta-caddy-validation.sh
+          bash -n tools/adhd-v02/install-adhd-photo-tailnet-serve.sh
           ADHD_PHOTO_GATEWAY_IMAGE=caddy:2.11.8-alpine \
             ADHD_PHOTO_GATEWAY_CONF=/tmp/photo-beta-gateway-conf \
             ADHD_PHOTO_GATEWAY_DATA=/tmp/photo-beta-gateway-data \
@@ -43,6 +44,8 @@ jobs:
         run: python3 -B tools/adhd-v02/test_audit_adhd_beta_caddy.py
       - name: ADHD independent photo gateway static security checks
         run: python3 -B tools/adhd-v02/test_photo_independent_gateway_static.py
+      - name: ADHD tailnet authenticated gateway static security checks
+        run: python3 -B tools/adhd-v02/test_adhd_photo_tailnet_static.py
       - name: ADHD piped Unraid diagnostic regression (mocked Docker)
         run: python3 -B tools/adhd-v02/test_complete_readonly_diagnostics.py
       - name: ADHD proxy route audit (synthetic, offline)
