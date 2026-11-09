@@ -52,6 +52,10 @@ if printf '%s\n' "$SOCKETS" | awk -v target=":$LOCAL_HTTP" \
     '$4 ~ target"$" {present=1} END{exit !present}'; then
   fail 'Local loopback beta HTTP port 18769 is already occupied.'
 fi
+if printf '%s\n' "$SOCKETS" | awk -v target=":$TAIL_HTTPS" \
+    '$4 ~ target"$" {present=1} END{exit !present}'; then
+  fail 'Proposed Tailscale HTTPS port 8444 already has a TCP listener.'
+fi
 if ! curl -sS --cacert "$CA" --connect-timeout 3 --max-time 6 \
   -o /dev/null -w '%{http_code}' https://10.200.1.30:18768/api/bootstrap |
      grep -qx '401'; then
