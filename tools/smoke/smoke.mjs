@@ -1512,8 +1512,13 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
   const transformBefore=await worldLayer.getAttribute("style");
   await page.keyboard.press("ArrowLeft");
   await page.waitForTimeout(80);
-  if(await worldLayer.getAttribute("style")===transformBefore)
-    throw Error("HD camera arrow-key pan did not move the world");
+  if(await worldLayer.getAttribute("style")===transformBefore) {
+    // A followed actor may already be at the left clamp: try the opposite direction.
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(80);
+    if(await worldLayer.getAttribute("style")===transformBefore)
+      throw Error("HD camera arrow-key pan did not move the world in either direction");
+  }
 
   await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).check();
   await page.locator('.hd-actor[data-art="synthetic"]').first().waitFor();
