@@ -18,16 +18,31 @@ export type WorldIsoCrowdPose = Readonly<{
  walking: boolean; waiting: boolean; walked: number;
  status: WorldIsoCrowdStatus; waitMs: number;
 }>;
+export type WorldIsoGoalOutcome = "pending" | "completed" | "rejected" | "unreachable" | "canceled" | "stalled";
+export type WorldIsoGoalDiagnostics = {
+ actorId: string; sequence: number; requested: GroundPoint | null;
+ requestAtMs: number; reservationAtMs: number | null; arrivalAtMs: number | null;
+ blockedMs: number; continuousBlockedMs: number; maxContinuousBlockedMs: number;
+ yieldingMs: number; recoveryAttempts: number; nonProgressMs: number; maxNonProgressMs: number;
+ lastProgressAtMs: number; bestDistance: number;
+ outcome: WorldIsoGoalOutcome; reason: string | null;
+};
 export type WorldIsoCrowdDiagnostics = Readonly<{
  ticks: number; simulatedMs: number; droppedMs: number; pathQueries: number; failedAssignments: number;
- recoveryAttempts: number; moves: number; maxWaitMs: number;
- actors: readonly Readonly<{ id: string; status: WorldIsoCrowdStatus; waitMs: number; goal: GroundPoint; arrived: boolean; reason: string | null }>[];
+ recoveryAttempts: number; moves: number; maxWaitMs: number; goalHistoryTruncated: number;
+ actors: readonly Readonly<{
+  id: string; status: WorldIsoCrowdStatus; waitMs: number; goal: GroundPoint;
+  requestedGoal: GroundPoint | null; reserved: boolean; goalAgeMs: number;
+  arrived: boolean; reason: string | null;
+ }>[];
+ goals: readonly WorldIsoGoalDiagnostics[];
 }>;
 type MutableActor = {
  id: string; kind: "pal" | "visitor"; at: GroundPoint; facing: WorldHdDirection; real: boolean;
  goal: GroundPoint; path: GroundPoint[]; waypoint: number; walking: boolean; waiting: boolean; walked: number; committed: boolean;
  status: WorldIsoCrowdStatus; waitMs: number; reason: string | null;
  yieldTo: GroundPoint | null; yieldHoldMs: number; failedGoal: GroundPoint | null; failedAt: number;
+ goalRecord: WorldIsoGoalDiagnostics | null;
 };
 const distance = (a: GroundPoint, b: GroundPoint) => Math.hypot(a.u - b.u, a.v - b.v);
 const copy = (p: GroundPoint): GroundPoint => ({ u: p.u, v: p.v });
@@ -40,6 +55,7 @@ const YIELD_HOLD_MS = 1_500;
 const RECOVER_AFTER_MS = 300;
 const REPLAN_AFTER_MS = 2_000;
 const MAX_RECOVERIES_PER_UPDATE = 2;
+const MAX_GOAL_HISTORY = 4096;
 const projection = worldIsoProjection();
 
 /**
@@ -59,6 +75,31 @@ export class WorldIsoCrowd {
  private actors = new Map<string, MutableActor>();
  private counters = { ticks: 0, simulatedMs: 0, droppedMs: 0, pathQueries: 0, failedAssignments: 0, recoveryAttempts: 0, moves: 0, maxWaitMs: 0 };
  private time = 0;
+ private goals: WorldIsoGoalDiagnostics[] = [];
+ private nextGoalSequence = 0;
+ private goalHistoryTruncated = 0;
+
+ private cancelGoal(a: MutableActor, reason: string): void {
+  const goal = a.goalRecord;
+  if (goal && (goal.outcome === "pending" || goal.outcome === "stalled")) {
+   goal.outcome = "canceled"; goal.reason = reason;
+  }
+ }
+ private startGoal(a: MutableActor, requested: GroundPoint | null): WorldIsoGoalDiagnostics {
+  this.cancelGoal(a, "superseded-by-assignment");
+  const goal: WorldIsoGoalDiagnostics = {
+   actorId: a.id, sequence: ++this.nextGoalSequence, requested: requested ? copy(requested) : null,
+   requestAtMs: this.time, reservationAtMs: null, arrivalAtMs: null,
+   blockedMs: 0, continuousBlockedMs: 0, maxContinuousBlockedMs: 0,
+   yieldingMs: 0, recoveryAttempts: 0, nonProgressMs: 0, maxNonProgressMs: 0,
+   lastProgressAtMs: this.time,
+   bestDistance: requested ? distance(a.at, requested) : Infinity,
+   outcome: "pending", reason: null,
+  };
+  a.goalRecord = goal; this.goals.push(goal);
+  if (this.goals.length > MAX_GOAL_HISTORY) { this.goals.shift(); this.goalHistoryTruncated++; }
+  return goal;
+ }
 
  constructor(plan: GroundPlan = WORLD_ISO_GREYBOX, radius = WORLD_ISO_FOOTPRINT) {
   if (!worldIsoPlanSealed(plan) || !worldIsoRadiusOk(radius))
@@ -79,10 +120,13 @@ export class WorldIsoCrowd {
   this.actors.set(input.id, { id: input.id, kind: input.kind, at, real: input.real === true,
    goal: copy(at), path: [copy(at)], waypoint: 1, facing: input.facing ?? "s",
    walking: false, waiting: false, walked: 0, committed: false, status: "arrived", waitMs: 0, reason: null,
-   yieldTo: null, yieldHoldMs: 0, failedGoal: null, failedAt: -Infinity });
+   yieldTo: null, yieldHoldMs: 0, failedGoal: null, failedAt: -Infinity, goalRecord: null });
   return true;
  }
- leave(id: string): void { this.actors.delete(id); }
+ leave(id: string): void {
+  const a = this.actors.get(id);
+  if (a) { this.cancelGoal(a, "roster-left"); this.actors.delete(id); }
+ }
  ids(): string[] { return [...this.actors.keys()].sort(); }
  setReal(id: string, real: boolean): void { const a = this.actors.get(id); if (a) a.real = real === true; }
  /**
@@ -107,31 +151,50 @@ export class WorldIsoCrowd {
   if (!a) return false;
   const numericTarget = !!target && typeof target.u === "number" && typeof target.v === "number"
    && Number.isFinite(target.u) && Number.isFinite(target.v);
-  const same = numericTarget && worldIsoPointFree(this.plan, target, this.radius) && distance(target, a.goal) < EPS;
-  if (same && !a.failedGoal) { a.committed = true; return true; }
-  if (numericTarget && a.failedGoal && distance(target, a.failedGoal) < EPS &&
-   this.time - a.failedAt < REPLAN_AFTER_MS) return false;
+  const requested = numericTarget ? copy(target) : null;
+  const same = !!requested && !!a.goalRecord?.requested &&
+   distance(requested, a.goalRecord.requested) < EPS;
+  const goal = same ? a.goalRecord! : this.startGoal(a, requested);
+  // A duplicate request must neither reset an intercepted yield nor erase
+  // its original request time, blocked duration, or recovery attempts.
+  if (same && a.committed && !a.failedGoal) return true;
+  if (same && a.failedGoal && this.time - a.failedAt < REPLAN_AFTER_MS) return false;
   const fail = (reason: string, status: WorldIsoCrowdStatus) => {
-   a.goal = numericTarget ? copy(target) : copy(a.at); a.path = [copy(a.at)]; a.waypoint = 1;
-   a.yieldTo = null; a.yieldHoldMs = 0; a.waitMs = 0;
+   a.goal = requested ? copy(requested) : copy(a.at);
+   a.path = [copy(a.at)]; a.waypoint = 1;
+   a.yieldTo = null; a.yieldHoldMs = 0;
    a.waiting = false; a.walking = false; a.status = status; a.reason = reason;
-   a.failedGoal = numericTarget ? copy(target) : null; a.failedAt = this.time; a.committed = true;
+   a.failedGoal = requested ? copy(requested) : null; a.failedAt = this.time;
+   // A rejected request never owns a reservation. Reassignment releases
+   // the previous claim immediately even when the new request fails.
+   a.committed = false;
+   goal.reservationAtMs = null; goal.arrivalAtMs = null;
+   goal.outcome = reason === "destination-reserved" ? "rejected" : "unreachable";
+   goal.reason = reason;
    this.counters.failedAssignments++; return false;
   };
-  if (!numericTarget || !worldIsoPointFree(this.plan, target, this.radius))
+  if (!requested || !worldIsoPointFree(this.plan, requested, this.radius))
    return fail("invalid-ground", "unreachable");
-  // Only explicit destination assignments, not initial join locations, are
-  // reservations. An actor may target a place another actor will depart.
   const reserved = [...this.actors.values()].some(b => b.id !== id && b.committed &&
-   distance(target, b.goal) < 2 * this.radius - EPS);
+   distance(requested, b.goal) < 2 * this.radius - EPS);
   if (reserved) return fail("destination-reserved", "blocked");
   this.counters.pathQueries++;
-  const path = worldIsoPath(this.plan, a.at, target, this.radius);
+  const path = worldIsoPath(this.plan, a.at, requested, this.radius);
   if (!path) return fail("no-static-route", "unreachable");
-  a.goal = copy(target); a.path = path; a.waypoint = 1; a.reason = null;
+  a.goal = copy(requested); a.path = path; a.waypoint = 1; a.reason = null;
   a.committed = true; a.failedGoal = null; a.failedAt = -Infinity;
   a.waitMs = 0; a.yieldTo = null; a.yieldHoldMs = 0;
-  a.status = distance(a.at, target) < EPS ? "arrived" : "moving"; a.waiting = false;
+  a.status = distance(a.at, requested) < EPS ? "arrived" : "moving";
+  a.waiting = false;
+  goal.reservationAtMs = this.time;
+  // Re-reserving the same goal after an ambient-period release or retry is
+  // not permission to restart its historical no-progress/blocked clock.
+  if (!same) {
+   goal.lastProgressAtMs = this.time; goal.nonProgressMs = 0;
+   goal.bestDistance = distance(a.at, requested);
+  }
+  goal.outcome = a.status === "arrived" ? "completed" : "pending";
+  goal.arrivalAtMs = a.status === "arrived" ? this.time : null; goal.reason = null;
   return true;
  }
  pose(id: string): WorldIsoCrowdPose | null {
@@ -141,11 +204,20 @@ export class WorldIsoCrowd {
  }
  snapshot(): WorldIsoCrowdPose[] { return this.ids().map(id => this.pose(id)!); }
  diagnostics(): WorldIsoCrowdDiagnostics {
-  return { ...this.counters, actors: this.ids().map(id => {
-   const a = this.actors.get(id)!;
-   return { id, status: a.status, waitMs: a.waitMs, goal: copy(a.goal),
-    arrived: distance(a.at, a.goal) < EPS, reason: a.reason };
-  }) };
+  return { ...this.counters, goalHistoryTruncated: this.goalHistoryTruncated,
+   actors: this.ids().map(id => {
+    const a = this.actors.get(id)!;
+    const goal = a.goalRecord;
+    return { id, status: a.status, waitMs: a.waitMs, goal: copy(a.goal),
+     requestedGoal: goal?.requested ? copy(goal.requested) : null,
+     reserved: a.committed, goalAgeMs: goal ? this.time - goal.requestAtMs : 0,
+     arrived: a.committed && a.status === "arrived" && !!goal &&
+      goal.outcome === "completed" && !!goal.requested &&
+      distance(a.at, goal.requested) < EPS,
+     reason: a.reason };
+   }),
+   goals: this.goals.map(g => ({ ...g, requested: g.requested ? copy(g.requested) : null })),
+  };
  }
  /** Do not count a safe, immobile actor as having arrived unless at its requested goal. */
  valid(): boolean {
@@ -176,6 +248,7 @@ export class WorldIsoCrowd {
   */
  private tryYield(a: MutableActor, blocker: MutableActor, old: Map<string, GroundPoint>, trails: Map<string, GroundPoint[]>): boolean {
   this.counters.recoveryAttempts++;
+  if (a.goalRecord) a.goalRecord.recoveryAttempts++;
   const du = a.goal.u - a.at.u, dv = a.goal.v - a.at.v;
   const length = Math.hypot(du, dv) || 1;
   const x = du / length, y = dv / length;
@@ -222,8 +295,11 @@ export class WorldIsoCrowd {
     recoverBudget.left--; this.counters.pathQueries++;
     const newPath = worldIsoPath(this.plan, a.at, a.goal, this.radius);
     a.yieldTo = null;
-    if (newPath) { a.path = newPath; a.waypoint = 1; a.reason = null; }
-    else { a.reason = "no-route-after-yield"; a.status = "unreachable"; }
+    if (newPath) { a.path = newPath; a.waypoint = 1; a.reason = null; a.status = "moving"; }
+    else {
+     a.reason = "no-route-after-yield"; a.status = "unreachable";
+     if (a.goalRecord) { a.goalRecord.outcome = "unreachable"; a.goalRecord.reason = a.reason; }
+    }
    }
    if (a.status === "unreachable" && !a.yieldTo) continue;
    const original = copy(a.at);
@@ -256,13 +332,45 @@ export class WorldIsoCrowd {
     a.at = current; a.walked += walked; a.walking = true; a.waitMs = 0;
     this.counters.moves += moved;
     trails.set(a.id, pathTrail);
-    if (!a.yieldTo) a.waypoint = atIndex;
+    if (!a.yieldTo) {
+     a.waypoint = atIndex;
+     if (a.goalRecord) {
+      const closer = distance(a.at, a.goal);
+      if (closer < a.goalRecord.bestDistance - 0.01) {
+       a.goalRecord.bestDistance = closer;
+       a.goalRecord.lastProgressAtMs = this.time + ms;
+      }
+     }
+    }
     a.status = a.yieldTo ? "yielding" : (distance(a.at, a.goal) < EPS ? "arrived" : "moving");
    }
    if (blocker) {
     a.waiting = true; a.waitMs += ms; a.reason = "actor:" + blocker.id;
     this.counters.maxWaitMs = Math.max(this.counters.maxWaitMs, a.waitMs);
-    if (!a.yieldTo && a.waitMs >= RECOVER_AFTER_MS && recoverBudget.left > 0) {
+    if (a.yieldTo && recoverBudget.left > 0) {
+     // A third actor can intercept a sidestep after it was selected.
+     // Invalidate that route and use one bounded recovery slot to find
+     // another statically and dynamically swept-clear destination.
+     const stale = a.yieldTo;
+     recoverBudget.left--;
+     a.yieldTo = null; a.yieldHoldMs = 0;
+     if (!this.tryYield(a, blocker, old, trails) ||
+      (a.yieldTo && distance(a.yieldTo, stale) < EPS)) {
+      a.yieldTo = null; a.yieldHoldMs = 0;
+      a.status = "blocked"; a.reason = "yield-intercepted:" + blocker.id;
+      // The original waypoints can now start off-path; plan from the
+      // current physical position rather than traversing a stale chord.
+      this.counters.pathQueries++;
+      const replanned = worldIsoPath(this.plan, a.at, a.goal, this.radius);
+      if (replanned) { a.path = replanned; a.waypoint = 1; }
+      else {
+       a.status = "unreachable"; a.reason = "no-route-after-interception";
+       if (a.goalRecord) {
+        a.goalRecord.outcome = "unreachable"; a.goalRecord.reason = a.reason;
+       }
+      }
+     }
+    } else if (!a.yieldTo && a.waitMs >= RECOVER_AFTER_MS && recoverBudget.left > 0) {
      const lower = this.rank(a) < this.rank(blocker) ||
       (this.rank(a) === this.rank(blocker) && a.id > blocker.id);
      if (lower || a.waitMs >= REPLAN_AFTER_MS) {
@@ -270,9 +378,38 @@ export class WorldIsoCrowd {
       this.tryYield(a, blocker, old, trails);
      }
     }
-    if (!a.yieldTo) a.status = a.waitMs >= WAIT_LIMIT_MS ? "blocked" : "waiting";
-   } else if (walked <= EPS && !a.yieldTo && distance(a.at, a.goal) < EPS) {
+    if (!a.yieldTo && a.status !== "unreachable")
+     a.status = a.waitMs >= WAIT_LIMIT_MS ? "blocked" :
+      (a.reason?.startsWith("yield-intercepted:") ? "blocked" : "waiting");
+   } else if (walked <= EPS && !a.yieldTo && a.committed &&
+    a.status !== "unreachable" && distance(a.at, a.goal) < EPS) {
     a.status = "arrived"; a.waitMs = 0;
+   }
+  }
+  // These clocks belong to logical requests, never to retry/yield timers.
+  // Yielding movement does not reset the no-goal-progress clock.
+  for (const a of ordered) {
+   const goal = a.goalRecord;
+   if (!goal || goal.outcome === "completed" || goal.outcome === "canceled" ||
+    goal.outcome === "rejected" || goal.outcome === "unreachable") continue;
+   if (a.committed && a.status === "arrived" && goal.requested &&
+    distance(a.at, goal.requested) < EPS) {
+    goal.outcome = "completed"; goal.arrivalAtMs = this.time + ms;
+    goal.nonProgressMs = 0; goal.continuousBlockedMs = 0; goal.reason = null;
+    continue;
+   }
+   const blocked = a.waiting || a.status === "yielding" || a.status === "blocked";
+   if (a.status === "yielding") goal.yieldingMs += ms;
+   if (blocked) {
+    goal.blockedMs += ms; goal.continuousBlockedMs += ms;
+    goal.maxContinuousBlockedMs = Math.max(goal.maxContinuousBlockedMs, goal.continuousBlockedMs);
+   } else goal.continuousBlockedMs = 0;
+   goal.nonProgressMs = Math.max(0, this.time + ms - goal.lastProgressAtMs);
+   goal.maxNonProgressMs = Math.max(goal.maxNonProgressMs, goal.nonProgressMs);
+   if (blocked && goal.nonProgressMs >= WAIT_LIMIT_MS) {
+    goal.outcome = "stalled"; goal.reason = "goal-progress-timeout";
+    a.yieldTo = null; a.yieldHoldMs = 0;
+    a.status = "blocked"; a.reason = goal.reason;
    }
   }
  }

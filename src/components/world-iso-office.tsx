@@ -73,6 +73,24 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  // At most two route assignments/retries per animation update, regardless
  // of the number of actors whose ambient destinations changed together.
  const pending = useRef<{id: string; target: {u: number; v: number}; real: boolean; nextAt: number}[]>([]);
+ const byId = useMemo(() => new Map(view.map(a => [a.id, a])), [view]);
+ // Scene generation runs during render for the initial static preview. A null
+ // or thrown frame is converted to a render-safe fault flag; its effect below
+ // latches the failure. The RAF effect also watches this flag, so it cannot
+ // start or continue while React is committing the fault.
+ const sceneState = useMemo(() => {
+  if (fault) return { scene: null, failed: false };
+  try {
+   const scene = worldIsoSceneFrame(WORLD_ISO_GREYBOX, poses.map(p => ({
+    ...p, name: byId.get(p.id)?.name ?? p.id, real: byId.get(p.id)?.real ?? null,
+   })));
+   return { scene, failed: !scene };
+  } catch { return { scene: null, failed: true }; }
+ }, [fault, poses, byId]);
+ const sceneFault = sceneState.failed ? "Isometric scene generation failed; simulation stopped." : null;
+ useEffect(() => {
+  if (sceneFault && !fault) setFault(sceneFault);
+ }, [sceneFault, fault]);
 
  // Join/leave only on genuinely changed identities. Already-present Pals
  // retain exact positions, routes and accumulated gait distance.
@@ -95,7 +113,7 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  useEffect(() => { lastRosterKey.current = ""; setView(initial); }, [rosterKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
  useEffect(() => {
-  if (!moving || fault) {
+  if (!moving || fault || sceneFault) {
    crowd.step(0, true);
    setPoses(crowd.snapshot());
    return;
@@ -143,7 +161,7 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
   };
   raf = requestAnimationFrame(frame);
   return () => { stopped = true; cancelAnimationFrame(raf); };
- }, [moving, crowd, fault, rosterKey]);
+ }, [moving, crowd, fault, sceneFault, rosterKey]);
 
  useEffect(() => {
   if (fault && lastReportedFault.current !== fault) {
@@ -151,15 +169,8 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
    latest.current.onFailure?.(fault);
   }
  }, [fault]);
- const byId = useMemo(() => new Map(view.map(a => [a.id, a])), [view]);
- const scene = useMemo(() => {
-  try {
-   return fault ? null : worldIsoSceneFrame(WORLD_ISO_GREYBOX, poses.map(p => ({
-    ...p, name: byId.get(p.id)?.name ?? p.id, real: byId.get(p.id)?.real ?? null,
-   })));
-  } catch { return null; }
- }, [fault, poses, byId]);
- if (!scene) return <div role="alert" data-iso-fallback="true">{fallback ?? FALLBACK_MESSAGE}</div>;
+ if (!sceneState.scene) return <div role="alert" data-iso-fallback="true">{fallback ?? FALLBACK_MESSAGE}</div>;
+ const scene = sceneState.scene;
  const transforms: CSSProperties | undefined = camera ? {
   transform: worldCameraTransform(camera, viewport ?? WORLD_ISO_CANVAS), transformOrigin: "0 0",
  } : undefined;

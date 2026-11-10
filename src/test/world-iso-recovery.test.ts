@@ -106,4 +106,132 @@ describe("P1/P2 crowd movement and recovery regressions", () => {
   expect(crowd.pose("pal:one")!.walked).toBe(before.walked);
   expect(crowd.valid()).toBe(true);
  });
+ it("does not create a ghost reservation after a denied claim is superseded", () => {
+  const crowd = new WorldIsoCrowd(square());
+  for (const [id, u] of [["A", 2], ["B", 4], ["C", 6]] as const)
+   expect(crowd.join({id,kind:"pal",at:{u,v:2}})).toBe(true);
+  const x={u:8,v:8}, y={u:8,v:7};
+  expect(crowd.assign("A",x)).toBe(true);
+  expect(crowd.assign("B",x)).toBe(false);
+  expect(crowd.diagnostics().actors.find(a=>a.id==="B")).toMatchObject({
+   status:"blocked", reserved:false, arrived:false, reason:"destination-reserved",
+  });
+  expect(crowd.assign("A",y)).toBe(true);
+  // No schedule reset, actor move, or 2s retry is required.
+  expect(crowd.assign("C",x)).toBe(true);
+  const d=crowd.diagnostics();
+  expect(d.actors.find(a=>a.id==="C")?.reserved).toBe(true);
+  expect(d.actors.find(a=>a.id==="B")?.reserved).toBe(false);
+  expect(d.goals.find(g=>g.actorId==="B")?.outcome).toBe("rejected");
+  expect(crowd.valid()).toBe(true);
+ });
+
+ it("reports truthful rejection and arrival for nonfinite, malformed, furniture and valid goals", () => {
+  const crowd=new WorldIsoCrowd(square(10,[{id:"desk",u1:7,v1:7,u2:9,v2:9}]));
+  expect(crowd.join({id:"A",kind:"pal",at:{u:2,v:2}})).toBe(true);
+  const invalid: unknown[]=[
+   {u:NaN,v:2},{u:Infinity,v:2},{u:-Infinity,v:2},
+   {u:"2",v:2},{u:2},{v:2},null,{u:8,v:8},
+  ];
+  for(const target of invalid){
+   expect(crowd.assign("A",target as {u:number;v:number})).toBe(false);
+   const actor=crowd.diagnostics().actors[0]!;
+   expect(actor.arrived).toBe(false);
+   expect(actor.reserved).toBe(false);
+   expect(actor.status).toBe("unreachable");
+   expect(actor.reason).toBe("invalid-ground");
+  }
+  expect(crowd.assign("A",{u:4,v:2})).toBe(true);
+  expect(crowd.diagnostics().actors[0]!.arrived).toBe(false);
+  for(let i=0;i<20;i++)crowd.step(200);
+  expect(crowd.diagnostics().actors[0]).toMatchObject({
+   status:"arrived", arrived:true, reserved:true,
+  });
+  expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("completed");
+  expect(crowd.diagnostics().goals.at(-1)?.arrivalAtMs).not.toBeNull();
+ });
+
+ it("distinguishes a statically valid but unreachable destination", () => {
+  const plan=square(10,[{id:"sealed-barrier",u1:0,v1:4.75,u2:10,v2:5.25}]);
+  expect(worldIsoPointFree(plan,{u:8,v:8})).toBe(true);
+  const crowd=new WorldIsoCrowd(plan);
+  expect(crowd.join({id:"A",kind:"pal",at:{u:2,v:2}})).toBe(true);
+  expect(crowd.assign("A",{u:8,v:8})).toBe(false);
+  expect(crowd.diagnostics().actors[0]).toMatchObject({
+   arrived:false, reserved:false, status:"unreachable", reason:"no-static-route",
+  });
+  expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("unreachable");
+ });
+
+ it("recovers from a late third-actor interception without jumping or obscuring goal age", () => {
+  const crowd=new WorldIsoCrowd(square());
+  expect(crowd.join({id:"visitor:a",kind:"visitor",at:{u:4,v:4}})).toBe(true);
+  expect(crowd.join({id:"pal:b",kind:"pal",at:{u:4.6,v:4}})).toBe(true);
+  expect(crowd.join({id:"pal:c",kind:"pal",at:{u:3.9,v:2.6}})).toBe(true);
+  expect(crowd.assign("visitor:a",{u:8,v:4})).toBe(true);
+  expect(crowd.assign("pal:b",{u:4.6,v:4})).toBe(true);
+  let yielding=false;
+  for(let i=0;i<20;i++){
+   crowd.step(100);
+   if(crowd.pose("visitor:a")?.status==="yielding"){yielding=true;break;}
+  }
+  expect(yielding).toBe(true);
+  const initialGoal=crowd.diagnostics().goals.find(g=>g.actorId==="visitor:a")!;
+  const initialRecovery=initialGoal.recoveryAttempts;
+  // C was already present, then starts moving into A's active sidestep.
+  expect(crowd.assign("pal:c",{u:3.9,v:3.25})).toBe(true);
+  let previous=crowd.snapshot();
+  for(let i=0;i<80;i++){
+   crowd.step(100);
+   const now=crowd.snapshot();
+   expect(crowd.valid()).toBe(true);
+   for(const pose of now){
+    const old=previous.find(p=>p.id===pose.id)!;
+    expect(dist(old.at,pose.at)).toBeLessThanOrEqual(0.161);
+   }
+   previous=now;
+  }
+  const interrupted=crowd.diagnostics().goals.find(g=>g.actorId==="visitor:a")!;
+  expect(interrupted.recoveryAttempts).toBeGreaterThan(initialRecovery);
+  expect(interrupted.requestAtMs).toBe(initialGoal.requestAtMs);
+  // Remove the original blocker to make the fixed goal solvable.
+  crowd.leave("pal:b");
+  for(let i=0;i<300 && crowd.pose("visitor:a")?.status!=="arrived";i++){
+   expect(crowd.assign("visitor:a",{u:8,v:4})).toBe(true);
+   crowd.step(100);
+   expect(crowd.valid()).toBe(true);
+  }
+  expect(crowd.pose("visitor:a")?.status).toBe("arrived");
+  const goal=crowd.diagnostics().goals.find(g=>g.actorId==="visitor:a")!;
+  expect(goal.outcome).toBe("completed");
+  expect(goal.arrivalAtMs).not.toBeNull();
+  expect(goal.recoveryAttempts).toBeGreaterThan(initialRecovery);
+ });
+
+ it("retains prolonged same-goal blockage rather than laundering it through retries", () => {
+  const corridor=square(10,[
+   {id:"south",u1:0,v1:0,u2:10,v2:3.64},
+   {id:"north",u1:0,v1:4.36,u2:10,v2:10},
+  ]);
+  const crowd=new WorldIsoCrowd(corridor);
+  expect(crowd.join({id:"visitor:a",kind:"visitor",at:{u:4,v:4}})).toBe(true);
+  expect(crowd.join({id:"pal:b",kind:"pal",at:{u:4.6,v:4}})).toBe(true);
+  expect(crowd.assign("visitor:a",{u:8,v:4})).toBe(true);
+  expect(crowd.assign("pal:b",{u:4.6,v:4})).toBe(true);
+  const seq=crowd.diagnostics().goals[0]!.sequence;
+  for(let i=0;i<300;i++){
+   if(i%5===0)expect(crowd.assign("visitor:a",{u:8,v:4})).toBe(true);
+   crowd.step(100);
+   expect(crowd.valid()).toBe(true);
+  }
+  const diag=crowd.diagnostics(),goal=diag.goals.find(g=>g.sequence===seq)!;
+  expect(diag.actors.find(a=>a.id==="visitor:a")?.arrived).toBe(false);
+  expect(diag.actors.find(a=>a.id==="visitor:a")?.status).toBe("blocked");
+  expect(goal.outcome).toBe("stalled");
+  expect(goal.nonProgressMs).toBeGreaterThanOrEqual(25_000);
+  expect(goal.requestAtMs).toBe(0);
+  expect(goal.maxContinuousBlockedMs).toBeGreaterThan(0);
+  expect(diag.goals.filter(g=>g.actorId==="visitor:a")).toHaveLength(1);
+ });
+
 });
