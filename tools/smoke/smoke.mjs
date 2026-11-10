@@ -1377,13 +1377,15 @@ await step("Immersive desktop Pal Room popup, camera reachability, resizing and 
   await page.mouse.down();
   await page.mouse.move(h2.x+h2.width/2+180,h2.y+h2.height/2,{steps:8});
   await page.mouse.up();
+  // Restore a maximized room for the remaining HD/character smoke coverage.
+  await room.getByRole("button",{name:"Maximize Pal Room"}).click();
   await showRoomSettings();
   // Closing with Escape must return focus to the Room Settings button;
   // X close and reopen must also leave the room visible.
   await popup.focus();
   await page.keyboard.press("Escape");
   await popup.waitFor({state:"hidden"});
-  if(!await trigger.isFocused()) throw Error("Room Settings Escape did not restore trigger focus");
+  if(!await trigger.evaluate(el=>document.activeElement===el)) throw Error("Room Settings Escape did not restore trigger focus");
   await showRoomSettings();
   await hideRoomSettings();
   await popup.waitFor({state:"hidden"});
@@ -1602,14 +1604,34 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
     const after = await identity();
     if (JSON.stringify(after) !== JSON.stringify(before.local)) throw Error("Switching looks changed other saved data");
   } finally {
+    // The controls unmount/remount when crossing 700px. Re-open the new
+    // Character Universe <details> before looking for Delete buttons, rather
+    // than silently treating a missing/hidden locator as successful cleanup.
+    await page.setViewportSize({ width: 1500, height: 900 });
+    await showRoomSettings();
+    const cleanupLibrary=page.locator(".room-settings-content details.world-character-library");
+    await cleanupLibrary.waitFor({state:"visible"});
+    if(await cleanupLibrary.getAttribute("open")===null) await cleanupLibrary.locator("summary").click();
     await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
     await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
     await appearance.getByRole("button", { name: "Restore Nova's original look" }).click().catch(() => undefined);
-    for (const name of ["Smoke Nova HD", "Smoke Nova Pixel"]) {
-      const del = library.getByRole("button", { name: "Delete " + name });
-      if (await del.count()) { page.once("dialog", d => d.accept()); await del.click(); }
+    for (const [id,name] of [[ids[0],"Smoke Nova HD"],[ids[1],"Smoke Nova Pixel"]]) {
+      const data=await (await page.request.get(URL_+"/api/character-universe")).json();
+      if(!data.characters?.some(c=>c.id===id)) continue;
+      const del=cleanupLibrary.getByRole("button",{name:"Delete "+name});
+      await del.waitFor({state:"visible",timeout:8000});
+      page.once("dialog",d=>d.accept());
+      await del.click();
+      await page.waitForFunction(async id=>{
+        const r=await fetch("/api/character-universe",{credentials:"same-origin"});
+        return r.ok && !((await r.json()).characters??[]).some(c=>c.id===id);
+      },id,{timeout:15000}).catch(async()=>{
+        const fresh=await (await page.request.get(URL_+"/api/character-universe")).json();
+        throw Error("Character Library Delete did not persist for "+name+
+          ". Sync status: "+await cleanupLibrary.locator('[role="status"]').allTextContents()+
+          " / revision "+fresh.revision);
+      });
     }
-    await page.waitForFunction(async ids => { const r = await fetch("/api/character-universe", { credentials: "same-origin" }); return r.ok && !((await r.json()).characters ?? []).some(c => ids.includes(c.id)); }, ids, { timeout: 15000 }).catch(() => undefined);
     await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
     await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
   }
