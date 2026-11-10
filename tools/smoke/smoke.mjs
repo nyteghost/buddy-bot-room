@@ -1654,7 +1654,7 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
     await showRoomSettings();
     const cleanupLibrary=page.locator(".room-settings-content details.world-character-library");
     await cleanupLibrary.waitFor({state:"visible"});
-    if(await cleanupLibrary.getAttribute("open")===null) await cleanupLibrary.locator("summary").click();
+    if(await cleanupLibrary.getAttribute("open")===null) await cleanupLibrary.locator(":scope > summary").click();
     await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
     await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
     await appearance.getByRole("button", { name: "Restore Nova's original look" }).click().catch(() => undefined);
