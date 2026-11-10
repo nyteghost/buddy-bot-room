@@ -110,7 +110,7 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
     actorPeriodArrivalSamples:arrivals,blockedOrUnreachableActorTickSamples:unreachable,maxWaitingMs:maxWaiting,
     waitThresholdViolations:longWaiters.size,
     distinctGoalRequests:goals.length,logicalGoalOutcomes:counts,
-    maxGoalAgeMs:Math.max(0,...goals.map(g=>metrics.simulatedMs-g.requestAtMs)),
+    maxGoalAgeMs:Math.max(0,...goals.map(g=>(g.finishedAtMs??metrics.simulatedMs)-g.requestAtMs)),
     maxPerGoalBlockedMs:Math.max(0,...goals.map(g=>g.blockedMs)),
     maxContinuousGoalBlockedMs:Math.max(0,...goals.map(g=>g.maxContinuousBlockedMs)),
     maxGoalNoProgressMs:Math.max(0,...goals.map(g=>g.maxNonProgressMs)),
@@ -246,7 +246,7 @@ describe("held-goal and adversarial liveness instrumentation",()=>{
      const id="visitor:"+Math.floor(tick/40);
      if(tick>0)crowd.leave("visitor:"+(Math.floor(tick/40)-1));
      expect(crowd.join({id,kind:"visitor",at:{u:18,v:2}})).toBe(true);
-     crowd.assign(id,{u:18,v:5});
+     crowd.assign(id,{u:18,v:15});
     }
     if(tick%37===0)crowd.step(30_000,true);
     if(tick%71===0)crowd.step(30_000);

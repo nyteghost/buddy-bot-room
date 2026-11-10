@@ -134,13 +134,14 @@ describe("Step 1b mounted-only-in-tests runtime contracts",()=>{
  it("cancels an already active RAF after a later scene frame becomes null",()=>{
   const real=isoScene.worldIsoSceneFrame;
   const scene=vi.spyOn(isoScene,"worldIsoSceneFrame");
-  let calls=0;
-  scene.mockImplementation((...args)=>++calls===1?real(...args):null);
+  let calls=0, fail=false;
+  scene.mockImplementation((...args)=>{calls++;return fail ? null : real(...args);});
   const onFailure=vi.fn();
   const {rerender,container,unmount}=render(<WorldIsoOffice pals={pals()} visitors={[]}
    visible playful paused={false} synthetic onFailure={onFailure}
    fallback={<span data-testid="fault-owner">Fallback</span>}/>);
   expect(queue.size).toBe(1);
+  fail=true;
   advance(100);
   expect(container.querySelector("[data-iso-fallback]")).toBeTruthy();
   expect(queue.size).toBe(0);

@@ -21,7 +21,7 @@ export type WorldIsoCrowdPose = Readonly<{
 export type WorldIsoGoalOutcome = "pending" | "completed" | "rejected" | "unreachable" | "canceled" | "stalled";
 export type WorldIsoGoalDiagnostics = {
  actorId: string; sequence: number; requested: GroundPoint | null;
- requestAtMs: number; reservationAtMs: number | null; arrivalAtMs: number | null;
+ requestAtMs: number; reservationAtMs: number | null; arrivalAtMs: number | null; finishedAtMs: number | null;
  blockedMs: number; continuousBlockedMs: number; maxContinuousBlockedMs: number;
  yieldingMs: number; recoveryAttempts: number; nonProgressMs: number; maxNonProgressMs: number;
  lastProgressAtMs: number; bestDistance: number;
@@ -82,14 +82,14 @@ export class WorldIsoCrowd {
  private cancelGoal(a: MutableActor, reason: string): void {
   const goal = a.goalRecord;
   if (goal && (goal.outcome === "pending" || goal.outcome === "stalled")) {
-   goal.outcome = "canceled"; goal.reason = reason;
+   goal.outcome = "canceled"; goal.reason = reason; goal.finishedAtMs = this.time;
   }
  }
  private startGoal(a: MutableActor, requested: GroundPoint | null): WorldIsoGoalDiagnostics {
   this.cancelGoal(a, "superseded-by-assignment");
   const goal: WorldIsoGoalDiagnostics = {
    actorId: a.id, sequence: ++this.nextGoalSequence, requested: requested ? copy(requested) : null,
-   requestAtMs: this.time, reservationAtMs: null, arrivalAtMs: null,
+   requestAtMs: this.time, reservationAtMs: null, arrivalAtMs: null, finishedAtMs: null,
    blockedMs: 0, continuousBlockedMs: 0, maxContinuousBlockedMs: 0,
    yieldingMs: 0, recoveryAttempts: 0, nonProgressMs: 0, maxNonProgressMs: 0,
    lastProgressAtMs: this.time,
@@ -168,7 +168,7 @@ export class WorldIsoCrowd {
    // A rejected request never owns a reservation. Reassignment releases
    // the previous claim immediately even when the new request fails.
    a.committed = false;
-   goal.reservationAtMs = null; goal.arrivalAtMs = null;
+   goal.reservationAtMs = null; goal.arrivalAtMs = null; goal.finishedAtMs = this.time;
    goal.outcome = reason === "destination-reserved" ? "rejected" : "unreachable";
    goal.reason = reason;
    this.counters.failedAssignments++; return false;
@@ -194,7 +194,8 @@ export class WorldIsoCrowd {
    goal.bestDistance = distance(a.at, requested);
   }
   goal.outcome = a.status === "arrived" ? "completed" : "pending";
-  goal.arrivalAtMs = a.status === "arrived" ? this.time : null; goal.reason = null;
+  goal.arrivalAtMs = a.status === "arrived" ? this.time : null;
+  goal.finishedAtMs = a.status === "arrived" ? this.time : null; goal.reason = null;
   return true;
  }
  pose(id: string): WorldIsoCrowdPose | null {
@@ -298,7 +299,8 @@ export class WorldIsoCrowd {
     if (newPath) { a.path = newPath; a.waypoint = 1; a.reason = null; a.status = "moving"; }
     else {
      a.reason = "no-route-after-yield"; a.status = "unreachable";
-     if (a.goalRecord) { a.goalRecord.outcome = "unreachable"; a.goalRecord.reason = a.reason; }
+     if (a.goalRecord) { a.goalRecord.outcome = "unreachable"; a.goalRecord.reason = a.reason;
+      a.goalRecord.finishedAtMs = this.time + ms; }
     }
    }
    if (a.status === "unreachable" && !a.yieldTo) continue;
@@ -367,6 +369,7 @@ export class WorldIsoCrowd {
        a.status = "unreachable"; a.reason = "no-route-after-interception";
        if (a.goalRecord) {
         a.goalRecord.outcome = "unreachable"; a.goalRecord.reason = a.reason;
+        a.goalRecord.finishedAtMs = this.time + ms;
        }
       }
      }
@@ -395,6 +398,7 @@ export class WorldIsoCrowd {
    if (a.committed && a.status === "arrived" && goal.requested &&
     distance(a.at, goal.requested) < EPS) {
     goal.outcome = "completed"; goal.arrivalAtMs = this.time + ms;
+    goal.finishedAtMs = this.time + ms;
     goal.nonProgressMs = 0; goal.continuousBlockedMs = 0; goal.reason = null;
     continue;
    }
@@ -408,6 +412,7 @@ export class WorldIsoCrowd {
    goal.maxNonProgressMs = Math.max(goal.maxNonProgressMs, goal.nonProgressMs);
    if (blocked && goal.nonProgressMs >= WAIT_LIMIT_MS) {
     goal.outcome = "stalled"; goal.reason = "goal-progress-timeout";
+    goal.finishedAtMs = this.time + ms;
     a.yieldTo = null; a.yieldHoldMs = 0;
     a.status = "blocked"; a.reason = goal.reason;
    }
