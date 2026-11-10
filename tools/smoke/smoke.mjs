@@ -1395,7 +1395,15 @@ await step("Immersive desktop Pal Room popup, camera reachability, resizing and 
   await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')!==null);
   if(await page.locator('[data-window-id="room-settings"]').count())
     throw Error("Separate Room Settings popup appeared in phone layout");
-  gallery.push({label:"PR #34 after · running app · 390×844 · phone inline-control layout",png:await page.screenshot({fullPage:false})});
+  // Use the actual mobile navigation to show the room, not just a hidden DOM
+  // assertion; capture both the scene and reachable inline controls.
+  await page.locator(".mobile-tabbar").getByRole("button",{name:"More"}).click();
+  await page.getByRole("group",{name:"More mobile tools"}).getByRole("button",{name:"Pal Room"}).click();
+  await room.waitFor({state:"visible"});
+  await room.getByRole("region",{name:"Pal Room activities"}).waitFor({state:"visible"});
+  gallery.push({label:"PR #34 after · running app · 390×844 · iPhone-sized Pal Room",png:await page.screenshot({fullPage:false})});
+  await room.locator(".room-settings-content").scrollIntoViewIfNeeded();
+  gallery.push({label:"PR #34 after · running app · 390×844 · accessible inline room controls",png:await page.screenshot({fullPage:false})});
   await page.setViewportSize({width:1500,height:900});
   await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')===null);
 });
