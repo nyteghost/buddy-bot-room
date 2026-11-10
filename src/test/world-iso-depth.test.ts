@@ -92,3 +92,28 @@ describe("slicing long props", () => {
   expect(order).toHaveLength(4);
  });
 });
+
+// ---------- PM review (PR #40): determinism and stated limits ----------
+describe("depth order: determinism and what it does not know", () => {
+ it("orders overlapping (intersecting) boxes by the fallback key, the same way every time, without throwing", () => {
+  const a = prop("a", 2, 2, 4, 4), b = prop("b", 3, 3, 5, 5), c = actor("inside", 3.5, 3.5);
+  const reference = worldIsoDepthOrder([a, b, c]).order;
+  expect(reference).toEqual(["a", "inside", "b"]);
+  for (const items of [[c, b, a], [b, a, c], [a, c, b]]) expect(worldIsoDepthOrder(items).order).toEqual(reference);
+ });
+
+ it("breaks exact ties by id", () => {
+  expect(worldIsoDepthOrder([actor("b", 3, 3), actor("a", 3, 3)]).order).toEqual(["a", "b"]);
+  expect(worldIsoDepthOrder([actor("z", 2, 4), actor("y", 4, 2)]).order).toEqual(["y", "z"]); // same depth, far apart on screen
+ });
+
+ it("is a ground-footprint order only: it has no knowledge of sprite height or drawn extents", () => {
+  // Two items whose footprints do not overlap on screen get no ordering constraint, however tall their art is.
+  // Whether a tall shelf's picture covers a character standing two tiles to its side must be checked with real art.
+  const shelf = prop("shelf", 2, 6, 3, 6.5), pal = actor("pal", 6, 3);
+  const { order, cycles } = worldIsoDepthOrder([shelf, pal]);
+  expect(cycles).toBe(0);
+  expect(order).toHaveLength(2);
+  expect(Object.keys(shelf.box).sort()).toEqual(["u1", "u2", "v1", "v2"]); // no height or pixel extent in the input
+ });
+});
