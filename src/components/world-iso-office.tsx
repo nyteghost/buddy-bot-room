@@ -34,7 +34,7 @@ export function WorldIsoOffice({ pals, visitors, visible, playful, paused, synth
  const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
  const moving = visible && playful && !paused && !reduced && !low && !hidden;
  const rosterKey = JSON.stringify([pals.map(p => [p.id, p.name, p.enabled, p.real]), visitors.slice(0, 6).map(v => [v.id, v.name])]);
- const scheduled = useMemo(() => worldIsoSchedule(pals, visitors), [rosterKey]); // eslint-disable-line react-hooks/exhaustive-deps
+ const scheduled = useMemo(() => worldIsoSchedule(pals, visitors, 0), [rosterKey]); // eslint-disable-line react-hooks/exhaustive-deps
  const crowd = useMemo(() => {
   const sim = new WorldIsoCrowd(WORLD_ISO_GREYBOX);
   for (const a of scheduled) {
