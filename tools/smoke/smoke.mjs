@@ -48,9 +48,11 @@ async function step(name, fn) {
 // can cover the room titlebar, so once open use its own X rather than clicking
 // through the popup to the room button. Phones keep their inline controls.
 async function showRoomSettings() {
+  const popup=page.locator('[data-window-id="room-settings"]');
+  if(await popup.isVisible().catch(()=>false)) return;
   const toggle=page.getByRole("button",{name:"Room settings",exact:true});
-  if(!await toggle.isVisible().catch(()=>false))return;
-  if(await toggle.getAttribute("aria-expanded")!=="true")await toggle.click();
+  if(!await toggle.isVisible().catch(()=>false)) return;
+  if(await toggle.getAttribute("aria-expanded")!=="true") await toggle.click();
   await page.locator('[data-window-id="room-settings"]').waitFor({state:"visible"});
 }
 async function hideRoomSettings() {
@@ -340,12 +342,21 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   // The Today window may be above the Pal Room; close it before selecting a board task.
   const todayItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i });
   if (await todayItem.getAttribute("aria-pressed") === "true") await todayItem.click();
-  await board.getByRole("button", { name: "Start: Organize the garage" }).waitFor();
-  await board.getByRole("button", { name: "Start: Organize the garage" }).click();
+  // The board is intentionally a *three-task shortlist*, not the full task list.
+  // An earlier smoke step may already have three higher-ranked tasks. In that
+  // case verify quick-start on the first available card rather than expecting
+  // this just-captured thought to be promoted against the documented ranking.
+  const requested = board.getByRole("button", { name: "Start: Organize the garage" });
+  const first = board.getByRole("button", { name: /^Start: / }).first();
+  await first.waitFor();
+  const chosen = await requested.count() ? requested : first;
+  const selected = (await chosen.getAttribute("aria-label"))?.replace(/^Start: /, "");
+  if (!selected) throw Error("Living Task Board had a task without a start label");
+  await chosen.click();
   const dialog = page.getByRole("dialog", { name: "Just Start" });
   await dialog.getByRole("textbox", { name: "What are you trying to start?" }).waitFor();
-  if (await dialog.getByRole("textbox", { name: "What are you trying to start?" }).inputValue() !== "Organize the garage") {
-    throw Error("Living Task Board did not preload the selected task");
+  if (await dialog.getByRole("textbox", { name: "What are you trying to start?" }).inputValue() !== selected) {
+    throw Error("Living Task Board did not preload the selected task: " + selected);
   }
   await dialog.getByRole("button", { name: "Close" }).click();
   // The control has a dynamic accessible label. Hold onto the same role-based
@@ -1310,39 +1321,82 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
   },undefined,{timeout:15000});
 });
 
+const gallery = [];
+
 // Pal Room window remains scene-first on desktop, while controls live in their own
 // movable window; phone-width devices continue to see controls directly below the room.
-await step("Immersive desktop Pal Room popup and unchanged phone controls", async () => {
-  await page.setViewportSize({width:1500,height:900});
-  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
-  if(await entry.getAttribute("aria-pressed")!=="true")await entry.click();
+await step("Immersive desktop Pal Room popup, camera reachability, resizing and phone controls", async () => {
+  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\\s*Pal Room\\s*$/i});
+  if(await entry.getAttribute("aria-pressed")!=="true") await entry.click();
   const room=page.locator('[data-window-id="room"]');
-  const trigger=room.getByRole("button",{name:"Room settings",exact:true});
-  await trigger.waitFor({state:"visible"});
-  await showRoomSettings();
   const popup=page.locator('[data-window-id="room-settings"]');
-  await popup.waitFor({state:"visible"});
-  await popup.getByRole("region",{name:"Pal Room activities"}).waitFor();
-  await popup.locator("details.world-character-library").waitFor({state:"visible"});
-  if(await room.locator(".room-settings-content").count())throw Error("Desktop room duplicated its controls under the scene");
-  const geometry=await room.evaluate(el=>{
-    const body=el.querySelector(".window-body"),scene=el.querySelector(".room-scene");
-    return {bodyH:body.clientHeight,bodyScroll:body.scrollHeight,sceneH:scene.getBoundingClientRect().height};
-  });
-  if(geometry.bodyScroll>geometry.bodyH+3||geometry.sceneH>geometry.bodyH+3)
-    throw Error("Desktop room still overflows instead of fitting its window: "+JSON.stringify(geometry));
+  const trigger=room.getByRole("button",{name:"Room settings",exact:true});
+  for(const [width,height] of [[1650,927],[1366,768],[940,700]]) {
+    await page.setViewportSize({width,height});
+    await trigger.waitFor({state:"visible"});
+    await showRoomSettings();
+    await popup.getByRole("region",{name:"Pal Room activities"}).waitFor();
+    await popup.locator("details.world-character-library").waitFor({state:"visible"});
+    if(await room.locator(".room-settings-content").count()) throw Error("Desktop room duplicated controls beneath scene");
+    const geometry=await room.evaluate(el=>{
+      const body=el.querySelector(".window-body"),scene=el.querySelector(".room-scene");
+      const r=el.getBoundingClientRect(), parent=el.parentElement.getBoundingClientRect();
+      return {roomW:r.width,roomH:r.height,canvasW:parent.width,canvasH:parent.height,bodyH:body.clientHeight,bodyScroll:body.scrollHeight,sceneH:scene.getBoundingClientRect().height};
+    });
+    if(geometry.roomW<geometry.canvasW*.94||geometry.roomH<geometry.canvasH*.94)
+      throw Error("Desktop room did not occupy the available workspace: "+JSON.stringify(geometry));
+    if(geometry.bodyScroll>geometry.bodyH+3||geometry.sceneH>geometry.bodyH+3)
+      throw Error("Desktop room still overflows: "+JSON.stringify(geometry));
+    gallery.push({label:`PR #34 after · running app · ${width}×${height} · immersive room and floating settings`,png:await page.screenshot({fullPage:false})});
+  }
+  // Real pointer drag on the independent settings titlebar, without force clicks.
+  const titlebar=popup.locator(".window-titlebar");
+  const original=await popup.boundingBox();
+  const bar=await titlebar.boundingBox();
+  await page.mouse.move(bar.x+85,bar.y+bar.height/2);
+  await page.mouse.down();
+  await page.mouse.move(bar.x+125,bar.y+bar.height/2+12,{steps:6});
+  await page.mouse.up();
+  const moved=await popup.boundingBox();
+  if(!moved||!original||moved.x<original.x+15) throw Error("Room Settings could not be moved");
+  // A real drag on the room window edge must resize it without a nested scrollbar.
+  await hideRoomSettings();
+  const edge=room.locator(".window-resize-e");
+  const before=await room.boundingBox();
+  const handle=await edge.boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x+handle.width/2-180,handle.y+handle.height/2,{steps:8});
+  await page.mouse.up();
+  const smaller=await room.boundingBox();
+  if(!smaller||!before||smaller.width>before.width-90) throw Error("Pal Room window resize did not shrink its canvas");
+  const narrow=await room.evaluate(el=>({body:el.querySelector(".window-body").clientHeight,scroll:el.querySelector(".window-body").scrollHeight}));
+  if(narrow.scroll>narrow.body+3) throw Error("Resized room introduced inner scrolling: "+JSON.stringify(narrow));
+  const h2=await edge.boundingBox();
+  await page.mouse.move(h2.x+h2.width/2,h2.y+h2.height/2);
+  await page.mouse.down();
+  await page.mouse.move(h2.x+h2.width/2+180,h2.y+h2.height/2,{steps:8});
+  await page.mouse.up();
+  await showRoomSettings();
+  // Closing with Escape must return focus to the Room Settings button;
+  // X close and reopen must also leave the room visible.
+  await popup.focus();
+  await page.keyboard.press("Escape");
+  await popup.waitFor({state:"hidden"});
+  if(!await trigger.isFocused()) throw Error("Room Settings Escape did not restore trigger focus");
+  await showRoomSettings();
   await hideRoomSettings();
   await popup.waitFor({state:"hidden"});
-  if(!await room.locator(".room-scene").isVisible())throw Error("Closing Room Settings hid the room");
+  if(!await room.locator(".room-scene").isVisible()) throw Error("Closing Room Settings hid the room");
   await page.setViewportSize({width:390,height:844});
   await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')!==null);
   if(await page.locator('[data-window-id="room-settings"]').count())
     throw Error("Separate Room Settings popup appeared in phone layout");
+  gallery.push({label:"PR #34 after · running app · 390×844 · phone inline-control layout",png:await page.screenshot({fullPage:false})});
   await page.setViewportSize({width:1500,height:900});
   await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')===null);
 });
 
-const gallery = [];
 // P1 regression guard: built-in guests (Green Jacket, Moon Mage, …) must stay in the room when the HD office is on.
 await step("HD office keeps enabled built-in guests (no disappearing, no duplicates) and restores them", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
