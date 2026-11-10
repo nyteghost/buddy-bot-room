@@ -2881,6 +2881,14 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
 /* Desktop Pal Room: a full-height canvas, with settings in a separate workspace window.
    Classic/Pixel retain their original 1.72 scene shape; phones retain the inline layout. */
 @media (min-width: 701px) {
+  /* The room owns the available desktop canvas until the user explicitly
+     drags, docks, or resizes it. Other workspace windows still stack above it. */
+  .workspace-window.window-room:not(.window-sized):not(.window-expanded) {
+    left: var(--window-x, 0px);
+    top: var(--window-y, 0px);
+    width: 100%;
+    height: 100%;
+  }
   .workspace-window.window-room > .window-body {
     overflow: hidden;
     container-type: size;
@@ -2908,11 +2916,19 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
     aspect-ratio: auto;
     flex: 1 1 auto;
   }
+  /* A compact, left-side floating inspector: the room's HD camera toolbar
+     is on the right and must remain directly clickable. Saved user geometry
+     and maximize/restore take precedence over these initial bounds. */
   .workspace-window.window-room-settings:not(.window-sized):not(.window-expanded) {
     left: var(--window-x, 12px);
-    top: var(--window-y, 50px);
-    width: min(520px, 95%);
-    height: calc(100% - 50px);
+    top: var(--window-y, 54px);
+    width: min(350px, calc(100% - 24px));
+    height: min(76%, calc(100% - 66px));
+  }
+  .window-room-settings > .window-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
   }
   .window-room-settings .room-settings-content {
     padding: 12px;
