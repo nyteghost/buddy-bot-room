@@ -42,7 +42,9 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   useEffect(() => {
     if (open) {
       setFront(++windowStack);
-      if (window.matchMedia("(max-width: 700px)").matches) ref.current?.focus({ preventScroll: true });
+      // A floating settings inspector receives keyboard focus so Escape can
+      // dismiss it and return focus to the Pal Room toggle.
+      if (id === "room-settings" || window.matchMedia("(max-width: 700px)").matches) ref.current?.focus({ preventScroll: true });
     }
   }, [open, focusVersion]);
   useEffect(() => {
@@ -215,7 +217,14 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   return <section ref={ref} tabIndex={-1} aria-label={title} hidden={!open} style={style}
     data-window-id={id}
     className={cn("workspace-window", `window-${id}`, className, size && "window-sized", expanded && "window-expanded")}
-    onPointerDownCapture={() => setFront(++windowStack)}>
+    onPointerDownCapture={() => setFront(++windowStack)}
+    onKeyDown={(event) => {
+      if (id !== "room-settings" || event.key !== "Escape" || event.defaultPrevented) return;
+      if ((event.target as HTMLElement).closest('[role="dialog"],[role="alertdialog"],[data-radix-popper-content-wrapper]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    }}>
     <div className="window-titlebar" onPointerDown={begin} onPointerMove={move} onPointerUp={() => end()} onPointerCancel={() => end(false)}>
       <span className="window-title">{icon}{title}</span>
       <GripHorizontal className="window-grip size-4" aria-hidden />
