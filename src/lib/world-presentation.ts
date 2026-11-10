@@ -50,7 +50,7 @@ export type WorldRoomAppearance = Readonly<{
  /** Feature flag: use the Living Universe HD office when the look resolves to HD (preview). */ hdOffice: boolean;
  /** Show synthetic HD placeholder bodies for Pals without approved HD art (preview of HD scale). */ synthetic: boolean;
  /** Hidden Stage 1b iso Office preview, never auto-enabled or selected on phones. */
- isoOffice: boolean;
+ isoOffice?: boolean;
 }>;
 export const WORLD_ROOM_APPEARANCE_DEFAULT: WorldRoomAppearance = Object.freeze({ look: "auto", hdOffice: false, synthetic: false, isoOffice: false });
 export function cleanWorldRoomAppearance(value: unknown): WorldRoomAppearance {
