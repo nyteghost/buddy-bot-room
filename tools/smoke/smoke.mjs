@@ -1349,6 +1349,14 @@ await step("Immersive desktop Pal Room popup, camera reachability, resizing and 
       throw Error("Desktop room still overflows: "+JSON.stringify(geometry));
     gallery.push({label:`PR #34 after · running app · ${width}×${height} · immersive room and floating settings`,png:await page.screenshot({fullPage:false})});
   }
+  // Classic remains independent of the HD/Pixel appearance selector.
+  const worldMode=popup.getByRole("region",{name:"Pal Room activities"});
+  await worldMode.getByRole("button",{name:"Switch to Classic Pal Room"}).click();
+  await page.locator(".room-scene:not(.living-world)").waitFor({state:"visible"});
+  if(await popup.locator("details.world-character-library").count()) throw Error("Classic mode still rendered Living World-only library");
+  await worldMode.getByRole("button",{name:"Switch to Living World"}).click();
+  await page.locator(".room-scene.living-world").waitFor({state:"visible"});
+  await popup.locator("details.world-character-library").waitFor({state:"visible"});
   // Real pointer drag on the independent settings titlebar, without force clicks.
   const titlebar=popup.locator(".window-titlebar");
   const original=await popup.boundingBox();
@@ -1496,6 +1504,17 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
   for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Zoom in" }).click();
   await page.waitForTimeout(3000);
   gallery.push({ label: `Running app (CI) · desktop · following ${followed}, zoomed in`, png: await page.locator(".room-scene").screenshot() });
+  // The focused camera viewport must accept keyboard pan at a zoom that
+  // exceeds its fit width; unlike forced clicks, this tests actual input.
+  const cameraViewport=office.locator(".hd-office-viewport");
+  const worldLayer=office.locator(".hd-office-world");
+  await cameraViewport.focus();
+  const transformBefore=await worldLayer.getAttribute("style");
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(80);
+  if(await worldLayer.getAttribute("style")===transformBefore)
+    throw Error("HD camera arrow-key pan did not move the world");
+
   await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).check();
   await page.locator('.hd-actor[data-art="synthetic"]').first().waitFor();
   await page.waitForTimeout(2000);
