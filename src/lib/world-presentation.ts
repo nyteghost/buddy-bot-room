@@ -52,10 +52,10 @@ export type WorldRoomAppearance = Readonly<{
  /** Hidden Stage 1b iso Office preview, never auto-enabled or selected on phones. */
  isoOffice?: boolean;
 }>;
-export const WORLD_ROOM_APPEARANCE_DEFAULT: WorldRoomAppearance = Object.freeze({ look: "auto", hdOffice: false, synthetic: false, isoOffice: false });
+export const WORLD_ROOM_APPEARANCE_DEFAULT: WorldRoomAppearance = Object.freeze({ look: "auto", hdOffice: false, synthetic: false });
 export function cleanWorldRoomAppearance(value: unknown): WorldRoomAppearance {
  const v = value && typeof value === "object" ? value as Record<string, unknown> : {};
- return { look: cleanWorldPresentationChoice(v["look"]), hdOffice: v["hdOffice"] === true, synthetic: v["synthetic"] === true, isoOffice: v["isoOffice"] === true };
+ return { look: cleanWorldPresentationChoice(v["look"]), hdOffice: v["hdOffice"] === true, synthetic: v["synthetic"] === true, ...(v["isoOffice"] === true ? { isoOffice: true } : {}) };
 }
 type Listener = () => void;
 const listeners = new Set<Listener>();
