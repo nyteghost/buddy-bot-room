@@ -1,4 +1,5 @@
-import type { GroundAnchor, GroundPlan, GroundPoint } from "./world-iso-ground";
+import type { GroundAnchor, GroundPlan } from "./world-iso-ground";
+import type { GroundPoint } from "./world-iso-projection";
 import { worldIsoPlanSealed } from "./world-iso-ground";
 import { WORLD_ISO_GREYBOX } from "./world-iso-greybox";
 
