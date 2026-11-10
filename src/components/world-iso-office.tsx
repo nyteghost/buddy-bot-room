@@ -110,6 +110,8 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
     const period = Math.floor(elapsed / WORLD_ISO_SCHEDULE_PERIOD_MS);
     if (lastPeriod.current !== period || lastRosterKey.current !== rosterKey) {
      const targets = worldIsoSchedule(source.pals, source.visitors, elapsed);
+     for (const target of targets) crowd.setReal(target.id,!!target.real);
+     crowd.beginSchedulePeriod();
      pending.current = targets.map(a => ({id:a.id, target:a.target, real:!!a.real, nextAt:elapsed}));
      setView(targets);
      lastPeriod.current = period; lastRosterKey.current = rosterKey;

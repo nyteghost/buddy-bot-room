@@ -85,6 +85,15 @@ export class WorldIsoCrowd {
  leave(id: string): void { this.actors.delete(id); }
  ids(): string[] { return [...this.actors.keys()].sort(); }
  setReal(id: string, real: boolean): void { const a = this.actors.get(id); if (a) a.real = real === true; }
+ /**
+  * Release the previous ambient period's tentative destination claims
+  * before assigning the new period. This prevents stale claims from blocking
+  * an actor whose target is being vacated. Real-work seats remain reserved.
+  * The physical actor footprints are still protected by swept checks.
+  */
+ beginSchedulePeriod(): void {
+  for (const a of this.actors.values()) if (!a.real) a.committed = false;
+ }
 
  /**
   * Safe destination assignment. Initial join locations do not reserve a

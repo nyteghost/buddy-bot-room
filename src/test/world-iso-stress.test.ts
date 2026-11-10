@@ -46,8 +46,9 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
      let inputs=pals;
      if (seed===1 && phase%4===0) inputs=pals.map(p=>({...p,real:"focus" as const}));
      const targets=worldIsoSchedule(inputs,visitors,time);
+     for (const a of targets) crowd.setReal(a.id,!!a.real);
+     crowd.beginSchedulePeriod();
      for (const a of targets) {
-      crowd.setReal(a.id,!!a.real);
       let target=a.target;
       if(seed===2 && phase%4===2 && a.kind==="visitor"){
        // All six rotate simultaneously through distinct currently occupied homes.
