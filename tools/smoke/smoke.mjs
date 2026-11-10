@@ -1326,7 +1326,7 @@ const gallery = [];
 // Pal Room window remains scene-first on desktop, while controls live in their own
 // movable window; phone-width devices continue to see controls directly below the room.
 await step("Immersive desktop Pal Room popup, camera reachability, resizing and phone controls", async () => {
-  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\\s*Pal Room\\s*$/i});
+  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
   if(await entry.getAttribute("aria-pressed")!=="true") await entry.click();
   const room=page.locator('[data-window-id="room"]');
   const popup=page.locator('[data-window-id="room-settings"]');
@@ -1385,7 +1385,8 @@ await step("Immersive desktop Pal Room popup, camera reachability, resizing and 
   await popup.focus();
   await page.keyboard.press("Escape");
   await popup.waitFor({state:"hidden"});
-  if(!await trigger.evaluate(el=>document.activeElement===el)) throw Error("Room Settings Escape did not restore trigger focus");
+  await page.waitForFunction(()=>document.activeElement?.classList.contains("room-settings-trigger"),undefined,{timeout:3000})
+    .catch(()=>{throw Error("Room Settings Escape did not restore trigger focus");});
   await showRoomSettings();
   await hideRoomSettings();
   await popup.waitFor({state:"hidden"});
