@@ -2105,7 +2105,7 @@ export function Room() {
       <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} initialQuestion={compareQuestion} />
       <SeerrDialog query={seerrQuery} onClose={() => setSeerrQuery(null)} onConfigure={() => { setSetupTarget(previous => ({ id: "seerr", request: (previous?.request ?? 0) + 1 })); if (window.matchMedia("(max-width: 700px)").matches) mobileTab("setup"); else setSetupOpen(true); }} onRequested={(summary) => say(`@seerr ${seerrQuery?.title ?? ""}${seerrQuery?.is4k ? " 4k" : ""}`.trim(), summary)} />
       <div className="workspace-frame">
-        <nav className="workspace-sidebar" aria-label="Workspace" onClickCapture={event => { if ((event.target as HTMLElement).closest(".sidebar-item")) setRoomSettingsOpen(false); }}>
+        <nav className="workspace-sidebar" aria-label="Workspace">
           <div className="sidebar-heading"><span>WORKSPACE</span><Button variant="ghost" size="icon" aria-label={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCompact ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCompact((value) => !value)}>{sidebarCompact ? <PanelLeftOpen /> : <PanelLeftClose />}</Button></div>
           <Button variant="ghost" className="sidebar-item" aria-pressed={captureOpen} onClick={()=>captureOpen?setCaptureOpen(false):window.dispatchEvent(new Event("pixelpals:inbox"))}><Mic /><span>Capture Inbox</span></Button>
           <Button variant="ghost" className="sidebar-item" aria-pressed={generalOpen} onClick={() => generalOpen ? closeGeneral() : openGeneral()}><MessageSquare /><span>General Chat · Ask Anything</span></Button>
@@ -2185,7 +2185,7 @@ export function Room() {
               {generalSeen && <Suspense fallback={<p className="p-4" role="status">Loading General Chat…</p>}><GeneralChat open={generalOpen} /></Suspense>}
             </WorkspaceWindow>
             <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => { setRoomOpen(false); setRoomSettingsOpen(false); }} resetVersion={resetVersion}
-              titleActions={roomSettingsDesktop ? <Button type="button" variant="ghost" size="sm" className="room-settings-trigger" title="Open Room Settings" aria-label="Room settings" aria-expanded={roomSettingsOpen} onClick={() => setRoomSettingsOpen(open => !open)}><Settings2 className="size-4" /><span>Room settings</span></Button> : undefined}>
+              titleActions={roomSettingsDesktop ? <Button type="button" variant="ghost" size="sm" className="room-settings-trigger" title={roomSettingsOpen ? "Hide Room Settings" : "Open Room Settings"} aria-label="Room settings" aria-expanded={roomSettingsOpen} onClick={() => setRoomSettingsOpen(open => !open)}><Settings2 className="size-4" /><span>Room settings</span></Button> : undefined}>
               <div className="room-column">          <div className={cn("room-scene",livingWorld && "living-world",hdWorld && "hd-world")}>
             <img
               src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
@@ -2261,7 +2261,7 @@ export function Room() {
           {!roomSettingsDesktop && roomControls()}
 </div>
             </WorkspaceWindow>
-            {roomSettingsDesktop && <WorkspaceWindow id="room-settings" title="Room Settings" icon={<Settings2 className="size-4" />} open={roomOpen && roomSettingsOpen} onClose={() => setRoomSettingsOpen(false)} resetVersion={resetVersion}>
+            {roomSettingsDesktop && <WorkspaceWindow id="room-settings" title="Room Settings" icon={<Settings2 className="size-4" />} open={roomOpen && roomSettingsOpen} onClose={() => { setRoomSettingsOpen(false); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".window-room .room-settings-trigger")?.focus({ preventScroll: true })); }} resetVersion={resetVersion}>
               {roomControls()}
             </WorkspaceWindow>}
             {renderModeWindow(myPalsMode)}
