@@ -49,11 +49,13 @@ export type WorldRoomAppearance = Readonly<{
  /** Auto / HD / Pixel. */ look: WorldPresentationChoice;
  /** Feature flag: use the Living Universe HD office when the look resolves to HD (preview). */ hdOffice: boolean;
  /** Show synthetic HD placeholder bodies for Pals without approved HD art (preview of HD scale). */ synthetic: boolean;
+ /** Hidden Stage 1b iso Office preview, never auto-enabled or selected on phones. */
+ isoOffice: boolean;
 }>;
-export const WORLD_ROOM_APPEARANCE_DEFAULT: WorldRoomAppearance = Object.freeze({ look: "auto", hdOffice: false, synthetic: false });
+export const WORLD_ROOM_APPEARANCE_DEFAULT: WorldRoomAppearance = Object.freeze({ look: "auto", hdOffice: false, synthetic: false, isoOffice: false });
 export function cleanWorldRoomAppearance(value: unknown): WorldRoomAppearance {
  const v = value && typeof value === "object" ? value as Record<string, unknown> : {};
- return { look: cleanWorldPresentationChoice(v["look"]), hdOffice: v["hdOffice"] === true, synthetic: v["synthetic"] === true };
+ return { look: cleanWorldPresentationChoice(v["look"]), hdOffice: v["hdOffice"] === true, synthetic: v["synthetic"] === true, isoOffice: v["isoOffice"] === true };
 }
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -93,4 +95,10 @@ export function worldDeviceHints(): WorldDeviceHints {
  */
 export function worldUsesHdOffice(appearance: WorldRoomAppearance, theme: string, hints: WorldDeviceHints): boolean {
  return appearance.hdOffice && theme === "linux" && worldPresentation(appearance.look, hints) === "hd";
+}
+
+/** Stage 1b selection only: never mounts a room or changes the current renderer. */
+export function worldUsesIsoOffice(appearance: WorldRoomAppearance, theme: string, hints: WorldDeviceHints): boolean {
+ return appearance.isoOffice === true && worldUsesHdOffice(appearance, theme, hints)
+  && hints.width > WORLD_PIXEL_MAX_WIDTH && !hints.saveData && !hints.lowPower;
 }
