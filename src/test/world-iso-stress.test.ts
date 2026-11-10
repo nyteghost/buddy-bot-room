@@ -33,6 +33,7 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
    })).toBe(true);
    let previous = crowd.snapshot(), collisions=0, invalid=0, teleports=0;
    let arrivals=0, unreachable=0, maxWaiting=0, routeFailures=0, totalSteps=0;
+   const longWaiters=new Set<string>();
    let lastPeriod=-1;
    const seenArrivals = new Set<string>();
    const beforeHeap=process.memoryUsage().heapUsed;
@@ -89,6 +90,7 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
      if(old && dist(actor.at,old.at) > .321 + TILE_EPS) teleports++;
      for(let j=i+1;j<now.length;j++) if(dist(actor.at,now[j]!.at)<.6-TILE_EPS) collisions++;
      if(actor.waitMs>maxWaiting) maxWaiting=actor.waitMs;
+     if(actor.waitMs>=25_000) longWaiters.add(actor.id);
      if(actor.status==="unreachable" || actor.status==="blocked") unreachable++;
      if(actor.status==="arrived" && !seenArrivals.has(actor.id+":"+phase)){
       arrivals++;seenArrivals.add(actor.id+":"+phase);
@@ -102,6 +104,7 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
    const summary={seed:seeds[seed],simulatedMinutes:20,actors:15,ticks:totalSteps,
     collisions,invalidGroundPositions:invalid,teleportViolations:teleports,
     arrivals,blockedOrUnreachableSamples:unreachable,maxWaitingMs:maxWaiting,
+    unresolvedDeadlocks:longWaiters.size,
     failedRouteAssignments:routeFailures,pathQueries:metrics.pathQueries,
     recoveryAttempts:metrics.recoveryAttempts,droppedMs:metrics.droppedMs,
     cpuMs:Number(elapsedCpuMs.toFixed(1)),approxHeapDeltaBytes:heapDeltaBytes,
@@ -111,6 +114,8 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
    expect(collisions).toBe(0);
    expect(invalid).toBe(0);
    expect(teleports).toBe(0);
+   expect(longWaiters.size).toBe(0); // the 25s recovery gate, never silently waived
+   expect(maxWaiting).toBeLessThan(25_000);
    expect(crowd.valid()).toBe(true);
    expect(arrivals).toBeGreaterThan(0);
    // A route which is genuinely blocked by another stationary occupant is

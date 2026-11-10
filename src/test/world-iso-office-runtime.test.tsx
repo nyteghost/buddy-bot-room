@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import { WorldIsoOffice } from "@/components/world-iso-office";
+import { WorldIsoCrowd } from "@/lib/world-iso-crowd";
 import { WORLD_ISO_PAL_IDS } from "@/lib/world-iso-schedule";
 import type { HdOfficePal } from "@/components/world-hd-office";
 
@@ -59,15 +60,35 @@ describe("Step 1b mounted-only-in-tests runtime contracts",()=>{
   unmount();
  },30_000);
 
- it("renders the caller-owned flat fallback on an asynchronous placement failure",()=>{
-  // Two different Pal IDs cannot both occupy the same initial seat only if the
-  // verified layout is altered; instead exercise an actual invalid roster by
-  // passing a duplicate visitor id with a Pal identity collision? The schedule
-  // deduplicates visitors, so use a deliberately invalid world camera in the
-  // separate synchronous boundary test below.
-  const {container}=render(<WorldIsoOffice pals={pals()} visitors={[]} visible playful paused={false}
-   synthetic fallback={<span data-testid="flat-owner">Flat Office stays outside this preview</span>}/>);
-  expect(container.querySelector("[data-iso-preview]")).toBeTruthy();
+ it("contains asynchronous placement failure and notifies once, without remount loops",()=>{
+  const join=vi.spyOn(WorldIsoCrowd.prototype,"join").mockReturnValue(false);
+  const onFailure=vi.fn();
+  const {rerender,container}=render(<WorldIsoOffice pals={pals()} visitors={[]} visible playful paused={false}
+   synthetic onFailure={onFailure}
+   fallback={<span data-testid="flat-owner">Flat Office stays outside this preview</span>}/>);
+  expect(join).toHaveBeenCalled();
+  expect(screen.getByTestId("flat-owner")).toBeTruthy();
+  expect(container.querySelector("[data-iso-preview]")).toBeNull();
+  expect(onFailure).toHaveBeenCalledTimes(1);
+  rerender(<WorldIsoOffice pals={pals()} visitors={[]} visible playful paused={false}
+   synthetic onFailure={onFailure}
+   fallback={<span data-testid="flat-owner">Flat Office stays outside this preview</span>}/>);
+  expect(onFailure).toHaveBeenCalledTimes(1);
+  expect(queue.size).toBe(0);
+ });
+
+ it("dispatches at most two new route assignments in an animation frame",()=>{
+  const assign=vi.spyOn(WorldIsoCrowd.prototype,"assign");
+  const {unmount}=render(<WorldIsoOffice pals={pals()} visitors={[]} visible playful paused={false} synthetic />);
+  advance(100);
+  expect(assign.mock.calls.length).toBeLessThanOrEqual(2);
+  for(let i=0;i<5;i++){
+   const old=assign.mock.calls.length;
+   advance(100);
+   expect(assign.mock.calls.length-old).toBeLessThanOrEqual(2);
+  }
+  expect(assign.mock.calls.length).toBe(9);
+  unmount();
  });
 
  it("contains synchronous render errors and shows the owner-provided flat fallback",()=>{
