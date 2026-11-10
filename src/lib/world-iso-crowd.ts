@@ -1,5 +1,6 @@
 import type { WorldHdDirection } from "./world-hd";
-import type { GroundPlan, GroundPoint } from "./world-iso-ground";
+import type { GroundPlan } from "./world-iso-ground";
+import type { GroundPoint } from "./world-iso-projection";
 import { WORLD_ISO_FOOTPRINT, worldIsoPath, worldIsoPlanSealed, worldIsoPointFree, worldIsoRadiusOk, worldIsoSegmentDistance } from "./world-iso-ground";
 import { worldIsoGroundFacing } from "./world-iso-facing";
 import { WORLD_ISO_WALK_SPEED } from "./world-iso-gait";
