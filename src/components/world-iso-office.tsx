@@ -31,12 +31,12 @@ const label = (s: string) => s.length > 30 ? s.slice(0, 30) + "…" : s;
 const FALLBACK_MESSAGE = "Isometric preview unavailable. The existing flat HD Office remains available.";
 
 class PreviewBoundary extends Component<{ fallback?: ReactNode; children: ReactNode }, { failed: boolean }> {
- state = { failed: false };
+ override state = { failed: false };
  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
- componentDidCatch(_error: Error, _info: ErrorInfo): void {
+ override componentDidCatch(_error: Error, _info: ErrorInfo): void {
   // The boundary isolates the visual preview; do not log user identities or scene payloads.
  }
- render() {
+ override render() {
   return this.state.failed
    ? <div role="alert" data-iso-fallback="true">{this.props.fallback ?? FALLBACK_MESSAGE}</div>
    : this.props.children;
