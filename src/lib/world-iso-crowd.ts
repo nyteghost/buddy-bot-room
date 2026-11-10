@@ -182,9 +182,22 @@ export class WorldIsoCrowd {
   const signs = a.id.localeCompare(blocker.id) < 0 ? [1, -1] : [-1, 1];
   const awayU = a.at.u - blocker.at.u, awayV = a.at.v - blocker.at.v;
   const awayLen = Math.hypot(awayU, awayV) || 1;
-  for (const factor of [1.5, 2.5]) for (const sign of signs) {
-   const candidate = { u: a.at.u + sign * -y * this.radius * factor + awayU / awayLen * 0.15,
-    v: a.at.v + sign * x * this.radius * factor + awayV / awayLen * 0.15 };
+  const away = {u:awayU/awayLen,v:awayV/awayLen};
+  // First choice is a full clearance lane, not a cosmetic 0.45-tile
+  // side-step that leaves the actor obstructing a 0.6-tile diameter lane.
+  // All candidates are statically/dynamically swept-tested and the search
+  // is bounded (3 distances × 8 directions). No shortcut/teleport.
+  const directions = [
+   ...signs.map(sign => ({u:-y*sign,v:x*sign})),
+   away,
+   {u:-x,v:-y},
+   ...signs.map(sign => ({u:(away.u-y*sign)*Math.SQRT1_2,v:(away.v+x*sign)*Math.SQRT1_2})),
+   {u:-away.v,v:away.u},
+   {u:away.v,v:-away.u},
+  ];
+  for (const factor of [2.5, 3.5, 5]) for (const dir of directions) {
+   const candidate = { u: a.at.u + dir.u * this.radius * factor + away.u * 0.10,
+    v: a.at.v + dir.v * this.radius * factor + away.v * 0.10 };
    if (!worldIsoSegmentClear(this.plan, a.at, candidate, this.radius)) continue;
    if (this.clearAgainstActors(a, a.at, candidate, old, trails)) continue;
    a.yieldTo = candidate;
