@@ -1,7 +1,7 @@
 import type { WorldHdDirection } from "./world-hd";
 import type { GroundPlan } from "./world-iso-ground";
 import type { GroundPoint } from "./world-iso-projection";
-import { WORLD_ISO_FOOTPRINT, worldIsoPath, worldIsoPlanSealed, worldIsoPointFree, worldIsoRadiusOk, worldIsoSegmentDistance } from "./world-iso-ground";
+import { WORLD_ISO_FOOTPRINT, worldIsoPath, worldIsoPlanSealed, worldIsoPointFree, worldIsoRadiusOk, worldIsoSegmentClear, worldIsoSegmentDistance } from "./world-iso-ground";
 import { worldIsoGroundFacing } from "./world-iso-facing";
 import { WORLD_ISO_WALK_SPEED } from "./world-iso-gait";
 import { WORLD_ISO_GREYBOX } from "./world-iso-greybox";
@@ -105,6 +105,8 @@ export class WorldIsoCrowd {
    }
    const traveled = distance(a.at, candidate);
    if (traveled <= EPS) { a.waypoint = nextIndex; continue; }
+   // A single tick may traverse a tight turn; verify the actual swept movement chord.
+   if (!worldIsoSegmentClear(this.plan, a.at, candidate, this.radius)) { a.waiting = true; continue; }
    const collision = ordered.some(b => {
     if (b.id === a.id) return false;
     const old = prior.get(b.id)!;
