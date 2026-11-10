@@ -1,6 +1,6 @@
 import type { WorldHdDirection } from "./world-hd";
 import { worldIsoGroundFacing } from "./world-iso-facing";
-import type { GroundAnchor, GroundAnchorKind, GroundBox, GroundPlan } from "./world-iso-ground";
+import { worldIsoSealPlan, type GroundAnchor, type GroundAnchorKind, type GroundBox, type GroundPlan } from "./world-iso-ground";
 import { WORLD_ISO_FLOOR, worldIsoProjection, type GroundPoint } from "./world-iso-projection";
 
 /**
@@ -75,12 +75,15 @@ const ANCHORS: readonly GroundAnchor[] = [
  anchor("visitor-home-4", "visitor", p(11.5, 11.5), "s"), anchor("visitor-home-5", "visitor", p(8.5, 13.0), "s"),
 ];
 
-export const WORLD_ISO_GREYBOX: GroundPlan = Object.freeze({
+const SEALED = worldIsoSealPlan({
  id: "office-iso-greybox",
- floor: Object.freeze([p(0, 0), p(WORLD_ISO_FLOOR.u, 0), p(WORLD_ISO_FLOOR.u, WORLD_ISO_FLOOR.v), p(0, WORLD_ISO_FLOOR.v)]),
- colliders: Object.freeze(COLLIDERS),
- anchors: Object.freeze(ANCHORS),
+ floor: [p(0, 0), p(WORLD_ISO_FLOOR.u, 0), p(WORLD_ISO_FLOOR.u, WORLD_ISO_FLOOR.v), p(0, WORLD_ISO_FLOOR.v)],
+ colliders: COLLIDERS,
+ anchors: ANCHORS,
  door: "door",
 });
+if (!SEALED) throw new Error("The grey-box Office plan failed its own geometry checks.");
+/** Sealed (validated, deep-frozen) grey-box plan. */
+export const WORLD_ISO_GREYBOX: GroundPlan = SEALED;
 /** Pairs of chat anchor ids, as in the flat office. */
 export const WORLD_ISO_GREYBOX_CHAT_PAIRS: readonly (readonly [string, string])[] = [["chat-a1", "chat-a2"], ["chat-b1", "chat-b2"], ["chat-c1", "chat-c2"], ["chat-d1", "chat-d2"]];

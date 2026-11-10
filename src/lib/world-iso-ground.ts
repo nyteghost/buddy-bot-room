@@ -5,18 +5,30 @@ import type { GroundPoint } from "./world-iso-projection";
  * Living Universe — isometric ground engine (Step 1a): walkable floor, colliders and paths.
  *
  * Units are ground tiles throughout (positions, edge costs, heuristic, clearances). The walkable floor is a
- * simple polygon; furniture blocks feet through axis-aligned ground boxes (most props sit on the tile grid);
- * a character is a disc of WORLD_ISO_FOOTPRINT tiles around its feet.
+ * simple polygon; furniture blocks feet through axis-aligned ground boxes; a character is a disc around its feet.
  *
- * Paths are A* on a half-tile grid (8 neighbours, diagonal cost √2 · step). Every grid edge, orthogonal or
- * diagonal, is accepted only if the whole footprint stays clear along it: the swept-disc test is exact
- * (segment-to-box and segment-to-edge distances), not sampled, so a diagonal step cannot clip a box corner
- * that sits between grid nodes. Diagonals additionally may not cut a corner (both orthogonal neighbours
- * free). The grid route is then string-pulled with the same exact test.
+ * TRUST: navigation only runs on SEALED plans. `worldIsoSealPlan` (or `worldIsoValidatePlan`, which seals and
+ * then checks anchors and reachability) checks structure, size limits and geometry on the raw input, then
+ * returns a deep-frozen private copy. Every query on anything else fails closed (false / null), so a caller
+ * cannot walk on unvalidated geometry, and nothing a caller does to its own objects afterwards can change a
+ * sealed plan or the grids cached for it. A future room-pack loader must pass imported plans through
+ * `worldIsoValidatePlan` and use only `report.plan`.
  *
- * Plans are treated as immutable (the grey box is frozen). Malformed geometry fails closed: path queries on
- * a plan whose floor or colliders are invalid return null, and `worldIsoValidatePlan` reports why without
- * throwing. Pure and deterministic; not yet used by any room.
+ * RADIUS: the footprint radius must be a finite number in [WORLD_ISO_LIMITS.minRadius, maxRadius] tiles
+ * (default WORLD_ISO_FOOTPRINT = 0.3). Any other radius, and any non-finite or out-of-range position, makes
+ * every query answer "blocked" / "no route". There is no silent clamping.
+ *
+ * LIMITS: WORLD_ISO_LIMITS bounds coordinates, floor extent, corner / collider / anchor counts, grid nodes and
+ * grid work. They are checked with arithmetic before any navigation array is allocated.
+ *
+ * PATHS: A* over a rectilinear grid whose lines are the half-tile lines plus "clearance lines" one footprint
+ * (+ a small margin) away from every collider side and floor corner. The extra lines put nodes inside any
+ * axis-aligned passage that is physically wide enough, even when it falls between half-tile columns. Edges
+ * join neighbouring lines (8 neighbours); each edge costs its true length and is accepted only if the whole
+ * footprint stays clear along it (exact swept-disc test), and diagonals may not cut corners. Start and goal
+ * connect to up to WORLD_ISO_MAX_CONNECTORS nearby nodes each, so an off-grid endpoint is not tied to a single
+ * nearest node. The heuristic is the straight-line distance (admissible and consistent). The grid route is
+ * then string-pulled with the same exact test. Everything is deterministic.
  */
 export const WORLD_ISO_FOOTPRINT = 0.3;
 export const WORLD_ISO_GRID_STEP = 0.5;
@@ -24,6 +36,32 @@ export const WORLD_ISO_GRID_STEP = 0.5;
 export const WORLD_ISO_ANCHOR_SPACING = 2 * WORLD_ISO_FOOTPRINT;
 /** Floors smaller than this (square tiles) are degenerate. */
 export const WORLD_ISO_MIN_FLOOR_AREA = 1;
+/** Clearance lines sit this far beyond one footprint from an obstacle side, so their nodes are strictly free. */
+export const WORLD_ISO_CLEARANCE_MARGIN = 0.005;
+/** How far (tiles) an endpoint looks for grid nodes to connect to, and how many it may use. */
+export const WORLD_ISO_CONNECTOR_REACH = 1.5;
+export const WORLD_ISO_MAX_CONNECTORS = 24;
+const CONNECTOR_CANDIDATES = 256;
+
+/**
+ * Hard limits, checked before allocation. The approved Office is 19 × 14 tiles with 14 colliders and 48
+ * anchors (about 4,000 grid nodes), so these leave roughly ten times the room on each axis.
+ */
+export const WORLD_ISO_LIMITS = Object.freeze({
+ /** Supported footprint radius, tiles (inclusive). */
+ minRadius: 0.1, maxRadius: 1,
+ /** Largest absolute coordinate, tiles. */
+ maxCoordinate: 1024,
+ /** Largest floor width or depth, tiles. */
+ maxExtent: 200,
+ maxFloorCorners: 128, maxColliders: 128, maxAnchors: 256,
+ /** Largest navigation grid, nodes. */
+ maxGridNodes: 200_000,
+ /** Largest nodes × (colliders + floor edges): bounds the clearance work of building and searching a grid. */
+ maxGridWork: 20_000_000,
+ /** Grids kept per plan (one per distinct radius); the oldest is dropped beyond this. */
+ maxCachedRadii: 4,
+});
 
 export type GroundBox = Readonly<{ id: string; u1: number; v1: number; u2: number; v2: number }>;
 export const WORLD_ISO_ANCHOR_KINDS = ["seat", "stand", "visitor", "door", "chat", "sofa", "coffee", "window", "board", "shelf", "plant"] as const;
@@ -52,10 +90,17 @@ export type GroundPlan = Readonly<{
  door: string;
 }>;
 
-// ---------- exact geometry ----------
+// ---------- numeric guards ----------
 const EPS = 1e-9;
 const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
-const finitePoint = (p: unknown): p is GroundPoint => !!p && typeof p === "object" && finite((p as GroundPoint).u) && finite((p as GroundPoint).v);
+const coordinate = (n: unknown): n is number => finite(n) && Math.abs(n) <= WORLD_ISO_LIMITS.maxCoordinate;
+const validPoint = (p: unknown): p is GroundPoint => !!p && typeof p === "object" && coordinate((p as GroundPoint).u) && coordinate((p as GroundPoint).v);
+/** True for a supported footprint radius: a finite number of tiles in [minRadius, maxRadius]. */
+export function worldIsoRadiusOk(radius: unknown): radius is number {
+ return finite(radius) && radius >= WORLD_ISO_LIMITS.minRadius && radius <= WORLD_ISO_LIMITS.maxRadius;
+}
+
+// ---------- exact geometry (pure helpers on numbers; no plan involved) ----------
 const cross = (o: GroundPoint, a: GroundPoint, b: GroundPoint) => (a.u - o.u) * (b.v - o.v) - (a.v - o.v) * (b.u - o.u);
 const onSegment = (p: GroundPoint, a: GroundPoint, b: GroundPoint) =>
  Math.min(a.u, b.u) - EPS <= p.u && p.u <= Math.max(a.u, b.u) + EPS && Math.min(a.v, b.v) - EPS <= p.v && p.v <= Math.max(a.v, b.v) + EPS;
@@ -104,196 +149,326 @@ export function worldIsoBoxGap(a: GroundBox, b: GroundBox): number {
 }
 const boxesOverlap = (a: GroundBox, b: GroundBox) => a.u1 < b.u2 && b.u1 < a.u2 && a.v1 < b.v2 && b.v1 < a.v2;
 const validBox = (c: unknown): c is GroundBox => !!c && typeof c === "object" && typeof (c as GroundBox).id === "string"
- && [(c as GroundBox).u1, (c as GroundBox).v1, (c as GroundBox).u2, (c as GroundBox).v2].every(finite) && (c as GroundBox).u2 > (c as GroundBox).u1 && (c as GroundBox).v2 > (c as GroundBox).v1;
+ && [(c as GroundBox).u1, (c as GroundBox).v1, (c as GroundBox).u2, (c as GroundBox).v2].every(coordinate) && (c as GroundBox).u2 > (c as GroundBox).u1 && (c as GroundBox).v2 > (c as GroundBox).v1;
 /** Signed area of a polygon (shoelace). */
 export function worldIsoPolygonArea(polygon: readonly GroundPoint[]): number {
  let sum = 0;
  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) sum += (polygon[j]!.u * polygon[i]!.v) - (polygon[i]!.u * polygon[j]!.v);
  return sum / 2;
 }
-/** Problems with a floor outline: too few or non-finite corners, repeated corners, zero area, self-intersection. */
-export function worldIsoFloorProblems(floor: unknown): ("floor-invalid" | "floor-degenerate" | "floor-self-intersecting")[] {
- if (!Array.isArray(floor) || floor.length < 3 || !floor.every(finitePoint)) return ["floor-invalid"];
- const pts = floor as GroundPoint[], n = pts.length, out: ("floor-degenerate" | "floor-self-intersecting")[] = [];
- for (let i = 0; i < n; i++) { const a = pts[i]!, b = pts[(i + 1) % n]!; if (Math.hypot(a.u - b.u, a.v - b.v) <= EPS) { out.push("floor-degenerate"); break; } }
- if (out.length) return out; // repeated corners make the edge tests meaningless
- if (Math.abs(worldIsoPolygonArea(pts)) < WORLD_ISO_MIN_FLOOR_AREA) out.push("floor-degenerate");
- {
-  outer: for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
-   const a = pts[i]!, b = pts[(i + 1) % n]!, c = pts[j]!, d = pts[(j + 1) % n]!;
-   const adjacent = j === i + 1 || (i === 0 && j === n - 1);
-   if (adjacent) {
-    // Neighbouring edges share one corner; they must not fold back over each other.
-    const shared = j === i + 1 ? b : a, otherA = j === i + 1 ? a : b, otherB = j === i + 1 ? d : c;
-    if (Math.abs(cross(shared, otherA, otherB)) <= EPS && (otherA.u - shared.u) * (otherB.u - shared.u) + (otherA.v - shared.v) * (otherB.v - shared.v) > 0) { out.push("floor-self-intersecting"); break outer; }
-    continue;
-   }
-   if (worldIsoSegmentsIntersect(a, b, c, d)) { out.push("floor-self-intersecting"); break outer; }
+export type GroundFloorProblemCode = "floor-invalid" | "floor-too-many-corners" | "floor-too-large" | "floor-degenerate" | "floor-self-intersecting";
+/** Problems with a floor outline. Size limits are checked first, before any quadratic work. */
+export function worldIsoFloorProblems(floor: unknown): GroundFloorProblemCode[] {
+ if (!Array.isArray(floor) || floor.length < 3) return ["floor-invalid"];
+ if (floor.length > WORLD_ISO_LIMITS.maxFloorCorners) return ["floor-too-many-corners"];
+ if (!floor.every(validPoint)) return ["floor-invalid"];
+ const pts = floor as GroundPoint[], n = pts.length;
+ let u1 = Infinity, u2 = -Infinity, v1 = Infinity, v2 = -Infinity;
+ for (const p of pts) { u1 = Math.min(u1, p.u); u2 = Math.max(u2, p.u); v1 = Math.min(v1, p.v); v2 = Math.max(v2, p.v); }
+ if (u2 - u1 > WORLD_ISO_LIMITS.maxExtent || v2 - v1 > WORLD_ISO_LIMITS.maxExtent) return ["floor-too-large"];
+ for (let i = 0; i < n; i++) { const a = pts[i]!, b = pts[(i + 1) % n]!; if (Math.hypot(a.u - b.u, a.v - b.v) <= EPS) return ["floor-degenerate"]; }
+ for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+  const a = pts[i]!, b = pts[(i + 1) % n]!, c = pts[j]!, d = pts[(j + 1) % n]!;
+  const adjacent = j === i + 1 || (i === 0 && j === n - 1);
+  if (adjacent) {
+   // Neighbouring edges share one corner; they must not fold back over each other.
+   const shared = j === i + 1 ? b : a, otherA = j === i + 1 ? a : b, otherB = j === i + 1 ? d : c;
+   if (Math.abs(cross(shared, otherA, otherB)) <= EPS && (otherA.u - shared.u) * (otherB.u - shared.u) + (otherA.v - shared.v) * (otherB.v - shared.v) > 0) return ["floor-self-intersecting"];
+   continue;
   }
+  if (worldIsoSegmentsIntersect(a, b, c, d)) return ["floor-self-intersecting"];
  }
- return out;
-}
-const geometryOk = new WeakMap<GroundPlan, boolean>();
-/** True when the plan's floor and colliders are well-formed enough to walk on (cached per plan object). */
-export function worldIsoGeometryOk(plan: GroundPlan): boolean {
- if (!plan || typeof plan !== "object") return false;
- const cached = geometryOk.get(plan);
- if (cached !== undefined) return cached;
- const ok = worldIsoFloorProblems(plan.floor).length === 0 && Array.isArray(plan.colliders) && plan.colliders.every(validBox);
- geometryOk.set(plan, ok);
- return ok;
+ if (Math.abs(worldIsoPolygonArea(pts)) < WORLD_ISO_MIN_FLOOR_AREA) return ["floor-degenerate"];
+ return [];
 }
 
-/** Feet at `p` fit: inside the floor, at least `radius` from its outline and from every collider. */
-export function worldIsoPointFree(plan: GroundPlan, p: GroundPoint, radius = WORLD_ISO_FOOTPRINT): boolean {
- if (!finitePoint(p) || !worldIsoGeometryOk(plan) || !worldIsoInsidePolygon(p, plan.floor)) return false;
+// ---------- sealing: the only way to obtain a walkable plan ----------
+const KINDS = new Set<string>(WORLD_ISO_ANCHOR_KINDS);
+const FACINGS = new Set<string>(WORLD_HD_DIRECTIONS);
+const validAnchor = (x: unknown): x is GroundAnchor => {
+ const a = x as GroundAnchor | null;
+ return !!a && typeof a === "object" && typeof a.id === "string" && KINDS.has(a.kind) && FACINGS.has(a.facing) && validPoint(a.at)
+  && (a.desk === undefined || (Number.isSafeInteger(a.desk) && a.desk >= 0)) && (a.front === undefined || typeof a.front === "string") && (a.standFallback === undefined || typeof a.standFallback === "string");
+};
+const sealed = new WeakSet<object>();
+/** True when `plan` came out of `worldIsoSealPlan` / `worldIsoValidatePlan` (deep-frozen, geometry checked). */
+export const worldIsoPlanSealed = (plan: unknown): plan is GroundPlan => !!plan && typeof plan === "object" && sealed.has(plan as object);
+function structureProblems(raw: unknown): GroundPlanProblem[] {
+ const problems: GroundPlanProblem[] = [];
+ const add = (code: GroundPlanProblemCode, id: string, message: string) => problems.push({ code, id, message });
+ const r = raw as Record<string, unknown> | null;
+ if (!r || typeof r !== "object" || !Array.isArray(r["floor"]) || !Array.isArray(r["colliders"]) || !Array.isArray(r["anchors"]) || typeof r["door"] !== "string" || (r["id"] !== undefined && typeof r["id"] !== "string")) {
+  add("plan-invalid", label(r?.["id"]), "A plan needs floor, colliders and anchors lists, a door id, and a text id.");
+  return problems;
+ }
+ const L = WORLD_ISO_LIMITS, id = label(r["id"]);
+ // Counts first: nothing below runs on an oversized list.
+ if ((r["colliders"] as unknown[]).length > L.maxColliders) add("too-many-colliders", id, `A plan may have at most ${L.maxColliders} colliders.`);
+ if ((r["anchors"] as unknown[]).length > L.maxAnchors) add("too-many-anchors", id, `A plan may have at most ${L.maxAnchors} anchors.`);
+ const floorMessages: Record<GroundFloorProblemCode, string> = {
+  "floor-invalid": `The walkable floor needs at least three corners with finite coordinates within ±${L.maxCoordinate} tiles.`,
+  "floor-too-many-corners": `The walkable floor may have at most ${L.maxFloorCorners} corners.`,
+  "floor-too-large": `The walkable floor may be at most ${L.maxExtent} tiles wide and deep.`,
+  "floor-degenerate": `The walkable floor repeats a corner or encloses less than ${WORLD_ISO_MIN_FLOOR_AREA} square tile.`,
+  "floor-self-intersecting": "The walkable floor outline crosses or folds back over itself.",
+ };
+ for (const code of worldIsoFloorProblems(r["floor"])) add(code, id, floorMessages[code]);
+ if (problems.some(p => p.code === "too-many-colliders" || p.code === "too-many-anchors")) return problems;
+ for (const c of r["colliders"] as unknown[]) if (!validBox(c)) add("collider-invalid", label((c as GroundBox | null)?.id), `Collider ${label((c as GroundBox | null)?.id)} needs a text id, finite bounds within ±${L.maxCoordinate} tiles and u1 < u2, v1 < v2.`);
+ for (const a of r["anchors"] as unknown[]) if (!validAnchor(a)) add("anchor-invalid", label((a as GroundAnchor | null)?.id), `Anchor ${label((a as GroundAnchor | null)?.id)} needs a text id, a known kind, a known facing and finite coordinates within ±${L.maxCoordinate} tiles.`);
+ return problems;
+}
+/**
+ * Read a raw plan exactly once into plain objects (at most limit + 1 entries per list, known fields only).
+ * All checks and the sealed copy are made from this capture, so input that changes between reads (getters,
+ * proxies, later mutation) cannot pass validation with one value and be stored with another.
+ */
+function capture(raw: unknown): unknown {
+ const r = raw as Record<string, unknown> | null;
+ if (!r || typeof r !== "object") return raw;
+ const L = WORLD_ISO_LIMITS;
+ const isObject = (e: unknown): e is Record<string, unknown> => !!e && typeof e === "object";
+ const list = (x: unknown, max: number, each: (e: unknown) => unknown) => Array.isArray(x) ? Array.from({ length: Math.min(x.length, max + 1) }, (_, i) => each(x[i])) : x;
+ const point = (e: unknown) => isObject(e) ? { u: e["u"], v: e["v"] } : e;
+ return {
+  id: r["id"], door: r["door"],
+  floor: list(r["floor"], L.maxFloorCorners, point),
+  colliders: list(r["colliders"], L.maxColliders, e => isObject(e) ? { id: e["id"], u1: e["u1"], v1: e["v1"], u2: e["u2"], v2: e["v2"] } : e),
+  anchors: list(r["anchors"], L.maxAnchors, e => isObject(e) ? { id: e["id"], kind: e["kind"], at: point(e["at"]), facing: e["facing"], desk: e["desk"], front: e["front"], standFallback: e["standFallback"] } : e),
+ };
+}
+function snapshot(raw: GroundPlan): GroundPlan {
+ const plan: GroundPlan = Object.freeze({
+  id: typeof raw.id === "string" ? raw.id : "plan",
+  floor: Object.freeze(raw.floor.map(p => Object.freeze({ u: p.u, v: p.v }))),
+  colliders: Object.freeze(raw.colliders.map(c => Object.freeze({ id: c.id, u1: c.u1, v1: c.v1, u2: c.u2, v2: c.v2 }))),
+  anchors: Object.freeze(raw.anchors.map(a => Object.freeze({
+   id: a.id, kind: a.kind, at: Object.freeze({ u: a.at.u, v: a.at.v }), facing: a.facing,
+   ...(a.desk !== undefined ? { desk: a.desk } : {}), ...(a.front !== undefined ? { front: a.front } : {}), ...(a.standFallback !== undefined ? { standFallback: a.standFallback } : {}),
+  }))),
+  door: raw.door,
+ });
+ sealed.add(plan);
+ return plan;
+}
+/**
+ * Check a raw plan's structure, size limits and geometry and return a deep-frozen private copy that the
+ * navigation functions accept, or null. The copy shares no object with the input. Sealing an already sealed
+ * plan returns it unchanged. Anchor placement and reachability are NOT checked here (see worldIsoValidatePlan).
+ */
+export function worldIsoSealPlan(raw: unknown): GroundPlan | null {
+ if (worldIsoPlanSealed(raw)) return raw;
+ try { const captured = capture(raw); return structureProblems(captured).length ? null : snapshot(captured as GroundPlan); } catch { return null; }
+}
+
+// ---------- clearance ----------
+function pointFree(plan: GroundPlan, p: GroundPoint, radius: number): boolean {
+ if (!worldIsoInsidePolygon(p, plan.floor)) return false;
  for (let i = 0, j = plan.floor.length - 1; i < plan.floor.length; j = i++) if (pointSegmentDistance(p, plan.floor[i]!, plan.floor[j]!) < radius - EPS) return false;
  for (const box of plan.colliders) if (worldIsoBoxDistance(p, box) < radius - EPS) return false;
  return true;
 }
-/**
- * The whole footprint stays clear while walking straight from a to b (exact swept-disc test): both ends are
- * free, and the segment keeps at least `radius` from every floor edge and every collider. With both ends
- * inside the floor and the segment never touching its outline, the whole walk stays inside.
- */
-export function worldIsoSegmentClear(plan: GroundPlan, a: GroundPoint, b: GroundPoint, radius = WORLD_ISO_FOOTPRINT): boolean {
- if (!worldIsoPointFree(plan, a, radius) || !worldIsoPointFree(plan, b, radius)) return false;
- const min = Math.max(radius - EPS, EPS);
+function segmentClear(plan: GroundPlan, a: GroundPoint, b: GroundPoint, radius: number): boolean {
+ if (!pointFree(plan, a, radius) || !pointFree(plan, b, radius)) return false;
+ const min = radius - EPS;
  for (let i = 0, j = plan.floor.length - 1; i < plan.floor.length; j = i++) if (worldIsoSegmentDistance(a, b, plan.floor[j]!, plan.floor[i]!) < min) return false;
  for (const box of plan.colliders) if (worldIsoSegmentBoxDistance(a, b, box) < min) return false;
  return true;
 }
+const usable = (plan: unknown, radius: unknown): plan is GroundPlan => worldIsoPlanSealed(plan) && worldIsoRadiusOk(radius);
+/** Feet at `p` fit: inside the floor, at least `radius` from its outline and from every collider. False for an unsealed plan, an unsupported radius or an invalid point. */
+export function worldIsoPointFree(plan: GroundPlan, p: GroundPoint, radius: number = WORLD_ISO_FOOTPRINT): boolean {
+ return usable(plan, radius) && validPoint(p) && pointFree(plan, p, radius);
+}
+/**
+ * The whole footprint stays clear while walking straight from a to b (exact swept-disc test): both ends are
+ * free, and the segment keeps at least `radius` from every floor edge and every collider. False for an
+ * unsealed plan, an unsupported radius or an invalid point.
+ */
+export function worldIsoSegmentClear(plan: GroundPlan, a: GroundPoint, b: GroundPoint, radius: number = WORLD_ISO_FOOTPRINT): boolean {
+ return usable(plan, radius) && validPoint(a) && validPoint(b) && segmentClear(plan, a, b, radius);
+}
 
 // ---------- grid ----------
+function gridLines(plan: GroundPlan, radius: number): { us: number[]; vs: number[] } {
+ const step = WORLD_ISO_GRID_STEP, off = radius + WORLD_ISO_CLEARANCE_MARGIN;
+ const build = (axis: "u" | "v") => {
+  const values = plan.floor.map(p => p[axis]), lo = Math.min(...values), hi = Math.max(...values);
+  const lines: number[] = [];
+  for (let k = Math.ceil(lo / step - EPS); k * step <= hi + EPS; k++) lines.push(k * step);
+  const extra = (x: number) => { if (x > lo && x < hi) lines.push(x); };
+  for (const c of plan.colliders) { extra((axis === "u" ? c.u1 : c.v1) - off); extra((axis === "u" ? c.u2 : c.v2) + off); }
+  for (const x of values) { extra(x - off); extra(x + off); }
+  lines.sort((a, b) => a - b);
+  const out: number[] = [];
+  for (const x of lines) if (!out.length || x - out[out.length - 1]! > 1e-6) out.push(x);
+  return out;
+ };
+ return { us: build("u"), vs: build("v") };
+}
+export type WorldIsoGridBudget = Readonly<{ cols: number; rows: number; nodes: number; work: number; ok: boolean }>;
+/** Size of the navigation grid a sealed plan would need, computed without allocating it; null if unusable. */
+export function worldIsoGridBudget(plan: GroundPlan, radius: number = WORLD_ISO_FOOTPRINT): WorldIsoGridBudget | null {
+ if (!usable(plan, radius)) return null;
+ const { us, vs } = gridLines(plan, radius); // at most a few thousand numbers: counts and extent are already limited
+ const nodes = us.length * vs.length, work = nodes * (plan.colliders.length + plan.floor.length);
+ return { cols: us.length, rows: vs.length, nodes, work, ok: nodes > 0 && nodes <= WORLD_ISO_LIMITS.maxGridNodes && work <= WORLD_ISO_LIMITS.maxGridWork };
+}
 export type WorldIsoGridEdge = Readonly<{ to: number; cost: number }>;
-/** The navigation grid of a plan: node ids, node positions (tiles), free nodes and walkable edges (costs in tiles). */
+/** The navigation grid of a sealed plan. Node id = row × cols + column. Everything it returns is frozen or a fresh copy. */
 export type WorldIsoGrid = Readonly<{
- cols: number; rows: number; step: number; radius: number;
+ cols: number; rows: number; radius: number;
+ /** Grid line positions (tiles), ascending. */
+ us: readonly number[]; vs: readonly number[];
  point(id: number): GroundPoint;
+ /** Node on the lines nearest (u, v), or -1 when (u, v) is not on grid lines (within 1e-6). */
+ nodeAt(u: number, v: number): number;
  free(id: number): boolean;
  /** Walkable neighbours of a free node, in a fixed order; each edge passed the exact swept-disc test. */
  neighbours(id: number): readonly WorldIsoGridEdge[];
 }>;
+const NO_EDGES: readonly WorldIsoGridEdge[] = Object.freeze([]);
 const grids = new WeakMap<GroundPlan, Map<number, WorldIsoGrid>>();
-/** Build (and cache) the half-tile navigation grid of a valid plan; null for malformed geometry. */
-export function worldIsoGrid(plan: GroundPlan, radius = WORLD_ISO_FOOTPRINT): WorldIsoGrid | null {
- if (!worldIsoGeometryOk(plan)) return null;
+const lowerBound = (xs: readonly number[], x: number) => { let lo = 0, hi = xs.length; while (lo < hi) { const m = (lo + hi) >> 1; if (xs[m]! < x) lo = m + 1; else hi = m; } return lo; };
+/** Build (and cache) the navigation grid; null for an unsealed plan, an unsupported radius, or a grid over the limits. */
+export function worldIsoGrid(plan: GroundPlan, radius: number = WORLD_ISO_FOOTPRINT): WorldIsoGrid | null {
+ if (!usable(plan, radius)) return null;
  let byRadius = grids.get(plan);
- if (!byRadius) grids.set(plan, byRadius = new Map());
- const found = byRadius.get(radius);
+ const found = byRadius?.get(radius);
  if (found) return found;
- const step = WORLD_ISO_GRID_STEP;
- const us = plan.floor.map(p => p.u), vs = plan.floor.map(p => p.v);
- const u0 = Math.floor(Math.min(...us) / step) * step, v0 = Math.floor(Math.min(...vs) / step) * step;
- const cols = Math.ceil((Math.max(...us) - u0) / step) + 1, rows = Math.ceil((Math.max(...vs) - v0) / step) + 1;
- const point = (id: number): GroundPoint => ({ u: u0 + (id % cols) * step, v: v0 + Math.floor(id / cols) * step });
- const freeNodes = new Uint8Array(cols * rows);
- for (let id = 0; id < cols * rows; id++) freeNodes[id] = worldIsoPointFree(plan, point(id), radius) ? 1 : 0;
- const edges = new Map<number, WorldIsoGridEdge[]>();
+ const budget = worldIsoGridBudget(plan, radius);
+ if (!budget?.ok) return null; // checked before any allocation
+ const lines = gridLines(plan, radius), us = Object.freeze(lines.us), vs = Object.freeze(lines.vs), cols = us.length, rows = vs.length, count = cols * rows;
+ const point = (id: number): GroundPoint => ({ u: us[id % cols]!, v: vs[Math.floor(id / cols)]! });
+ const inRange = (id: number) => Number.isSafeInteger(id) && id >= 0 && id < count;
+ const freeNodes = new Uint8Array(count);
+ for (let id = 0; id < count; id++) freeNodes[id] = pointFree(plan, point(id), radius) ? 1 : 0;
+ const edges = new Map<number, readonly WorldIsoGridEdge[]>();
  const neighbours = (id: number): readonly WorldIsoGridEdge[] => {
+  if (!inRange(id) || !freeNodes[id]) return NO_EDGES;
   const cached = edges.get(id);
   if (cached) return cached;
-  const out: WorldIsoGridEdge[] = [];
-  if (freeNodes[id]) {
-   const c = id % cols, r = Math.floor(id / cols);
-   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-    if (!dr && !dc) continue;
-    const nc = c + dc, nr = r + dr;
-    if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
-    const n = nr * cols + nc;
-    if (!freeNodes[n]) continue;
-    if (dr && dc && (!freeNodes[r * cols + nc] || !freeNodes[nr * cols + c])) continue; // no corner cutting
-    if (!worldIsoSegmentClear(plan, point(id), point(n), radius)) continue;        // exact swept footprint
-    out.push({ to: n, cost: (dr && dc ? Math.SQRT2 : 1) * step });
-   }
+  const out: WorldIsoGridEdge[] = [], c = id % cols, r = Math.floor(id / cols), here = point(id);
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+   if (!dr && !dc) continue;
+   const nc = c + dc, nr = r + dr;
+   if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+   const n = nr * cols + nc;
+   if (!freeNodes[n]) continue;
+   if (dr && dc && (!freeNodes[r * cols + nc] || !freeNodes[nr * cols + c])) continue; // no corner cutting
+   const there = point(n);
+   if (!segmentClear(plan, here, there, radius)) continue;                            // exact swept footprint
+   out.push(Object.freeze({ to: n, cost: Math.hypot(there.u - here.u, there.v - here.v) }));
   }
-  edges.set(id, out);
-  return out;
+  const frozen = Object.freeze(out);
+  edges.set(id, frozen);
+  return frozen;
  };
- const grid: WorldIsoGrid = Object.freeze({ cols, rows, step, radius, point, free: (id: number) => freeNodes[id] === 1, neighbours });
+ const nodeAt = (u: number, v: number) => {
+  if (!finite(u) || !finite(v)) return -1;
+  const near = (xs: readonly number[], x: number) => { const i = lowerBound(xs, x - 1e-6); return i < xs.length && Math.abs(xs[i]! - x) <= 1e-6 ? i : -1; };
+  const c = near(us, u), r = near(vs, v);
+  return c < 0 || r < 0 ? -1 : r * cols + c;
+ };
+ const grid: WorldIsoGrid = Object.freeze({ cols, rows, radius, us, vs, point: (id: number) => inRange(id) ? point(id) : { u: Number.NaN, v: Number.NaN }, nodeAt, free: (id: number) => inRange(id) && freeNodes[id] === 1, neighbours });
+ if (!byRadius) grids.set(plan, byRadius = new Map());
+ if (byRadius.size >= WORLD_ISO_LIMITS.maxCachedRadii) byRadius.delete(byRadius.keys().next().value as number);
  byRadius.set(radius, grid);
  return grid;
 }
-/** Nearest free node that `p` can walk to in a straight line (searched within 1.5 tiles); ties go to the lower id. */
-function nearestNode(plan: GroundPlan, g: WorldIsoGrid, p: GroundPoint): number | null {
- const u0 = g.point(0).u, v0 = g.point(0).v;
- const c0 = Math.round((p.u - u0) / g.step), r0 = Math.round((p.v - v0) / g.step), reach = Math.ceil(1.5 / g.step);
- let best: number | null = null, bestD = Infinity;
- for (let r = r0 - reach; r <= r0 + reach; r++) for (let c = c0 - reach; c <= c0 + reach; c++) {
-  if (c < 0 || r < 0 || c >= g.cols || r >= g.rows) continue;
+export type WorldIsoConnector = Readonly<{ node: number; cost: number }>;
+/**
+ * Grid nodes an off-grid point can walk straight to: free nodes within WORLD_ISO_CONNECTOR_REACH tiles whose
+ * connecting segment passes the exact clearance test, nearest first (ties by node id), at most
+ * WORLD_ISO_MAX_CONNECTORS of the nearest candidates. Empty when the point is not free.
+ */
+export function worldIsoConnectors(plan: GroundPlan, p: GroundPoint, radius: number = WORLD_ISO_FOOTPRINT): WorldIsoConnector[] {
+ const g = worldIsoGrid(plan, radius);
+ if (!g || !validPoint(p) || !pointFree(plan, p, radius)) return [];
+ const reach = WORLD_ISO_CONNECTOR_REACH, candidates: WorldIsoConnector[] = [];
+ const c1 = lowerBound(g.us, p.u - reach), c2 = lowerBound(g.us, p.u + reach + EPS), r1 = lowerBound(g.vs, p.v - reach), r2 = lowerBound(g.vs, p.v + reach + EPS);
+ for (let r = r1; r < r2; r++) for (let c = c1; c < c2; c++) {
   const id = r * g.cols + c;
   if (!g.free(id)) continue;
-  const q = g.point(id), d = Math.hypot(q.u - p.u, q.v - p.v);
-  if (d < bestD - EPS && worldIsoSegmentClear(plan, p, q, g.radius)) { best = id; bestD = d; }
+  const d = Math.hypot(g.us[c]! - p.u, g.vs[r]! - p.v);
+  if (d <= reach + EPS) candidates.push({ node: id, cost: d });
  }
- return best;
-}
-/** Octile distance in TILES (node positions are in tiles), admissible and consistent for √2·step / step edge costs. */
-export function worldIsoOctileTiles(a: GroundPoint, b: GroundPoint): number {
- const du = Math.abs(a.u - b.u), dv = Math.abs(a.v - b.v);
- return Math.max(du, dv) + (Math.SQRT2 - 1) * Math.min(du, dv);
+ candidates.sort((a, b) => a.cost - b.cost || a.node - b.node);
+ const out: WorldIsoConnector[] = [];
+ for (let i = 0; i < candidates.length && i < CONNECTOR_CANDIDATES && out.length < WORLD_ISO_MAX_CONNECTORS; i++)
+  if (segmentClear(plan, p, g.point(candidates[i]!.node), radius)) out.push(candidates[i]!);
+ return out;
 }
 
 export type WorldIsoGridRoute = Readonly<{ start: number; goal: number; nodes: readonly number[]; cost: number }>;
 /**
- * Raw A* route between the grid nodes nearest `from` and `to` (before smoothing). `cost` is the grid route
- * length in tiles and is the true shortest distance on the grid graph. Null when either end is not free or
- * no route exists.
+ * Raw A* route (before smoothing) from `from` to `to` through the grid: from → a start connector → grid edges
+ * → a goal connector → to. `cost` is the total length in tiles and is the shortest possible through this
+ * graph. Null when the plan or radius is unusable, either end is not free, or no route exists.
  */
-export function worldIsoGridRoute(plan: GroundPlan, from: GroundPoint, to: GroundPoint, radius = WORLD_ISO_FOOTPRINT): WorldIsoGridRoute | null {
+export function worldIsoGridRoute(plan: GroundPlan, from: GroundPoint, to: GroundPoint, radius: number = WORLD_ISO_FOOTPRINT): WorldIsoGridRoute | null {
  const g = worldIsoGrid(plan, radius);
- if (!g || !worldIsoPointFree(plan, from, radius) || !worldIsoPointFree(plan, to, radius)) return null;
- const start = nearestNode(plan, g, from), goal = nearestNode(plan, g, to);
- if (start === null || goal === null) return null;
- const goalPoint = g.point(goal);
- const h = (id: number) => worldIsoOctileTiles(g.point(id), goalPoint);
- const cost = new Map<number, number>([[start, 0]]), came = new Map<number, number>();
+ if (!g || !validPoint(from) || !validPoint(to)) return null;
+ const starts = worldIsoConnectors(plan, from, radius), goals = worldIsoConnectors(plan, to, radius);
+ if (!starts.length || !goals.length) return null;
+ const exit = new Map<number, number>(goals.map(c => [c.node, c.cost]));
+ const GOAL = -1; // virtual node standing for `to`
+ const h = (id: number) => { if (id === GOAL) return 0; const q = g.point(id); return Math.hypot(q.u - to.u, q.v - to.v); };
+ const cost = new Map<number, number>(), came = new Map<number, number>();
  // Binary heap keyed by (f, id) so ties resolve the same way every time.
- const heap: [number, number][] = [[h(start), start]];
+ const heap: [number, number][] = [];
  const less = (a: [number, number], b: [number, number]) => a[0] < b[0] - 1e-12 || (Math.abs(a[0] - b[0]) <= 1e-12 && a[1] < b[1]);
  const push = (item: [number, number]) => { heap.push(item); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (!less(heap[i]!, heap[p]!)) break; [heap[i], heap[p]] = [heap[p]!, heap[i]!]; i = p; } };
  const pop = () => { const first = heap[0]!, last = heap.pop()!; if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && less(heap[l]!, heap[m]!)) m = l; if (r < heap.length && less(heap[r]!, heap[m]!)) m = r; if (m === i) break; [heap[i], heap[m]] = [heap[m]!, heap[i]!]; i = m; } } return first; };
+ const relax = (id: number, next: number, via: number | undefined) => {
+  if (next < (cost.get(id) ?? Infinity) - 1e-12) { cost.set(id, next); if (via === undefined) came.delete(id); else came.set(id, via); push([next + h(id), id]); }
+ };
+ for (const s of starts) relax(s.node, s.cost, undefined);
  const closed = new Set<number>();
  while (heap.length) {
   const [, id] = pop();
   if (closed.has(id)) continue;
-  if (id === goal) break;
+  if (id === GOAL) break;
   closed.add(id);
   const base = cost.get(id)!;
-  for (const edge of g.neighbours(id)) {
-   if (closed.has(edge.to)) continue;
-   const next = base + edge.cost;
-   if (next < (cost.get(edge.to) ?? Infinity) - 1e-12) { cost.set(edge.to, next); came.set(edge.to, id); push([next + h(edge.to), edge.to]); }
-  }
+  for (const edge of g.neighbours(id)) if (!closed.has(edge.to)) relax(edge.to, base + edge.cost, id);
+  const out = exit.get(id);
+  if (out !== undefined) relax(GOAL, base + out, id);
  }
- if (!cost.has(goal)) return null;
+ if (!cost.has(GOAL)) return null;
  const nodes: number[] = [];
- for (let id: number | undefined = goal; id !== undefined; id = came.get(id)) nodes.unshift(id);
- return { start, goal, nodes, cost: cost.get(goal)! };
+ for (let id = came.get(GOAL); id !== undefined; id = came.get(id)) nodes.unshift(id);
+ return { start: nodes[0]!, goal: nodes[nodes.length - 1]!, nodes, cost: cost.get(GOAL)! };
 }
 
+const copy = (p: GroundPoint): GroundPoint => ({ u: p.u, v: p.v });
 /**
- * Walkable route from `from` to `to` (both must be free), smoothed; `null` when unreachable or the plan is
- * malformed. The result starts at `from`, ends exactly at `to`, and every segment passes the exact
- * swept-footprint test.
+ * Walkable route from `from` to `to`, smoothed; null when unreachable, when either end is not free, or when
+ * the plan, radius or points are not usable. The result is a fresh array of fresh points that starts at
+ * `from` and ends at `to`, and every segment passes the exact swept-footprint test.
  */
-export function worldIsoPath(plan: GroundPlan, from: GroundPoint, to: GroundPoint, radius = WORLD_ISO_FOOTPRINT): GroundPoint[] | null {
- if (!worldIsoGeometryOk(plan) || !worldIsoPointFree(plan, from, radius) || !worldIsoPointFree(plan, to, radius)) return null;
- if (worldIsoSegmentClear(plan, from, to, radius)) return [from, to];
+export function worldIsoPath(plan: GroundPlan, from: GroundPoint, to: GroundPoint, radius: number = WORLD_ISO_FOOTPRINT): GroundPoint[] | null {
+ if (!usable(plan, radius) || !validPoint(from) || !validPoint(to) || !pointFree(plan, from, radius) || !pointFree(plan, to, radius)) return null;
+ if (segmentClear(plan, from, to, radius)) return [copy(from), copy(to)];
  const route = worldIsoGridRoute(plan, from, to, radius), g = worldIsoGrid(plan, radius);
  if (!route || !g) return null;
  return worldIsoSmoothPath(plan, [from, ...route.nodes.map(id => g.point(id)), to], radius);
 }
 
-/** String-pull a path: from each corner, jump to the furthest later point still reachable in a straight line. */
-export function worldIsoSmoothPath(plan: GroundPlan, path: readonly GroundPoint[], radius = WORLD_ISO_FOOTPRINT): GroundPoint[] {
- if (path.length <= 2) return [...path];
- const out: GroundPoint[] = [path[0]!];
+/**
+ * String-pull a walkable path: from each corner, jump to the furthest later point reachable in a straight
+ * line. Returns fresh points. If the plan, radius or any point is unusable, or a consecutive pair is not
+ * clear, the input is returned as a copy with nothing joined (it never invents a shortcut it cannot verify).
+ */
+export function worldIsoSmoothPath(plan: GroundPlan, path: readonly GroundPoint[], radius: number = WORLD_ISO_FOOTPRINT): GroundPoint[] {
+ const same = Array.isArray(path) ? path.filter(validPoint).map(copy) : [];
+ if (!usable(plan, radius) || same.length !== path.length || path.length <= 2) return same;
+ const out: GroundPoint[] = [same[0]!];
  let i = 0;
- while (i < path.length - 1) {
-  let j = path.length - 1;
-  while (j > i + 1 && !worldIsoSegmentClear(plan, path[i]!, path[j]!, radius)) j--;
-  out.push(path[j]!);
+ while (i < same.length - 1) {
+  let j = same.length - 1;
+  while (j > i + 1 && !segmentClear(plan, same[i]!, same[j]!, radius)) j--;
+  out.push(same[j]!);
   i = j;
  }
  return out;
@@ -302,74 +477,70 @@ export const worldIsoPathLength = (path: readonly GroundPoint[]) => path.reduce(
 
 // ---------- validation ----------
 export type GroundPlanProblemCode =
- | "plan-invalid" | "floor-invalid" | "floor-degenerate" | "floor-self-intersecting"
+ | "plan-invalid" | "radius-invalid" | GroundFloorProblemCode
+ | "too-many-colliders" | "too-many-anchors" | "grid-too-large"
  | "duplicate-id" | "door-missing" | "door-kind-invalid" | "collider-invalid" | "collider-overlap"
  | "anchor-invalid" | "anchor-blocked" | "anchor-unreachable" | "anchor-crowded" | "seat-link-missing";
 export type GroundPlanProblem = Readonly<{ code: GroundPlanProblemCode; id: string; message: string }>;
-export type GroundPlanReport = Readonly<{ ok: boolean; problems: readonly GroundPlanProblem[]; routes: Readonly<Record<string, number>> }>;
-const KINDS = new Set<string>(WORLD_ISO_ANCHOR_KINDS);
-const FACINGS = new Set<string>(WORLD_HD_DIRECTIONS);
-const label = (x: unknown) => typeof x === "string" ? x : "(no id)";
+export type GroundPlanReport = Readonly<{
+ ok: boolean; problems: readonly GroundPlanProblem[]; routes: Readonly<Record<string, number>>;
+ /** The sealed, deep-frozen plan to use from now on; null unless `ok`. */
+ plan: GroundPlan | null;
+}>;
+function label(x: unknown): string { return typeof x === "string" ? x.slice(0, 64) : "(no id)"; }
 
 /**
- * Check a plan before any room uses it. Never throws: malformed input is reported, and geometry problems
- * stop the walking checks (fail closed). Checks: plan shape; floor corners finite, distinct, non-zero area and
- * not self-intersecting; unique ids; colliders finite with u1 < u2, v1 < v2 and not overlapping; anchors with a
- * known kind, a known facing and finite coordinates; the door anchor present and of kind "door"; every anchor
- * free and reachable from the door; anchors that may be occupied together not overlapping; seats linked to an
- * existing front prop and standing fallback. `routes` maps each reachable anchor to its walking distance (tiles).
+ * Fully check a raw plan before any room uses it. Never throws and never allocates beyond WORLD_ISO_LIMITS.
+ * Order: plan shape → radius → counts and size limits → floor and collider geometry → anchor structure
+ * (all on the raw input; any failure stops here, fail closed) → seal a private copy → grid size → unique ids,
+ * collider overlaps, door present and of kind "door", every anchor free and reachable from the door, anchors
+ * not crowded, seat links. `routes` maps each reachable anchor to its walking distance (tiles). `plan` is the
+ * sealed copy when everything passed.
  */
-export function worldIsoValidatePlan(plan: GroundPlan, radius = WORLD_ISO_FOOTPRINT): GroundPlanReport {
+export function worldIsoValidatePlan(raw: unknown, radius: number = WORLD_ISO_FOOTPRINT): GroundPlanReport {
  const problems: GroundPlanProblem[] = [];
  const add = (code: GroundPlanProblemCode, id: string, message: string) => problems.push({ code, id, message });
  const routes: Record<string, number> = {};
- const raw = plan as unknown as Record<string, unknown> | null;
- if (!raw || typeof raw !== "object" || !Array.isArray(raw["floor"]) || !Array.isArray(raw["colliders"]) || !Array.isArray(raw["anchors"]) || typeof raw["door"] !== "string") {
-  add("plan-invalid", label(raw?.["id"]), "A plan needs floor, colliders and anchors lists and a door id.");
-  return { ok: false, problems, routes };
+ const fail = (): GroundPlanReport => ({ ok: false, problems, routes: {}, plan: null });
+ try {
+  const captured = worldIsoPlanSealed(raw) ? raw : capture(raw);
+  if (!worldIsoRadiusOk(radius)) { add("radius-invalid", label((captured as GroundPlan | null)?.id), `The footprint radius must be a number from ${WORLD_ISO_LIMITS.minRadius} to ${WORLD_ISO_LIMITS.maxRadius} tiles.`); return fail(); }
+  if (!worldIsoPlanSealed(captured)) { problems.push(...structureProblems(captured)); if (problems.length) return fail(); }
+  const plan = worldIsoPlanSealed(captured) ? captured : snapshot(captured as GroundPlan);
+  const budget = worldIsoGridBudget(plan, radius);
+  if (!budget?.ok) { add("grid-too-large", plan.id, `The plan needs a navigation grid of ${budget?.nodes ?? 0} nodes; the limit is ${WORLD_ISO_LIMITS.maxGridNodes} nodes and ${WORLD_ISO_LIMITS.maxGridWork} clearance checks. Use a smaller floor or fewer colliders.`); return fail(); }
+  const anchors = plan.anchors, boxes = plan.colliders;
+  const ids = new Set<string>();
+  for (const id of [...boxes.map(c => c.id), ...anchors.map(a => a.id)]) { if (ids.has(id)) add("duplicate-id", id, `Id ${id} is used more than once.`); ids.add(id); }
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++)
+   if (boxesOverlap(boxes[i]!, boxes[j]!)) add("collider-overlap", boxes[i]!.id, `Colliders ${boxes[i]!.id} and ${boxes[j]!.id} overlap.`);
+  const door = anchors.find(a => a.id === plan.door);
+  if (!door) add("door-missing", label(plan.door), `Door anchor ${label(plan.door)} is missing.`);
+  else if (door.kind !== "door") add("door-kind-invalid", door.id, `Anchor ${door.id} is used as the door but its kind is "${door.kind}", not "door".`);
+  const doorFree = !!door && pointFree(plan, door.at, radius);
+  for (const a of anchors) {
+   if (!pointFree(plan, a.at, radius)) { add("anchor-blocked", a.id, `Anchor ${a.id} is off the floor or inside a collider.`); continue; }
+   if (!door || !doorFree) continue;
+   if (a.id === door.id) { routes[a.id] = 0; continue; }
+   const path = worldIsoPath(plan, door.at, a.at, radius);
+   if (path) routes[a.id] = Math.round(worldIsoPathLength(path) * 1000) / 1000;
+   else add("anchor-unreachable", a.id, `Anchor ${a.id} cannot be reached from the door.`);
+  }
+  // A seat and its own standing fallback are used by the same Pal, never together.
+  const partner = new Map<string, string>();
+  for (const a of anchors) if (a.standFallback) { partner.set(a.id, a.standFallback); partner.set(a.standFallback, a.id); }
+  for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
+   const a = anchors[i]!, b = anchors[j]!;
+   if (partner.get(a.id) === b.id) continue;
+   if (Math.hypot(a.at.u - b.at.u, a.at.v - b.at.v) < WORLD_ISO_ANCHOR_SPACING - EPS) add("anchor-crowded", a.id, `Anchors ${a.id} and ${b.id} are closer than two footprints.`);
+  }
+  for (const a of anchors.filter(x => x.kind === "seat")) {
+   if (!a.front || !boxes.some(c => c.id === a.front)) add("seat-link-missing", a.id, `Seat ${a.id} needs an existing front prop.`);
+   if (!a.standFallback || !anchors.some(x => x.id === a.standFallback)) add("seat-link-missing", a.id, `Seat ${a.id} needs an existing standing fallback.`);
+  }
+  return problems.length ? { ok: false, problems, routes, plan: null } : { ok: true, problems, routes, plan };
+ } catch {
+  add("plan-invalid", "(no id)", "The plan could not be read."); // e.g. a hostile getter on the input
+  return fail();
  }
- const floorMessages = {
-  "floor-invalid": "The walkable floor needs at least three corners with finite coordinates.",
-  "floor-degenerate": `The walkable floor repeats a corner or encloses less than ${WORLD_ISO_MIN_FLOOR_AREA} square tile.`,
-  "floor-self-intersecting": "The walkable floor outline crosses or folds back over itself.",
- } as const;
- for (const code of worldIsoFloorProblems(plan.floor)) add(code, label(plan.id), floorMessages[code]);
- for (const c of plan.colliders as unknown[]) if (!validBox(c)) add("collider-invalid", label((c as GroundBox | null)?.id), `Collider ${label((c as GroundBox | null)?.id)} needs a string id, finite bounds and u1 < u2, v1 < v2.`);
- const anchors: GroundAnchor[] = [];
- for (const a of plan.anchors as unknown[]) {
-  const x = a as GroundAnchor | null;
-  if (!x || typeof x !== "object" || typeof x.id !== "string" || !KINDS.has(x.kind) || !FACINGS.has(x.facing) || !finitePoint(x.at))
-   add("anchor-invalid", label(x?.id), `Anchor ${label(x?.id)} needs a string id, a known kind, a known facing and finite coordinates.`);
-  else anchors.push(x);
- }
- const ids = new Set<string>();
- for (const id of [...plan.colliders.filter(validBox).map(c => c.id), ...anchors.map(a => a.id)]) { if (ids.has(id)) add("duplicate-id", id, `Id ${id} is used more than once.`); ids.add(id); }
- const boxes = plan.colliders.filter(validBox);
- for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++)
-  if (boxesOverlap(boxes[i]!, boxes[j]!)) add("collider-overlap", boxes[i]!.id, `Colliders ${boxes[i]!.id} and ${boxes[j]!.id} overlap.`);
- const door = anchors.find(a => a.id === plan.door);
- if (!door) add("door-missing", plan.door, `Door anchor ${plan.door} is missing.`);
- else if (door.kind !== "door") add("door-kind-invalid", door.id, `Anchor ${door.id} is used as the door but its kind is "${door.kind}", not "door".`);
- if (!worldIsoGeometryOk(plan)) return { ok: false, problems, routes }; // fail closed: no walking checks on bad geometry
- for (const a of anchors) {
-  if (!worldIsoPointFree(plan, a.at, radius)) { add("anchor-blocked", a.id, `Anchor ${a.id} is off the floor or inside a collider.`); continue; }
-  if (!door || a.id === door.id) { if (a.id === door?.id) routes[a.id] = 0; continue; }
-  if (!worldIsoPointFree(plan, door.at, radius)) continue; // reported as anchor-blocked for the door itself
-  const path = worldIsoPath(plan, door.at, a.at, radius);
-  if (path) routes[a.id] = Math.round(worldIsoPathLength(path) * 1000) / 1000;
-  else add("anchor-unreachable", a.id, `Anchor ${a.id} cannot be reached from the door.`);
- }
- // A seat and its own standing fallback are used by the same Pal, never together.
- const partner = new Map<string, string>();
- for (const a of anchors) if (a.standFallback) { partner.set(a.id, a.standFallback); partner.set(a.standFallback, a.id); }
- for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) {
-  const a = anchors[i]!, b = anchors[j]!;
-  if (partner.get(a.id) === b.id) continue;
-  if (Math.hypot(a.at.u - b.at.u, a.at.v - b.at.v) < WORLD_ISO_ANCHOR_SPACING - EPS) add("anchor-crowded", a.id, `Anchors ${a.id} and ${b.id} are closer than two footprints.`);
- }
- for (const a of anchors.filter(x => x.kind === "seat")) {
-  if (!a.front || !boxes.some(c => c.id === a.front)) add("seat-link-missing", a.id, `Seat ${a.id} needs an existing front prop.`);
-  if (!a.standFallback || !anchors.some(x => x.id === a.standFallback)) add("seat-link-missing", a.id, `Seat ${a.id} needs an existing standing fallback.`);
- }
- return { ok: problems.length === 0, problems, routes };
 }
