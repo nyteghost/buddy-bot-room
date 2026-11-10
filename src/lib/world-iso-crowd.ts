@@ -25,7 +25,7 @@ export type WorldIsoCrowdDiagnostics = Readonly<{
 }>;
 type MutableActor = {
  id: string; kind: "pal" | "visitor"; at: GroundPoint; facing: WorldHdDirection; real: boolean;
- goal: GroundPoint; path: GroundPoint[]; waypoint: number; walking: boolean; waiting: boolean; walked: number;
+ goal: GroundPoint; path: GroundPoint[]; waypoint: number; walking: boolean; waiting: boolean; walked: number; committed: boolean;
  status: WorldIsoCrowdStatus; waitMs: number; reason: string | null;
  yieldTo: GroundPoint | null; yieldHoldMs: number; failedGoal: GroundPoint | null; failedAt: number;
 };
@@ -78,7 +78,7 @@ export class WorldIsoCrowd {
   const at = copy(input.at);
   this.actors.set(input.id, { id: input.id, kind: input.kind, at, real: input.real === true,
    goal: copy(at), path: [copy(at)], waypoint: 1, facing: input.facing ?? "s",
-   walking: false, waiting: false, walked: 0, status: "arrived", waitMs: 0, reason: null,
+   walking: false, waiting: false, walked: 0, committed: false, status: "arrived", waitMs: 0, reason: null,
    yieldTo: null, yieldHoldMs: 0, failedGoal: null, failedAt: -Infinity });
   return true;
  }
@@ -86,31 +86,42 @@ export class WorldIsoCrowd {
  ids(): string[] { return [...this.actors.keys()].sort(); }
  setReal(id: string, real: boolean): void { const a = this.actors.get(id); if (a) a.real = real === true; }
 
- /** A failed static route never destroys a previous valid goal. Repeated failed requests are cached. */
+ /**
+  * Safe destination assignment. Initial join locations do not reserve a
+  * future destination until explicitly assigned; this preserves legacy
+  * head-on exchange semantics. Failed assignments stop the obsolete route,
+  * keep the requested target visible as blocked/unreachable, and retry on
+  * a bounded 2-second cadence without searching every animation frame.
+  */
  assign(id: string, target: GroundPoint): boolean {
   const a = this.actors.get(id);
   if (!a) return false;
-  if (!worldIsoPointFree(this.plan, target, this.radius)) {
-   a.reason = "invalid-ground"; a.status = "unreachable"; a.failedGoal = copy(target); a.failedAt = this.time;
+  const numericTarget = !!target && typeof target.u === "number" && typeof target.v === "number"
+   && Number.isFinite(target.u) && Number.isFinite(target.v);
+  const same = numericTarget && worldIsoPointFree(this.plan, target, this.radius) && distance(target, a.goal) < EPS;
+  if (same && !a.failedGoal) { a.committed = true; return true; }
+  if (numericTarget && a.failedGoal && distance(target, a.failedGoal) < EPS &&
+   this.time - a.failedAt < REPLAN_AFTER_MS) return false;
+  const fail = (reason: string, status: WorldIsoCrowdStatus) => {
+   a.goal = numericTarget ? copy(target) : copy(a.at); a.path = [copy(a.at)]; a.waypoint = 1;
+   a.yieldTo = null; a.yieldHoldMs = 0; a.waitMs = 0;
+   a.waiting = false; a.walking = false; a.status = status; a.reason = reason;
+   a.failedGoal = numericTarget ? copy(target) : null; a.failedAt = this.time; a.committed = true;
    this.counters.failedAssignments++; return false;
-  }
-  if (distance(target, a.goal) < EPS) return true;
-  if (a.failedGoal && distance(target, a.failedGoal) < EPS && this.time - a.failedAt < REPLAN_AFTER_MS) return false;
-  // An already-held target cannot be occupied by two stationary actors.
-  const occupied = [...this.actors.values()].some(b => b.id !== id &&
-   (distance(target, b.goal) < 2 * this.radius - EPS || (distance(target, b.at) < 2 * this.radius - EPS && distance(b.goal, b.at) < EPS)));
-  if (occupied) {
-   a.reason = "destination-reserved"; a.status = "blocked"; a.failedGoal = copy(target); a.failedAt = this.time;
-   this.counters.failedAssignments++; return false;
-  }
+  };
+  if (!numericTarget || !worldIsoPointFree(this.plan, target, this.radius))
+   return fail("invalid-ground", "unreachable");
+  // Only explicit destination assignments, not initial join locations, are
+  // reservations. An actor may target a place another actor will depart.
+  const reserved = [...this.actors.values()].some(b => b.id !== id && b.committed &&
+   distance(target, b.goal) < 2 * this.radius - EPS);
+  if (reserved) return fail("destination-reserved", "blocked");
   this.counters.pathQueries++;
   const path = worldIsoPath(this.plan, a.at, target, this.radius);
-  if (!path) {
-   a.reason = "no-static-route"; a.status = "unreachable"; a.failedGoal = copy(target); a.failedAt = this.time;
-   this.counters.failedAssignments++; return false;
-  }
+  if (!path) return fail("no-static-route", "unreachable");
   a.goal = copy(target); a.path = path; a.waypoint = 1; a.reason = null;
-  a.failedGoal = null; a.failedAt = -Infinity; a.waitMs = 0; a.yieldTo = null; a.yieldHoldMs = 0;
+  a.committed = true; a.failedGoal = null; a.failedAt = -Infinity;
+  a.waitMs = 0; a.yieldTo = null; a.yieldHoldMs = 0;
   a.status = distance(a.at, target) < EPS ? "arrived" : "moving"; a.waiting = false;
   return true;
  }

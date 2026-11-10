@@ -70,6 +70,9 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  const lastRosterKey = useRef("");
  const lastRender = useRef(0);
  const lastReportedFault = useRef<string | null>(null);
+ // At most two route assignments/retries per animation update, regardless
+ // of the number of actors whose ambient destinations changed together.
+ const pending = useRef<{id: string; target: {u: number; v: number}; real: boolean; nextAt: number}[]>([]);
 
  // Join/leave only on genuinely changed identities. Already-present Pals
  // retain exact positions, routes and accumulated gait distance.
@@ -107,14 +110,22 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
     const period = Math.floor(elapsed / WORLD_ISO_SCHEDULE_PERIOD_MS);
     if (lastPeriod.current !== period || lastRosterKey.current !== rosterKey) {
      const targets = worldIsoSchedule(source.pals, source.visitors, elapsed);
-     for (const actor of targets) {
-      crowd.setReal(actor.id, !!actor.real);
-      // Failed static routes or occupied goals are reported by diagnostics;
-      // never hide the error by claiming an arrival or teleporting.
-      if (!crowd.assign(actor.id, actor.target)) source.onDiagnostics?.(crowd.diagnostics());
-     }
+     pending.current = targets.map(a => ({id:a.id, target:a.target, real:!!a.real, nextAt:elapsed}));
      setView(targets);
      lastPeriod.current = period; lastRosterKey.current = rosterKey;
+    }
+    let assignments = 0;
+    for(let i=0;i<pending.current.length && assignments<2;) {
+     const request=pending.current[i]!;
+     if(elapsed<request.nextAt){i++;continue;}
+     crowd.setReal(request.id,request.real);
+     assignments++;
+     if(crowd.assign(request.id,request.target)) pending.current.splice(i,1);
+     else {
+      request.nextAt=elapsed+2_000;
+      try { source.onDiagnostics?.(crowd.diagnostics()); } catch { /* telemetry is optional */ }
+      i++;
+     }
     }
     // Advance only the capped elapsed time. Suspended-tab time is deliberately
     // discarded by WorldIsoClock; do not simulate a catch-up burst on resume.

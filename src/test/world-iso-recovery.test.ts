@@ -63,6 +63,7 @@ describe("P1/P2 crowd movement and recovery regressions", () => {
   const crowd = new WorldIsoCrowd(square());
   expect(crowd.join({id:"pal:owner",kind:"pal",at:{u:5,v:5}})).toBe(true);
   expect(crowd.join({id:"pal:other",kind:"pal",at:{u:2,v:5}})).toBe(true);
+  expect(crowd.assign("pal:owner",{u:5,v:5})).toBe(true); // explicit workstation reservation
   expect(crowd.assign("pal:other",{u:5,v:5})).toBe(false);
   expect(crowd.diagnostics().actors.find(a=>a.id==="pal:other")?.reason).toBe("destination-reserved");
   expect(crowd.pose("pal:other")?.status).toBe("blocked");

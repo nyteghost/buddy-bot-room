@@ -73,6 +73,7 @@ describe("five full-population twenty-minute iso crowd stress scenarios", () => 
       if (crowd.join({id,kind:"visitor",at:anchor.at})) { rejoined=true; break; }
      }
      expect(rejoined).toBe(true);
+     previous=previous.filter(p=>p.id!==id); // a new life is not a movement tick
      expect(crowd.pose("pal:nova")!.at).toEqual(unchanged.at);
     }
     if (seed===3 && tick%300===0) {
