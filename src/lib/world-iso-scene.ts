@@ -1,6 +1,7 @@
 import type { WorldHdDirection } from "./world-hd";
 import { worldIsoActorBox, worldIsoDepthOrder, type WorldIsoDepthItem, type WorldIsoDepthResult } from "./world-iso-depth";
-import { worldIsoPlanSealed, worldIsoPointFree, type GroundBox, type GroundPlan, type GroundPoint } from "./world-iso-ground";
+import { worldIsoPlanSealed, worldIsoPointFree, type GroundBox, type GroundPlan } from "./world-iso-ground";
+import type { GroundPoint } from "./world-iso-projection";
 import { WORLD_ISO_GREYBOX } from "./world-iso-greybox";
 import { WORLD_ISO_CANVAS, WORLD_ISO_FLOOR, worldIsoProjection, type ScreenPoint } from "./world-iso-projection";
 import type { WorldIsoRealActivity } from "./world-iso-schedule";
