@@ -387,6 +387,16 @@ export function Room() {
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(true);
+  const [roomSettingsOpen, setRoomSettingsOpen] = useState(false);
+  const [roomSettingsDesktop, setRoomSettingsDesktop] = useState(false);
+  // Phones retain their existing inline controls; desktop uses a separate window.
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 701px)");
+    const update = () => setRoomSettingsDesktop(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [palRoomPlayful, setPalRoomPlayful] = useState(true);
   const [livingWorld, setLivingWorld] = useState(true);
   const [worldSky,setWorldSky]=useState<Sky>("clear");
@@ -1917,6 +1927,94 @@ export function Room() {
   const customVisitors = worldUniverse.characters.filter(c => enabledWorldPacks.includes(c.id) && !palLookIds.has(c.id));
   // The HD office draws built-in guests (Green Jacket, Goku, …) as well as custom ones; one actor per enabled visitor.
   const hdVisitors = worldHdVisitors(enabledWorldPacks, worldUniverse.characters, palLookIds);
+  // Render a single instance of the controls in the desktop popup or mobile room.
+  const roomControls = () => <div className="room-settings-content">
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} onCustomInstallBackup={installWorldBackup} onCustomUpdatePack={updateWorldPack} onCustomExportBackup={exportWorldBackup} recoveryBackup={worldRecoveryBackup} animationsPaused={focusMode} />
+          <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
+          <QuestCorner session={focusCompanion} />
+          <div className="section-heading">
+            <button
+              type="button"
+              className="pals-toggle"
+              aria-expanded={palsOpen}
+              title={palsOpen ? "Hide pals" : "Show pals"}
+              onClick={() => setPalsOpen((v) => !v)}
+            >
+              <h2>
+                The pals <span>{enabled.length}/{agents.length}</span>
+              </h2>
+              <ChevronDown
+                size={16}
+                className={cn("pals-chevron", !palsOpen && "pals-chevron-closed")}
+              />
+            </button>
+            <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
+              <Settings2 size={14} />
+              {settings ? "Hide settings" : "Model settings"}
+            </Button>
+          </div>
+          {palsOpen && (
+            <div className="agent-grid">
+              {agents.map((a) => (
+                <div
+                  key={a.id}
+                  className={cn(
+                    "agent-card",
+                    `agent-${a.id}`,
+                    !enabled.includes(a.id) && "agent-disabled",
+                  )}
+                >
+                  <div className="agent-card-top">
+                    <span className="avatar-tile">
+                      <PixelCharacter id={a.id} />
+                    </span>
+                    <Switch
+                      aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
+                      checked={enabled.includes(a.id)}
+                      disabled={running}
+                      onCheckedChange={(checked) =>
+                        setEnabled((prev) =>
+                          checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
+                        )
+                      }
+                    />
+                  </div>
+                  <h3>
+                    {agentName(a.id, hell, horror, characterMode)}
+                    <span className="agent-dot" />
+                  </h3>
+                  <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
+                  <span className="model-label">
+                    {models.find((m) => m.id === selectedModels[a.id])?.label}
+                  </span>
+                  {settings && (
+                    <Select
+                      value={selectedModels[a.id]}
+                      disabled={running}
+                      onValueChange={(value) =>
+                        setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
+                        className="mt-3"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {models.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+  </div>;
   return (
     <div aria-busy={!ready} className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
@@ -2086,7 +2184,8 @@ export function Room() {
             <WorkspaceWindow id="general-chat" title="General Chat" icon={<MessageSquare className="size-4" />} open={generalOpen} onClose={closeGeneral} resetVersion={resetVersion}>
               {generalSeen && <Suspense fallback={<p className="p-4" role="status">Loading General Chat…</p>}><GeneralChat open={generalOpen} /></Suspense>}
             </WorkspaceWindow>
-            <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => setRoomOpen(false)} resetVersion={resetVersion}>
+            <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => { setRoomOpen(false); setRoomSettingsOpen(false); }} resetVersion={resetVersion}
+              titleActions={roomSettingsDesktop ? <Button type="button" variant="ghost" size="sm" className="room-settings-trigger" title={roomSettingsOpen ? "Hide Room Settings" : "Open Room Settings"} aria-label="Room settings" aria-expanded={roomSettingsOpen} onClick={() => setRoomSettingsOpen(open => !open)}><Settings2 className="size-4" /><span>Room settings</span></Button> : undefined}>
               <div className="room-column">          <div className={cn("room-scene",livingWorld && "living-world",hdWorld && "hd-world")}>
             <img
               src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
@@ -2159,93 +2258,12 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} onCustomInstallBackup={installWorldBackup} onCustomUpdatePack={updateWorldPack} onCustomExportBackup={exportWorldBackup} recoveryBackup={worldRecoveryBackup} animationsPaused={focusMode} />
-          <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
-          <QuestCorner session={focusCompanion} />
-          <div className="section-heading">
-            <button
-              type="button"
-              className="pals-toggle"
-              aria-expanded={palsOpen}
-              title={palsOpen ? "Hide pals" : "Show pals"}
-              onClick={() => setPalsOpen((v) => !v)}
-            >
-              <h2>
-                The pals <span>{enabled.length}/{agents.length}</span>
-              </h2>
-              <ChevronDown
-                size={16}
-                className={cn("pals-chevron", !palsOpen && "pals-chevron-closed")}
-              />
-            </button>
-            <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
-              <Settings2 size={14} />
-              {settings ? "Hide settings" : "Model settings"}
-            </Button>
-          </div>
-          {palsOpen && (
-            <div className="agent-grid">
-              {agents.map((a) => (
-                <div
-                  key={a.id}
-                  className={cn(
-                    "agent-card",
-                    `agent-${a.id}`,
-                    !enabled.includes(a.id) && "agent-disabled",
-                  )}
-                >
-                  <div className="agent-card-top">
-                    <span className="avatar-tile">
-                      <PixelCharacter id={a.id} />
-                    </span>
-                    <Switch
-                      aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
-                      checked={enabled.includes(a.id)}
-                      disabled={running}
-                      onCheckedChange={(checked) =>
-                        setEnabled((prev) =>
-                          checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
-                        )
-                      }
-                    />
-                  </div>
-                  <h3>
-                    {agentName(a.id, hell, horror, characterMode)}
-                    <span className="agent-dot" />
-                  </h3>
-                  <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
-                  <span className="model-label">
-                    {models.find((m) => m.id === selectedModels[a.id])?.label}
-                  </span>
-                  {settings && (
-                    <Select
-                      value={selectedModels[a.id]}
-                      disabled={running}
-                      onValueChange={(value) =>
-                        setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
-                        className="mt-3"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {models.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          {!roomSettingsDesktop && roomControls()}
 </div>
             </WorkspaceWindow>
+            {roomSettingsDesktop && <WorkspaceWindow id="room-settings" title="Room Settings" icon={<Settings2 className="size-4" />} open={roomOpen && roomSettingsOpen} onClose={() => { setRoomSettingsOpen(false); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".window-room .room-settings-trigger")?.focus({ preventScroll: true })); }} resetVersion={resetVersion}>
+              {roomControls()}
+            </WorkspaceWindow>}
             {renderModeWindow(myPalsMode)}
             {renderModeWindow(loungeMode)}
             <WorkspaceWindow id="tools" title="Legacy Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>

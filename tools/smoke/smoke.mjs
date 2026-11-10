@@ -43,6 +43,24 @@ async function step(name, fn) {
   catch (e) { await page.screenshot({path:"/tmp/pixel-smoke-failure.png"}).catch(()=>undefined); problems.push(`${name}: ${String(e?.stack || e).slice(0, 1800)}`); notes.push(`FAIL ${name}`); console.log(`FAIL ${name}: ${e.message}`); }
 }
 
+
+// Desktop controls live in a separate draggable window. The settings popup
+// can cover the room titlebar, so once open use its own X rather than clicking
+// through the popup to the room button. Phones keep their inline controls.
+async function showRoomSettings() {
+  const popup=page.locator('[data-window-id="room-settings"]');
+  if(await popup.isVisible().catch(()=>false)) return;
+  const toggle=page.getByRole("button",{name:"Room settings",exact:true});
+  if(!await toggle.isVisible().catch(()=>false)) return;
+  if(await toggle.getAttribute("aria-expanded")!=="true") await toggle.click();
+  await page.locator('[data-window-id="room-settings"]').waitFor({state:"visible"});
+}
+async function hideRoomSettings() {
+  const popup=page.locator('[data-window-id="room-settings"]');
+  if(await popup.isVisible().catch(()=>false))
+    await popup.getByRole("button",{name:"Hide Room Settings"}).click();
+}
+
 await step("home page loads", async () => {
   const r = await page.goto(URL_, { waitUntil: "domcontentloaded", timeout: 60000 });
   // The sign-in page is served with 401 before the first login; anything else that isn't OK is a real failure.
@@ -274,6 +292,7 @@ await step("Focus Assist body double and saved checkpoint", async () => {
   const minimizeCompanion = companion.getByRole("button", { name: "Minimize Focus Assist" });
   if (await minimizeCompanion.count()) await minimizeCompanion.click();
   await companion.getByRole("button", { name: "Expand Focus Assist" }).waitFor();
+  await showRoomSettings();
   const activity = page.getByRole("region", { name: "Pal Room activities" });
   await activity.getByText(/Byte is working beside you/).waitFor();
   const quest = page.getByRole("region", { name: "Tiny Quest Corner" });
@@ -313,6 +332,7 @@ await step("Focus Assist body double and saved checkpoint", async () => {
 await step("Living Pal Room task board, quick start, and calm/playful controls", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const board = page.getByRole("region", { name: "Living Task Board" });
   await board.getByRole("button", { name: "Add a thought" }).click();
@@ -322,12 +342,21 @@ await step("Living Pal Room task board, quick start, and calm/playful controls",
   // The Today window may be above the Pal Room; close it before selecting a board task.
   const todayItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Today\s*$/i });
   if (await todayItem.getAttribute("aria-pressed") === "true") await todayItem.click();
-  await board.getByRole("button", { name: "Start: Organize the garage" }).waitFor();
-  await board.getByRole("button", { name: "Start: Organize the garage" }).click();
+  // The board is intentionally a *three-task shortlist*, not the full task list.
+  // An earlier smoke step may already have three higher-ranked tasks. In that
+  // case verify quick-start on the first available card rather than expecting
+  // this just-captured thought to be promoted against the documented ranking.
+  const requested = board.getByRole("button", { name: "Start: Organize the garage" });
+  const first = board.getByRole("button", { name: /^Start: / }).first();
+  await first.waitFor();
+  const chosen = await requested.count() ? requested : first;
+  const selected = (await chosen.getAttribute("aria-label"))?.replace(/^Start: /, "");
+  if (!selected) throw Error("Living Task Board had a task without a start label");
+  await chosen.click();
   const dialog = page.getByRole("dialog", { name: "Just Start" });
   await dialog.getByRole("textbox", { name: "What are you trying to start?" }).waitFor();
-  if (await dialog.getByRole("textbox", { name: "What are you trying to start?" }).inputValue() !== "Organize the garage") {
-    throw Error("Living Task Board did not preload the selected task");
+  if (await dialog.getByRole("textbox", { name: "What are you trying to start?" }).inputValue() !== selected) {
+    throw Error("Living Task Board did not preload the selected task: " + selected);
   }
   await dialog.getByRole("button", { name: "Close" }).click();
   // The control has a dynamic accessible label. Hold onto the same role-based
@@ -1194,14 +1223,14 @@ await step("Character Universe custom art, guest roster and interaction controls
   await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
   const roomEntry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
   if(await roomEntry.getAttribute("aria-pressed")!=="true")await roomEntry.click();
-  const room=page.locator('[data-window-id="room"]');
-  const activities=room.getByRole("region",{name:"Pal Room activities"});
+  await showRoomSettings();
+  const activities=page.getByRole("region",{name:"Pal Room activities"});
   const mood=activities.getByRole("button",{name:/^Switch Pal Room to (Calm|Playful)$/});
   if(await mood.getAttribute("aria-pressed")!=="true")await mood.click();
   await activities.getByRole("button",{name:"Wave to all Pals"}).waitFor();
   await activities.getByRole("button",{name:"Wave to all Pals"}).click();
   await page.locator('.room-scene .office-pal[data-world-cue="wave"]').first().waitFor({state:"visible"});
-  const library=room.locator("details.world-character-library");
+  const library=page.locator(".room-settings-content details.world-character-library");
   await library.locator("summary").click();
   await library.getByText("Goku · Fan Tribute",{exact:true}).waitFor();
   await library.getByText("Homer · Fan Tribute",{exact:true}).waitFor();
@@ -1212,7 +1241,7 @@ await step("Character Universe custom art, guest roster and interaction controls
   await editor.getByRole("button",{name:"Close editor"}).click();
 });
 for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, approve, render, and clean up`,async()=>{
-  const library=page.locator('[data-window-id="room"] details.world-character-library');
+  const library=page.locator(".room-settings-content details.world-character-library");
   await library.waitFor({state:"visible"});
   if(await library.getAttribute("open")===null)await library.locator("summary").click();
   const pack=hdCharacterSmokeZip(version);
@@ -1293,13 +1322,118 @@ for(const version of [2,3])await step(`import v${version} 256x256 ZIP, preview, 
 });
 
 const gallery = [];
+
+// Pal Room window remains scene-first on desktop, while controls live in their own
+// movable window; phone-width devices continue to see controls directly below the room.
+await step("Immersive desktop Pal Room popup, camera reachability, resizing and phone controls", async () => {
+  // Earlier smoke steps deliberately test restoring a user-sized workspace.
+  // Start this *default desktop geometry* check with no saved custom Pal Room
+  // geometry, while retaining the disposable test account and all app data.
+  await page.evaluate(() => {
+    for(const key of ["pixel-pals-window-room-v1","pixel-pals-window-room-size-v1",
+      "pixel-pals-window-room-settings-v1","pixel-pals-window-room-settings-size-v1"])
+      localStorage.removeItem(key);
+  });
+  await page.reload();
+  await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
+  const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
+  if(await entry.getAttribute("aria-pressed")!=="true") await entry.click();
+  const room=page.locator('[data-window-id="room"]');
+  const popup=page.locator('[data-window-id="room-settings"]');
+  const trigger=room.getByRole("button",{name:"Room settings",exact:true});
+  for(const [width,height] of [[1650,927],[1366,768],[940,700]]) {
+    await page.setViewportSize({width,height});
+    await trigger.waitFor({state:"visible"});
+    await showRoomSettings();
+    await popup.getByRole("region",{name:"Pal Room activities"}).waitFor();
+    await popup.locator("details.world-character-library").waitFor({state:"visible"});
+    if(await room.locator(".room-settings-content").count()) throw Error("Desktop room duplicated controls beneath scene");
+    const geometry=await room.evaluate(el=>{
+      const body=el.querySelector(".window-body"),scene=el.querySelector(".room-scene");
+      const r=el.getBoundingClientRect(), parent=el.parentElement.getBoundingClientRect();
+      return {roomW:r.width,roomH:r.height,canvasW:parent.width,canvasH:parent.height,bodyH:body.clientHeight,bodyScroll:body.scrollHeight,sceneH:scene.getBoundingClientRect().height};
+    });
+    if(geometry.roomW<geometry.canvasW*.94||geometry.roomH<geometry.canvasH*.94)
+      throw Error("Desktop room did not occupy the available workspace: "+JSON.stringify(geometry));
+    if(geometry.bodyScroll>geometry.bodyH+3||geometry.sceneH>geometry.bodyH+3)
+      throw Error("Desktop room still overflows: "+JSON.stringify(geometry));
+    gallery.push({label:`PR #34 after · running app · ${width}×${height} · immersive room and floating settings`,png:await page.screenshot({fullPage:false})});
+  }
+  // Classic remains independent of the HD/Pixel appearance selector.
+  const worldMode=popup.getByRole("region",{name:"Pal Room activities"});
+  await worldMode.getByRole("button",{name:"Switch to Classic Pal Room"}).click();
+  await page.locator(".room-scene:not(.living-world)").waitFor({state:"visible"});
+  if(await popup.locator("details.world-character-library").count()) throw Error("Classic mode still rendered Living World-only library");
+  await worldMode.getByRole("button",{name:"Switch to Living World"}).click();
+  await page.locator(".room-scene.living-world").waitFor({state:"visible"});
+  await popup.locator("details.world-character-library").waitFor({state:"visible"});
+  // Real pointer drag on the independent settings titlebar, without force clicks.
+  const titlebar=popup.locator(".window-titlebar");
+  const original=await popup.boundingBox();
+  const bar=await titlebar.boundingBox();
+  await page.mouse.move(bar.x+85,bar.y+bar.height/2);
+  await page.mouse.down();
+  await page.mouse.move(bar.x+125,bar.y+bar.height/2+12,{steps:6});
+  await page.mouse.up();
+  const moved=await popup.boundingBox();
+  if(!moved||!original||moved.x<original.x+15) throw Error("Room Settings could not be moved");
+  // A real drag on the room window edge must resize it without a nested scrollbar.
+  await hideRoomSettings();
+  const edge=room.locator(".window-resize-e");
+  const before=await room.boundingBox();
+  const handle=await edge.boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x+handle.width/2-180,handle.y+handle.height/2,{steps:8});
+  await page.mouse.up();
+  const smaller=await room.boundingBox();
+  if(!smaller||!before||smaller.width>before.width-90) throw Error("Pal Room window resize did not shrink its canvas");
+  const narrow=await room.evaluate(el=>({body:el.querySelector(".window-body").clientHeight,scroll:el.querySelector(".window-body").scrollHeight}));
+  if(narrow.scroll>narrow.body+3) throw Error("Resized room introduced inner scrolling: "+JSON.stringify(narrow));
+  const h2=await edge.boundingBox();
+  await page.mouse.move(h2.x+h2.width/2,h2.y+h2.height/2);
+  await page.mouse.down();
+  await page.mouse.move(h2.x+h2.width/2+180,h2.y+h2.height/2,{steps:8});
+  await page.mouse.up();
+  // Restore a maximized room for the remaining HD/character smoke coverage.
+  await room.getByRole("button",{name:"Maximize Pal Room"}).click();
+  await showRoomSettings();
+  // Closing with Escape must return focus to the Room Settings button;
+  // X close and reopen must also leave the room visible.
+  await popup.focus();
+  await page.keyboard.press("Escape");
+  await popup.waitFor({state:"hidden"});
+  await page.waitForFunction(()=>document.activeElement?.classList.contains("room-settings-trigger"),undefined,{timeout:3000})
+    .catch(()=>{throw Error("Room Settings Escape did not restore trigger focus");});
+  await showRoomSettings();
+  await hideRoomSettings();
+  await popup.waitFor({state:"hidden"});
+  if(!await room.locator(".room-scene").isVisible()) throw Error("Closing Room Settings hid the room");
+  await page.setViewportSize({width:390,height:844});
+  await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')!==null);
+  if(await page.locator('[data-window-id="room-settings"]').count())
+    throw Error("Separate Room Settings popup appeared in phone layout");
+  // Use the actual mobile navigation to show the room, not just a hidden DOM
+  // assertion; capture both the scene and reachable inline controls.
+  await page.locator(".mobile-tabbar").getByRole("button",{name:"More"}).click();
+  await page.getByRole("group",{name:"More mobile tools"}).getByRole("button",{name:"Pal Room"}).click();
+  await room.waitFor({state:"visible"});
+  await room.getByRole("region",{name:"Pal Room activities"}).waitFor({state:"visible"});
+  gallery.push({label:"PR #34 after · running app · 390×844 · iPhone-sized Pal Room",png:await page.screenshot({fullPage:false})});
+  await room.locator(".room-settings-content").scrollIntoViewIfNeeded();
+  gallery.push({label:"PR #34 after · running app · 390×844 · accessible inline room controls",png:await page.screenshot({fullPage:false})});
+  await page.setViewportSize({width:1500,height:900});
+  await page.waitForFunction(()=>document.querySelector('[data-window-id="room"] .room-settings-content')===null);
+});
+
 // P1 regression guard: built-in guests (Green Jacket, Moon Mage, …) must stay in the room when the HD office is on.
 await step("HD office keeps enabled built-in guests (no disappearing, no duplicates) and restores them", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const appearance = mood.getByRole("group", { name: "Room appearance" });
-  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  const library = page.locator(".room-settings-content details.world-character-library");
   await library.waitFor({ state: "visible" });
   if (await library.getAttribute("open") === null) await library.locator("summary").click();
   const guests = ["Green Jacket Guy", "Moon Mage"];
@@ -1341,6 +1475,7 @@ await step("HD office keeps enabled built-in guests (no disappearing, no duplica
 await step("Living Universe HD office preview: Room Appearance flag, camera, honest ambient life, fallback", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   await page.getByRole("combobox", { name: "Theme", exact: true }).click();
   await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
@@ -1379,6 +1514,22 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
   for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Zoom in" }).click();
   await page.waitForTimeout(3000);
   gallery.push({ label: `Running app (CI) · desktop · following ${followed}, zoomed in`, png: await page.locator(".room-scene").screenshot() });
+  // The focused camera viewport must accept keyboard pan at a zoom that
+  // exceeds its fit width; unlike forced clicks, this tests actual input.
+  const cameraViewport=office.locator(".hd-office-viewport");
+  const worldLayer=office.locator(".hd-office-world");
+  await cameraViewport.focus();
+  const transformBefore=await worldLayer.getAttribute("style");
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(80);
+  if(await worldLayer.getAttribute("style")===transformBefore) {
+    // A followed actor may already be at the left clamp: try the opposite direction.
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(80);
+    if(await worldLayer.getAttribute("style")===transformBefore)
+      throw Error("HD camera arrow-key pan did not move the world in either direction");
+  }
+
   await appearance.getByRole("checkbox", { name: /Synthetic HD placeholders/ }).check();
   await page.locator('.hd-actor[data-art="synthetic"]').first().waitFor();
   await page.waitForTimeout(2000);
@@ -1420,9 +1571,10 @@ await step("Living Universe HD office preview: Room Appearance flag, camera, hon
 await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cosmetic and reversible", async () => {
   const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await showRoomSettings();
   const mood = page.getByRole("region", { name: "Pal Room activities" });
   const appearance = mood.getByRole("group", { name: "Room appearance" });
-  const library = page.locator('[data-window-id="room"] details.world-character-library');
+  const library = page.locator(".room-settings-content details.world-character-library");
   await library.waitFor({ state: "visible" });
   if (await library.getAttribute("open") === null) await library.locator("summary").click();
   const ids = ["user-smokenovahd1", "user-smokenovapx1"];
@@ -1495,14 +1647,34 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
     const after = await identity();
     if (JSON.stringify(after) !== JSON.stringify(before.local)) throw Error("Switching looks changed other saved data");
   } finally {
+    // The controls unmount/remount when crossing 700px. Re-open the new
+    // Character Universe <details> before looking for Delete buttons, rather
+    // than silently treating a missing/hidden locator as successful cleanup.
+    await page.setViewportSize({ width: 1500, height: 900 });
+    await showRoomSettings();
+    const cleanupLibrary=page.locator(".room-settings-content details.world-character-library");
+    await cleanupLibrary.waitFor({state:"visible"});
+    if(await cleanupLibrary.getAttribute("open")===null) await cleanupLibrary.locator(":scope > summary").click();
     await appearance.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
     await appearance.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
     await appearance.getByRole("button", { name: "Restore Nova's original look" }).click().catch(() => undefined);
-    for (const name of ["Smoke Nova HD", "Smoke Nova Pixel"]) {
-      const del = library.getByRole("button", { name: "Delete " + name });
-      if (await del.count()) { page.once("dialog", d => d.accept()); await del.click(); }
+    for (const [id,name] of [[ids[0],"Smoke Nova HD"],[ids[1],"Smoke Nova Pixel"]]) {
+      const data=await (await page.request.get(URL_+"/api/character-universe")).json();
+      if(!data.characters?.some(c=>c.id===id)) continue;
+      const del=cleanupLibrary.getByRole("button",{name:"Delete "+name});
+      await del.waitFor({state:"visible",timeout:8000});
+      page.once("dialog",d=>d.accept());
+      await del.click();
+      await page.waitForFunction(async id=>{
+        const r=await fetch("/api/character-universe",{credentials:"same-origin"});
+        return r.ok && !((await r.json()).characters??[]).some(c=>c.id===id);
+      },id,{timeout:15000}).catch(async()=>{
+        const fresh=await (await page.request.get(URL_+"/api/character-universe")).json();
+        throw Error("Character Library Delete did not persist for "+name+
+          ". Sync status: "+await cleanupLibrary.locator('[role="status"]').allTextContents()+
+          " / revision "+fresh.revision);
+      });
     }
-    await page.waitForFunction(async ids => { const r = await fetch("/api/character-universe", { credentials: "same-origin" }); return r.ok && !((await r.json()).characters ?? []).some(c => ids.includes(c.id)); }, ids, { timeout: 15000 }).catch(() => undefined);
     await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
     await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
   }
