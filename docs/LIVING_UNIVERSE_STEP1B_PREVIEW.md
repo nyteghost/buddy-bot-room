@@ -1,30 +1,82 @@
-# Pixel Pals — Step 1b isolated grey-box preview (stages 1–3)
+# Pixel Pals — Step 1b isolated preview, stages 1–3
 
-**Status:** Draft implementation, dependent on Step 1a PR #40, not mounted in the app. Stage 4 remains unapproved.
+**Status:** Draft, stacked on Step 1a PR #40. Stage 4 is not included or authorized.
+The isometric Office is **not imported or mounted** in room.tsx. No Room Settings,
+CSS, Character Universe importer, Pal identity/permission, service, Unraid, or
+active flat-HD renderer code has changed.
 
-## Files and boundaries
+## Preview contracts
 
-- `world-presentation.ts` adds `isoOffice` to the existing **per-device** appearance setting, sanitized to `false` when missing, malformed or old; the current renderer still selects `worldUsesHdOffice` and never calls `worldUsesIsoOffice`.
-- `world-iso-schedule.ts` maps stable Pal IDs to nine desk anchors, six uniquely assigned visitor homes, and deterministic ambient targets. **Real activity is an input, never fabricated by ambient scheduling.**
-- `world-iso-crowd.ts` implements collision-checked ground-space movement and actor reservations on the sealed Step 1a plan. It is not an integration with the existing flat `WorldCrowd`.
-- `world-iso-scene.ts` projects a 19×14 synthetic floor and grey-box furniture and computes a deterministic depth order.
-- `world-iso-office.tsx` is a standalone React preview with the six existing HD Office props, plus optional externally supplied camera/viewport/fallback. It uses SVG placeholders, not private or production assets; it is **not imported in room.tsx**.
-- Tests cover preference migration, desktop/phone safeguards, stable seat/visitor mapping, honest task status, crowd clearance, depth ordering and isolated component rendering.
+- **Settings:** the optional per-device isoOffice flag is absent/false in old
+  storage. Activation needs explicit opt-in, the HD Office on the Linux theme,
+  desktop-sized viewport **and no coarse primary pointer or mobile device
+  classification**, low-power or data saver. Width alone is insufficient for
+  landscape phones. The current app does not read this selection.
+- **Nine Pals/six visitors:** canonical immutable AgentId-to-seat mapping,
+  ordered distinct visitor homes, no Pal/visitor identity conversion; real
+  activity comes only from supplied authoritative state. Ambient choices
+  reserve unique social anchors or fall back to each actor's own home.
+- **Navigation:** sealed Step 1a ground geometry only. worldIsoCrowd reserves
+  the complete old/current trajectories, moves along *each verified route
+  segment* and checks every dynamic swept disc, not the shortcut chord.
+  No teleport or ignoring furniture to satisfy arrival.
+- **Congestion:** deterministic Pal/real-work priority, bounded substeps and
+  limited temporary yielding on walkable ground. On a busy route the actor can
+  wait; a genuinely unavailable workstation or no safe recovery is explicitly
+  reported as blocked/unreachable. The simulator does **not guarantee**
+  that every arbitrary bounded geometry permits all actors to arrive.
+- **Diagnostics:** worldIsoCrowd.diagnostics() reports total ticks, simulated
+  and dropped time, path queries, assignment failures, bounded recovery
+  attempts, moves, max continuous wait, per-actor status, goal and failure
+  reason. The isolated component may forward diagnostics to an owner callback.
+  This is **not** a server-activity or privacy permission channel.
+- **Clock:** elapsed simulated time is held in a stable ref independent of
+  parent arrays. Real pauses stop the clock and movement; resumption does
+  not replay suspended time. Each update simulates at most 200 ms, partitioned
+  into at most four 50 ms movement slices. Excess elapsed wall time is
+  explicitly dropped. Roster changes join/leave actors without discarding
+  surviving Pal trajectories.
+- **Error containment:** PreviewBoundary catches synchronous component
+  failures; the RAF catches asynchronous simulation failures and stops.
+  Both display the caller-supplied fallback ReactNode or a default alert.
+  Stage 4's future owner MUST provide the existing flat-HD Office element
+  as that fallback. **No flat renderer is mounted by this PR.**
+- **Camera:** optional, externally owned WorldCamera transform. It does not
+  implement Fit/Follow/Pan/Pinch inputs; these remain a future Stage 4
+  integration dependency.
 
-## Limitations before Stage 4
+## CI and stress methodology
 
-- The crowd reservation engine is conservative: it prevents overlap/swaps, but **deadlock-freedom and all 25-second recovery cases are not yet proved**. Simulate doorway rush, opposing actors and blocked seats with independent stress tests before enabling this in a room.
-- Preview sprites are circles, labels and direction rays only. Art-layer chair backs, tall furniture and actual HD256 foot contact/occlusion are not established by the SVG grey box.
-- The component's internal camera support is a contract only. Real Fit, Follow, zoom, pan and popup UI behavior require deliberate integration with PR #34 and device tests.
-- A React error boundary only catches synchronous render errors; the component has a separate asynchronous simulation fail-off guard. Stage 4 must mount the **existing flat HD Office** if the preview fails, rather than showing only the placeholder notice.
-- Physical iPhone Safari performance is untested. Phone widths, low-power and data-saver hints are explicitly ineligible for the preview.
-- No new importer, asset pack, permission, memory, activity authority or persisted server data exists here.
-- A separate release gate is needed for dynamic 15-actor stress, real FPS/heap profiling and real art.
+The standalone Node/Vitest tests simulate five named full-office scenarios,
+**nine Pals + six visitors, 20 simulated minutes per scenario** in bounded
+200 ms updates. Scenarios include ambient schedules, desk recalls, visitor
+rotation, doorway/head-on travel, contended socials, blocked workstations,
+pause/resume, leave/rejoin and deterministic assignment. They log
+ISO_STRESS_RESULT JSON records with measured collisions, invalid ground,
+teleports, arrivals, blocked/unreachable samples, failed routes, max wait,
+path queries, recovery attempts, test-process CPU wall time and approximate
+heap delta. A measured heap delta is **not** a browser heap profile.
 
-## Safe sequencing
+Separate tests reproduce the Core head-on example (0.6-tile initial separation,
+opposite goals), a tight desk corner with a chord that clips the desk, route
+reservation retries, timestep partitioning, landscape eligibility, a
+persistent clock, React rerenders, pause/resume and preview error fallback.
 
-1. Independent Core + QA accept Step 1a at `a244409c279d7e1986899bfb02ba53b99cac664c` or its reviewed successor.
-2. Review this stacked Step 1b draft and run full TypeScript, unit, build and existing browser smoke.
-3. Resolve PR #34 through UX QA, preserving HD/Pixel/Classic and full-window Room Settings.
-4. **Only after separate owner approval:** Stage 4 wiring (room mount, checkbox, style and smoke). Then Gate 1 desktop and physical phone testing.
-5. No merge into beta/main, no Unraid deployment, and no private artwork in GitHub as part of stages 1–3.
+The <=25-second waiting objective applies **only where a conflict-free path
+exists**. Safety and deterministic refusal are the higher priority where a
+destination is irreducibly blocked. The stress results must be inspected;
+a green test suite alone does not prove deadlock freedom, 25-second recovery
+for all configurations, iPhone Safari performance, or realistic HD256
+occlusion. Any measured exception is a release blocker to report, not a
+passing claim to fabricate.
+
+## Restrictions and remaining gates
+
+The active Room, its separate Room Settings popup, Classic and Mobile Pixel
+presentations, existing flat Office and Character Universe v3 HD256 import
+remain untouched. No production assets, no live UI checkbox, and no stage 4.
+
+Independent Core/QA review must inspect the exact new SHA, test logs and
+reproducible congestion scenarios. Separate Stage 4 authorization is required
+after PR #34 UX acceptance, performance/physical-device testing and reliable
+flat fallback input/controller wiring. Do not merge or deploy without approval.

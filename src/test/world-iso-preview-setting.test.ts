@@ -30,6 +30,10 @@ describe("Step 1b hidden preview selection (no UI wiring)", () => {
  it("never enables on phone widths, low-power or data-saver hints even with forced HD", () => {
   const on = cleanWorldRoomAppearance({ look: "hd", hdOffice: true, isoOffice: true });
   expect(worldUsesIsoOffice(on, "linux", mobile)).toBe(false);
+  expect(worldUsesIsoOffice(on, "linux", { width: 844, coarse: true, mobile: true })).toBe(false);
+  expect(worldUsesIsoOffice(on, "linux", { width: 844, coarse: true })).toBe(false);
+  expect(worldUsesIsoOffice(on, "linux", { width: 1024, coarse: false, mobile: true })).toBe(false);
+  expect(worldUsesIsoOffice(on, "linux", { width: 1440, coarse: false, mobile: false })).toBe(true);
   expect(worldUsesIsoOffice(on, "linux", { ...desktop, saveData: true })).toBe(false);
   expect(worldUsesIsoOffice(on, "linux", { ...desktop, lowPower: true })).toBe(false);
   expect(worldUsesIsoOffice(on, "linux", { ...desktop, width: 700 })).toBe(false);

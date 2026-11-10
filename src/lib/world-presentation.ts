@@ -13,6 +13,8 @@ export type WorldDeviceHints = Readonly<{
  /** Primary pointer is coarse (touch). */ coarse: boolean;
  /** Data saver / low-power preference. */ saveData?: boolean;
  lowPower?: boolean;
+ /** Device-level phone classification independent of orientation and viewport width. */
+ mobile?: boolean;
 }>;
 export const WORLD_PRESENTATION_KEY = "pixel-pals-presentation-v1";
 /** Below this width a phone-sized room is assumed. */
@@ -86,8 +88,10 @@ export function subscribeWorldRoomAppearance(listener: Listener): () => void {
 export function worldDeviceHints(): WorldDeviceHints {
  if (typeof window === "undefined") return { width: 1280, coarse: false };
  const media = (q: string) => typeof window.matchMedia === "function" && window.matchMedia(q).matches;
- const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
- return { width: window.innerWidth || 1280, coarse: media("(pointer: coarse)"), saveData: !!connection?.saveData };
+ const nav = navigator as Navigator & { connection?: { saveData?: boolean }; userAgentData?: { mobile?: boolean } };
+ const connection = nav.connection;
+ const mobile = nav.userAgentData?.mobile === true || /iPhone|iPod|Android.*Mobile|Mobile\//i.test(nav.userAgent || "");
+ return { width: window.innerWidth || 1280, coarse: media("(pointer: coarse)"), mobile, saveData: !!connection?.saveData };
 }
 /**
  * Whether the HD office replaces the current Living World room: feature flag on, office theme,
@@ -100,5 +104,5 @@ export function worldUsesHdOffice(appearance: WorldRoomAppearance, theme: string
 /** Stage 1b selection only: never mounts a room or changes the current renderer. */
 export function worldUsesIsoOffice(appearance: WorldRoomAppearance, theme: string, hints: WorldDeviceHints): boolean {
  return appearance.isoOffice === true && worldUsesHdOffice(appearance, theme, hints)
-  && hints.width > WORLD_PIXEL_MAX_WIDTH && !hints.saveData && !hints.lowPower;
+  && hints.width > WORLD_PIXEL_MAX_WIDTH && !hints.mobile && !hints.coarse && !hints.saveData && !hints.lowPower;
 }

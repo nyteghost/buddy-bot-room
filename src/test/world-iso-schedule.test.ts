@@ -22,6 +22,9 @@ describe("Step 1b authoritative-isolated ambient schedules", () => {
   const b = worldIsoSchedule(pals, [...guests].reverse(), 0).filter(x => x.kind === "visitor");
   expect(a).toEqual(b);
   expect(new Set(a.map(x => x.home)).size).toBe(6);
+  const moving = worldIsoSchedule(pals, guests, 25_000);
+  const shared = moving.filter(x => x.activity === "ambient").map(x => x.target.u + "," + x.target.v);
+  expect(new Set(shared).size).toBe(shared.length);
  });
  it("only reports real work when the app explicitly supplied it", () => {
   const realPals = pals.map(p => p.id === "nova" ? { ...p, real: "responding" as const } : p);
