@@ -37,6 +37,15 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   positionRef.current = position;
   const sizeRef = useRef(size);
   sizeRef.current = size;
+  // Room Settings is an inspector belonging to the Pal Room. Raise it with the
+  // room when the user clicks the scene/camera so the full-size room cannot
+  // steal pointer events from controls in its own floating inspector.
+  useEffect(() => {
+    if (id !== "room-settings" || !open) return;
+    const raise = () => setFront(++windowStack);
+    window.addEventListener("pixelpals:raise-room-settings", raise);
+    return () => window.removeEventListener("pixelpals:raise-room-settings", raise);
+  }, [id, open]);
   const key = `pixel-pals-window-${id}-v1`;
   const sizeKey = `pixel-pals-window-${id}-size-v1`;
   useEffect(() => {
@@ -217,7 +226,12 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   return <section ref={ref} tabIndex={-1} aria-label={title} hidden={!open} style={style}
     data-window-id={id}
     className={cn("workspace-window", `window-${id}`, className, size && "window-sized", expanded && "window-expanded")}
-    onPointerDownCapture={() => setFront(++windowStack)}
+    onPointerDownCapture={() => {
+      setFront(++windowStack);
+      if (id === "room" && document.querySelector('[data-window-id="room-settings"]:not([hidden])')) {
+        window.dispatchEvent(new Event("pixelpals:raise-room-settings"));
+      }
+    }}
     onKeyDown={(event) => {
       if (id !== "room-settings" || event.key !== "Escape" || event.defaultPrevented) return;
       if ((event.target as HTMLElement).closest('[role="dialog"],[role="alertdialog"],[data-radix-popper-content-wrapper]')) return;
