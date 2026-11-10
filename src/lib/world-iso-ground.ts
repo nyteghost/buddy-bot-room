@@ -63,6 +63,9 @@ export const WORLD_ISO_LIMITS = Object.freeze({
  maxCachedRadii: 4,
 });
 
+/** Longest waypoint list worldIsoSmoothPath accepts (a route visits each grid node at most once, plus both ends). */
+const SMOOTH_MAX_POINTS = WORLD_ISO_LIMITS.maxGridNodes + 2;
+
 export type GroundBox = Readonly<{ id: string; u1: number; v1: number; u2: number; v2: number }>;
 export const WORLD_ISO_ANCHOR_KINDS = ["seat", "stand", "visitor", "door", "chat", "sofa", "coffee", "window", "board", "shelf", "plant"] as const;
 export type GroundAnchorKind = (typeof WORLD_ISO_ANCHOR_KINDS)[number];
@@ -456,19 +459,27 @@ export function worldIsoPath(plan: GroundPlan, from: GroundPoint, to: GroundPoin
 }
 
 /**
- * String-pull a walkable path: from each corner, jump to the furthest later point reachable in a straight
- * line. Returns fresh points. If the plan, radius or any point is unusable, or a consecutive pair is not
- * clear, the input is returned as a copy with nothing joined (it never invents a shortcut it cannot verify).
+ * String-pull a walkable path: from each corner, jump to the furthest later point reachable in a straight line.
+ *
+ * Contract (fail closed): the input must already be a walkable path on a sealed plan. The function returns
+ * null, never a path, when the plan is not sealed, the radius is unsupported, `path` is not a non-empty array,
+ * any waypoint is invalid (waypoints are never dropped or skipped over), or any consecutive pair of waypoints
+ * fails the exact swept-footprint test (a single waypoint must itself be free). Otherwise it returns a fresh
+ * array of fresh points with the same first and last waypoint, and every returned segment has passed the exact
+ * swept-footprint test. Deterministic. A null result means "no verified path", the same as worldIsoPath.
  */
-export function worldIsoSmoothPath(plan: GroundPlan, path: readonly GroundPoint[], radius: number = WORLD_ISO_FOOTPRINT): GroundPoint[] {
- const same = Array.isArray(path) ? path.filter(validPoint).map(copy) : [];
- if (!usable(plan, radius) || same.length !== path.length || path.length <= 2) return same;
- const out: GroundPoint[] = [same[0]!];
+export function worldIsoSmoothPath(plan: GroundPlan, path: readonly GroundPoint[], radius: number = WORLD_ISO_FOOTPRINT): GroundPoint[] | null {
+ if (!usable(plan, radius) || !Array.isArray(path) || path.length === 0 || path.length > SMOOTH_MAX_POINTS) return null;
+ const points: GroundPoint[] = [];
+ for (let i = 0; i < path.length; i++) { const p: unknown = path[i]; if (!validPoint(p)) return null; points.push(copy(p)); }
+ if (points.length === 1) return pointFree(plan, points[0]!, radius) ? points : null;
+ for (let i = 1; i < points.length; i++) if (!segmentClear(plan, points[i - 1]!, points[i]!, radius)) return null;
+ const out: GroundPoint[] = [points[0]!];
  let i = 0;
- while (i < same.length - 1) {
-  let j = same.length - 1;
-  while (j > i + 1 && !segmentClear(plan, same[i]!, same[j]!, radius)) j--;
-  out.push(same[j]!);
+ while (i < points.length - 1) {
+  let j = points.length - 1;
+  while (j > i + 1 && !segmentClear(plan, points[i]!, points[j]!, radius)) j--;
+  out.push(points[j]!); // j === i + 1 was verified above; any further j was verified in this loop
   i = j;
  }
  return out;

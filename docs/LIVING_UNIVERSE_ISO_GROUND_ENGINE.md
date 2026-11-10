@@ -74,6 +74,17 @@ The synthetic depth tests do not establish visual correctness.
 - **Nothing can go stale.** The sealed copy shares no object with the input, so later changes to the input do nothing. Grids and edges are cached per sealed plan. Grid lines and edge lists are frozen, and node points, routes and paths are returned as fresh copies.
 - **Room packs (future loader):** parse the manifest, pass the ground plan to `worldIsoValidatePlan`, and use only `report.plan`. Re-validate to pick up an updated pack; the old sealed plan stays valid and unchanged until it is dropped.
 
+### Path smoothing contract (`worldIsoSmoothPath`)
+
+- **Input:** a path that is already walkable on a sealed plan.
+- **Returns `null`, never a path, when:**
+  - the plan is not sealed, or the radius is unsupported;
+  - the path is not a non-empty list;
+  - any waypoint is invalid (waypoints are never dropped or skipped);
+  - any consecutive pair of waypoints fails the exact swept-footprint test, including two-point paths, or a single waypoint is not free.
+- **Otherwise** it returns fresh points with the same first and last waypoint, and every returned segment has passed the exact swept-footprint test.
+- `null` means "no verified path", the same result `worldIsoPath` uses.
+
 ### Footprint radius and positions
 
 - **Supported radius:** a finite number from 0.1 to 1 tile, inclusive. The default is 0.3.

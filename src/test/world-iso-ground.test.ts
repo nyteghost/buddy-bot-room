@@ -365,7 +365,7 @@ describe("invalid collision inputs fail closed (Core/QA P1)", () => {
    expect(worldIsoGridRoute(desk, blocked[0], blocked[1], radius)).toBeNull();
    expect(worldIsoPath(desk, blocked[0], blocked[1], radius)).toBeNull();
    expect(worldIsoPath(desk, open[0], open[1], radius)).toBeNull();
-   expect(worldIsoSmoothPath(desk, [blocked[0], { u: 1, v: 1 }, blocked[1]], radius)).toHaveLength(3); // nothing joined
+   expect(worldIsoSmoothPath(desk, [open[0], { u: 4, v: 1.5 }, open[1]], radius)).toBeNull();            // even a walkable path gets no result
    expect(codes(rawPlan("r", square(8)), radius)).toEqual(["radius-invalid"]);
    expect(worldIsoValidatePlan(rawPlan("r", square(8)), radius).plan).toBeNull();
   }
@@ -382,7 +382,7 @@ describe("invalid collision inputs fail closed (Core/QA P1)", () => {
    expect(worldIsoGridRoute(desk, open[0], p)).toBeNull();
    expect(worldIsoPath(desk, p, open[1])).toBeNull();
    expect(worldIsoPath(desk, open[0], p)).toBeNull();
-   expect(worldIsoSmoothPath(desk, [open[0], p, open[1]]).length).toBeLessThanOrEqual(2); // the bad point is dropped, nothing is joined across it
+   expect(worldIsoSmoothPath(desk, [open[0], p, open[1]])).toBeNull(); // never dropped, never joined across
   }
   const g = worldIsoGrid(desk)!;
   for (const id of [-1, 1.5, Number.NaN, Infinity, g.cols * g.rows, 1e12]) { expect(g.free(id)).toBe(false); expect(g.neighbours(id)).toEqual([]); }
@@ -685,5 +685,104 @@ describe("off-grid passages, endpoints and connectors (Core/QA P2)", () => {
   const started = Date.now();
   for (const a of anchors) if (a.id !== "door") expect(worldIsoPath(WORLD_ISO_GREYBOX, door.at, a.at)).not.toBeNull();
   expect(Date.now() - started).toBeLessThan(3000); // 47 routes including first-use edge checks; generous for slow CI
+ });
+});
+
+describe("worldIsoSmoothPath fails closed (PM review of 0052733)", () => {
+ const desk = bare("smooth-desk", square(8), [{ id: "desk", u1: 3, v1: 3, u2: 5, v2: 5 }]);
+ const A = { u: 1, v: 4 }, B = { u: 7, v: 4 };                       // opposite sides of the desk
+ const around = [A, { u: 1, v: 1.5 }, { u: 4, v: 1.5 }, { u: 7, v: 1.5 }, B]; // a walkable detour with removable corners
+ const BAD_RADII: unknown[] = [Number.NaN, Infinity, -Infinity, 0, -0, -0.3, 0.05, 1.5, 1e9, "0.3", null, {}, true];
+ const BAD_POINTS: unknown[] = [{ u: Number.NaN, v: 1.5 }, { u: 4, v: Infinity }, { u: -Infinity, v: 1.5 }, { u: 1e9, v: 1.5 }, { u: "4", v: 1.5 }, { u: 4 }, {}, null, undefined, 7, "4,1.5"];
+
+ it("returns null for every unsupported radius, even for a walkable path", () => {
+  for (const bad of BAD_RADII) {
+   expect(worldIsoSmoothPath(desk, around, bad as number)).toBeNull();
+   expect(worldIsoSmoothPath(desk, [A, B], bad as number)).toBeNull();
+   expect(worldIsoSmoothPath(desk, [A], bad as number)).toBeNull();
+  }
+ });
+
+ it("returns null for unsealed or junk plans", () => {
+  const raw = rawPlan("raw", square(8), [{ id: "desk", u1: 3, v1: 3, u2: 5, v2: 5 }]) as unknown as GroundPlan;
+  for (const plan of [raw, null, undefined, 5, "plan", {}, []]) {
+   expect(worldIsoSmoothPath(plan as GroundPlan, around)).toBeNull();
+   expect(worldIsoSmoothPath(plan as GroundPlan, [{ u: 1, v: 1 }, { u: 2, v: 1 }])).toBeNull();
+  }
+ });
+
+ it("returns null when any waypoint is invalid: it is never dropped and its neighbours are never joined", () => {
+  for (const bad of BAD_POINTS) for (let at = 0; at <= around.length; at++) {
+   const path = [...around.slice(0, at), bad as GroundPoint, ...around.slice(at)];
+   expect(worldIsoSmoothPath(desk, path)).toBeNull();
+  }
+  // The neighbours of the bad waypoint here are directly joinable; the result must still be null, not a two-point path.
+  expect(worldIsoSegmentClear(desk, { u: 1, v: 1.5 }, { u: 7, v: 1.5 })).toBe(true);
+  expect(worldIsoSmoothPath(desk, [{ u: 1, v: 1.5 }, { u: Number.NaN, v: 1.5 }, { u: 7, v: 1.5 }])).toBeNull();
+  for (const junk of [null, undefined, 5, "path", {}, []]) expect(worldIsoSmoothPath(desk, junk as unknown as GroundPoint[])).toBeNull();
+ });
+
+ it("returns null for a two-point path that crosses furniture, leaves the floor or ends in a blocked spot", () => {
+  expect(worldIsoSmoothPath(desk, [A, B])).toBeNull();                                  // straight through the desk
+  expect(worldIsoSmoothPath(desk, [{ u: 2.6, v: 3.1 }, { u: 3.1, v: 2.6 }])).toBeNull(); // both ends free, clips the corner
+  expect(worldIsoSmoothPath(desk, [A, { u: 4, v: 4 }])).toBeNull();                     // ends inside the desk
+  expect(worldIsoSmoothPath(desk, [A, { u: 9, v: 4 }])).toBeNull();                     // ends off the floor
+  expect(worldIsoSmoothPath(desk, [{ u: 4, v: 4 }])).toBeNull();                        // a single blocked point
+  expect(worldIsoSmoothPath(L_FLOOR, [{ u: 2, v: 8 }, { u: 8, v: 2 }])).toBeNull();     // cuts across the missing corner of the floor
+ });
+
+ it("returns null when any consecutive segment is blocked, wherever it is in the path", () => {
+  expect(worldIsoSmoothPath(desk, [A, { u: 1, v: 1.5 }, { u: 7, v: 1.5 }, B, A])).toBeNull();                 // last leg goes back through the desk
+  expect(worldIsoSmoothPath(desk, [A, B, { u: 7, v: 1.5 }])).toBeNull();                                      // first leg blocked
+  expect(worldIsoSmoothPath(desk, [A, { u: 1, v: 1.5 }, { u: 4, v: 4 }, { u: 7, v: 1.5 }, B])).toBeNull();    // a waypoint inside the desk
+  // The blocked middle leg cannot be "smoothed away" even though its two ends are joinable by another route.
+  expect(worldIsoSmoothPath(desk, [{ u: 1, v: 1.5 }, A, B, { u: 7, v: 1.5 }])).toBeNull();
+ });
+
+ it("returns valid one- and two-point paths unchanged, as fresh copies", () => {
+  const p = { u: 1, v: 1 }, q = { u: 7, v: 1 };
+  const two = worldIsoSmoothPath(desk, [p, q])!;
+  expect(two).toEqual([{ u: 1, v: 1 }, { u: 7, v: 1 }]);
+  expect(two[0] === p || two[1] === q).toBe(false);
+  expect(worldIsoSmoothPath(desk, [p])).toEqual([{ u: 1, v: 1 }]);
+  expect(worldIsoSmoothPath(desk, [p, p])).toEqual([p, p]); // a zero-length step at a free point is walkable
+ });
+
+ it("smooths a valid multi-point path: same ends, fewer corners, never longer, every segment verified", () => {
+  const out = worldIsoSmoothPath(desk, around)!;
+  expect(out[0]).toEqual(A); expect(out.at(-1)).toEqual(B);
+  expect(out.length).toBeLessThan(around.length);
+  expect(worldIsoPathLength(out)).toBeLessThanOrEqual(worldIsoPathLength(around) + 1e-9);
+  expect(pathClear(desk, out)).toBe(true);
+  for (let i = 1; i < out.length; i++) expect(worldIsoSegmentClear(desk, out[i - 1]!, out[i]!)).toBe(true);
+  // A path with nothing to remove comes back with the same waypoints.
+  expect(worldIsoSmoothPath(ROOM, [{ u: 2, v: 7 }, { u: 4.75, v: 5 }, { u: 4.75, v: 3 }, { u: 2, v: 1 }])).toHaveLength(4);
+  // Supported non-default radii follow the same rules.
+  expect(pathClear(desk, worldIsoSmoothPath(desk, [{ u: 1.5, v: 4 }, { u: 1.5, v: 1.5 }, { u: 6.5, v: 1.5 }, { u: 6.5, v: 4 }], 1)!, 1)).toBe(true);
+  expect(worldIsoSmoothPath(desk, [{ u: 1.5, v: 4 }, { u: 1.5, v: 2.5 }, { u: 6.5, v: 2.5 }, { u: 6.5, v: 4 }], 1)).toBeNull(); // too close to the desk for a 1-tile footprint
+ });
+
+ it("is deterministic and does not modify its input", () => {
+  const input = around.map(p => ({ ...p })), before = JSON.stringify(input);
+  const first = JSON.stringify(worldIsoSmoothPath(desk, input));
+  for (let k = 0; k < 5; k++) expect(JSON.stringify(worldIsoSmoothPath(desk, input))).toBe(first);
+  expect(JSON.stringify(input)).toBe(before);
+  const again = seal(JSON.parse(JSON.stringify(desk)));
+  expect(JSON.stringify(worldIsoSmoothPath(again, input))).toBe(first);
+ });
+
+ it("keeps worldIsoPath compatible: every route it returns re-smooths to itself", () => {
+  let checked = 0;
+  for (const plan of LAYOUTS) {
+   const g = worldIsoGrid(plan)!;
+   for (const [a, b] of pairs(plan, 20)) {
+    const path = worldIsoPath(plan, g.point(a), g.point(b));
+    if (!path) continue;
+    expect(worldIsoSmoothPath(plan, path)).not.toBeNull();
+    expect(pathClear(plan, path)).toBe(true);
+    checked++;
+   }
+  }
+  expect(checked).toBeGreaterThan(80);
  });
 });
