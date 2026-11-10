@@ -203,6 +203,9 @@ describe("held-goal and adversarial liveness instrumentation",()=>{
   expect(g.outcome).toBe("rejected");
   expect(g.reason).toBe("destination-reserved");
   expect(g.requestAtMs).toBe(0);
+  expect(g.blockedMs).toBeGreaterThanOrEqual(59_900);
+  expect(g.maxContinuousBlockedMs).toBeGreaterThanOrEqual(59_900);
+  expect(g.maxNonProgressMs).toBeGreaterThanOrEqual(59_900);
   expect(d.actors.find(a=>a.id==="claimant")).toMatchObject({
    arrived:false,reserved:false,status:"blocked",reason:"destination-reserved",
   });

@@ -157,7 +157,30 @@ export class WorldIsoCrowd {
   const goal = same ? a.goalRecord! : this.startGoal(a, requested);
   // A duplicate request must neither reset an intercepted yield nor erase
   // its original request time, blocked duration, or recovery attempts.
-  if (same && a.committed && !a.failedGoal) return true;
+  if (same && a.committed && !a.failedGoal) {
+   // A repeated goal is not authorization to retain a stale yielding route.
+   // A third actor can intercept a sidestep between calls to step().
+   if (a.yieldTo) {
+    const positions = new Map(this.ordered().map(b => [b.id, copy(b.at)]));
+    const blocker = this.clearAgainstActors(a, a.at, a.yieldTo, positions, new Map());
+    if (!worldIsoSegmentClear(this.plan, a.at, a.yieldTo, this.radius) || blocker) {
+     a.yieldTo = null; a.yieldHoldMs = 0;
+     a.status = "blocked"; a.reason = "yield-route-obstructed";
+     this.counters.pathQueries++;
+     const reroute = worldIsoPath(this.plan, a.at, a.goal, this.radius);
+     if (reroute) { a.path = reroute; a.waypoint = 1; }
+     else {
+      a.committed = false; a.status = "unreachable";
+      a.reason = "no-route-after-interception";
+      goal.outcome = "unreachable"; goal.reason = a.reason;
+      goal.finishedAtMs = this.time;
+      a.failedGoal = copy(a.goal); a.failedAt = this.time;
+      return false;
+     }
+    }
+   }
+   return true;
+  }
   if (same && a.failedGoal && this.time - a.failedAt < REPLAN_AFTER_MS) return false;
   const fail = (reason: string, status: WorldIsoCrowdStatus) => {
    a.goal = requested ? copy(requested) : copy(a.at);
@@ -173,7 +196,8 @@ export class WorldIsoCrowd {
    goal.reason = reason;
    this.counters.failedAssignments++; return false;
   };
-  if (!requested || !worldIsoPointFree(this.plan, requested, this.radius))
+  if (!requested) return fail("invalid-coordinate", "unreachable");
+  if (!worldIsoPointFree(this.plan, requested, this.radius))
    return fail("invalid-ground", "unreachable");
   const reserved = [...this.actors.values()].some(b => b.id !== id && b.committed &&
    distance(requested, b.goal) < 2 * this.radius - EPS);
@@ -186,16 +210,22 @@ export class WorldIsoCrowd {
   a.waitMs = 0; a.yieldTo = null; a.yieldHoldMs = 0;
   a.status = distance(a.at, requested) < EPS ? "arrived" : "moving";
   a.waiting = false;
-  goal.reservationAtMs = this.time;
+  if (goal.reservationAtMs === null) goal.reservationAtMs = this.time;
   // Re-reserving the same goal after an ambient-period release or retry is
   // not permission to restart its historical no-progress/blocked clock.
   if (!same) {
    goal.lastProgressAtMs = this.time; goal.nonProgressMs = 0;
    goal.bestDistance = distance(a.at, requested);
   }
-  goal.outcome = a.status === "arrived" ? "completed" : "pending";
-  goal.arrivalAtMs = a.status === "arrived" ? this.time : null;
-  goal.finishedAtMs = a.status === "arrived" ? this.time : null; goal.reason = null;
+  const reached = a.status === "arrived";
+  goal.outcome = reached ? "completed" : "pending";
+  // A repeat reservation at an already reached destination is not a new
+  // logical completion; preserve its first successful arrival timestamp.
+  if (reached) {
+   if (goal.arrivalAtMs === null) goal.arrivalAtMs = this.time;
+   if (goal.finishedAtMs === null) goal.finishedAtMs = this.time;
+  } else { goal.arrivalAtMs = null; goal.finishedAtMs = null; }
+  goal.reason = null;
   return true;
  }
  pose(id: string): WorldIsoCrowdPose | null {
@@ -393,16 +423,17 @@ export class WorldIsoCrowd {
   // Yielding movement does not reset the no-goal-progress clock.
   for (const a of ordered) {
    const goal = a.goalRecord;
-   if (!goal || goal.outcome === "completed" || goal.outcome === "canceled" ||
-    goal.outcome === "rejected" || goal.outcome === "unreachable") continue;
-   if (a.committed && a.status === "arrived" && goal.requested &&
+   if (!goal || goal.outcome === "completed" || goal.outcome === "canceled") continue;
+   const rejected = goal.outcome === "rejected" || goal.outcome === "unreachable";
+   if (!rejected && a.committed && a.status === "arrived" && goal.requested &&
     distance(a.at, goal.requested) < EPS) {
     goal.outcome = "completed"; goal.arrivalAtMs = this.time + ms;
     goal.finishedAtMs = this.time + ms;
     goal.nonProgressMs = 0; goal.continuousBlockedMs = 0; goal.reason = null;
     continue;
    }
-   const blocked = a.waiting || a.status === "yielding" || a.status === "blocked";
+   const blocked = a.waiting || a.status === "yielding" ||
+    a.status === "blocked" || a.status === "unreachable";
    if (a.status === "yielding") goal.yieldingMs += ms;
    if (blocked) {
     goal.blockedMs += ms; goal.continuousBlockedMs += ms;
@@ -410,6 +441,9 @@ export class WorldIsoCrowd {
    } else goal.continuousBlockedMs = 0;
    goal.nonProgressMs = Math.max(0, this.time + ms - goal.lastProgressAtMs);
    goal.maxNonProgressMs = Math.max(goal.maxNonProgressMs, goal.nonProgressMs);
+   // Rejected or statically impossible held requests also accumulate honest
+   // unresolved blockage time; they are never reclassified as arrivals.
+   if (rejected) { goal.finishedAtMs = this.time + ms; continue; }
    if (blocked && goal.nonProgressMs >= WAIT_LIMIT_MS) {
     goal.outcome = "stalled"; goal.reason = "goal-progress-timeout";
     goal.finishedAtMs = this.time + ms;

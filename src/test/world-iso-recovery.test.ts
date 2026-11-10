@@ -139,7 +139,8 @@ describe("P1/P2 crowd movement and recovery regressions", () => {
    expect(actor.arrived).toBe(false);
    expect(actor.reserved).toBe(false);
    expect(actor.status).toBe("unreachable");
-   expect(actor.reason).toBe("invalid-ground");
+   expect(actor.reason).toBe(target === invalid[invalid.length-1] ?
+    "invalid-ground" : "invalid-coordinate");
   }
   expect(crowd.assign("A",{u:4,v:2})).toBe(true);
   expect(crowd.diagnostics().actors[0]!.arrived).toBe(false);
@@ -149,6 +150,13 @@ describe("P1/P2 crowd movement and recovery regressions", () => {
   });
   expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("completed");
   expect(crowd.diagnostics().goals.at(-1)?.arrivalAtMs).not.toBeNull();
+  const firstArrival=crowd.diagnostics().goals.at(-1)!.arrivalAtMs;
+  const firstReservation=crowd.diagnostics().goals.at(-1)!.reservationAtMs;
+  crowd.beginSchedulePeriod();
+  expect(crowd.assign("A",{u:4,v:2})).toBe(true);
+  expect(crowd.diagnostics().goals.at(-1)?.arrivalAtMs).toBe(firstArrival);
+  expect(crowd.diagnostics().goals.at(-1)?.reservationAtMs).toBe(firstReservation);
+  expect(crowd.diagnostics().goals.filter(g=>g.actorId==="A").at(-1)?.outcome).toBe("completed");
  });
 
  it("distinguishes a statically valid but unreachable destination", () => {
