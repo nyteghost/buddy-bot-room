@@ -1326,6 +1326,16 @@ const gallery = [];
 // Pal Room window remains scene-first on desktop, while controls live in their own
 // movable window; phone-width devices continue to see controls directly below the room.
 await step("Immersive desktop Pal Room popup, camera reachability, resizing and phone controls", async () => {
+  // Earlier smoke steps deliberately test restoring a user-sized workspace.
+  // Start this *default desktop geometry* check with no saved custom Pal Room
+  // geometry, while retaining the disposable test account and all app data.
+  await page.evaluate(() => {
+    for(const key of ["pixel-pals-window-room-v1","pixel-pals-window-room-size-v1",
+      "pixel-pals-window-room-settings-v1","pixel-pals-window-room-settings-size-v1"])
+      localStorage.removeItem(key);
+  });
+  await page.reload();
+  await page.locator('.modular-workspace[aria-busy="false"]').waitFor();
   const entry=page.locator(".workspace-sidebar .sidebar-item",{hasText:/^\s*Pal Room\s*$/i});
   if(await entry.getAttribute("aria-pressed")!=="true") await entry.click();
   const room=page.locator('[data-window-id="room"]');
