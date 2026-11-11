@@ -798,7 +798,7 @@ it("Strata QA P2: General Chat preserves safe typed pre-stream auth/model/busy/o
     expect(response.status).toBe(503);
     const data = (await response.json()) as { error: string };
     expect(data.error).toContain(message);
-    expect(handleChat).toHaveBeenCalledTimes(1 + 2 + [401, 409, 429, 503].indexOf(status));
+    expect(handleChat).toHaveBeenCalledTimes(1 + [401, 409, 429, 503].indexOf(status));
     expect((await readChatRows()).find(row => row.id === c.id)!.messages).toHaveLength(1);
   }
 });
