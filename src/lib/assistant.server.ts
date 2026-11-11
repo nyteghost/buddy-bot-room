@@ -130,6 +130,7 @@ async function parseAnswer(
     throw Error("The selected provider could not answer. Check AI settings or choose Auto.");
   }
   let result = "",
+    truncated = false,
     lastPreview = "",
     lastSent = 0,
     completed = false;
@@ -146,6 +147,7 @@ async function parseAnswer(
       throw Error("The provider sent an invalid response. Your question is saved; retry.");
     }
     if (d.type === "finish") completed = true;
+    if (d.type === "message-metadata" && d.messageMetadata?.truncated === true) truncated = true;
     if (d.type === "error" || d.type === "abort" || d.finishReason === "error")
       throw Error(
         "The provider interrupted this answer. Your question is saved; retry or choose another provider.",
@@ -167,7 +169,7 @@ async function parseAnswer(
       "The provider disconnected before completing the answer. Your question is saved; retry.",
     );
   if (!result.trim()) throw Error("The provider returned no text. Your question is saved.");
-  return result.trim();
+  return result.trim() + (truncated ? "\n\n[Strata output reached its token limit; this answer may be incomplete.]" : "");
 }
 function streamedAnswer(req: Request, data: Record<string, unknown>): Response {
   const cancelled = new AbortController();
