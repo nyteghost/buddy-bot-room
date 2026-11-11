@@ -83,7 +83,9 @@ export class WorldIsoCrowd {
 
  private cancelGoal(a: MutableActor, reason: string): void {
   const goal = a.goalRecord;
-  if (goal && (goal.outcome === "pending" || goal.outcome === "stalled")) {
+  // Only an unfinished request can be canceled. Stalled is already a
+  // terminal result and retains its original first-failure timestamp.
+  if (goal?.outcome === "pending") {
    goal.outcome = "canceled"; goal.reason = reason; goal.finishedAtMs = this.time;
   }
  }
