@@ -40,7 +40,7 @@ export function setupSummary(items: SetupItem[]): string {
 
 /** The Settings window groups its cards under these headings, in this order. Anything not listed lands in "More" so nothing can go missing. */
 export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: string[] }[] = [
-  { id: "basics", name: "Basics", blurb: "Time zone, your local AI, search and dictation", ids: ["general", "ollama", "searxng", "whisper"] },
+  { id: "basics", name: "Basics", blurb: "Time zone, your local AI, search and dictation", ids: ["general", "strata", "ollama", "searxng", "whisper"] },
   { id: "calendar-mail", name: "Calendar & mail", blurb: "Calendar feeds, Google Calendar, email", ids: ["calendar", "gcal", "imap", "m365"] },
   { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "today", "telegram", "discord", "brief", "caldav"] },
   { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
