@@ -118,8 +118,17 @@ async function request(
       redirect: "error",
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(Math.min(120_000, Math.max(500, timeoutMs)))]) : AbortSignal.timeout(Math.min(120_000, Math.max(500, timeoutMs))),
     });
-  } catch {
+  } catch (error) {
+    // An exhausted bounded queue is not a sleeping gaming PC. Preserve the
+    // provider-specific code instead of collapsing all safe failures to offline.
+    if (error instanceof StrataError) throw error;
     throw new StrataError("offline", "Strata is unreachable from the application server.");
+  }
+  // HTTP errors are mapped from status alone; their bodies must be cancelled.
+  // Otherwise the guarded streaming transport retains its slot indefinitely
+  // on 401/403/404/429/5xx responses with unfinished bodies.
+  if (!response.ok) {
+    try { await response.body?.cancel(); } catch { /* retain the HTTP status error */ }
   }
   if (response.status === 401 || response.status === 403)
     throw new StrataError("auth", "Strata rejected the configured API key.");
@@ -145,6 +154,13 @@ export async function strataModels(fetcher: typeof fetch = fetch): Promise<Strat
   });
 }
 
+/** Never silently increase a caller-owned token cap (Working Pals approves 900). */
+export function strataTokenLimit(requested = 1024): number {
+  if (!Number.isInteger(requested) || requested < 1)
+    throw new StrataError("response", "Invalid Strata output-token limit.");
+  return Math.min(4000, requested);
+}
+
 export async function strataChat(
   messages: readonly StrataMessage[],
   modelOverride?: string,
@@ -159,7 +175,7 @@ export async function strataChat(
       typeof m.content !== "string" || !m.content.trim() || m.content.length > 20_000))
     throw new StrataError("response", "The requested local conversation is invalid.");
   const data = await request("/chat/completions",
-    { model, messages, max_tokens: Math.min(4000, Math.max(200, options.maxTokens ?? 1024)), stream: false }, fetcher, 120_000, options.signal);
+    { model, messages, max_tokens: strataTokenLimit(options.maxTokens), stream: false }, fetcher, 120_000, options.signal);
   const choices = data["choices"];
   const choice = Array.isArray(choices) ? choices[0] as Record<string, unknown> | undefined : undefined;
   const message = choice && typeof choice["message"] === "object" && choice["message"]
@@ -266,8 +282,9 @@ export const strataSdkFetch: typeof fetch = async (input, init) => {
       async cancel(reason) { try { await reader.cancel(reason); } finally { done(); } },
     });
     return new Response(stream, { status: res.status, statusText: res.statusText, headers: res.headers });
-  } catch {
+  } catch (error) {
     done();
-    throw new StrataError("offline", "Strata is unreachable, busy, or the local request was cancelled.");
+    if (error instanceof StrataError) throw error;
+    throw new StrataError("offline", "Strata is unreachable or the local request was cancelled.");
   }
 };
