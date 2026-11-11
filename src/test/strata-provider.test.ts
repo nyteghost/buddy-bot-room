@@ -66,7 +66,7 @@ describe("Strata provider foundation (source-only, no active route)", () => {
     const [url, init] = vi.mocked(fetcher).mock.calls[0]!;
     expect(url).toBe(endpoint + "/models");
     expect(init?.redirect).toBe("error");
-    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer " + fake);
+    expect((init?.headers as Record<string, string>)["Authorization"]).toBe("Bearer " + fake);
     expect(JSON.stringify(models)).not.toContain(fake);
   });
 
