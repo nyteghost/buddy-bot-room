@@ -145,6 +145,30 @@ describe("Strata opt-in routing security and Local-Only", () => {
     expect(askChain(settings, "private task", true).map(p => p.kind)).toEqual(["strata-server"]);
     await expect(strataModels()).rejects.toMatchObject({ code: "offline" });
   });
+
+  it("cancels rejected oversized JSON and releases Strata slots for later requests", async () => {
+    const cancelled = vi.fn();
+    let call = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      call++;
+      if (call === 1) return new Response(new ReadableStream<Uint8Array>({ cancel: cancelled }), {
+        headers: { "content-length": "300000", "content-type": "application/json" },
+      });
+      if (call === 3) return new Response(new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new Uint8Array(300000)); },
+        cancel: cancelled,
+      }), { headers: { "content-type": "application/json" } });
+      return Response.json({ data: [{ id: model }] });
+    });
+    await expect(strataModels()).rejects.toMatchObject({ code: "response" });
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    expect((await strataModels())[0]?.id).toBe(model);
+    await expect(strataModels()).rejects.toMatchObject({ code: "response" });
+    expect(cancelled).toHaveBeenCalledTimes(2);
+    expect((await strataModels())[0]?.id).toBe(model);
+    expect(call).toBe(4);
+  });
+
   it("fails closed for wrong model, auth failures and a sleeping gaming PC", async () => {
     process.env["STRATA_MODEL"] = "another-loaded-model";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [{ id: model, status: { value: "loaded" } }] }));
