@@ -279,7 +279,7 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         ...(engine.kind === "anthropic" || custom ? { maxOutputTokens: 1500 } : {}),
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
         ...(strataServer ? { maxOutputTokens: Math.min(4000, Math.max(1500, Number(engine.maxTokens) || 2400)) } : {}),
-        onError: logStreamError,
+        onError: strataServer ? () => { logServer("warn", "Strata local inference stream failed"); } : logStreamError,
         ...(localServer ? { onFinish: () => { void touchKeepAlive(localApi, localModel, keepAliveSetting()); } } : {}),
       });
       return free.toUIMessageStreamResponse({
@@ -287,7 +287,10 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         originalMessages: messages,
         messageMetadata: ({ part }) =>
           part.type === "start" ? { agentId: agent.id, round: body.round, ...(strataServer ? { model: selectedStrataModel, via: "Strata" } : {}), ...(answeredBy ? { model: answeredBy.model, ...(answeredBy.fellBack ? { fellBackFrom: answeredBy.requested } : {}) } : {}) } : undefined,
-        onError: (e) => { logServer("error", `${engine.kind} stream failed`, e); return safeError(e); },
+        onError: (e) => {
+          if (strataServer) { logServer("warn", "Strata local inference stream interrupted"); return "Strata inference stopped before finishing; your question is preserved. Retry when the local model is online."; }
+          logServer("error", `${engine.kind} stream failed`, e); return safeError(e);
+        },
       });
     }
   } catch (error) {
