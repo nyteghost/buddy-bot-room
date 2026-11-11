@@ -762,12 +762,13 @@ it("Strata QA P2: persists and displays truncation from inline finish metadata",
   const result = await ask(c, "Please finish this", { provider: "strata-server", engine: { kind: "strata-server" } });
   expect(result.route.provider).toBe("strata-server");
   expect(result.route.model).toBe("qa-loaded-strata-model");
+  const lastText = (c: Conversation) => c.messages.at(-1)?.parts.filter(p => p.type === "text").map(p => p.text).join("\n") ?? "";
   const returned = result.conversation as Conversation;
-  const text = returned.messages.at(-1)!.parts[0]!.text;
+  const text = lastText(returned);
   expect(text).toContain("Only part of the local answer");
   expect(text).toMatch(/token limit.*incomplete/i);
-  const saved = (await readChatRows()).find(row => row.id === c.id)!;
-  expect(saved.messages.at(-1)!.parts[0]).toMatchObject({ type: "text", text });
+  const saved = (await readChatRows()).find(row => row.id === c.id) as Conversation;
+  expect(lastText(saved)).toBe(text);
   expect(handleChat).toHaveBeenCalledTimes(1);
 
   const second = await create();
@@ -778,9 +779,9 @@ it("Strata QA P2: persists and displays truncation from inline finish metadata",
   const done = receipt.at(-1);
   expect(done.type).toBe("done");
   const streamed = done.result.conversation as Conversation;
-  expect(streamed.messages.at(-1)!.parts[0]!.text).toMatch(/token limit.*incomplete/i);
-  expect((await readChatRows()).find(row => row.id === second.id)!.messages.at(-1)!.parts[0].text)
-    .toMatch(/token limit.*incomplete/i);
+  expect(lastText(streamed)).toMatch(/token limit.*incomplete/i);
+  const persistedStream = (await readChatRows()).find(row => row.id === second.id) as Conversation;
+  expect(lastText(persistedStream)).toMatch(/token limit.*incomplete/i);
 });
 
 it("Strata QA P2: General Chat preserves safe typed pre-stream auth/model/busy/offline errors", async () => {
