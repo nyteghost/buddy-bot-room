@@ -8,7 +8,7 @@ import { calendarData, mailData } from "./inbox.server";
 import { imapConfig } from "./imap.server";
 import { mailSendReady } from "./mailbox.server";
 import { ollamaBase } from "./ollama.server";
-import { strataConfigured, strataModels } from "./strata.server";
+import { strataConfigured, strataReadyModel, StrataError } from "./strata.server";
 import { INTEGRATIONS, itemById, type SetupItem, type SetupTest } from "./setup";
 import { telegramEnabled, telegramSend } from "./telegram.server";
 import { discordEnabled, testDiscordConnection } from "./discord.server";
@@ -57,12 +57,15 @@ async function reach(url: string, path = "", headers: Record<string, string> = {
 const tests: Record<string, () => Promise<SetupTest>> = {
   strata: async () => {
     try {
-      const models = await strataModels();
-      const selected = (process.env["STRATA_MODEL"] ?? "").trim();
-      return models.some(m => m.id === selected)
-        ? { ok: true, note: "Authenticated private Strata connection; selected model available." }
-        : { ok: false, note: "Strata connected but selected model is unavailable. Check its exact ID." };
-    } catch { return { ok: false, note: "Strata unavailable. Verify its private address, API key and loaded model." }; }
+      // Test must use the same authenticated exact-model readiness gate as
+      // inference. A discovered but not_loaded model cannot be called ready.
+      await strataReadyModel();
+      return { ok: true, note: "Authenticated private Strata connection; selected model loaded." };
+    } catch (error) {
+      return { ok: false, note: error instanceof StrataError
+        ? error.message
+        : "Strata unavailable. Verify the private address and local service." };
+    }
   },
   ollama: () => reach(ollamaBase(), "/api/tags"),
   searxng: () => reach(env("SEARXNG_URL")),
