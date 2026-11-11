@@ -25,6 +25,8 @@ export type WorldIsoGoalDiagnostics = {
  blockedMs: number; continuousBlockedMs: number; maxContinuousBlockedMs: number;
  yieldingMs: number; recoveryAttempts: number; nonProgressMs: number; maxNonProgressMs: number;
  lastProgressAtMs: number; bestDistance: number;
+ /** Bounded trace of the last causal interceptor of an active sidestep. */
+ yieldInterceptions: number; lastYieldInterceptorId: string | null; lastYieldInterceptedAtMs: number | null;
  outcome: WorldIsoGoalOutcome; reason: string | null;
 };
 export type WorldIsoCrowdDiagnostics = Readonly<{
@@ -33,7 +35,7 @@ export type WorldIsoCrowdDiagnostics = Readonly<{
  actors: readonly Readonly<{
   id: string; status: WorldIsoCrowdStatus; waitMs: number; goal: GroundPoint;
   requestedGoal: GroundPoint | null; reserved: boolean; goalAgeMs: number;
-  arrived: boolean; reason: string | null;
+  arrived: boolean; reason: string | null; yieldTarget: GroundPoint | null;
  }>[];
  goals: readonly WorldIsoGoalDiagnostics[];
 }>;
@@ -94,6 +96,7 @@ export class WorldIsoCrowd {
    yieldingMs: 0, recoveryAttempts: 0, nonProgressMs: 0, maxNonProgressMs: 0,
    lastProgressAtMs: this.time,
    bestDistance: requested ? distance(a.at, requested) : Infinity,
+   yieldInterceptions: 0, lastYieldInterceptorId: null, lastYieldInterceptedAtMs: null,
    outcome: "pending", reason: null,
   };
   a.goalRecord = goal; this.goals.push(goal);
@@ -245,7 +248,7 @@ export class WorldIsoCrowd {
      arrived: a.committed && a.status === "arrived" && !!goal &&
       goal.outcome === "completed" && !!goal.requested &&
       distance(a.at, goal.requested) < EPS,
-     reason: a.reason };
+     reason: a.reason, yieldTarget: a.yieldTo ? copy(a.yieldTo) : null };
    }),
    goals: this.goals.map(g => ({ ...g, requested: g.requested ? copy(g.requested) : null })),
   };
@@ -384,6 +387,11 @@ export class WorldIsoCrowd {
      // Invalidate that route and use one bounded recovery slot to find
      // another statically and dynamically swept-clear destination.
      const stale = a.yieldTo;
+     if (a.goalRecord) {
+      a.goalRecord.yieldInterceptions++;
+      a.goalRecord.lastYieldInterceptorId = blocker.id;
+      a.goalRecord.lastYieldInterceptedAtMs = this.time + ms;
+     }
      recoverBudget.left--;
      a.yieldTo = null; a.yieldHoldMs = 0;
      if (!this.tryYield(a, blocker, old, trails) ||
@@ -443,8 +451,10 @@ export class WorldIsoCrowd {
    goal.maxNonProgressMs = Math.max(goal.maxNonProgressMs, goal.nonProgressMs);
    // Rejected or statically impossible held requests also accumulate honest
    // unresolved blockage time; they are never reclassified as arrivals.
-   if (rejected) { goal.finishedAtMs = this.time + ms; continue; }
-   if (blocked && goal.nonProgressMs >= WAIT_LIMIT_MS) {
+   // Terminal outcome times must not drift during observation slices. The
+   // blocked and no-progress clocks above still accumulate for held failures.
+   if (rejected) continue;
+   if (blocked && goal.outcome !== "stalled" && goal.nonProgressMs >= WAIT_LIMIT_MS) {
     goal.outcome = "stalled"; goal.reason = "goal-progress-timeout";
     goal.finishedAtMs = this.time + ms;
     a.yieldTo = null; a.yieldHoldMs = 0;
