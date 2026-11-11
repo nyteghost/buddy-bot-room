@@ -822,7 +822,7 @@ export function Room() {
     // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
     let obsidianContext = "";
     try {
-      if (localStorage.getItem("pixelpals-brain-retrieval")==="1" && ["ollama","local","local-server","auto-ollama"].includes(engine.kind) && topic.trim()) {
+      if (localStorage.getItem("pixelpals-brain-retrieval")==="1" && ["ollama","local","local-server","auto-ollama","strata-server"].includes(engine.kind) && topic.trim()) {
         const response=await fetch("/api/second-brain?q="+encodeURIComponent(topic.slice(0,200)),{signal:AbortSignal.timeout(2500)});
         if(response.ok){const data=await response.json() as {notes?:BrainNote[]};obsidianContext=renderMemoryContext(data.notes??[],1800);}
       }
@@ -909,8 +909,8 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: agent.id === "mimic" && memoryAccess(personasNow, agent.id) !== "all" ? undefined : activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
-            contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
+            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: agent.id === "mimic" && memoryAccess(personasNow, agent.id) !== "all" ? undefined : activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server","strata-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
+            contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" || engine.kind === "strata-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
             docContext: agent.id === "mimic" && !mayUseRealData(personasNow, agent.id) ? "" : docText,
@@ -972,7 +972,7 @@ export function Room() {
           const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
-            const chain = first.kind === "ollama-server" ? [first] : orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
+            const chain = first.kind === "ollama-server" || first.kind === "strata-server" ? [first] : orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
             const failures: string[] = [];
             let lastError: unknown;
             for (const p of chain) {
@@ -1045,7 +1045,7 @@ export function Room() {
             hasAnswer: () => !!(answer && messageText(answer).trim()),
             clearAnswer: () => { answer = undefined; },
             runChain,
-            localChain: () => runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" })),
+            localChain: () => runChain(engine.kind === "strata-server" ? providerForTurn(engine, turnIndex, { agentId: agent.id })! : localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" })),
             runOllama,
             runBrowserModel: async () => consume(await runLocal(), "In-browser model"),
             cloudFallback,
