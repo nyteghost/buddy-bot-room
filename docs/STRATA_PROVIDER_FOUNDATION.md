@@ -47,6 +47,10 @@ To use Strata after a separately authorized rollout:
 
 ## Server-side safeguards
 
+- **Owner authorization is mandatory for native Strata inference**: unsigned-in
+  requests, non-owners, and installations with accounts disabled fail closed
+  before model discovery or completion. Trusted internal callers do not override
+  a disabled account system. The previous Ollama authorization policy is unchanged.
 - Local-Only guard admits `strata-server` **only at exactly the configured,
   validated private origin and canonical `/v1` path**. All other cloud/custom
   providers remain forbidden when Local-Only is enabled.
@@ -54,14 +58,19 @@ To use Strata after a separately authorized rollout:
   `/v1/models` and `/v1/chat/completions`. Redirects disabled.
 - Maximum 2 in-flight local Strata API operations and 4 queued, with bounded
   queue wait; slots stay held until body/stream consumption, cancellation or
-  error. SDK streaming and non-streaming replies use the same guarded fetch.
+  error. **Every unsuccessful HTTP response cancels its body before returning**,
+  preventing authentication/throttling/model failures from exhausting both slots.
+  The queue-full condition is reported as **busy**, never misclassified as offline.
+  SDK streaming and non-streaming replies use the same guarded fetch.
 - Server-side timeout/abort and response-size caps; canceled streams and
   sleeping-PC failures return safe status/error text and never expose the key.
-- Provider/model are labeled for actual routed responses; model discovery
-  checks the configured ID. Reasoning models receive an adequate output-token
-  budget. Non-streaming results with `finish_reason=length` are explicitly
-  marked as potentially truncated; **stream-completion truncation UX still
-  needs end-to-end mounted-client QA**.
+- Provider/model are labeled for actual routed responses; Setup and inference
+  apply the same loaded-model check (`not_loaded` cannot test green). Safe auth,
+  busy, model and offline errors remain distinct in General Chat. General Chat
+  detects inline AI SDK finish metadata and persists an incomplete-answer
+  warning when the output token budget is exhausted. Working Pals preserves its
+  explicitly approved 900-token maximum; no hidden 1,500-token minimum.
+  **Real mounted-client truncation UX still needs end-to-end QA**.
 - No autonomous AI tool invocation, file/database writes, mail, imports,
   memory-permission escalation, or secret-sharing is introduced by routing.
   Previously authorized conversation scopes remain authoritative.
