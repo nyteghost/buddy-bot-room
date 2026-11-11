@@ -110,6 +110,7 @@ describe("Strata opt-in routing security and Local-Only", () => {
     expect(calls.every(c => c.auth === "Bearer " + key)).toBe(true);
     const requestBody = JSON.parse(calls.find(c => c.url.endsWith("/chat/completions"))!.body) as { model: string };
     expect(requestBody.model).toBe(model);
+    expect(requestBody).not.toHaveProperty("tools");
     expect(response).not.toContain(key);
   });
 
@@ -119,4 +120,37 @@ describe("Strata opt-in routing security and Local-Only", () => {
     expect(askChain(settings, "private task", true).map(p => p.kind)).toEqual(["strata-server"]);
     await expect(strataModels()).rejects.toMatchObject({ code: "offline" });
   });
+  it("fails closed for wrong model, auth failures and a sleeping gaming PC", async () => {
+    process.env["STRATA_MODEL"] = "another-loaded-model";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [{ id: model, status: { value: "loaded" } }] }));
+    const { strataReadyModel } = await import("@/lib/strata.server");
+    await expect(strataReadyModel()).rejects.toMatchObject({ code: "model" });
+    process.env["STRATA_MODEL"] = model;
+    for (const [status, code] of [[401, "auth"], [404, "model"], [429, "busy"]] as const) {
+      vi.mocked(globalThis.fetch).mockResolvedValue(new Response("", { status }));
+      await expect(strataModels()).rejects.toMatchObject({ code });
+    }
+    vi.mocked(globalThis.fetch).mockRejectedValue(new Error("Host went to sleep"));
+    await expect(strataModels()).rejects.toMatchObject({ code: "offline" });
+  });
+
+  it("does not dispatch or retain streaming work after cancellation", async () => {
+    const cancel = vi.fn();
+    const controller = new AbortController();
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({
+      start(target) { target.enqueue(new TextEncoder().encode("data: part\\n\\n")); },
+      cancel,
+    }), { headers: { "Content-Type": "text/event-stream" } }));
+    const response = await strataSdkFetch(base + "/chat/completions", { method: "POST", signal: controller.signal });
+    const reader = response.body!.getReader();
+    expect((await reader.read()).done).toBe(false);
+    controller.abort();
+    await reader.read();
+    expect(cancel).toHaveBeenCalled();
+    const already = new AbortController();
+    already.abort();
+    await expect(strataSdkFetch(base + "/chat/completions", { signal: already.signal }))
+      .rejects.toMatchObject({ code: "offline" });
+  });
+
 });
