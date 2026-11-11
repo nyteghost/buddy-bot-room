@@ -3,7 +3,7 @@ export type SetupItem = { id: string; name: string; what: string; env: string; c
 export type SetupTest = { ok: boolean; note: string };
 
 export const INTEGRATIONS: { id: string; name: string; what: string; env: string; testable: boolean }[] = [
-  { id: "strata", name: "Local AI (Strata — preview)", what: "Private inference on your gaming PC over Tailscale", env: "STRATA_ENABLED, STRATA_URL, STRATA_API_KEY, STRATA_MODEL", testable: false },
+  { id: "strata", name: "Local AI (Strata)", what: "Private inference on your gaming PC over Tailscale", env: "STRATA_ENABLED, STRATA_URL, STRATA_API_KEY, STRATA_MODEL", testable: true },
   { id: "ollama", name: "Local AI (Ollama)", what: "Answers on your own GPU", env: "OLLAMA_URL", testable: true },
   { id: "obsidian", name: "Obsidian vault", what: "Open and edit your vault notes in the Notes tab", env: "OBSIDIAN_VAULT_DIR", testable: false },
   { id: "searxng", name: "Web search (SearXNG)", what: "Lets pals look things up", env: "SEARXNG_URL", testable: true },
