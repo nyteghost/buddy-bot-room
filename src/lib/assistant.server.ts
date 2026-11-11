@@ -44,7 +44,8 @@ import {
   semanticScores,
 } from "./memory-keeper.server";
 import { handleChat } from "./chat.server";
-import { engineFromJson, localServerProvider, turnProviders, type TurnProvider } from "./engine";
+import { engineFromJson, localServerProvider, strataServerProvider, turnProviders, type TurnProvider } from "./engine";
+import { strataConfigured, strataFallbackOllama } from "./strata.server";
 import { readOllamaHealth } from "./ollama-health.server";
 import { installedName } from "./ollama-health";
 import { isModelName } from "./model-catalog";
@@ -980,14 +981,19 @@ export async function handleAssistant(
         )
       )
         local = { ...local, model: c.assistant.provider.model };
-      const clouds = localOnlyOn() ? [] : turnProviders(settings, mode === "auto");
+      const strataRequested = mode === "strata-server" || (mode === "auto" && settings.kind === "strata-server");
+      const strata = strataRequested && strataConfigured() ? strataServerProvider(settings) : null;
+      const localBackup = strata && strataFallbackOllama() && health.reachable ? [local] : [];
+      const clouds = localOnlyOn() || strataRequested ? [] : turnProviders(settings, mode === "auto");
       let providers: TurnProvider[] =
-        mode === "auto"
+        strata ? [strata, ...localBackup]
+          : strataRequested ? []
+          : mode === "auto"
           ? [...(health.reachable ? [local] : []), ...clouds]
           : mode === "ollama-server"
             ? [local]
             : clouds.filter((p) => p.kind === mode);
-      if (mode === "auto" && c.assistant.provider?.kind !== "ollama-server") {
+      if (mode === "auto" && !strataRequested && c.assistant.provider?.kind !== "ollama-server") {
         const i = providers.findIndex((p) => p.kind === c.assistant.provider?.kind);
         if (i > 0) providers = [providers[i]!, ...providers.filter((_, j) => j !== i)];
       }
@@ -995,7 +1001,7 @@ export async function handleAssistant(
         return reply(
           {
             error: localOnlyOn()
-              ? "Local-Only is enabled. Connect Ollama and choose an installed model."
+              ? "Local-Only requires configured Strata or Ollama; no cloud fallback is allowed."
               : "No configured provider is available. Connect Ollama or add a provider key in AI engine settings.",
           },
           503,
@@ -1010,7 +1016,7 @@ export async function handleAssistant(
         try {
           await preview?.("");
           const allowMemory =
-            p.kind === "ollama-server" || process.env["MEMORY_CLOUD_CONTEXT"] === "on";
+            p.kind === "ollama-server" || p.kind === "strata-server" || process.env["MEMORY_CLOUD_CONTEXT"] === "on";
           supplied = allowMemory ? memories : [];
           if ((await keeperSnapshot()).epoch !== fresh.epoch)
             throw Error("Memory permissions changed; retry with fresh context");
@@ -1083,7 +1089,7 @@ export async function handleAssistant(
           break;
         } catch (e) {
           lastError = e instanceof Error ? e.message : "Provider unavailable";
-          if (mode !== "auto") break;
+          if (mode !== "auto" && !strataRequested) break;
         }
       }
       if (!provider || !answer)
