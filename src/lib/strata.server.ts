@@ -206,6 +206,7 @@ async function acquire(signal: AbortSignal): Promise<() => void> {
       const i = queued.indexOf(queuedItem);
       if (i < 0) return;
       queued.splice(i, 1);
+      clearTimeout(timer);
       reject(new StrataError("busy", "Strata inference queue timed out or was cancelled."));
     };
     const timer = setTimeout(cancel, 8_000);
@@ -240,6 +241,9 @@ export const strataSdkFetch: typeof fetch = async (input, init) => {
     const res = await fetch(target, { ...init, headers, signal: controller.signal, redirect: "error", cache: "no-store" });
     if (!res.body) { done(); return res; }
     const reader = res.body.getReader();
+    // Abort must release the held concurrency slot even if an upstream server
+    // never completes its stream or a mock ignores the fetch abort signal.
+    controller.signal.addEventListener("abort", () => { void reader.cancel().catch(() => {}); done(); }, { once: true });
     let size = 0;
     const stream = new ReadableStream<Uint8Array>({
       async pull(consumer) {
@@ -249,7 +253,7 @@ export const strataSdkFetch: typeof fetch = async (input, init) => {
           size += part.value.byteLength;
           if (size > 4 * 1024 * 1024) throw new StrataError("response", "Strata stream exceeded its size limit.");
           consumer.enqueue(part.value);
-        } catch (error) { done(); consumer.error(error); }
+        } catch (error) { try { await reader.cancel(error); } catch { /* already closed */ } done(); consumer.error(error); }
       },
       async cancel(reason) { try { await reader.cancel(reason); } finally { done(); } },
     });
