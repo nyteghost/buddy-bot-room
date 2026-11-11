@@ -127,6 +127,11 @@ async function parseAnswer(
     const data = await response.json().catch(() => ({}));
     if (data.code === "ollama-model" || data.code === "local-only")
       throw Error(String(data.error).slice(0, 400));
+    // Native Strata errors originate from server-generated, secret-free codes
+    // and messages; don't discard auth/busy/model/offline into a vague failure.
+    if (typeof data.code === "string" && /^strata-(?:disabled|config|auth|busy|offline|model|response)$/.test(data.code))
+      throw Error(typeof data.error === "string" ? data.error.slice(0, 400) : "Strata local inference is unavailable.");
+    if (data.code === "owner-auth") throw Error("Owner sign-in required for protected Strata inference.");
     throw Error("The selected provider could not answer. Check AI settings or choose Auto.");
   }
   let result = "",
@@ -147,7 +152,12 @@ async function parseAnswer(
       throw Error("The provider sent an invalid response. Your question is saved; retry.");
     }
     if (d.type === "finish") completed = true;
-    if (d.type === "message-metadata" && d.messageMetadata?.truncated === true) truncated = true;
+    // AI SDK includes messageMetadata on the *finish* event, not necessarily
+    // on a standalone event. Also accept the standard finishReason=length.
+    if ((d.type === "finish" || d.type === "message-metadata") &&
+        (d.messageMetadata?.truncated === true ||
+          (d.type === "finish" && (d.finishReason === "length" || d.messageMetadata?.finishReason === "length"))))
+      truncated = true;
     if (d.type === "error" || d.type === "abort" || d.finishReason === "error")
       throw Error(
         "The provider interrupted this answer. Your question is saved; retry or choose another provider.",
