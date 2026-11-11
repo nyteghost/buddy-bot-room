@@ -965,6 +965,10 @@ export function Room() {
               };
               ui.push([...transcript, answer]);
             }
+              if (answer?.metadata?.truncated) {
+                answer = { ...answer, parts: [...answer.parts, { type: "text", text: "\n\n[Strata output reached its token limit; this answer may be incomplete.]" }] };
+                ui.push([...transcript, answer]);
+              }
             } finally { ui.flush(); }
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
