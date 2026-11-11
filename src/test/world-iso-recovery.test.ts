@@ -362,6 +362,23 @@ describe("P1/P2 crowd movement and recovery regressions", () => {
   expect(goal.requestAtMs).toBe(0);
   expect(goal.maxContinuousBlockedMs).toBeGreaterThan(0);
   expect(diag.goals.filter(g=>g.actorId==="visitor:a")).toHaveLength(1);
+  const firstStallAt=goal.finishedAtMs;
+  expect(firstStallAt).not.toBeNull();
+  // A truly new request must not erase the prior goal's terminal event.
+  const newTarget=crowd.pose("visitor:a")!.at;
+  expect(crowd.assign("visitor:a",newTarget)).toBe(true);
+  const separate=crowd.diagnostics().goals.filter(g=>g.actorId==="visitor:a");
+  expect(separate).toHaveLength(2);
+  expect(separate[0]).toMatchObject({
+   sequence:seq,outcome:"stalled",requestAtMs:0,finishedAtMs:firstStallAt,
+  });
+  expect(separate[1]!.sequence).not.toBe(seq);
+  expect(separate[1]).toMatchObject({
+   outcome:"completed",requestAtMs:30_000,reservationAtMs:30_000,
+   arrivalAtMs:30_000,finishedAtMs:30_000,
+  });
+  crowd.step(100);
+  expect(crowd.diagnostics().goals.find(g=>g.sequence===seq)?.finishedAtMs).toBe(firstStallAt);
  });
 
 });
