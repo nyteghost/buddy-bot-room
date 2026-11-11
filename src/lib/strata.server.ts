@@ -221,6 +221,7 @@ export const strataSdkFetch: typeof fetch = async (input, init) => {
   if (target !== base + "/models" && target !== base + "/chat/completions")
     throw new StrataError("config", "Strata requested a forbidden endpoint.");
   const sourceSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+  if (sourceSignal?.aborted) throw new StrataError("offline", "Local request was cancelled.");
   const controller = new AbortController();
   const abort = () => controller.abort();
   sourceSignal?.addEventListener("abort", abort, { once: true });
