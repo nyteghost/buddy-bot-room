@@ -762,7 +762,8 @@ it("Strata QA P2: persists and displays truncation from inline finish metadata",
   const result = await ask(c, "Please finish this", { provider: "strata-server", engine: { kind: "strata-server" } });
   expect(result.route.provider).toBe("strata-server");
   expect(result.route.model).toBe("qa-loaded-strata-model");
-  const text = result.conversation.messages.at(-1).parts[0].text;
+  const returned = result.conversation as Conversation;
+  const text = returned.messages.at(-1)!.parts[0]!.text;
   expect(text).toContain("Only part of the local answer");
   expect(text).toMatch(/token limit.*incomplete/i);
   const saved = (await readChatRows()).find(row => row.id === c.id)!;
@@ -776,7 +777,8 @@ it("Strata QA P2: persists and displays truncation from inline finish metadata",
   }));
   const done = receipt.at(-1);
   expect(done.type).toBe("done");
-  expect(done.result.conversation.messages.at(-1).parts[0].text).toMatch(/token limit.*incomplete/i);
+  const streamed = done.result.conversation as Conversation;
+  expect(streamed.messages.at(-1)!.parts[0]!.text).toMatch(/token limit.*incomplete/i);
   expect((await readChatRows()).find(row => row.id === second.id)!.messages.at(-1)!.parts[0].text)
     .toMatch(/token limit.*incomplete/i);
 });
