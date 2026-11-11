@@ -123,7 +123,7 @@ describe("Strata opt-in routing security and Local-Only", () => {
         'data: {"id":"length","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Incomplete"},"finish_reason":null}]}',
         'data: {"id":"length","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"length"}]}',
         "data: [DONE]", "",
-      ].join("\\n\\n"), { headers: { "Content-Type": "text/event-stream" } });
+      ].join("\n\n"), { headers: { "Content-Type": "text/event-stream" } });
       throw Error("Unexpected URL");
     });
     const res = await handleChat(new Request("http://local/api/chat", {
@@ -163,7 +163,7 @@ describe("Strata opt-in routing security and Local-Only", () => {
     const cancel = vi.fn();
     const controller = new AbortController();
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(new ReadableStream<Uint8Array>({
-      start(target) { target.enqueue(new TextEncoder().encode("data: part\\n\\n")); },
+      start(target) { target.enqueue(new TextEncoder().encode("data: part\n\n")); },
       cancel,
     }), { headers: { "Content-Type": "text/event-stream" } }));
     const response = await strataSdkFetch(base + "/chat/completions", { method: "POST", signal: controller.signal });
