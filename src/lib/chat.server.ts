@@ -270,6 +270,7 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         localModel = prep.model;
         answeredBy = { model: prep.model, requested: prep.requested, fellBack: prep.fellBack };
       }
+      let strataFinishReason: string | null = null;
       const free = streamText({
         model: provider(strataServer ? selectedStrataModel : custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "openrouter/free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
@@ -280,13 +281,17 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
         ...(strataServer ? { maxOutputTokens: Math.min(4000, Math.max(1500, Number(engine.maxTokens) || 2400)) } : {}),
         onError: strataServer ? () => { logServer("warn", "Strata local inference stream failed"); } : logStreamError,
+        ...(strataServer ? { onFinish: ({ finishReason }: { finishReason: string }) => { strataFinishReason = finishReason; } } : {}),
         ...(localServer ? { onFinish: () => { void touchKeepAlive(localApi, localModel, keepAliveSetting()); } } : {}),
       });
       return free.toUIMessageStreamResponse({
         ...(protectedLocal ? { headers: { "x-pixelpals-model": strataServer ? selectedStrataModel : answeredBy?.model ?? "", ...(answeredBy?.fellBack ? { "x-pixelpals-fallback-from": answeredBy.requested } : {}) } } : {}),
         originalMessages: messages,
         messageMetadata: ({ part }) =>
-          part.type === "start" ? { agentId: agent.id, round: body.round, ...(strataServer ? { model: selectedStrataModel, via: "Strata" } : {}), ...(answeredBy ? { model: answeredBy.model, ...(answeredBy.fellBack ? { fellBackFrom: answeredBy.requested } : {}) } : {}) } : undefined,
+          part.type === "start" ? { agentId: agent.id, round: body.round, ...(strataServer ? { model: selectedStrataModel, via: "Strata" } : {}), ...(answeredBy ? { model: answeredBy.model, ...(answeredBy.fellBack ? { fellBackFrom: answeredBy.requested } : {}) } : {}) }
+          : part.type === "finish" && strataServer
+          ? { truncated: strataFinishReason === "length", finishReason: strataFinishReason ?? "unknown" }
+          : undefined,
         onError: (e) => {
           if (strataServer) { logServer("warn", "Strata local inference stream interrupted"); return "Strata inference stopped before finishing; your question is preserved. Retry when the local model is online."; }
           logServer("error", `${engine.kind} stream failed`, e); return safeError(e);
