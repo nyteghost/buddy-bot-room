@@ -112,7 +112,7 @@ describe("Strata provider foundation (source-only, no active route)", () => {
   it("saves Strata API key only in protected server secrets and groups settings", () => {
     expect(fieldByKey("STRATA_API_KEY")?.secret).toBe(true);
     expect(fieldByKey("STRATA_ENABLED")?.options).toEqual(["off", "on"]);
-    expect(INTEGRATIONS.find(i => i.id === "strata")?.testable).toBe(false);
+    expect(INTEGRATIONS.find(i => i.id === "strata")?.testable).toBe(true);
     const items = INTEGRATIONS.map(i => ({ ...i, configured: false }));
     expect(groupItems(items).find(g => g.id === "basics")?.items.some(i => i.id === "strata")).toBe(true);
   });
