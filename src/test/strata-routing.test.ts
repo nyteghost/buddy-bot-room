@@ -114,6 +114,31 @@ describe("Strata opt-in routing security and Local-Only", () => {
     expect(response).not.toContain(key);
   });
 
+
+  it("reports token-limited streamed Strata replies without calling them complete", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/models")) return Response.json({ data: [{ id: model, status: { value: "loaded" } }] });
+      if (url.endsWith("/chat/completions")) return new Response([
+        'data: {"id":"length","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Incomplete"},"finish_reason":null}]}',
+        'data: {"id":"length","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"length"}]}',
+        "data: [DONE]", "",
+      ].join("\\n\\n"), { headers: { "Content-Type": "text/event-stream" } });
+      throw Error("Unexpected URL");
+    });
+    const res = await handleChat(new Request("http://local/api/chat", {
+      method: "POST", body: JSON.stringify({
+        agentId: agents[0]!.id, model: models[0]!.id, mode: "direct",
+        messages: [{ id: "question", role: "user", parts: [{ type: "text", text: "Answer clearly" }] }],
+        engine: { kind: "strata-server" },
+      }),
+    }));
+    expect(res.ok).toBe(true);
+    const stream = await res.text();
+    expect(stream).toContain("Incomplete");
+    expect(stream).toContain("truncated");
+  });
+
   it("keeps cloud disabled when private Strata is offline", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("PC sleeping"));
     const settings = engineFromJson(JSON.stringify({ kind: "strata-server", groqKey: "fake-cloud" }));
