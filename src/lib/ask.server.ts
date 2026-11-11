@@ -4,7 +4,7 @@ import { installedName, modelProblem } from "./ollama-health";
 import { generateText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { engineFromJson, freeModels, localServerProvider, strataServerProvider, turnProviders, type EngineSettings, type TurnProvider } from "./engine";
-import { strataConfigured, strataFallbackOllama, strataReadyModel, strataChat, StrataError } from "./strata.server";
+import { strataConfigured, strataFallbackOllama, strataReadyModel, strataChat, strataConnection, StrataError } from "./strata.server";
 import { accountFileName } from "./local-account";
 import { ownerName } from "./accounts.server";
 import { ollamaBase, resolveLocalModel } from "./ollama.server";
@@ -88,6 +88,7 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
     if (original.kind === "strata-server") {
       try {
         const model = await strataReadyModel();
+        assertInferenceAllowed("strata-server", strataConnection().base, ollamaBase());
         const result = await strataChat([{ role: "system", content: system }, { role: "user", content: user }], model, fetch,
           { maxTokens: Math.min(4000, Math.max(1500, opts.maxTokens ?? 2400)), ...(opts.signal ? { signal: opts.signal } : {}) });
         const output = scrubChatText(result.text.trim());
