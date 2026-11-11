@@ -8,6 +8,7 @@ import { calendarData, mailData } from "./inbox.server";
 import { imapConfig } from "./imap.server";
 import { mailSendReady } from "./mailbox.server";
 import { ollamaBase } from "./ollama.server";
+import { strataConfigured, strataModels } from "./strata.server";
 import { INTEGRATIONS, itemById, type SetupItem, type SetupTest } from "./setup";
 import { telegramEnabled, telegramSend } from "./telegram.server";
 import { discordEnabled, testDiscordConnection } from "./discord.server";
@@ -17,6 +18,7 @@ import { getWeather, weatherConfigured } from "./weather.server";
 const env = (k: string) => (process.env[k] ?? "").trim().replace(/\/+$/, "");
 
 const configured: Record<string, () => boolean> = {
+  strata: () => strataConfigured(),
   ollama: () => !!ollamaBase(),
   searxng: () => !!env("SEARXNG_URL"),
   plex: () => !!env("PLEX_URL"),
@@ -53,6 +55,15 @@ async function reach(url: string, path = "", headers: Record<string, string> = {
 }
 
 const tests: Record<string, () => Promise<SetupTest>> = {
+  strata: async () => {
+    try {
+      const models = await strataModels();
+      const selected = (process.env["STRATA_MODEL"] ?? "").trim();
+      return models.some(m => m.id === selected)
+        ? { ok: true, note: "Authenticated private Strata connection; selected model available." }
+        : { ok: false, note: "Strata connected but selected model is unavailable. Check its exact ID." };
+    } catch { return { ok: false, note: "Strata unavailable. Verify its private address, API key and loaded model." }; }
+  },
   ollama: () => reach(ollamaBase(), "/api/tags"),
   searxng: () => reach(env("SEARXNG_URL")),
   plex: () => reach(env("PLEX_URL"), "/identity", env("PLEX_TOKEN") ? { "X-Plex-Token": env("PLEX_TOKEN") } : {}),
