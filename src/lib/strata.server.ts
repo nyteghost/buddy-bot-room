@@ -62,20 +62,27 @@ export function strataConfigured(): boolean {
 /** Read bounded JSON, including chunked responses that do not advertise a length. */
 async function boundedJson(response: Response): Promise<Record<string, unknown>> {
   const len = Number(response.headers.get("content-length") ?? "0");
-  if (len > MAX_BYTES) throw new StrataError("response", "Strata response exceeded size limit.");
+  if (len > MAX_BYTES) {
+    await response.body?.cancel().catch(() => {});
+    throw new StrataError("response", "Strata response exceeded size limit.");
+  }
   const reader = response.body?.getReader();
   if (!reader) throw new StrataError("response", "Strata returned an empty response.");
-  let total = 0;
+  let total = 0, complete = false;
   const chunks: Uint8Array[] = [];
   try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) { complete = true; break; }
       total += value.byteLength;
       if (total > MAX_BYTES) throw new StrataError("response", "Strata response exceeded size limit.");
       chunks.push(value);
     }
-  } finally { reader.releaseLock(); }
+  } finally {
+    // Always release the SDK transport slot on rejected oversized/aborted JSON.
+    if (!complete) { try { await reader.cancel(); } catch { /* already closed */ } }
+    reader.releaseLock();
+  }
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
