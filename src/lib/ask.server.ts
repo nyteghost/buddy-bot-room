@@ -90,7 +90,7 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
         const model = await strataReadyModel();
         assertInferenceAllowed("strata-server", strataConnection().base, ollamaBase());
         const result = await strataChat([{ role: "system", content: system }, { role: "user", content: user }], model, fetch,
-          { maxTokens: Math.min(4000, Math.max(1500, opts.maxTokens ?? 2400)), ...(opts.signal ? { signal: opts.signal } : {}) });
+          { maxTokens: Math.min(4000, Math.max(1, Math.floor(opts.maxTokens ?? 2400))), ...(opts.signal ? { signal: opts.signal } : {}) });
         const output = scrubChatText(result.text.trim());
         if (output) return { ok: true, text: result.truncated ? output + "\n\n[Strata reached its token limit; the answer may be incomplete.]" : output,
           via: "Strata · " + result.model };
