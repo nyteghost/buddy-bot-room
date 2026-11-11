@@ -11,7 +11,7 @@ import { agents, models } from "@/lib/agents";
 const key = "FAKE-STRATA-KEY-TEST-ONLY";
 const model = "qwen3.8-flash-next-coder-iq1_m";
 const base = "http://100.80.10.20:8090/v1";
-const keys = ["STRATA_ENABLED", "STRATA_URL", "STRATA_API_KEY", "STRATA_MODEL", "STRATA_FALLBACK", "LOCAL_ONLY_AI"] as const;
+const keys = ["STRATA_ENABLED", "STRATA_URL", "STRATA_API_KEY", "STRATA_MODEL", "STRATA_FALLBACK", "LOCAL_ONLY_AI", "BUDDY_DATA_DIR", "BUDDY_ACCOUNTS"] as const;
 const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]));
 beforeEach(() => {
   process.env["STRATA_ENABLED"] = "on";
@@ -20,6 +20,10 @@ beforeEach(() => {
   process.env["STRATA_MODEL"] = model;
   process.env["STRATA_FALLBACK"] = "off";
   process.env["LOCAL_ONLY_AI"] = "on";
+  // Existing route fixtures exercise server-trusted internal chat; public
+  // unsigned/non-owner requests are covered in strata-qa-blockers.test.ts.
+  process.env["BUDDY_DATA_DIR"] = "/tmp/pixelpals-strata-routing-test-no-write";
+  process.env["BUDDY_ACCOUNTS"] = "1";
 });
 afterEach(() => {
   for (const k of keys) {
@@ -101,7 +105,7 @@ describe("Strata opt-in routing security and Local-Only", () => {
         messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "Hello" }] }],
         engine: { kind: "strata-server", apiKey: "FAKE-CLIENT-INJECTED", baseUrl: "https://api.openai.com/v1", model: "attacker-model" },
       }),
-    }));
+    }), undefined, true);
     expect(res.ok).toBe(true);
     expect(res.headers.get("x-pixelpals-model")).toBe(model);
     const response = await res.text();
@@ -132,7 +136,7 @@ describe("Strata opt-in routing security and Local-Only", () => {
         messages: [{ id: "question", role: "user", parts: [{ type: "text", text: "Answer clearly" }] }],
         engine: { kind: "strata-server" },
       }),
-    }));
+    }), undefined, true);
     expect(res.ok).toBe(true);
     const stream = await res.text();
     expect(stream).toContain("Incomplete");
