@@ -194,7 +194,10 @@ export class WorldIsoCrowd {
    // A rejected request never owns a reservation. Reassignment releases
    // the previous claim immediately even when the new request fails.
    a.committed = false;
-   goal.reservationAtMs = null; goal.arrivalAtMs = null; goal.finishedAtMs = this.time;
+   goal.reservationAtMs = null; goal.arrivalAtMs = null;
+   // A same-goal retry reports the ORIGINAL rejection event, not a new
+   // terminal event every time the bounded retry window expires.
+   if (goal.finishedAtMs === null) goal.finishedAtMs = this.time;
    goal.outcome = reason === "destination-reserved" ? "rejected" : "unreachable";
    goal.reason = reason;
    this.counters.failedAssignments++; return false;
@@ -320,6 +323,16 @@ export class WorldIsoCrowd {
   const trails = new Map<string, GroundPoint[]>();
   for (const a of ordered) {
    a.walking = false; a.waiting = false;
+   // A stalled logical goal is terminal. Do not let its previous path or
+   // sidestep restart on a later slice; keep the physically safe blocked
+   // position and continue recording real elapsed waiting separately.
+   if (a.goalRecord?.outcome === "stalled") {
+    a.yieldTo = null; a.yieldHoldMs = 0;
+    a.status = "blocked"; a.reason = a.goalRecord.reason ?? "goal-progress-timeout";
+    a.waiting = true; a.waitMs += ms;
+    this.counters.maxWaitMs = Math.max(this.counters.maxWaitMs, a.waitMs);
+    continue;
+   }
    if (a.yieldTo && distance(a.at, a.yieldTo) < EPS) {
     a.yieldHoldMs -= ms;
     if (a.yieldHoldMs > 0) { a.status = "yielding"; continue; }
