@@ -2,12 +2,12 @@ import { useSyncExternalStore } from "react";
 import { pickModel, type RouteHint } from "./model-catalog";
 
 /** Which brain powers the pals. All options are free: "cloud" shares every entered free key, "local" runs in the browser. */
-export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama" | "local-server";
+export type EngineKind = "cloud" | "local" | "auto" | "ollama" | "auto-ollama" | "local-server" | "strata-server";
 export type ReplyLength = "short" | "medium" | "long";
 export const replyTokens: Record<ReplyLength, number> = { short: 400, medium: 800, long: 1500 };
 export type FreeProvider = "groq" | "gemini" | "openrouter" | "nvidia";
 /** Claude is a PAID provider, so it is never part of the free rotation unless the user opts in. */
-export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server" | "custom"; apiKey: string; model?: string; maxTokens?: number; noFallback?: boolean; baseUrl?: string };
+export type TurnProvider = { kind: FreeProvider | "anthropic" | "ollama-server" | "strata-server" | "custom"; apiKey: string; model?: string; maxTokens?: number; noFallback?: boolean; baseUrl?: string };
 export type ClaudeMode = "off" | "share" | "only" | "fallback";
 export const CLAUDE_MODELS = [
   { id: "claude-haiku-5-5", label: "Haiku 5.5 (cheapest)", price: "$0.10 in / $0.50 out per 1M tokens" },
@@ -88,7 +88,7 @@ let cache: EngineSettings | null = null;
 
 /** Older saves used "lovable", "groq" or "gemini"; they all become the shared free cloud mode. */
 export function normalizeKind(kind: unknown): EngineKind {
-  return kind === "local" || kind === "auto" || kind === "ollama" || kind === "auto-ollama" || kind === "local-server" ? kind : "cloud";
+  return kind === "local" || kind === "auto" || kind === "ollama" || kind === "auto-ollama" || kind === "local-server" || kind === "strata-server" ? kind : "cloud";
 }
 
 /** Settings from a saved JSON string (the account snapshot on the server). Missing fields get defaults. */
@@ -200,7 +200,7 @@ export function orderByHealth(chain: TurnProvider[], bench: Bench, now = Date.no
 
 /** What to try, in order, when `failed` errored before producing text. */
 export function chainAfter(s: EngineSettings, failed: TurnProvider, blockPaid = false): TurnProvider[] {
-  if (failed.kind === "ollama-server") return [];
+  if (failed.kind === "ollama-server" || failed.kind === "strata-server") return [];
   const rotation = turnProviders(s, blockPaid).filter((p) => p.kind !== failed.kind || p.baseUrl !== failed.baseUrl);
   const fallback = fallbackProviders(s, blockPaid).filter((p) => p.kind !== failed.kind);
   return [...rotation, ...fallback];
@@ -211,13 +211,18 @@ export function localServerProvider(s: EngineSettings, hint: RouteHint = {}): Tu
   return { kind: "ollama-server", apiKey: "", model: pickModel(s, hint), noFallback: !!s.localPals?.[hint.agentId ?? ""], maxTokens: replyTokens[s.replyLength] };
 }
 
+export function strataServerProvider(s: EngineSettings): TurnProvider {
+  return { kind: "strata-server", apiKey: "", maxTokens: Math.max(1500, replyTokens[s.replyLength]) };
+}
+
 export function providerForTurn(s: EngineSettings, turnIndex: number, hint: RouteHint = {}, blockPaid = false): TurnProvider | undefined {
+  if (s.kind === "strata-server") return strataServerProvider(s);
   if (s.kind === "local-server") return localServerProvider(s, hint);
   const list = turnProviders(s, blockPaid);
   return list.length ? list[turnIndex % list.length] : undefined;
 }
 
-export const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", custom: "Custom" };
+export const providerNames: Record<TurnProvider["kind"], string> = { groq: "Groq", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA", anthropic: "Claude", "ollama-server": "Ollama", "strata-server": "Strata", custom: "Custom" };
 const shortModel = (m: string): string => (m.split("/").pop() ?? m).slice(0, 40);
 
 /** Which AI answers for the pal at this position in the roster, in words: "Groq · gpt-oss-120b", "Ollama · qwen2.5:7b". Same rotation the chat uses. */
@@ -225,6 +230,7 @@ export function palEngineLabel(s: EngineSettings, rosterIndex: number): string {
   if (s.kind === "local") return "In-browser model";
   if (s.kind === "ollama") return `Ollama · ${s.ollamaModel}`;
   if (s.kind === "local-server") return "Ollama on your server";
+  if (s.kind === "strata-server") return "Strata on your gaming PC";
   const list = turnProviders(s);
   const p = list.length ? list[Math.max(0, rosterIndex) % list.length] : undefined;
   if (!p) return s.kind === "auto-ollama" ? "Ollama" : "In-browser model";

@@ -37,6 +37,7 @@ const options: { kind: EngineKind; label: string; note: string }[] = [
   { kind: "auto", label: "Auto (fastest)", note: "Free keys first; the in-browser model steps in if a key runs out." },
   { kind: "local", label: "In-browser (WebGPU)", note: "Runs on your computer. Free and private; downloads once." },
   { kind: "local-server", label: "Local AI (this server)", note: "Your configured Ollama, reached through Pixel Pals (including a remote PC)." },
+  { kind: "strata-server", label: "Strata (gaming PC)", note: "Private Strata model, configured by the owner on the server. No cloud fallback." },
   { kind: "ollama", label: "Ollama on my computer", note: "Uses the backend when configured; browser-direct remains an advanced option." },
   { kind: "auto-ollama", label: "Auto (keys + Ollama)", note: "Free keys first; your Ollama takes over if they fail." },
 ];
@@ -63,6 +64,7 @@ export function EngineSettingsDialog() {
           : engine.kind === "ollama"
           ? `Ollama (${engine.ollamaModel})`
           : engine.kind === "local-server" ? "Local AI (server connection)"
+          : engine.kind === "strata-server" ? "Strata (gaming PC)"
           : `Free keys (${count})`;
   async function prepareLocal() {
     setLoading(true);
@@ -89,7 +91,7 @@ export function EngineSettingsDialog() {
             Choose where the pals' replies come from. Everything here is free unless you turn on a paid provider.
           </DialogDescription>
         </DialogHeader>
-        {health.localOnly && <p role="status" className="rounded border p-2 text-sm">Local-Only AI is on. Every mode, including Auto, uses your configured backend Ollama. Cloud keys remain saved but are blocked; no cloud fallback will run.</p>}
+        {health.localOnly && <p role="status" className="rounded border p-2 text-sm">Local-Only AI is on. Cloud models are blocked; use your protected local Strata or configured Ollama. Cloud keys remain saved but are blocked; no cloud fallback will run.</p>}
         <div className="grid gap-1.5" role="radiogroup" aria-label="Where replies come from">
           {options.map((o) => (
             <button
@@ -184,6 +186,7 @@ export function EngineSettingsDialog() {
           </div>
         )}
         {engine.kind === "local-server" && <LocalAiPanel />}
+        {engine.kind === "strata-server" && <p className="text-sm text-muted-foreground">Configure the private Strata address, bearer key and loaded model in owner Settings → Basics → Strata. Replies use only the saved server connection; they never receive a browser-provided key or URL. Ollama fallback is opt-in in Settings.</p>}
         {!health.localOnly && (engine.kind === "cloud" || engine.kind === "auto" || engine.kind === "auto-ollama") && (
           <div className="grid gap-3">
             <FreeKeysWizard />

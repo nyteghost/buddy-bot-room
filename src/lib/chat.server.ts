@@ -24,6 +24,8 @@ import { readHardware } from "./hardware.server";
 import { isModelName, parseAutoMarker } from "./model-catalog";
 import { isCustomModel, validateCustomUrl } from "./custom-provider";
 import { assertInferenceAllowed, localOnlyOn, LocalOnlyError } from "./ai/guard.server";
+import { strataConnection, strataReadyModel, strataSdkFetch, classifyStrataError, StrataError } from "./strata.server";
+import { assertStrataAuthority, StrataOwnerError } from "./strata-authority.server";
 import { friendlyAiError, makeProbe, withRetry } from "./ai/reliability";
 import { blockedMessage, engineAllowed } from "./local-only";
 const CLAUDE_IDS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
@@ -199,15 +201,22 @@ export async function handleChat(request: Request, assistantContext?: string, tr
     }
     // Free cloud engines with the user's own key (never stored on the server).
     const engine = body.engine;
-    if (!engine || !["groq", "gemini", "openrouter", "nvidia", "anthropic", "ollama-server", "custom"].includes(engine.kind))
+    if (!engine || !["groq", "gemini", "openrouter", "nvidia", "anthropic", "ollama-server", "strata-server", "custom"].includes(engine.kind))
       return Response.json({ error: "Add a free key in AI engine settings, or choose In-browser." }, { status: 400 });
     if (!engineAllowed(engine.kind, localOnlyOn())) {
       logServer("warn", `chat blocked by Local-Only AI mode: engine=${String(engine.kind)}`);
       return Response.json({ error: blockedMessage(engine.kind), code: "local-only" }, { status: 403 });
     }
     {
+      const strataServer = engine.kind === "strata-server";
       const localServer = engine.kind === "ollama-server";
-      if (localServer && accountsEnabled(process.env) && !trustedServerOwner && !(await currentUser(request))?.owner) return Response.json({ error: "Owner sign-in required for server Local AI." }, { status: 403 });
+      const protectedLocal = localServer || strataServer;
+      // New server-held Strata credentials are privileged: no account system means
+      // no verifiable owner, even when the caller is a trusted internal request.
+      // Preserve the pre-existing optional-account policy for Ollama separately.
+      if (strataServer) await assertStrataAuthority({ kind: "owner-request", request });
+      if (localServer && accountsEnabled(process.env) && !trustedServerOwner && !(await currentUser(request))?.owner)
+        return Response.json({ error: "Owner sign-in required for server Local AI." }, { status: 403 });
       if (localServer && !ollamaBase())
         return Response.json({ error: "Local AI isn't set up on this server. Add Ollama to the stack (see the README) or choose another engine." }, { status: 400 });
       let localModel = localServer ? String(engine.model ?? "") : "";
@@ -230,10 +239,12 @@ export async function handleChat(request: Request, assistantContext?: string, tr
       const customUrl = custom ? validateCustomUrl(engine.baseUrl, process.env["ALLOW_PRIVATE_CUSTOM"] === "1") : null;
       if (customUrl && !customUrl.ok) return Response.json({ error: customUrl.error }, { status: 400 });
       if (custom && !isCustomModel(engine.model)) return Response.json({ error: "Enter a model name for your custom provider." }, { status: 400 });
-      if (!localServer && !custom && (typeof engine.apiKey !== "string" || !engine.apiKey.trim()))
+      if (!protectedLocal && !custom && (typeof engine.apiKey !== "string" || !engine.apiKey.trim()))
         return Response.json({ error: "Add your free API key in Engine settings." }, { status: 400 });
+      const strataBase = strataServer ? strataConnection().base : "";
+      const selectedStrataModel = strataServer ? await strataReadyModel() : "";
       const baseURL: string =
-        customUrl && customUrl.ok
+        strataServer ? strataBase : customUrl && customUrl.ok
             ? customUrl.url
             : localServer
             ? `${ollamaBase()}/v1`
@@ -250,8 +261,9 @@ export async function handleChat(request: Request, assistantContext?: string, tr
       let answeredBy: { model: string; requested: string; fellBack: boolean } | null = null;
       const provider = createOpenAICompatible({
         name: engine.kind,
-        apiKey: localServer ? "ollama" : custom ? String(engine.apiKey ?? "").trim() || "none" : engine.apiKey.trim(),
+        apiKey: strataServer ? "server-held" : localServer ? "ollama" : custom ? String(engine.apiKey ?? "").trim() || "none" : engine.apiKey.trim(),
         baseURL,
+        ...(strataServer ? { fetch: strataSdkFetch } : {}),
       });
       assertInferenceAllowed(engine.kind, baseURL, ollamaBase());
       if (localServer) {
@@ -264,29 +276,48 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         localModel = prep.model;
         answeredBy = { model: prep.model, requested: prep.requested, fellBack: prep.fellBack };
       }
+      let strataFinishReason: string | null = null;
+      let strataStreamFailure: StrataError | null = null;
       const free = streamText({
-        model: provider(custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "openrouter/free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
+        model: provider(strataServer ? selectedStrataModel : custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "openrouter/free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
         messages: history,
-        abortSignal: localServer ? AbortSignal.any([request.signal, AbortSignal.timeout(LOCAL_REPLY_LIMIT_MS)]) : request.signal,
+        abortSignal: protectedLocal ? AbortSignal.any([request.signal, AbortSignal.timeout(LOCAL_REPLY_LIMIT_MS)]) : request.signal,
         maxRetries: 0,
         ...(engine.kind === "anthropic" || custom ? { maxOutputTokens: 1500 } : {}),
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
-        onError: logStreamError,
+        ...(strataServer ? { maxOutputTokens: Math.min(4000, Math.max(1500, Number(engine.maxTokens) || 2400)) } : {}),
+        onError: strataServer ? ({ error }: { error: unknown }) => {
+          strataStreamFailure = classifyStrataError(error);
+          logServer("warn", `Strata local inference failed (${strataStreamFailure.code})`);
+        } : logStreamError,
+        ...(strataServer ? { onFinish: ({ finishReason }: { finishReason: string }) => { strataFinishReason = finishReason; } } : {}),
         ...(localServer ? { onFinish: () => { void touchKeepAlive(localApi, localModel, keepAliveSetting()); } } : {}),
       });
       return free.toUIMessageStreamResponse({
-        ...(answeredBy ? { headers: { "x-pixelpals-model": answeredBy.model, ...(answeredBy.fellBack ? { "x-pixelpals-fallback-from": answeredBy.requested } : {}) } } : {}),
+        ...(protectedLocal ? { headers: { "x-pixelpals-model": strataServer ? selectedStrataModel : answeredBy?.model ?? "", ...(answeredBy?.fellBack ? { "x-pixelpals-fallback-from": answeredBy.requested } : {}) } } : {}),
         originalMessages: messages,
         messageMetadata: ({ part }) =>
-          part.type === "start" ? { agentId: agent.id, round: body.round, ...(answeredBy ? { model: answeredBy.model, ...(answeredBy.fellBack ? { fellBackFrom: answeredBy.requested } : {}) } : {}) } : undefined,
-        onError: (e) => { logServer("error", `${engine.kind} stream failed`, e); return safeError(e); },
+          part.type === "start" ? { agentId: agent.id, round: body.round, ...(strataServer ? { model: selectedStrataModel, via: "Strata" } : {}), ...(answeredBy ? { model: answeredBy.model, ...(answeredBy.fellBack ? { fellBackFrom: answeredBy.requested } : {}) } : {}) }
+          : part.type === "finish" && strataServer
+          ? { truncated: strataFinishReason === "length", finishReason: strataFinishReason ?? "unknown" }
+          : undefined,
+        onError: (e) => {
+          if (strataServer) {
+            const failure = strataStreamFailure ?? classifyStrataError(e);
+            logServer("warn", `Strata stream stopped (${failure.code})`);
+            return `[strata-${failure.code}] ${failure.message} Your question is preserved; retry.`;
+          }
+          logServer("error", `${engine.kind} stream failed`, e); return safeError(e);
+        },
       });
     }
   } catch (error) {
     if (request.signal.aborted || isAbortError(error))
       return new Response(null, { status: 499 });
     if (error instanceof LocalOnlyError) return Response.json({ error: error.message, code: "local-only" }, { status: 403 });
+    if (error instanceof StrataOwnerError) return Response.json({ error: error.message, code: error.code }, { status: 403 });
+    if (error instanceof StrataError) return Response.json({ error: error.message, code: "strata-" + error.code }, { status: error.code === "auth" ? 401 : error.code === "model" ? 409 : error.code === "busy" ? 429 : 503 });
     logServer("error", "chat request failed", error);
     return Response.json({ error: safeError(error) }, { status: 400 });
   }

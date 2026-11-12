@@ -644,6 +644,7 @@ export function GeneralChat({
                       <select value={provider} onChange={(e) => setProvider(e.target.value)}>
                         <option value="auto">Auto — prefer local, configured free fallback</option>
                         <option value="ollama-server">Local Ollama only</option>
+                        <option value="strata-server">Private Strata (configured gaming PC)</option>
                         {turnProviders(engine).map((p) => (
                           <option key={p.kind} value={p.kind}>
                             {p.kind} (configured)
@@ -652,7 +653,7 @@ export function GeneralChat({
                       </select>
                     </label>
                     <label>
-                      Manual Ollama model
+                      Manual Ollama model (ignored for Strata)
                       <input
                         value={model}
                         onChange={(e) => setModel(e.target.value)}

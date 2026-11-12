@@ -3,6 +3,7 @@ export type SetupItem = { id: string; name: string; what: string; env: string; c
 export type SetupTest = { ok: boolean; note: string };
 
 export const INTEGRATIONS: { id: string; name: string; what: string; env: string; testable: boolean }[] = [
+  { id: "strata", name: "Local AI (Strata)", what: "Private inference on your gaming PC over Tailscale", env: "STRATA_ENABLED, STRATA_URL, STRATA_API_KEY, STRATA_MODEL", testable: true },
   { id: "ollama", name: "Local AI (Ollama)", what: "Answers on your own GPU", env: "OLLAMA_URL", testable: true },
   { id: "obsidian", name: "Obsidian vault", what: "Open and edit your vault notes in the Notes tab", env: "OBSIDIAN_VAULT_DIR", testable: false },
   { id: "searxng", name: "Web search (SearXNG)", what: "Lets pals look things up", env: "SEARXNG_URL", testable: true },
@@ -39,7 +40,7 @@ export function setupSummary(items: SetupItem[]): string {
 
 /** The Settings window groups its cards under these headings, in this order. Anything not listed lands in "More" so nothing can go missing. */
 export const SETUP_GROUPS: { id: string; name: string; blurb: string; ids: string[] }[] = [
-  { id: "basics", name: "Basics", blurb: "Time zone, your local AI, search and dictation", ids: ["general", "ollama", "searxng", "whisper"] },
+  { id: "basics", name: "Basics", blurb: "Time zone, your local AI, search and dictation", ids: ["general", "strata", "ollama", "searxng", "whisper"] },
   { id: "calendar-mail", name: "Calendar & mail", blurb: "Calendar feeds, Google Calendar, email", ids: ["calendar", "gcal", "imap", "m365"] },
   { id: "phone", name: "Phone & reminders", blurb: "Alerts, Telegram, the morning brief, iPhone sync", ids: ["ntfy", "today", "telegram", "discord", "brief", "caldav"] },
   { id: "media", name: "Movies & shows", blurb: "Plex, Jellyfin, Seerr, Trakt", ids: ["plex", "jellyfin", "seerr", "trakt"] },
