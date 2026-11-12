@@ -5,6 +5,7 @@ import { generateText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { engineFromJson, freeModels, localServerProvider, strataServerProvider, turnProviders, type EngineSettings, type TurnProvider } from "./engine";
 import { strataConfigured, strataFallbackOllama, strataReadyModel, strataChat, strataConnection, StrataError } from "./strata.server";
+import { assertStrataAuthority, StrataOwnerError, type StrataAuthority } from "./strata-authority.server";
 import { accountFileName } from "./local-account";
 import { ownerName } from "./accounts.server";
 import { ollamaBase, resolveLocalModel } from "./ollama.server";
@@ -63,12 +64,18 @@ export function askChain(s: EngineSettings, prompt: string, forceLocal = false):
 
 export type AskResult = { ok: true; text: string; via: string } | { ok: false; error: string };
 
-export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean; signal?: AbortSignal | undefined } = {}): Promise<AskResult> {
+export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean; signal?: AbortSignal | undefined; authority?: StrataAuthority } = {}): Promise<AskResult> {
   prompt=scrubChatText(prompt,{maskIdentifiers:process.env["CHAT_MASK_IDENTIFIERS"]==="on"});
   if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
   const s = engineFromJson(raw);
+  if (s.kind === "strata-server") {
+    try { await assertStrataAuthority(opts.authority); }
+    catch (error) {
+      return { ok: false, error: error instanceof StrataOwnerError ? error.message : "Protected Strata authorization unavailable." };
+    }
+  }
   const chain = askChain(s, prompt, opts.localOnly === true);
   if (!chain.length) return { ok: false, error: opts.localOnly || localOnlyOn() ? "Local-Only AI mode is on and protected Strata or Ollama is unavailable on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
 
