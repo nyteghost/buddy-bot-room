@@ -289,8 +289,13 @@ export const strataSdkFetch: typeof fetch = async (input, init) => {
       // completion can leave an unfinished body, monopolizing both local slots.
       // Cancel at the shared HTTP transport boundary, before returning to SDK.
       const safe = strataHttpError(res.status);
-      try { await res.body?.cancel(); } catch { /* preserve sanitized HTTP status */ }
-      finally { done(); }
+      // Start cancellation but never wait for a broken upstream cancel() to
+      // settle before freeing capacity. Abort also closes the underlying HTTP
+      // transport; the rejected body is never exposed to an SDK consumer.
+      try { void res.body?.cancel().catch(() => {}); }
+      catch { /* preserve sanitized HTTP status */ }
+      controller.abort();
+      done();
       // Only a synthetic, secret-free error is passed to the AI SDK.
       return Response.json({ error: { message: safe.message, type: "strata_" + safe.code,
         code: "strata-" + safe.code } }, { status: res.status });
