@@ -132,9 +132,12 @@ describe("final QA: AI SDK streaming HTTP status cleanup", () => {
   it("aborted SDK completion frees a slot even when the upstream never finishes headers", async () => {
     const cancelled = vi.fn();
     let calls = 0;
+    let started!: () => void;
+    const inFlight = new Promise<void>(resolve => { started = resolve; });
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
       calls++;
       if (calls === 1) return new Promise<Response>((_resolve, reject) => {
+        started();
         const signal = init?.signal;
         if (signal?.aborted) { reject(new Error("aborted")); return; }
         signal?.addEventListener("abort", () => { cancelled(); reject(new Error("aborted")); }, { once: true });
@@ -143,6 +146,7 @@ describe("final QA: AI SDK streaming HTTP status cleanup", () => {
     });
     const controller = new AbortController();
     const pending = strataSdkFetch(base + "/chat/completions", { method: "POST", signal: controller.signal });
+    await inFlight;
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: "offline" });
     expect(cancelled).toHaveBeenCalledTimes(1);
