@@ -7,6 +7,12 @@ import { engineFromJson, providerForTurn } from "@/lib/engine";
 import { dispatchTurn } from "@/lib/turn-dispatch";
 import { handleChat } from "@/lib/chat.server";
 import { agents, models } from "@/lib/agents";
+// The native handler now requires a verified owner; anonymous server-trust
+// flags are deliberately not accepted as proof of Strata authorization.
+vi.mock("@/lib/accounts.server", async importOriginal => ({
+  ...(await importOriginal<typeof import("@/lib/accounts.server")>()),
+  currentUser: vi.fn().mockResolvedValue({ username: "owner", owner: true }),
+}));
 
 const key = "FAKE-STRATA-KEY-TEST-ONLY";
 const model = "qwen3.8-flash-next-coder-iq1_m";
