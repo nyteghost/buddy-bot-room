@@ -14,6 +14,27 @@ export class StrataError extends Error {
   }
 }
 
+/** Sanitized status mapping for both JSON clients and AI SDK streaming errors. */
+export function strataHttpError(status: number): StrataError {
+  if (status === 401 || status === 403)
+    return new StrataError("auth", "Strata rejected the configured API key.");
+  if (status === 404)
+    return new StrataError("model", "Strata endpoint or model is unavailable.");
+  if (status === 408 || status === 429)
+    return new StrataError("busy", "Strata is busy. Please retry.");
+  return new StrataError("offline", "Strata could not complete the local request.");
+}
+export function classifyStrataError(error: unknown): StrataError {
+  if (error instanceof StrataError) return error;
+  if (error && typeof error === "object") {
+    const obj = error as { statusCode?: unknown; status?: unknown };
+    const status = obj.statusCode ?? obj.status;
+    if (typeof status === "number" && status >= 400 && status <= 599)
+      return strataHttpError(status);
+  }
+  return new StrataError("offline", "Strata inference was interrupted. Retry when the local model is available.");
+}
+
 export type StrataModel = Readonly<{ id: string; status?: string }>;
 export type StrataMessage = Readonly<{ role: "system" | "user" | "assistant"; content: string }>;
 export type StrataReply = Readonly<{ text: string; model: string; truncated: boolean; finishReason: string }>;
@@ -263,6 +284,17 @@ export const strataSdkFetch: typeof fetch = async (input, init) => {
     headers.set("Authorization", "Bearer " + key);
     headers.set("Accept", "application/json");
     const res = await fetch(target, { ...init, headers, signal: controller.signal, redirect: "error", cache: "no-store" });
+    if (!res.ok) {
+      // IMPORTANT: SDK consumers do not use request()/boundedJson(). A failed
+      // completion can leave an unfinished body, monopolizing both local slots.
+      // Cancel at the shared HTTP transport boundary, before returning to SDK.
+      const safe = strataHttpError(res.status);
+      try { await res.body?.cancel(); } catch { /* preserve sanitized HTTP status */ }
+      finally { done(); }
+      // Only a synthetic, secret-free error is passed to the AI SDK.
+      return Response.json({ error: { message: safe.message, type: "strata_" + safe.code,
+        code: "strata-" + safe.code } }, { status: res.status });
+    }
     if (!res.body) { done(); return res; }
     const reader = res.body.getReader();
     // Abort must release the held concurrency slot even if an upstream server
