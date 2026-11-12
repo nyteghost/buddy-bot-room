@@ -154,3 +154,49 @@ describe("final QA: AI SDK streaming HTTP status cleanup", () => {
     expect(calls).toBe(2);
   });
 });
+
+
+describe("final QA: cancellation and timeout hardening", () => {
+  it("releases capacity even when an upstream error body never completes cancellation", async () => {
+    const cancelled = vi.fn();
+    let count = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      count++;
+      if (count === 1)
+        return new Response(new ReadableStream<Uint8Array>({
+          cancel() { cancelled(); return new Promise<void>(() => {}); },
+        }), { status: 401 });
+      return Response.json({ data: [{ id: model }] });
+    });
+    const response = await strataSdkFetch(base + "/chat/completions", { method: "POST", body: "{}" });
+    expect(response.status).toBe(401);
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    expect((await strataModels())[0]?.id).toBe(model);
+    expect(count).toBe(2);
+  });
+
+  it("aborts a stalled HTTP request at its total deadline and recovers capacity", async () => {
+    vi.useFakeTimers();
+    try {
+      let started!: () => void;
+      const inFlight = new Promise<void>(resolve => { started = resolve; });
+      let count = 0;
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+        count++;
+        if (count === 1) return new Promise<Response>((_resolve, reject) => {
+          started();
+          init?.signal?.addEventListener("abort", () => reject(new Error("timeout")), { once: true });
+        });
+        return Response.json({ data: [{ id: model }] });
+      });
+      const pending = strataSdkFetch(base + "/chat/completions", { method: "POST" });
+      await inFlight;
+      await vi.advanceTimersByTimeAsync(120_001);
+      await expect(pending).rejects.toMatchObject({ code: "offline" });
+      expect((await strataModels())[0]?.id).toBe(model);
+      expect(count).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
