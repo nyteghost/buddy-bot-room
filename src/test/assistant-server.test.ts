@@ -825,7 +825,7 @@ it("Strata final P2: explicit Ollama token-limit warning never attributes its an
     .filter(p => p.type === "text").map(p => p.text).join("\n");
   expect(text).toMatch(/Ollama output reached its token limit/);
   expect(text).not.toMatch(/Strata output/);
-  const saved = (await readChatRows()).find(x => x.id === c.id)!;
+  const saved = (await readChatRows()).find(x => x.id === c.id) as Conversation;
   const persisted = saved.messages.at(-1)!.parts.filter(p => p.type === "text").map(p => p.text).join("\n");
   expect(persisted).toBe(text);
 });
@@ -846,7 +846,7 @@ it("Strata final P2: explicit local fallback persists the actual Ollama attribut
     .filter(p => p.type === "text").map(p => p.text).join("\n");
   expect(text).toMatch(/Ollama output reached its token limit/);
   expect(text).not.toMatch(/Strata output/);
-  expect((await readChatRows()).find(x => x.id === c.id)!.assistant.provider?.kind).toBe("ollama-server");
+  expect((await readChatRows()).find(x => x.id === c.id)!.assistant?.provider?.kind).toBe("ollama-server");
   expect(handleChat).toHaveBeenCalledTimes(2);
   const calls = vi.mocked(handleChat).mock.calls;
   expect((await calls[0]![0].clone().json()).engine.kind).toBe("strata-server");
