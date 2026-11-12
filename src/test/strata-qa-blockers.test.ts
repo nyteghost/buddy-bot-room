@@ -99,6 +99,30 @@ describe("independent QA blockers — owner gate, Setup readiness and Working Pa
     expect(calls).toEqual([base + "/models", base + "/chat/completions"]);
   });
 
+
+  it.each([
+    [401, "auth"], [404, "model"], [429, "busy"], [503, "offline"],
+  ] as const)("P1/P2 live Pal SDK stream cancels unfinished HTTP %i and reports safe %s without cloud fallback", async (status, code) => {
+    const canceled = vi.fn();
+    const calls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+      const url = String(input);
+      calls.push(url);
+      if (url === base + "/models")
+        return Response.json({ data: [{ id: model, status: { value: "loaded" } }] });
+      if (url === base + "/chat/completions")
+        return new Response(new ReadableStream<Uint8Array>({ cancel: canceled }), { status });
+      throw Error("Unexpected outbound target");
+    });
+    const reply = await handleChat(palRequest());
+    expect(reply.ok).toBe(true);
+    const data = await reply.text();
+    expect(data).toContain("strata-" + code);
+    expect(data).not.toContain(key);
+    expect(canceled).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([base + "/models", base + "/chat/completions"]);
+  });
+
   it("P2 Setup rejects not_loaded and absent models but accepts exactly the loaded model", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ data: [{ id: model, status: { value: "not_loaded" } }] }));
     const unloaded = await (await handleSetup(setupRequest())).json() as { ok: boolean; note: string };
