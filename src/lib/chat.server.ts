@@ -24,7 +24,7 @@ import { readHardware } from "./hardware.server";
 import { isModelName, parseAutoMarker } from "./model-catalog";
 import { isCustomModel, validateCustomUrl } from "./custom-provider";
 import { assertInferenceAllowed, localOnlyOn, LocalOnlyError } from "./ai/guard.server";
-import { strataConnection, strataReadyModel, strataSdkFetch, StrataError } from "./strata.server";
+import { strataConnection, strataReadyModel, strataSdkFetch, classifyStrataError, StrataError } from "./strata.server";
 import { assertStrataAuthority, StrataOwnerError } from "./strata-authority.server";
 import { friendlyAiError, makeProbe, withRetry } from "./ai/reliability";
 import { blockedMessage, engineAllowed } from "./local-only";
@@ -277,6 +277,7 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         answeredBy = { model: prep.model, requested: prep.requested, fellBack: prep.fellBack };
       }
       let strataFinishReason: string | null = null;
+      let strataStreamFailure: StrataError | null = null;
       const free = streamText({
         model: provider(strataServer ? selectedStrataModel : custom ? String(engine.model) : localServer ? localModel : engine.kind === "anthropic" ? (CLAUDE_IDS.includes(String(engine.model)) ? String(engine.model) : "claude-haiku-5-5") : engine.kind === "groq" ? "openai/gpt-oss-120b" : engine.kind === "openrouter" ? "openrouter/free" : engine.kind === "nvidia" ? "meta/llama-3.1-70b-instruct" : "gemini-2.5-flash"),
         system: instructions,
@@ -286,7 +287,10 @@ export async function handleChat(request: Request, assistantContext?: string, tr
         ...(engine.kind === "anthropic" || custom ? { maxOutputTokens: 1500 } : {}),
         ...(localServer ? { maxOutputTokens: Math.min(4000, Math.max(200, Number(engine.maxTokens) || 800)) } : {}),
         ...(strataServer ? { maxOutputTokens: Math.min(4000, Math.max(1500, Number(engine.maxTokens) || 2400)) } : {}),
-        onError: strataServer ? () => { logServer("warn", "Strata local inference stream failed"); } : logStreamError,
+        onError: strataServer ? ({ error }: { error: unknown }) => {
+          strataStreamFailure = classifyStrataError(error);
+          logServer("warn", `Strata local inference failed (${strataStreamFailure.code})`);
+        } : logStreamError,
         ...(strataServer ? { onFinish: ({ finishReason }: { finishReason: string }) => { strataFinishReason = finishReason; } } : {}),
         ...(localServer ? { onFinish: () => { void touchKeepAlive(localApi, localModel, keepAliveSetting()); } } : {}),
       });
@@ -299,7 +303,11 @@ export async function handleChat(request: Request, assistantContext?: string, tr
           ? { truncated: strataFinishReason === "length", finishReason: strataFinishReason ?? "unknown" }
           : undefined,
         onError: (e) => {
-          if (strataServer) { logServer("warn", "Strata local inference stream interrupted"); return "Strata inference stopped before finishing; your question is preserved. Retry when the local model is online."; }
+          if (strataServer) {
+            const failure = strataStreamFailure ?? classifyStrataError(e);
+            logServer("warn", `Strata stream stopped (${failure.code})`);
+            return `[strata-${failure.code}] ${failure.message} Your question is preserved; retry.`;
+          }
           logServer("error", `${engine.kind} stream failed`, e); return safeError(e);
         },
       });
