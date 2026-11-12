@@ -192,6 +192,101 @@ describe("P1/P2 crowd movement and recovery regressions", () => {
    .toBe(60_000);
  });
 
+ it("retains QA's rejection when the freed destination is accepted and eventually reached",()=>{
+  const crowd=new WorldIsoCrowd(square());
+  expect(crowd.join({id:"A",kind:"pal",at:{u:2,v:2}})).toBe(true);
+  expect(crowd.join({id:"B",kind:"pal",at:{u:4,v:2}})).toBe(true);
+  const x={u:8,v:8}, y={u:8,v:7};
+  expect(crowd.assign("A",x)).toBe(true);
+  expect(crowd.assign("B",x)).toBe(false);
+  const first=crowd.diagnostics().goals.find(g=>g.actorId==="B")!;
+  expect(first).toMatchObject({outcome:"rejected",finishedAtMs:0,arrivalAtMs:null});
+  expect(crowd.assign("A",y)).toBe(true);
+  const beforeRetry=crowd.diagnostics();
+  expect(crowd.assign("B",x)).toBe(false);
+  expect(crowd.diagnostics().pathQueries).toBe(beforeRetry.pathQueries);
+  expect(crowd.diagnostics().actors.find(a=>a.id==="B"))
+   .toMatchObject({reserved:false,arrived:false});
+  for(let i=0;i<11;i++)checkSafeStep(crowd,200);
+  const held=crowd.diagnostics().goals.find(g=>g.sequence===first.sequence)!;
+  expect(crowd.assign("B",x)).toBe(true);
+  const retry=crowd.diagnostics().goals.filter(g=>g.actorId==="B").at(-1)!;
+  expect(retry.sequence).toBeGreaterThan(first.sequence);
+  expect(retry).toMatchObject({actorId:"B",requested:x,requestAtMs:2200,
+   reservationAtMs:2200,outcome:"pending",finishedAtMs:null,arrivalAtMs:null});
+  expect(crowd.diagnostics().goals.find(g=>g.sequence===first.sequence)).toEqual(held);
+  for(let i=0;i<500 && !crowd.diagnostics().actors.find(a=>a.id==="B")!.arrived;i++)
+   checkSafeStep(crowd,50);
+  expect(crowd.diagnostics().actors.find(a=>a.id==="B"))
+   .toMatchObject({reserved:true,arrived:true,status:"arrived"});
+  expect(dist(crowd.pose("B")!.at,x)).toBeLessThan(1e-8);
+  const end=crowd.diagnostics().goals.find(g=>g.sequence===retry.sequence)!;
+  expect(end.outcome).toBe("completed");
+  expect(end.arrivalAtMs).toBeGreaterThan(2200);
+  expect(end.finishedAtMs).toBe(end.arrivalAtMs);
+  expect(crowd.diagnostics().goals.find(g=>g.sequence===first.sequence)).toEqual(held);
+  expect(crowd.diagnostics().goals.filter(g=>g.actorId==="B")).toHaveLength(2);
+ });
+
+ it("keeps an unreachable terminal event when a later retry fails for a different reason",()=>{
+  const crowd=new WorldIsoCrowd(square(10,[{id:"wall",u1:0,v1:4.75,u2:10,v2:5.25}]));
+  const x={u:8,v:8};
+  expect(crowd.join({id:"A",kind:"pal",at:{u:2,v:2}})).toBe(true);
+  expect(crowd.join({id:"B",kind:"pal",at:x})).toBe(true);
+  expect(crowd.assign("A",x)).toBe(false);
+  const first=crowd.diagnostics().goals[0]!;
+  expect(first).toMatchObject({outcome:"unreachable",reason:"no-static-route",finishedAtMs:0});
+  expect(crowd.assign("B",x)).toBe(true);
+  for(let i=0;i<300;i++){
+   checkSafeStep(crowd,200);
+   expect(crowd.assign("A",x)).toBe(false);
+  }
+  expect(crowd.diagnostics().goals.find(g=>g.sequence===first.sequence)).toMatchObject({
+   outcome:"unreachable",reason:"no-static-route",finishedAtMs:0,arrivalAtMs:null,reservationAtMs:null,
+  });
+  expect(crowd.diagnostics().actors.find(a=>a.id==="A"))
+   .toMatchObject({reserved:false,arrived:false,reason:"destination-reserved"});
+  expect(crowd.diagnostics().goals.filter(g=>g.actorId==="A")).toHaveLength(1);
+  // The sealed static barrier cannot become reachable: a different valid request is new.
+  expect(crowd.assign("A",{u:3,v:2})).toBe(true);
+  for(let i=0;i<20;i++)checkSafeStep(crowd,50);
+  expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("completed");
+  expect(crowd.diagnostics().goals[0]!.finishedAtMs).toBe(0);
+ });
+
+ it("retains a stalled sequence through schedule refresh and records a separate restart",()=>{
+  const crowd=new WorldIsoCrowd(square(10,[
+   {id:"south",u1:0,v1:0,u2:10,v2:3.64},
+   {id:"north",u1:0,v1:4.36,u2:10,v2:10},
+  ]));
+  const x={u:8,v:4};
+  expect(crowd.join({id:"visitor:a",kind:"visitor",at:{u:4,v:4}})).toBe(true);
+  expect(crowd.join({id:"pal:b",kind:"pal",at:{u:4.6,v:4}})).toBe(true);
+  expect(crowd.assign("visitor:a",x)).toBe(true);
+  expect(crowd.assign("pal:b",{u:4.6,v:4})).toBe(true);
+  for(let i=0;i<430;i++)checkSafeStep(crowd,200);
+  const first=crowd.diagnostics().goals[0]!;
+  expect(first.outcome).toBe("stalled");
+  crowd.beginSchedulePeriod();
+  expect(crowd.assign("visitor:a",x)).toBe(true);
+  const restart=crowd.diagnostics().goals.filter(g=>g.actorId==="visitor:a").at(-1)!;
+  expect(restart.sequence).toBeGreaterThan(first.sequence);
+  expect(restart).toMatchObject({outcome:"pending",requestAtMs:86000,finishedAtMs:null});
+  checkSafeStep(crowd,50);
+  expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("pending");
+  for(let i=0;i<300;i++)checkSafeStep(crowd,200);
+  expect(crowd.diagnostics().goals.find(g=>g.sequence===first.sequence)).toEqual(first);
+  expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("stalled");
+  expect(crowd.diagnostics().actors.find(a=>a.id==="visitor:a")?.arrived).toBe(false);
+  // Once the blocker leaves, a schedule restart can arrive on a third sequence.
+  crowd.leave("pal:b"); crowd.beginSchedulePeriod();
+  expect(crowd.assign("visitor:a",x)).toBe(true);
+  for(let i=0;i<200;i++)checkSafeStep(crowd,50);
+  expect(crowd.diagnostics().goals.at(-1)?.outcome).toBe("completed");
+  expect(crowd.diagnostics().goals.find(g=>g.sequence===first.sequence)).toEqual(first);
+  expect(crowd.diagnostics().goals.filter(g=>g.actorId==="visitor:a")).toHaveLength(3);
+ });
+
  it("reports truthful rejection and arrival for nonfinite, malformed, furniture and valid goals", () => {
   const crowd=new WorldIsoCrowd(square(10,[{id:"desk",u1:7,v1:7,u2:9,v2:9}]));
   expect(crowd.join({id:"A",kind:"pal",at:{u:2,v:2}})).toBe(true);

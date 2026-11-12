@@ -232,7 +232,15 @@ describe("held-goal and adversarial liveness instrumentation",()=>{
   const d=crowd.diagnostics();
   expect(d.actors.find(a=>a.id==="C")?.reserved).toBe(true);
   expect(d.actors.find(a=>a.id==="B")?.reserved).toBe(true);
-  expect(d.goals.filter(g=>g.outcome==="rejected").length).toBe(0);
+  // Accepted retries must retain both original rejections in history.
+  const rejected=d.goals.filter(g=>g.outcome==="rejected");
+  expect(rejected.map(g=>g.actorId)).toEqual(["B","C"]);
+  for(const goal of rejected)expect(goal).toMatchObject({
+   requestAtMs:0,finishedAtMs:0,reservationAtMs:null,arrivalAtMs:null,
+  });
+  const currentC=d.goals.filter(g=>g.actorId==="C").at(-1)!;
+  expect(currentC.sequence).toBeGreaterThan(rejected[1]!.sequence);
+  expect(currentC).toMatchObject({outcome:"pending",requestAtMs:4200,reservationAtMs:4200});
   expect(crowd.valid()).toBe(true);
  });
 

@@ -159,7 +159,7 @@ export class WorldIsoCrowd {
   const requested = numericTarget ? copy(target) : null;
   const same = !!requested && !!a.goalRecord?.requested &&
    distance(requested, a.goalRecord.requested) < EPS;
-  const goal = same ? a.goalRecord! : this.startGoal(a, requested);
+  let goal = same ? a.goalRecord! : this.startGoal(a, requested);
   // A duplicate request must neither reset an intercepted yield nor erase
   // its original request time, blocked duration, or recovery attempts.
   if (same && a.committed && !a.failedGoal) {
@@ -196,12 +196,15 @@ export class WorldIsoCrowd {
    // A rejected request never owns a reservation. Reassignment releases
    // the previous claim immediately even when the new request fails.
    a.committed = false;
-   goal.reservationAtMs = null; goal.arrivalAtMs = null;
-   // A same-goal retry reports the ORIGINAL rejection event, not a new
-   // terminal event every time the bounded retry window expires.
-   if (goal.finishedAtMs === null) goal.finishedAtMs = this.time;
-   goal.outcome = reason === "destination-reserved" ? "rejected" : "unreachable";
-   goal.reason = reason;
+   // Repeated denial may change the actor's current reason, but must not
+   // rewrite the original terminal event (including its outcome/reason).
+   // Held-failure duration metrics continue accumulating until a new attempt.
+   if (goal.finishedAtMs === null) {
+    goal.reservationAtMs = null; goal.arrivalAtMs = null;
+    goal.finishedAtMs = this.time;
+    goal.outcome = reason === "destination-reserved" ? "rejected" : "unreachable";
+    goal.reason = reason;
+   }
    this.counters.failedAssignments++; return false;
   };
   if (!requested) return fail("invalid-coordinate", "unreachable");
@@ -213,14 +216,21 @@ export class WorldIsoCrowd {
   this.counters.pathQueries++;
   const path = worldIsoPath(this.plan, a.at, requested, this.radius);
   if (!path) return fail("no-static-route", "unreachable");
+  // A successful restart after a terminal failure is a NEW logical attempt.
+  // Allocate only after validation/cooldown succeeds: denied polls do not
+  // flood history, and active pending goals retain their progress clocks.
+  // Re-reserving an already completed goal in place remains idempotent.
+  if (goal.finishedAtMs !== null &&
+   (goal.outcome !== "completed" || distance(a.at, requested) >= EPS))
+   goal = this.startGoal(a, requested);
   a.goal = copy(requested); a.path = path; a.waypoint = 1; a.reason = null;
   a.committed = true; a.failedGoal = null; a.failedAt = -Infinity;
   a.waitMs = 0; a.yieldTo = null; a.yieldHoldMs = 0;
   a.status = distance(a.at, requested) < EPS ? "arrived" : "moving";
   a.waiting = false;
   if (goal.reservationAtMs === null) goal.reservationAtMs = this.time;
-  // Re-reserving the same goal after an ambient-period release or retry is
-  // not permission to restart its historical no-progress/blocked clock.
+  // A pending goal keeps its clock across ambient-period release. A new
+  // attempt already received fresh clocks in startGoal above.
   if (!same) {
    goal.lastProgressAtMs = this.time; goal.nonProgressMs = 0;
    goal.bestDistance = distance(a.at, requested);
