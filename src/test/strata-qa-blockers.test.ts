@@ -19,6 +19,14 @@ const model = "qwen3.8-flash-next-coder-iq1_m";
 const key = "FAKE-KEY-NOT-REAL-STRATA";
 let dir = "";
 const owner = { username: "owner", owner: true };
+const missionId = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
+const mission = (status = "running", revision = 3) => ({
+  id: missionId, title: "Owner summary", question: "Summarize the approved work",
+  scope: "personal", project: "", status, revision, created: "2026-11-11T12:00:00Z",
+  updated: "2026-11-11T12:01:00Z", approvedAt: "2026-11-11T12:00:30Z",
+  startedAt: "2026-11-11T12:01:00Z", finishedAt: "", result: "", error: "",
+  source: "owner-ui", execution: "local-summary-only",
+});
 const palRequest = () => new Request("http://localhost/api/chat", {
   method: "POST", headers: { "content-type": "application/json" },
   body: JSON.stringify({
@@ -52,6 +60,7 @@ beforeEach(async () => {
   await fs.mkdir(dir + "/accounts");
   await fs.writeFile(dir + "/accounts/" + await accountFileName("owner"),
     JSON.stringify({ data: { "pixel-pals-engine-v1": JSON.stringify({ kind: "strata-server", localChat: "auto" }) } }));
+  await fs.writeFile(dir + "/working-pals.json", JSON.stringify([mission()]));
 });
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -133,9 +142,11 @@ describe("independent QA blockers — owner gate, Setup readiness and Working Pa
       throw Error("Unexpected provider");
     });
     const approved = await askPals("Provide an authorized read-only summary", { localOnly: true, maxTokens: 900,
+      authority: { kind: "approved-working-pal", missionId, revision: 3 },
       system: "You are an approved read-only Working Pal. No tools." });
     expect(approved).toMatchObject({ ok: true, via: "Strata · " + model });
-    const smaller = await askPals("Keep it short", { localOnly: true, maxTokens: 80 });
+    const smaller = await askPals("Keep it short", { localOnly: true, maxTokens: 80,
+      authority: { kind: "owner-request", request: palRequest() } });
     expect(smaller.ok).toBe(true);
     expect(budgets).toEqual([900, 80]);
   });
