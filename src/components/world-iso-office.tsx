@@ -26,6 +26,14 @@ export type WorldIsoOfficeProps = Readonly<{
  /** Bounded progress/blocked-route telemetry; does not grant any app permissions. */
  onDiagnostics?: (report: WorldIsoCrowdDiagnostics) => void;
 }>;
+// Entry order is deterministic and independent of incumbent positions/routes.
+// A temporary occupied home is not a scene fault. Only join() may admit an actor.
+function joinAtAvailableHome(crowd: WorldIsoCrowd, actor: WorldIsoScheduledActor): boolean {
+ const homes = WORLD_ISO_GREYBOX.anchors.filter(a => a.kind === (actor.kind === "pal" ? "seat" : "visitor"))
+  .sort((a, b) => Number(b.id === actor.home) - Number(a.id === actor.home) || a.id.localeCompare(b.id));
+ return homes.some(home => crowd.join({ id: actor.id, kind: actor.kind, at: home.at,
+  facing: home.facing, real: !!actor.real }));
+}
 const pointString = (poly: readonly { x: number; y: number }[]) => poly.map(p => p.x + "," + p.y).join(" ");
 const label = (s: string) => s.length > 30 ? s.slice(0, 30) + "…" : s;
 const FALLBACK_MESSAGE = "Isometric preview unavailable. The existing flat HD Office remains available.";
@@ -54,7 +62,7 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  // Stable semantic keys: existing room.tsx creates fresh but equivalent arrays on
  // every parent render. Neither the crowd nor the RAF clock must depend on their identities.
  const rosterKey = JSON.stringify([pals.map(p => [p.id, p.name, p.enabled, p.real]),
-  visitors.slice(0, 6).map(v => [v.id, v.name])]);
+  visitors.map(v => [v.id, v.name])]);
  const latest = useRef({ pals, visitors, onFailure, onDiagnostics });
  latest.current = { pals, visitors, onFailure, onDiagnostics };
  const clock = useRef(new WorldIsoClock());
@@ -67,6 +75,7 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  const [poses, setPoses] = useState<WorldIsoCrowdPose[]>([]);
  const [fault, setFault] = useState<string | null>(null);
  const lastPeriod = useRef(-1);
+ const nextJoinAt = useRef(0);
  const lastRosterKey = useRef("");
  const lastRender = useRef(0);
  const lastReportedFault = useRef<string | null>(null);
@@ -97,13 +106,8 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  useEffect(() => {
   const nextIds = new Set(initial.map(a => a.id));
   for (const id of crowd.ids()) if (!nextIds.has(id)) crowd.leave(id);
-  for (const a of initial) if (!crowd.pose(a.id)) {
-   const home = WORLD_ISO_GREYBOX.anchors.find(x => x.id === a.home);
-   if (!home || !crowd.join({ id: a.id, kind: a.kind, at: home.at, facing: home.facing, real: !!a.real })) {
-    setFault("Unable to place an actor safely.");
-    break;
-   }
-  }
+  for (const a of initial) if (!crowd.pose(a.id)) joinAtAvailableHome(crowd, a);
+  nextJoinAt.current = clock.current.elapsedMs + 2_000;
   lastRosterKey.current = "";
   setView(initial); setPoses(crowd.snapshot());
  }, [crowd, rosterIds]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,10 +138,22 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
      setView(targets);
      lastPeriod.current = period; lastRosterKey.current = rosterKey;
     }
+    // Retry missing roster members without resetting incumbent routes or the
+    // schedule period. Paused/hidden previews retry when motion resumes.
+    if (elapsed >= nextJoinAt.current) {
+     for (const actor of worldIsoSchedule(source.pals, source.visitors, elapsed)) {
+      if (!crowd.pose(actor.id) && joinAtAvailableHome(crowd, actor)) {
+       const request = pending.current.find(p => p.id === actor.id);
+       if (request) request.nextAt = elapsed;
+       else pending.current.push({id:actor.id, target:actor.target, real:!!actor.real, nextAt:elapsed});
+      }
+     }
+     nextJoinAt.current = elapsed + 2_000;
+    }
     let assignments = 0;
     for(let i=0;i<pending.current.length && assignments<2;) {
      const request=pending.current[i]!;
-     if(elapsed<request.nextAt){i++;continue;}
+     if(elapsed<request.nextAt || !crowd.pose(request.id)){i++;continue;}
      crowd.setReal(request.id,request.real);
      assignments++;
      if(crowd.assign(request.id,request.target)) pending.current.splice(i,1);
