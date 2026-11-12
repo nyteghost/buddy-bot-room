@@ -190,9 +190,11 @@ describe("final QA: cancellation and timeout hardening", () => {
         return Response.json({ data: [{ id: model }] });
       });
       const pending = strataSdkFetch(base + "/chat/completions", { method: "POST" });
+      // Observe rejection immediately, before fake timers trigger the timeout.
+      const expectedFailure = expect(pending).rejects.toMatchObject({ code: "offline" });
       await inFlight;
       await vi.advanceTimersByTimeAsync(120_001);
-      await expect(pending).rejects.toMatchObject({ code: "offline" });
+      await expectedFailure;
       expect((await strataModels())[0]?.id).toBe(model);
       expect(count).toBe(2);
     } finally {
