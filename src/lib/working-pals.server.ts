@@ -133,6 +133,7 @@ async function execute(id: string, expected: number): Promise<{ ok: boolean; mes
         const response = await askPals(current.question, {
           localOnly: true,
           signal,
+          authority: { kind: "approved-working-pal", missionId: id, revision: expected + 1 },
           maxTokens: 900,
           system:
             "You are a Working Pal performing a specifically approved, READ-ONLY local summary. No browsing, tools, file writes, calendar changes, messaging, external actions, hidden work or claims that actions were done. Answer with a practical summary. Cite only sources actually supplied; say when you lack information. Keep it under 350 words.",
