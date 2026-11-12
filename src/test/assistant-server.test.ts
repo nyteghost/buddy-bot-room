@@ -805,3 +805,72 @@ it("Strata QA P2: General Chat preserves safe typed pre-stream auth/model/busy/o
     expect((await readChatRows()).find(row => row.id === c.id)!.messages).toHaveLength(1);
   }
 });
+
+
+const limitedOllamaFixture = () => new Response(
+  'data: {"type":"text-delta","id":"a","delta":"Incomplete Ollama answer"}\n\n' +
+  'data: {"type":"finish","finishReason":"length","messageMetadata":{"truncated":true,"finishReason":"length"}}\n\n' +
+  'data: [DONE]\n\n',
+  { headers: { "x-pixelpals-model": "qwen3.5:9b" } },
+);
+
+it("Strata final P2: explicit Ollama token-limit warning never attributes its answer to Strata", async () => {
+  const c = await create();
+  vi.mocked(handleChat).mockResolvedValueOnce(limitedOllamaFixture());
+  const result = await ask(c, "Long Ollama explanation", {
+    provider: "ollama-server", engine: { kind: "local-server", localChat: "auto" },
+  });
+  expect(result.route.provider).toBe("ollama-server");
+  const text = (result.conversation as Conversation).messages.at(-1)!.parts
+    .filter(p => p.type === "text").map(p => p.text).join("\n");
+  expect(text).toMatch(/Ollama output reached its token limit/);
+  expect(text).not.toMatch(/Strata output/);
+  const saved = (await readChatRows()).find(x => x.id === c.id)!;
+  const persisted = saved.messages.at(-1)!.parts.filter(p => p.type === "text").map(p => p.text).join("\n");
+  expect(persisted).toBe(text);
+});
+
+it("Strata final P2: explicit local fallback persists the actual Ollama attribution and receipt", async () => {
+  useStrataQaSettings();
+  vi.stubEnv("STRATA_FALLBACK", "ollama");
+  const c = await create();
+  vi.mocked(handleChat).mockResolvedValueOnce(Response.json({
+    error: "Strata is busy. Please retry.", code: "strata-busy",
+  }, { status: 429 })).mockResolvedValueOnce(limitedOllamaFixture());
+  const result = await ask(c, "Keep this private", {
+    provider: "strata-server", engine: { kind: "strata-server", localChat: "auto" },
+  });
+  expect(result.route.provider).toBe("ollama-server");
+  expect(result.route.model).toBe("qwen3.5:9b");
+  const text = (result.conversation as Conversation).messages.at(-1)!.parts
+    .filter(p => p.type === "text").map(p => p.text).join("\n");
+  expect(text).toMatch(/Ollama output reached its token limit/);
+  expect(text).not.toMatch(/Strata output/);
+  expect((await readChatRows()).find(x => x.id === c.id)!.assistant.provider?.kind).toBe("ollama-server");
+  expect(handleChat).toHaveBeenCalledTimes(2);
+  const calls = vi.mocked(handleChat).mock.calls;
+  expect((await calls[0]![0].clone().json()).engine.kind).toBe("strata-server");
+  expect((await calls[1]![0].clone().json()).engine.kind).toBe("ollama-server");
+});
+
+it("Strata final P2: streamed completion errors retain sanitized auth, model, busy and offline categories", async () => {
+  useStrataQaSettings();
+  for (const [code, label] of [
+    ["auth", "API key"], ["model", "model"], ["busy", "busy"], ["offline", "unavailable"],
+  ] as const) {
+    const c = await create();
+    const line = JSON.stringify({ type: "error", errorText: "[strata-" + code + "] safe-server-error" });
+    vi.mocked(handleChat).mockResolvedValueOnce(new Response(
+      'data: {"type":"text-delta","id":"a","delta":"unfinished"}\n\n' +
+      "data: " + line + "\n\n" + "data: [DONE]\n\n",
+    ));
+    const response = await handleAssistant(req({ op: "ask", id: c.id,
+      revision: c.assistant.revision, question: "Private Strata response",
+      provider: "strata-server", engine: { kind: "strata-server" } }));
+    expect(response.status).toBe(503);
+    const outcome = (await response.json()) as { error: string };
+    expect(outcome.error.toLowerCase()).toContain(label.toLowerCase());
+    expect(outcome.error).not.toContain("safe-server-error");
+    expect((await readChatRows()).find(x => x.id === c.id)!.messages).toHaveLength(1);
+  }
+});
