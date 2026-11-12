@@ -45,6 +45,25 @@ To use Strata after a separately authorized rollout:
    If Strata is not available and no owner-enabled Ollama fallback exists,
    the work is marked unavailable; jobs are not rerouted to cloud providers.
 
+## Final security corrections (November 11 independent QA)
+
+- Protected Strata requires an enabled local-account system and a cryptographically
+  verified owner session. Legacy accounts-disabled deployments cannot use Strata,
+  even with retained engine settings or a trusted-internal boolean. The existing
+  Ollama authorization rules are unchanged.
+- The shared `askPals` entry enforces the same gate. Focus Food forwards its
+  signed request; unattended Working Pals must match the **running revision**
+  of a persisted, explicitly owner-approved, read-only mission; and the
+  owner-configured Telegram bot must match the allowed chat ID and have a
+  persistent owner account. Unauthorized calls cannot reach model discovery.
+- The **SDK streaming transport itself** cancels all non-2xx upstream bodies,
+  releases its bounded inference slot, and passes the SDK only a synthetic,
+  secret-free JSON error. Typed authentication, missing-model, rate/busy and
+  offline failures survive both Pal streaming and General Chat parsing.
+- A token-limited response is labeled with its **actual answering provider**,
+  including an explicitly enabled Ollama fallback; no Ollama answer is
+  mislabeled as Strata.
+
 ## Server-side safeguards
 
 - **Owner authorization is mandatory for native Strata inference**: unsigned-in
