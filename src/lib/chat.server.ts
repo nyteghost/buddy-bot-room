@@ -25,6 +25,7 @@ import { isModelName, parseAutoMarker } from "./model-catalog";
 import { isCustomModel, validateCustomUrl } from "./custom-provider";
 import { assertInferenceAllowed, localOnlyOn, LocalOnlyError } from "./ai/guard.server";
 import { strataConnection, strataReadyModel, strataSdkFetch, StrataError } from "./strata.server";
+import { assertStrataAuthority, StrataOwnerError } from "./strata-authority.server";
 import { friendlyAiError, makeProbe, withRetry } from "./ai/reliability";
 import { blockedMessage, engineAllowed } from "./local-only";
 const CLAUDE_IDS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
@@ -213,8 +214,7 @@ export async function handleChat(request: Request, assistantContext?: string, tr
       // New server-held Strata credentials are privileged: no account system means
       // no verifiable owner, even when the caller is a trusted internal request.
       // Preserve the pre-existing optional-account policy for Ollama separately.
-      if (strataServer && (!accountsEnabled(process.env) || (!trustedServerOwner && !(await currentUser(request))?.owner)))
-        return Response.json({ error: "Owner sign-in required for protected Strata inference.", code: "owner-auth" }, { status: 403 });
+      if (strataServer) await assertStrataAuthority({ kind: "owner-request", request });
       if (localServer && accountsEnabled(process.env) && !trustedServerOwner && !(await currentUser(request))?.owner)
         return Response.json({ error: "Owner sign-in required for server Local AI." }, { status: 403 });
       if (localServer && !ollamaBase())
@@ -308,6 +308,7 @@ export async function handleChat(request: Request, assistantContext?: string, tr
     if (request.signal.aborted || isAbortError(error))
       return new Response(null, { status: 499 });
     if (error instanceof LocalOnlyError) return Response.json({ error: error.message, code: "local-only" }, { status: 403 });
+    if (error instanceof StrataOwnerError) return Response.json({ error: error.message, code: error.code }, { status: 403 });
     if (error instanceof StrataError) return Response.json({ error: error.message, code: "strata-" + error.code }, { status: error.code === "auth" ? 401 : error.code === "model" ? 409 : error.code === "busy" ? 429 : 503 });
     logServer("error", "chat request failed", error);
     return Response.json({ error: safeError(error) }, { status: 400 });
