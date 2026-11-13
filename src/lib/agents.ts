@@ -259,6 +259,8 @@ export type RoomMessage = UIMessage<{
   /** The model the server actually used, and the one it was asked for when memory ran out and a smaller one took over. */
   model?: string;
   fellBackFrom?: string;
+  truncated?: boolean;
+  finishReason?: string;
 }>;
 export function contextForMode(messages: RoomMessage[], mode: Mode): RoomMessage[] {
   return mode === "broadcast" ? messages.filter((message) => message.role === "user") : messages;

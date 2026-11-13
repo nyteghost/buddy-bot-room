@@ -38,7 +38,7 @@ export async function handleTelegramText(text: string, chatId: string): Promise<
   if (sn) return (await import("./reminders.server")).snooze("", (sn[1] ?? "").trim());
   const captured = await captureFromText(t);
   if (captured) return captured;
-  const r = await askPals(t.startsWith("/") ? t.slice(1) : t);
+  const r = await askPals(t.startsWith("/") ? t.slice(1) : t, { authority: { kind: "owner-telegram", chatId } });
   return r.ok ? `${r.text}\n\n— ${r.via}` : `Couldn't answer: ${r.error}`;
 }
 

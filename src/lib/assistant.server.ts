@@ -44,7 +44,8 @@ import {
   semanticScores,
 } from "./memory-keeper.server";
 import { handleChat } from "./chat.server";
-import { engineFromJson, localServerProvider, turnProviders, type TurnProvider } from "./engine";
+import { engineFromJson, localServerProvider, strataServerProvider, turnProviders, type TurnProvider } from "./engine";
+import { strataConfigured, strataFallbackOllama } from "./strata.server";
 import { readOllamaHealth } from "./ollama-health.server";
 import { installedName } from "./ollama-health";
 import { isModelName } from "./model-catalog";
@@ -121,14 +122,21 @@ async function parseAnswer(
   signal: AbortSignal,
   preview?: (text: string) => Promise<void>,
   maskIdentifiers = false,
+  answeringProvider = "",
 ): Promise<string> {
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     if (data.code === "ollama-model" || data.code === "local-only")
       throw Error(String(data.error).slice(0, 400));
+    // Native Strata errors originate from server-generated, secret-free codes
+    // and messages; don't discard auth/busy/model/offline into a vague failure.
+    if (typeof data.code === "string" && /^strata-(?:disabled|config|auth|busy|offline|model|response)$/.test(data.code))
+      throw Error(typeof data.error === "string" ? data.error.slice(0, 400) : "Strata local inference is unavailable.");
+    if (data.code === "owner-auth") throw Error("Owner sign-in required for protected Strata inference.");
     throw Error("The selected provider could not answer. Check AI settings or choose Auto.");
   }
   let result = "",
+    truncated = false,
     lastPreview = "",
     lastSent = 0,
     completed = false;
@@ -145,10 +153,27 @@ async function parseAnswer(
       throw Error("The provider sent an invalid response. Your question is saved; retry.");
     }
     if (d.type === "finish") completed = true;
-    if (d.type === "error" || d.type === "abort" || d.finishReason === "error")
-      throw Error(
-        "The provider interrupted this answer. Your question is saved; retry or choose another provider.",
-      );
+    // AI SDK includes messageMetadata on the *finish* event, not necessarily
+    // on a standalone event. Also accept the standard finishReason=length.
+    if ((d.type === "finish" || d.type === "message-metadata") &&
+        (d.messageMetadata?.truncated === true ||
+          (d.type === "finish" && (d.finishReason === "length" || d.messageMetadata?.finishReason === "length"))))
+      truncated = true;
+    if (d.type === "error" || d.type === "abort" || d.finishReason === "error") {
+      // Only trust a fixed set of server-generated categories on the selected
+      // Strata route; never render arbitrary upstream error text or credentials.
+      const category = answeringProvider === "strata-server" && typeof d.errorText === "string"
+        ? /^\[strata-(auth|model|busy|offline|response|config|disabled)\]/.exec(d.errorText)?.[1]
+        : undefined;
+      const message = category === "auth" ? "Strata rejected the configured API key."
+        : category === "model" ? "Strata endpoint or model is unavailable."
+        : category === "busy" ? "Strata is busy. Please retry."
+        : category === "offline" ? "Strata inference is temporarily unavailable."
+        : category === "response" ? "Strata returned an invalid response."
+        : category === "config" || category === "disabled" ? "Protected Strata is not configured."
+        : "The provider interrupted this answer.";
+      throw Error(message + " Your question is saved; retry or choose another provider.");
+    }
     if (d.type === "text-delta" && typeof d.delta === "string") result += d.delta;
     if (result.length > 50000)
       throw Error("Answer exceeded the size limit. Ask a narrower question.");
@@ -166,7 +191,8 @@ async function parseAnswer(
       "The provider disconnected before completing the answer. Your question is saved; retry.",
     );
   if (!result.trim()) throw Error("The provider returned no text. Your question is saved.");
-  return result.trim();
+  const providerName = answeringProvider === "strata-server" ? "Strata" : answeringProvider === "ollama-server" ? "Ollama" : "The provider";
+  return result.trim() + (truncated ? `\n\n[${providerName} output reached its token limit; this answer may be incomplete.]` : "");
 }
 function streamedAnswer(req: Request, data: Record<string, unknown>): Response {
   const cancelled = new AbortController();
@@ -980,14 +1006,19 @@ export async function handleAssistant(
         )
       )
         local = { ...local, model: c.assistant.provider.model };
-      const clouds = localOnlyOn() ? [] : turnProviders(settings, mode === "auto");
+      const strataRequested = mode === "strata-server" || (mode === "auto" && settings.kind === "strata-server");
+      const strata = strataRequested && strataConfigured() ? strataServerProvider(settings) : null;
+      const localBackup = strata && strataFallbackOllama() && health.reachable ? [local] : [];
+      const clouds = localOnlyOn() || strataRequested ? [] : turnProviders(settings, mode === "auto");
       let providers: TurnProvider[] =
-        mode === "auto"
+        strata ? [strata, ...localBackup]
+          : strataRequested ? []
+          : mode === "auto"
           ? [...(health.reachable ? [local] : []), ...clouds]
           : mode === "ollama-server"
             ? [local]
             : clouds.filter((p) => p.kind === mode);
-      if (mode === "auto" && c.assistant.provider?.kind !== "ollama-server") {
+      if (mode === "auto" && !strataRequested && c.assistant.provider?.kind !== "ollama-server") {
         const i = providers.findIndex((p) => p.kind === c.assistant.provider?.kind);
         if (i > 0) providers = [providers[i]!, ...providers.filter((_, j) => j !== i)];
       }
@@ -995,7 +1026,7 @@ export async function handleAssistant(
         return reply(
           {
             error: localOnlyOn()
-              ? "Local-Only is enabled. Connect Ollama and choose an installed model."
+              ? "Local-Only requires configured Strata or Ollama; no cloud fallback is allowed."
               : "No configured provider is available. Connect Ollama or add a provider key in AI engine settings.",
           },
           503,
@@ -1010,7 +1041,7 @@ export async function handleAssistant(
         try {
           await preview?.("");
           const allowMemory =
-            p.kind === "ollama-server" || process.env["MEMORY_CLOUD_CONTEXT"] === "on";
+            p.kind === "ollama-server" || p.kind === "strata-server" || process.env["MEMORY_CLOUD_CONTEXT"] === "on";
           supplied = allowMemory ? memories : [];
           if ((await keeperSnapshot()).epoch !== fresh.epoch)
             throw Error("Memory permissions changed; retry with fresh context");
@@ -1072,6 +1103,7 @@ export async function handleAssistant(
                   }
                 : undefined,
               process.env["CHAT_MASK_IDENTIFIERS"] === "on" || data["maskIdentifiers"] === true,
+              p.kind,
             ),
             {
               maskIdentifiers:
@@ -1083,7 +1115,7 @@ export async function handleAssistant(
           break;
         } catch (e) {
           lastError = e instanceof Error ? e.message : "Provider unavailable";
-          if (mode !== "auto") break;
+          if (mode !== "auto" && !strataRequested) break;
         }
       }
       if (!provider || !answer)
