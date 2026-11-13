@@ -42,7 +42,7 @@ const pointString = (poly: readonly { x: number; y: number }[]) => poly.map(p =>
 const label = (s: string) => s.length > 30 ? s.slice(0, 30) + "…" : s;
 const FALLBACK_MESSAGE = "Isometric preview unavailable. The existing flat HD Office remains available.";
 
-class PreviewBoundary extends Component<{ fallback?: ReactNode; onFailure?: (reason: string) => void; children: ReactNode }, { failed: boolean }> {
+class PreviewBoundary extends Component<{ fallback?: ReactNode; onFailure?: ((reason: string) => void) | undefined; children: ReactNode }, { failed: boolean }> {
  override state = { failed: false };
  private reported = false;
  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }

@@ -1684,6 +1684,66 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
   await roomItem.click();
 });
 
+
+await step("Stage 4A opt-in isometric Office: real mounted scene, camera, reversible flat HD and phone ineligibility", async () => {
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\\s*Pal Room\\s*$/i });
+  if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await showRoomSettings();
+  const appearance = page.getByRole("region", { name: "Pal Room activities" }).getByRole("group", { name: "Room appearance" });
+  const iso = appearance.getByRole("checkbox", { name: "Isometric Office (grey-box preview)" });
+  if (await iso.isChecked()) throw Error("Isometric Office was unexpectedly enabled by default");
+  try {
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click();
+    await page.getByRole("option", { name: "Linux Theme", exact: true }).click();
+    await appearance.getByRole("radio", { name: "HD", exact: true }).click();
+    await appearance.getByRole("checkbox", { name: /HD office preview/ }).check();
+    const flat = page.locator(".room-scene.hd-world .hd-office:not(.iso-office)");
+    await flat.waitFor({ state: "visible", timeout: 10000 });
+    if (await iso.isDisabled()) throw Error("Eligible desktop ISO control was disabled");
+    await iso.check();
+    const mounted = page.locator('.room-scene [data-iso-mounted="true"]');
+    await mounted.waitFor({ state: "visible", timeout: 10000 });
+    await mounted.locator('[data-testid="iso-preview-svg"]').waitFor({ state: "visible" });
+    const ids = await mounted.locator("[data-iso-actor]").evaluateAll(nodes => nodes.map(node => node.getAttribute("data-iso-actor")));
+    if (ids.length < 1 || ids.length > 15 || new Set(ids).size !== ids.length) throw Error("ISO identity/cap mismatch: " + ids.join(","));
+    if (await page.locator(".room-scene .hd-office:not(.iso-office)").count()) throw Error("Flat HD and ISO rendered simultaneously");
+    const tools = mounted.getByRole("toolbar", { name: "Room camera" });
+    if (await tools.count() !== 1) throw Error("ISO camera toolbar was duplicated");
+    await tools.getByRole("button", { name: "Zoom in" }).click();
+    await tools.getByRole("button", { name: "Zoom out" }).click();
+    await tools.getByRole("button", { name: "Fit room" }).click();
+    if (await tools.getByRole("combobox", { name: "Follow a character" }).locator("option").count() > 1)
+      await tools.getByRole("combobox", { name: "Follow a character" }).selectOption({ index: 1 });
+    await mounted.locator(".iso-office-stage").focus();
+    await page.keyboard.press("ArrowRight");
+    const viewBox = await mounted.locator('[data-testid="iso-preview-svg"]').getAttribute("viewBox");
+    if (!viewBox || viewBox.split(" ").length !== 4) throw Error("ISO camera viewport not projected correctly");
+    gallery.push({ label: "Running app (CI) · Stage 4A opt-in synthetic ISO Office with live actors and shared camera", png: await page.locator(".room-scene").screenshot() });
+    await iso.uncheck();
+    await flat.waitFor({ state: "visible" });
+    if (await mounted.count()) throw Error("ISO remained mounted after reverting to flat HD");
+    await iso.check();
+    await mounted.waitFor({ state: "visible" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(200);
+    if (await page.locator('[data-iso-mounted="true"]').count()) throw Error("Isometric preview mounted on phone-width viewport");
+    const phoneIso = page.locator('[data-window-id="room"] .room-settings-content').getByRole("checkbox", { name: "Isometric Office (grey-box preview)" });
+    if (await phoneIso.count() && !await phoneIso.isDisabled()) throw Error("ISO choice available at phone width");
+  } finally {
+    await page.setViewportSize({ width: 1500, height: 900 });
+    await showRoomSettings();
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+    await page.getByRole("option", { name: "Linux Theme", exact: true }).click().catch(() => undefined);
+    const appearanceNow = page.getByRole("region", { name: "Pal Room activities" }).getByRole("group", { name: "Room appearance" });
+    await appearanceNow.getByRole("checkbox", { name: "Isometric Office (grey-box preview)" }).uncheck().catch(() => undefined);
+    await appearanceNow.getByRole("checkbox", { name: /HD office preview/ }).uncheck().catch(() => undefined);
+    await appearanceNow.getByRole("radio", { name: /^Auto/ }).click().catch(() => undefined);
+    await page.getByRole("combobox", { name: "Theme", exact: true }).click().catch(() => undefined);
+    await page.getByRole("option", { name: "Normal Mode", exact: true }).click().catch(() => undefined);
+  }
+});
+
 await step("health endpoint", async () => {
   const r = await page.request.get(`${URL_}/__health`);
   if (!r.ok()) throw new Error(`status ${r.status()}`);

@@ -46,7 +46,6 @@ import { WorldHdOffice } from "./world-hd-office";
 import { WorldIsoOfficeViewport } from "./world-iso-office-viewport";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
 import { worldUsesHdOffice, worldUsesIsoOffice } from "@/lib/world-presentation";
-import { lowPower } from "@/lib/power";
 import { useWorldPalLookIds } from "@/lib/world-pal-skins";
 import { worldHdVisitors } from "@/lib/world-hd-visitors";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
