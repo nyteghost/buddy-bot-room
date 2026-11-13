@@ -1686,7 +1686,7 @@ await step("One Nova, two appearances: Desktop HD and Mobile Pixel looks are cos
 
 
 await step("Stage 4A opt-in isometric Office: real mounted scene, camera, reversible flat HD and phone ineligibility", async () => {
-  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\\s*Pal Room\\s*$/i });
+  const roomItem = page.locator(".workspace-sidebar .sidebar-item", { hasText: /^\s*Pal Room\s*$/i });
   if (await roomItem.getAttribute("aria-pressed") !== "true") await roomItem.click();
   await page.setViewportSize({ width: 1500, height: 900 });
   await showRoomSettings();
