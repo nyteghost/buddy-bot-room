@@ -1,3 +1,14 @@
+# Never copy the checkout's Git credentials or developer environment into an image.
+.git
+.github
+.env
+.env.*
+!.env.local.example
+*.pem
+*.key
+*.p12
+*.pfx
+**/node_modules
 node_modules
 .output
 .vinxi
@@ -8,3 +19,5 @@ dist-ssr
 *.log
 *.local
 src-tauri/target
+mnt
+backups
