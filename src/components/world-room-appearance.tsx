@@ -1,4 +1,5 @@
-import { setWorldRoomAppearance, worldPresentation, worldPresentationDefault, type WorldPresentationChoice } from "@/lib/world-presentation";
+import { setWorldRoomAppearance, worldPresentation, worldPresentationDefault, WORLD_PIXEL_MAX_WIDTH, type WorldPresentationChoice } from "@/lib/world-presentation";
+import { lowPower } from "@/lib/power";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
 import { clearWorldPalLook, useWorldPalPixelSkins, useWorldPalSkins, useWorldSkinCharacters, worldPalAppearances } from "@/lib/world-pal-skins";
 import { worldLookArtNote } from "@/lib/world-hd-animation";
@@ -19,6 +20,9 @@ const LOOKS: Array<{ value: WorldPresentationChoice; label: string; hint: string
 export function WorldRoomAppearance() {
  const appearance = useWorldRoomAppearance(), hints = useWorldDeviceHints();
  const resolved = worldPresentation(appearance.look, hints), auto = worldPresentationDefault(hints);
+ const low = lowPower.use();
+ const isoEligible = appearance.hdOffice && resolved === "hd" && hints.width > WORLD_PIXEL_MAX_WIDTH &&
+  !hints.coarse && !hints.mobile && !hints.saveData && !low;
  return <fieldset className="world-room-appearance mb-3 rounded-md border border-border/60 p-2">
   <legend className="px-1 text-xs font-semibold">Room appearance</legend>
   <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Living Universe look">
@@ -32,12 +36,17 @@ export function WorldRoomAppearance() {
    <span><span className="font-semibold">HD office preview</span> <span id="hd-office-hint" className="text-muted-foreground">— the Office theme in the larger HD room when the look is HD. Other themes and Pixel keep today's Living World.</span></span>
   </label>
   <label className="mt-1 flex items-start gap-2 text-xs">
+   <input type="checkbox" aria-label="Isometric Office (grey-box preview)" checked={appearance.isoOffice === true} disabled={!isoEligible}
+    onChange={e => setWorldRoomAppearance({ isoOffice: e.target.checked })} />
+   <span><span className="font-semibold">Isometric Office (grey-box preview)</span> <span className="text-muted-foreground">— experimental synthetic 2:1 Office, available only on desktop with HD Office and Linux/Office theme. Off by default; Classic, Pixel and flat HD stay available.</span></span>
+  </label>
+  <label className="mt-1 flex items-start gap-2 text-xs">
    <input type="checkbox" checked={appearance.synthetic} disabled={!appearance.hdOffice} onChange={e => setWorldRoomAppearance({ synthetic: e.target.checked })} />
    <span><span className="font-semibold">Synthetic HD placeholders</span> <span className="text-muted-foreground">— code-drawn stand-ins to preview HD scale for Pals without approved HD art.</span></span>
   </label>
   <PalAppearances showing={resolved} />
   <p className="mt-1 text-[11px] text-muted-foreground" role="status">
-   This device shows {resolved === "hd" ? "HD" : "Pixel"}{appearance.hdOffice && resolved === "hd" ? " (HD office preview in the Office theme)" : ""}. Saved on this device only; your Pals, memories and tasks are the same in every look.
+   This device shows {resolved === "hd" ? "HD" : "Pixel"}{appearance.hdOffice && resolved === "hd" ? appearance.isoOffice && isoEligible ? " (isometric grey-box in the Office theme; otherwise flat HD)" : " (flat HD office preview in the Office theme)" : ""}. Saved on this device only; your Pals, memories and tasks are the same in every look.
   </p>
  </fieldset>;
 }

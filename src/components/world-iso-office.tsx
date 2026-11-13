@@ -13,6 +13,8 @@ import { worldIsoSceneFrame } from "@/lib/world-iso-scene";
 import { WorldIsoClock } from "@/lib/world-iso-clock";
 import type { HdOfficePal } from "./world-hd-office";
 
+export type WorldIsoActorPoint = Readonly<{ id: string; x: number; y: number }>;
+
 /**
  * Isolated, unmounted grey-box. Stage 4 owns the actual flat-Office fallback
  * element and shared WorldCamera. Neither is created or mounted here.
@@ -23,6 +25,8 @@ export type WorldIsoOfficeProps = Readonly<{
  camera?: WorldCamera; viewport?: WorldSize; fallback?: ReactNode;
  /** Optional diagnostic notification. Called once after an asynchronous fault. */
  onFailure?: (reason: string) => void;
+ /** Read-only rendered positions for external camera Follow. */
+ onActorPositions?: (actors: readonly WorldIsoActorPoint[]) => void;
  /** Bounded progress/blocked-route telemetry; does not grant any app permissions. */
  onDiagnostics?: (report: WorldIsoCrowdDiagnostics) => void;
 }>;
@@ -38,11 +42,16 @@ const pointString = (poly: readonly { x: number; y: number }[]) => poly.map(p =>
 const label = (s: string) => s.length > 30 ? s.slice(0, 30) + "…" : s;
 const FALLBACK_MESSAGE = "Isometric preview unavailable. The existing flat HD Office remains available.";
 
-class PreviewBoundary extends Component<{ fallback?: ReactNode; children: ReactNode }, { failed: boolean }> {
+class PreviewBoundary extends Component<{ fallback?: ReactNode; onFailure?: (reason: string) => void; children: ReactNode }, { failed: boolean }> {
  override state = { failed: false };
+ private reported = false;
  static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
  override componentDidCatch(_error: Error, _info: ErrorInfo): void {
   // The boundary isolates the visual preview; do not log user identities or scene payloads.
+  if (!this.reported) {
+   this.reported = true;
+   try { this.props.onFailure?.("Isometric preview failed; switched to flat HD."); } catch { /* nonessential notification */ }
+  }
  }
  override render() {
   return this.state.failed
@@ -52,11 +61,11 @@ class PreviewBoundary extends Component<{ fallback?: ReactNode; children: ReactN
 }
 
 export function WorldIsoOffice(props: WorldIsoOfficeProps) {
- return <PreviewBoundary fallback={props.fallback}><WorldIsoOfficeInner {...props}/></PreviewBoundary>;
+ return <PreviewBoundary fallback={props.fallback} onFailure={props.onFailure}><WorldIsoOfficeInner {...props}/></PreviewBoundary>;
 }
 
 function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthetic: _synthetic,
- camera, viewport, fallback, onFailure, onDiagnostics }: WorldIsoOfficeProps) {
+ camera, viewport, fallback, onFailure, onActorPositions, onDiagnostics }: WorldIsoOfficeProps) {
  const reduced = useReducedMotion(), low = lowPower.use(), hidden = useTabHidden();
  const moving = visible && playful && !paused && !reduced && !low && !hidden;
  // Stable semantic keys: existing room.tsx creates fresh but equivalent arrays on
@@ -100,6 +109,11 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  useEffect(() => {
   if (sceneFault && !fault) setFault(sceneFault);
  }, [sceneFault, fault]);
+ useEffect(() => {
+  if (!sceneState.scene) return;
+  try { onActorPositions?.(sceneState.scene.actors.map(a => ({ id: a.id, x: a.feet.x, y: a.feet.y }))); }
+  catch { /* read-only camera telemetry must not affect actor simulation */ }
+ }, [sceneState.scene, onActorPositions]);
 
  // Join/leave only on genuinely changed identities. Already-present Pals
  // retain exact positions, routes and accumulated gait distance.
@@ -195,8 +209,8 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
  return <div data-iso-preview="isolated" data-running={moving} aria-label="Isometric Office synthetic preview"
   style={{ position: "relative", width: "100%" }}>
   <svg role="img" aria-label="Synthetic isometric Office floor with nine Pal desks and six visitor homes"
-   viewBox={"0 0 " + scene.width + " " + scene.height} data-testid="iso-preview-svg"
-   style={{ display: "block", width: "100%", height: "auto", background: "#171c30" }}>
+   viewBox={"0 0 " + (camera ? (viewport ?? WORLD_ISO_CANVAS).width : scene.width) + " " + (camera ? (viewport ?? WORLD_ISO_CANVAS).height : scene.height)} data-testid="iso-preview-svg"
+   style={{ display: "block", width: "100%", height: camera ? "100%" : "auto", background: "#171c30" }}>
    <g style={transforms}>
     <polygon data-testid="iso-preview-floor" points={pointString(scene.floor)} fill="#38425d" stroke="#8b9bc1" strokeWidth="5" />
     {scene.grid.map((line, i) => <line key={i} x1={line[0].x} y1={line[0].y}
@@ -220,7 +234,7 @@ function WorldIsoOfficeInner({ pals, visitors, visible, playful, paused, synthet
     })}
    </g>
   </svg>
-  <span style={{ position: "absolute", top: 8, left: 8, fontSize: 12, color: "white",
+  <span style={{ position: "absolute", top: 40, left: 8, fontSize: 12, color: "white",
    background: "#111827dc", padding: "4px 8px", borderRadius: 6 }}>
    Isometric grey-box prototype · Not production art
   </span>

@@ -43,8 +43,10 @@ import { MessageRow, type RowActions } from "./message-row";
 import { ThinkingProp } from "./thinking-prop";
 import { OfficePal } from "./office-pal";
 import { WorldHdOffice } from "./world-hd-office";
+import { WorldIsoOfficeViewport } from "./world-iso-office-viewport";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
-import { worldUsesHdOffice } from "@/lib/world-presentation";
+import { worldUsesHdOffice, worldUsesIsoOffice } from "@/lib/world-presentation";
+import { lowPower } from "@/lib/power";
 import { useWorldPalLookIds } from "@/lib/world-pal-skins";
 import { worldHdVisitors } from "@/lib/world-hd-visitors";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
@@ -1923,7 +1925,9 @@ export function Room() {
     );
   }
   // Living Universe HD office preview: only real agent state (an active reply or a focus session) can show a Pal working.
+  const lowPowerRoom = lowPower.use();
   const hdWorld = livingWorld && worldUsesHdOffice(roomAppearance, characterMode, deviceHints); // the Linux theme is the assistant-family office
+  const isoWorld = hdWorld && !lowPowerRoom && worldUsesIsoOffice(roomAppearance, characterMode, deviceHints);
   const hdPals = agents.map(a => ({ id: a.id, name: agentName(a.id, hell, characterMode === "horror", characterMode),
     enabled: enabled.includes(a.id) || focusCompanion?.pal === a.id,
     real: running && speaking === a.id ? "responding" as const : focusCompanion && !focusBreak && focusCompanion.pal === a.id ? "focus" as const : null }));
@@ -2204,7 +2208,9 @@ export function Room() {
             />
             {hell && <div className="hell-glow" aria-hidden />}
             {livingWorld && !hdWorld && <WorldAtmosphere theme={characterMode} active={roomOpen} sky={worldSky}/>}
-            {hdWorld && <WorldHdOffice pals={hdPals} visitors={hdVisitors} visible={roomOpen} playful={palRoomPlayful} paused={focusMode} synthetic={roomAppearance.synthetic}/>}
+            {hdWorld && (isoWorld
+              ? <WorldIsoOfficeViewport pals={hdPals} visitors={hdVisitors} visible={roomOpen} playful={palRoomPlayful} paused={focusMode} synthetic={roomAppearance.synthetic}/>
+              : <WorldHdOffice pals={hdPals} visitors={hdVisitors} visible={roomOpen} playful={palRoomPlayful} paused={focusMode} synthetic={roomAppearance.synthetic}/>)}
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}

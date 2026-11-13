@@ -2949,3 +2949,10 @@ html[data-hidden="1"] .room-scene.living-world .world-guest *,html[data-lowpower
   padding: 0 8px;
   font-size: 11px;
 }
+
+/* Stage 4A draft: an isolated opt-in camera layer; Classic/Pixel/flat HD CSS is unchanged. */
+.iso-office-stage > [data-iso-preview="isolated"]{position:absolute;inset:0;width:100%;height:100%;}
+.iso-office-stage [data-testid="iso-preview-svg"]{display:block;width:100%;height:100%;}
+.iso-office-stage [data-iso-fallback="true"]{position:absolute;inset:0;}
+.iso-office-toolbar{top:36px;}
+.iso-office-stage [data-iso-actor]{cursor:pointer;}

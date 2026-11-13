@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type WheelEvent, type KeyboardEvent } from "react";
 import { WorldHdOffice, type HdOfficePal } from "./world-hd-office";
 import { WorldIsoOffice, type WorldIsoActorPoint } from "./world-iso-office";
 import type { WorldCustomCharacter } from "@/lib/world-custom-packs";
@@ -101,7 +101,7 @@ export function WorldIsoOfficeViewport(props: Props) {
   setCamera(old => worldIsoCameraZoomAt(old, factor, { x: viewportRef.current.width / 2, y: viewportRef.current.height / 2 }, viewportRef.current));
  };
  const fit = () => { stopFollow(); setCamera(worldIsoCameraFit(viewportRef.current)); };
- const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+ const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
   const vector: Record<string, [number, number]> = {
    ArrowLeft: [35, 0], ArrowRight: [-35, 0], ArrowUp: [0, 35], ArrowDown: [0, -35],
   };
