@@ -17,10 +17,10 @@ function readSize(raw: string | null): Size | null {
   } catch { return null; }
 }
 
-export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className, focusVersion }: {
+export function WorkspaceWindow({ id, title, icon, open, onClose, children, resetVersion, className, focusVersion, titleActions }: {
   className?: string;
   id: string; title: string; icon: ReactNode; open: boolean; onClose: () => void;
-  children: ReactNode; resetVersion: number; focusVersion?: number;
+  children: ReactNode; resetVersion: number; focusVersion?: number; titleActions?: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
   const drag = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
@@ -37,12 +37,23 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   positionRef.current = position;
   const sizeRef = useRef(size);
   sizeRef.current = size;
+  // Room Settings is an inspector belonging to the Pal Room. Raise it with the
+  // room when the user clicks the scene/camera so the full-size room cannot
+  // steal pointer events from controls in its own floating inspector.
+  useEffect(() => {
+    if (id !== "room-settings" || !open) return;
+    const raise = () => setFront(++windowStack);
+    window.addEventListener("pixelpals:raise-room-settings", raise);
+    return () => window.removeEventListener("pixelpals:raise-room-settings", raise);
+  }, [id, open]);
   const key = `pixel-pals-window-${id}-v1`;
   const sizeKey = `pixel-pals-window-${id}-size-v1`;
   useEffect(() => {
     if (open) {
       setFront(++windowStack);
-      if (window.matchMedia("(max-width: 700px)").matches) ref.current?.focus({ preventScroll: true });
+      // A floating settings inspector receives keyboard focus so Escape can
+      // dismiss it and return focus to the Pal Room toggle.
+      if (id === "room-settings" || window.matchMedia("(max-width: 700px)").matches) ref.current?.focus({ preventScroll: true });
     }
   }, [open, focusVersion]);
   useEffect(() => {
@@ -215,11 +226,24 @@ export function WorkspaceWindow({ id, title, icon, open, onClose, children, rese
   return <section ref={ref} tabIndex={-1} aria-label={title} hidden={!open} style={style}
     data-window-id={id}
     className={cn("workspace-window", `window-${id}`, className, size && "window-sized", expanded && "window-expanded")}
-    onPointerDownCapture={() => setFront(++windowStack)}>
+    onPointerDownCapture={() => {
+      setFront(++windowStack);
+      if (id === "room" && document.querySelector('[data-window-id="room-settings"]:not([hidden])')) {
+        window.dispatchEvent(new Event("pixelpals:raise-room-settings"));
+      }
+    }}
+    onKeyDown={(event) => {
+      if (id !== "room-settings" || event.key !== "Escape" || event.defaultPrevented) return;
+      if ((event.target as HTMLElement).closest('[role="dialog"],[role="alertdialog"],[data-radix-popper-content-wrapper]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    }}>
     <div className="window-titlebar" onPointerDown={begin} onPointerMove={move} onPointerUp={() => end()} onPointerCancel={() => end(false)}>
       <span className="window-title">{icon}{title}</span>
       <GripHorizontal className="window-grip size-4" aria-hidden />
       <div className="window-actions">
+        {titleActions}
         <Button variant="ghost" size="icon" title={expanded || snapped ? `Restore ${title}` : `Maximize ${title}`} aria-label={expanded || snapped ? `Restore ${title}` : `Maximize ${title}`} onClick={() => {
           if (snapped && restoreRef.current) {
             const next = restoreRef.current;

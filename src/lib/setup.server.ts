@@ -8,6 +8,7 @@ import { calendarData, mailData } from "./inbox.server";
 import { imapConfig } from "./imap.server";
 import { mailSendReady } from "./mailbox.server";
 import { ollamaBase } from "./ollama.server";
+import { strataConfigured, strataReadyModel, StrataError } from "./strata.server";
 import { INTEGRATIONS, itemById, type SetupItem, type SetupTest } from "./setup";
 import { telegramEnabled, telegramSend } from "./telegram.server";
 import { discordEnabled, testDiscordConnection } from "./discord.server";
@@ -17,6 +18,7 @@ import { getWeather, weatherConfigured } from "./weather.server";
 const env = (k: string) => (process.env[k] ?? "").trim().replace(/\/+$/, "");
 
 const configured: Record<string, () => boolean> = {
+  strata: () => strataConfigured(),
   ollama: () => !!ollamaBase(),
   searxng: () => !!env("SEARXNG_URL"),
   plex: () => !!env("PLEX_URL"),
@@ -53,6 +55,18 @@ async function reach(url: string, path = "", headers: Record<string, string> = {
 }
 
 const tests: Record<string, () => Promise<SetupTest>> = {
+  strata: async () => {
+    try {
+      // Test must use the same authenticated exact-model readiness gate as
+      // inference. A discovered but not_loaded model cannot be called ready.
+      await strataReadyModel();
+      return { ok: true, note: "Authenticated private Strata connection; selected model loaded." };
+    } catch (error) {
+      return { ok: false, note: error instanceof StrataError
+        ? error.message
+        : "Strata unavailable. Verify the private address and local service." };
+    }
+  },
   ollama: () => reach(ollamaBase(), "/api/tags"),
   searxng: () => reach(env("SEARXNG_URL")),
   plex: () => reach(env("PLEX_URL"), "/identity", env("PLEX_TOKEN") ? { "X-Plex-Token": env("PLEX_TOKEN") } : {}),

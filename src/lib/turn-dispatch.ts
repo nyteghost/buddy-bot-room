@@ -38,7 +38,7 @@ export async function dispatchTurn<P>(d: DispatchDeps<P>): Promise<void> {
     return;
   }
   // Your own mail, calendar and tasks are only ever read by your own Ollama: free API tokens aren't spent on them and the details never go to a cloud AI.
-  const keepLocal = d.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server";
+  const keepLocal = d.realData && engine.kind !== "local" && engine.kind !== "ollama" && engine.kind !== "local-server" && engine.kind !== "strata-server";
   if (keepLocal) {
     try {
       if (engine.kind === "auto-ollama") await d.runOllama();
@@ -65,6 +65,9 @@ export async function dispatchTurn<P>(d: DispatchDeps<P>): Promise<void> {
         }
       }
     }
+  } else if (engine.kind === "strata-server") {
+    if (!provider) throw new Error("Protected Strata local model is not configured.");
+    await d.runChain(provider); // No browser cloud fallback in the Strata-only mode.
   } else if (engine.kind === "local-server") {
     if (!provider) throw new Error("Local AI isn't available.");
     try { await d.runChain(provider); } catch (err) { await d.cloudFallback(err); }

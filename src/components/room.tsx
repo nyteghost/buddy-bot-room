@@ -43,8 +43,9 @@ import { MessageRow, type RowActions } from "./message-row";
 import { ThinkingProp } from "./thinking-prop";
 import { OfficePal } from "./office-pal";
 import { WorldHdOffice } from "./world-hd-office";
+import { WorldIsoOfficeViewport } from "./world-iso-office-viewport";
 import { useWorldDeviceHints, useWorldRoomAppearance } from "@/lib/world-presentation-react";
-import { worldUsesHdOffice } from "@/lib/world-presentation";
+import { worldUsesHdOffice, worldUsesIsoOffice } from "@/lib/world-presentation";
 import { useWorldPalLookIds } from "@/lib/world-pal-skins";
 import { worldHdVisitors } from "@/lib/world-hd-visitors";
 import { assistantCommand, characterModeCommand, setAssistantMode, setCharacterMode, useAssistantMode, useCharacterMode, type CharacterMode } from "@/lib/hellraiser";
@@ -387,6 +388,16 @@ export function Room() {
   const [settings, setSettings] = useState(false);
   const [palsOpen, setPalsOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(true);
+  const [roomSettingsOpen, setRoomSettingsOpen] = useState(false);
+  const [roomSettingsDesktop, setRoomSettingsDesktop] = useState(false);
+  // Phones retain their existing inline controls; desktop uses a separate window.
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 701px)");
+    const update = () => setRoomSettingsDesktop(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [palRoomPlayful, setPalRoomPlayful] = useState(true);
   const [livingWorld, setLivingWorld] = useState(true);
   const [worldSky,setWorldSky]=useState<Sky>("clear");
@@ -822,7 +833,7 @@ export function Room() {
     // Only when the memories do not all fit in a prompt: score them against this question (keyword + meaning) so the right ones are kept.
     let obsidianContext = "";
     try {
-      if (localStorage.getItem("pixelpals-brain-retrieval")==="1" && ["ollama","local","local-server","auto-ollama"].includes(engine.kind) && topic.trim()) {
+      if (localStorage.getItem("pixelpals-brain-retrieval")==="1" && ["ollama","local","local-server","auto-ollama","strata-server"].includes(engine.kind) && topic.trim()) {
         const response=await fetch("/api/second-brain?q="+encodeURIComponent(topic.slice(0,200)),{signal:AbortSignal.timeout(2500)});
         if(response.ok){const data=await response.json() as {notes?:BrainNote[]};obsidianContext=renderMemoryContext(data.notes??[],1800);}
       }
@@ -909,8 +920,8 @@ export function Room() {
             ...(shortOn[mode] ? { short: true } : {}),
             campaign: dmRole ? { role: dmRole, context: campaignContext(getCampaign()) } : undefined,
             assistant: assistantRef.current || !!ask || !!mentioned,
-            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: agent.id === "mimic" && memoryAccess(personasNow, agent.id) !== "all" ? undefined : activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
-            contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" ? 6000 : 12000,
+            memoryContext: [agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all" ? (projectNow ? projectBrief(projectNow, (pid) => agentName(pid as AgentId, false, false, "normal")) : "") : "", promptContextFor(getWorkbench(), topic, { pal: agent.id, project: agent.id === "mimic" && memoryAccess(personasNow, agent.id) !== "all" ? undefined : activeProject.get() || undefined, access: memoryAccess(personasNow, agent.id), boost: memBoost }), (agent.id !== "mimic" || memoryAccess(personasNow, agent.id) === "all") && ["ollama","local","local-server","strata-server"].includes(engine.kind) ? obsidianContext : ""].filter(Boolean).join("\n\n"),
+            contextChars: engine.kind === "local" || engine.kind === "ollama" || engine.kind === "local-server" || engine.kind === "strata-server" ? 6000 : 12000,
             agentNote: notesNow[agent.id] ?? "",
             ...(Object.keys(personasNow).length ? { personas: personasNow } : {}),
             docContext: agent.id === "mimic" && !mayUseRealData(personasNow, agent.id) ? "" : docText,
@@ -965,6 +976,10 @@ export function Room() {
               };
               ui.push([...transcript, answer]);
             }
+              if (answer?.metadata?.truncated) {
+                answer = { ...answer, parts: [...answer.parts, { type: "text", text: "\n\n[Strata output reached its token limit; this answer may be incomplete.]" }] };
+                ui.push([...transcript, answer]);
+              }
             } finally { ui.flush(); }
           };
           const lastUser = [...transcript].reverse().find((m) => m.role === "user");
@@ -972,7 +987,7 @@ export function Room() {
           const provider = providerForTurn(engine, direct && !dmRole ? Math.max(0, agents.findIndex((x) => x.id === agent.id)) : turnIndex, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" }, blockPaid);
           // Try the provider; if it errors before any text, move on to the next one (free keys first, then paid "fallback" ones).
           const runChain = async (first: NonNullable<typeof provider>) => {
-            const chain = first.kind === "ollama-server" ? [first] : orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
+            const chain = first.kind === "ollama-server" || first.kind === "strata-server" ? [first] : orderByHealth([first, ...chainAfter(engine, first, blockPaid)], benchRef.current);
             const failures: string[] = [];
             let lastError: unknown;
             for (const p of chain) {
@@ -1045,7 +1060,7 @@ export function Room() {
             hasAnswer: () => !!(answer && messageText(answer).trim()),
             clearAnswer: () => { answer = undefined; },
             runChain,
-            localChain: () => runChain(localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" })),
+            localChain: () => runChain(engine.kind === "strata-server" ? providerForTurn(engine, turnIndex, { agentId: agent.id })! : localServerProvider(engine, { agentId: agent.id, mode: dmRole || summary ? "roundtable" : direct ? "direct" : mode, text: lastUser ? messageText(lastUser) : "" })),
             runOllama,
             runBrowserModel: async () => consume(await runLocal(), "In-browser model"),
             cloudFallback,
@@ -1909,7 +1924,9 @@ export function Room() {
     );
   }
   // Living Universe HD office preview: only real agent state (an active reply or a focus session) can show a Pal working.
+  const lowPowerRoom = lowPower.use();
   const hdWorld = livingWorld && worldUsesHdOffice(roomAppearance, characterMode, deviceHints); // the Linux theme is the assistant-family office
+  const isoWorld = hdWorld && !lowPowerRoom && worldUsesIsoOffice(roomAppearance, characterMode, deviceHints);
   const hdPals = agents.map(a => ({ id: a.id, name: agentName(a.id, hell, characterMode === "horror", characterMode),
     enabled: enabled.includes(a.id) || focusCompanion?.pal === a.id,
     real: running && speaking === a.id ? "responding" as const : focusCompanion && !focusBreak && focusCompanion.pal === a.id ? "focus" as const : null }));
@@ -1917,6 +1934,94 @@ export function Room() {
   const customVisitors = worldUniverse.characters.filter(c => enabledWorldPacks.includes(c.id) && !palLookIds.has(c.id));
   // The HD office draws built-in guests (Green Jacket, Goku, …) as well as custom ones; one actor per enabled visitor.
   const hdVisitors = worldHdVisitors(enabledWorldPacks, worldUniverse.characters, palLookIds);
+  // Render a single instance of the controls in the desktop popup or mobile room.
+  const roomControls = () => <div className="room-settings-content">
+          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} onCustomInstallBackup={installWorldBackup} onCustomUpdatePack={updateWorldPack} onCustomExportBackup={exportWorldBackup} recoveryBackup={worldRecoveryBackup} animationsPaused={focusMode} />
+          <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
+          <QuestCorner session={focusCompanion} />
+          <div className="section-heading">
+            <button
+              type="button"
+              className="pals-toggle"
+              aria-expanded={palsOpen}
+              title={palsOpen ? "Hide pals" : "Show pals"}
+              onClick={() => setPalsOpen((v) => !v)}
+            >
+              <h2>
+                The pals <span>{enabled.length}/{agents.length}</span>
+              </h2>
+              <ChevronDown
+                size={16}
+                className={cn("pals-chevron", !palsOpen && "pals-chevron-closed")}
+              />
+            </button>
+            <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
+              <Settings2 size={14} />
+              {settings ? "Hide settings" : "Model settings"}
+            </Button>
+          </div>
+          {palsOpen && (
+            <div className="agent-grid">
+              {agents.map((a) => (
+                <div
+                  key={a.id}
+                  className={cn(
+                    "agent-card",
+                    `agent-${a.id}`,
+                    !enabled.includes(a.id) && "agent-disabled",
+                  )}
+                >
+                  <div className="agent-card-top">
+                    <span className="avatar-tile">
+                      <PixelCharacter id={a.id} />
+                    </span>
+                    <Switch
+                      aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
+                      checked={enabled.includes(a.id)}
+                      disabled={running}
+                      onCheckedChange={(checked) =>
+                        setEnabled((prev) =>
+                          checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
+                        )
+                      }
+                    />
+                  </div>
+                  <h3>
+                    {agentName(a.id, hell, horror, characterMode)}
+                    <span className="agent-dot" />
+                  </h3>
+                  <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
+                  <span className="model-label">
+                    {models.find((m) => m.id === selectedModels[a.id])?.label}
+                  </span>
+                  {settings && (
+                    <Select
+                      value={selectedModels[a.id]}
+                      disabled={running}
+                      onValueChange={(value) =>
+                        setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
+                        className="mt-3"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {models.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+  </div>;
   return (
     <div aria-busy={!ready} className={cn("app-shell modular-workspace", sidebarCompact && "sidebar-collapsed", focusMode && "focus-mode", focusMode && focusOptions && "focus-options")}>
       <header className="app-header">
@@ -2086,7 +2191,8 @@ export function Room() {
             <WorkspaceWindow id="general-chat" title="General Chat" icon={<MessageSquare className="size-4" />} open={generalOpen} onClose={closeGeneral} resetVersion={resetVersion}>
               {generalSeen && <Suspense fallback={<p className="p-4" role="status">Loading General Chat…</p>}><GeneralChat open={generalOpen} /></Suspense>}
             </WorkspaceWindow>
-            <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => setRoomOpen(false)} resetVersion={resetVersion}>
+            <WorkspaceWindow id="room" title="Pal Room" icon={<Users className="size-4" />} open={roomOpen} onClose={() => { setRoomOpen(false); setRoomSettingsOpen(false); }} resetVersion={resetVersion}
+              titleActions={roomSettingsDesktop ? <Button type="button" variant="ghost" size="sm" className="room-settings-trigger" title={roomSettingsOpen ? "Hide Room Settings" : "Open Room Settings"} aria-label="Room settings" aria-expanded={roomSettingsOpen} onClick={() => setRoomSettingsOpen(open => !open)}><Settings2 className="size-4" /><span>Room settings</span></Button> : undefined}>
               <div className="room-column">          <div className={cn("room-scene",livingWorld && "living-world",hdWorld && "hd-world")}>
             <img
               src={assistantOn ? officeRoomImage : characterMode === "dcc" ? dccRoomImage : characterMode === "cyberpunk" ? cyberRoomImage : characterMode === "linux" ? officeRoomImage : characterMode === "devteam" ? devRoomImage : characterMode === "matrix" ? matrixRoomImage : characterMode === "finalfantasy" ? fantasyRoomImage : characterMode === "horror" ? horrorRoomImage : hell ? hellRoomImage : roomImage}
@@ -2101,7 +2207,9 @@ export function Room() {
             />
             {hell && <div className="hell-glow" aria-hidden />}
             {livingWorld && !hdWorld && <WorldAtmosphere theme={characterMode} active={roomOpen} sky={worldSky}/>}
-            {hdWorld && <WorldHdOffice pals={hdPals} visitors={hdVisitors} visible={roomOpen} playful={palRoomPlayful} paused={focusMode} synthetic={roomAppearance.synthetic}/>}
+            {hdWorld && (isoWorld
+              ? <WorldIsoOfficeViewport pals={hdPals} visitors={hdVisitors} visible={roomOpen} playful={palRoomPlayful} paused={focusMode} synthetic={roomAppearance.synthetic}/>
+              : <WorldHdOffice pals={hdPals} visitors={hdVisitors} visible={roomOpen} playful={palRoomPlayful} paused={focusMode} synthetic={roomAppearance.synthetic}/>)}
             {assistantOn && (
               <img src={officeRoomImage} className="pixel-room-image office-foreground" width={1536} height={864} alt="" aria-hidden />
             )}
@@ -2159,93 +2267,12 @@ export function Room() {
               </span>
             </div>
           </div>
-          <PalRoomActivities session={focusCompanion} paused={focusBreak} onPauseChange={setFocusBreak} onStart={() => beginFocusTask()} playful={palRoomPlayful} onPlayfulChange={changePalRoomMood} phase={palRoomPhase} livingWorld={livingWorld} onLivingWorldChange={changeLivingWorld} enabledWorldPacks={enabledWorldPacks} onWorldPackChange={changeWorldPack} onWaveAll={()=>cue("wave")} onCelebrateWorld={()=>cue("celebrate")} customCharacters={worldUniverse.characters} syncStatus={worldUniverseStatus} onCustomSave={saveCustomWorldVisitor} onCustomInstallPack={installCustomWorldPack} onCustomDelete={removeCustomWorldVisitor} onCustomInstallBackup={installWorldBackup} onCustomUpdatePack={updateWorldPack} onCustomExportBackup={exportWorldBackup} recoveryBackup={worldRecoveryBackup} animationsPaused={focusMode} />
-          <LivingTaskBoard onStartTask={beginFocusTask} onOpenTasks={() => setTasksOpen(true)} onBrainDump={() => { setTodayOpen(true); window.setTimeout(() => window.dispatchEvent(new Event("pixelpals:brain-dump")), 100); }} />
-          <QuestCorner session={focusCompanion} />
-          <div className="section-heading">
-            <button
-              type="button"
-              className="pals-toggle"
-              aria-expanded={palsOpen}
-              title={palsOpen ? "Hide pals" : "Show pals"}
-              onClick={() => setPalsOpen((v) => !v)}
-            >
-              <h2>
-                The pals <span>{enabled.length}/{agents.length}</span>
-              </h2>
-              <ChevronDown
-                size={16}
-                className={cn("pals-chevron", !palsOpen && "pals-chevron-closed")}
-              />
-            </button>
-            <Button variant="ghost" size="sm" onClick={() => setSettings(!settings)}>
-              <Settings2 size={14} />
-              {settings ? "Hide settings" : "Model settings"}
-            </Button>
-          </div>
-          {palsOpen && (
-            <div className="agent-grid">
-              {agents.map((a) => (
-                <div
-                  key={a.id}
-                  className={cn(
-                    "agent-card",
-                    `agent-${a.id}`,
-                    !enabled.includes(a.id) && "agent-disabled",
-                  )}
-                >
-                  <div className="agent-card-top">
-                    <span className="avatar-tile">
-                      <PixelCharacter id={a.id} />
-                    </span>
-                    <Switch
-                      aria-label={`Enable ${agentName(a.id, hell, horror, characterMode)}`}
-                      checked={enabled.includes(a.id)}
-                      disabled={running}
-                      onCheckedChange={(checked) =>
-                        setEnabled((prev) =>
-                          checked ? [...prev, a.id] : prev.filter((id) => id !== a.id),
-                        )
-                      }
-                    />
-                  </div>
-                  <h3>
-                    {agentName(a.id, hell, horror, characterMode)}
-                    <span className="agent-dot" />
-                  </h3>
-                  <p>{agentPersona(a.id, hell, horror, characterMode).role}</p>
-                  <span className="model-label">
-                    {models.find((m) => m.id === selectedModels[a.id])?.label}
-                  </span>
-                  {settings && (
-                    <Select
-                      value={selectedModels[a.id]}
-                      disabled={running}
-                      onValueChange={(value) =>
-                        setSelectedModels((prev) => ({ ...prev, [a.id]: value }))
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label={`${agentName(a.id, hell, horror, characterMode)} model`}
-                        className="mt-3"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {models.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          {!roomSettingsDesktop && roomControls()}
 </div>
             </WorkspaceWindow>
+            {roomSettingsDesktop && <WorkspaceWindow id="room-settings" title="Room Settings" icon={<Settings2 className="size-4" />} open={roomOpen && roomSettingsOpen} onClose={() => { setRoomSettingsOpen(false); window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".window-room .room-settings-trigger")?.focus({ preventScroll: true })); }} resetVersion={resetVersion}>
+              {roomControls()}
+            </WorkspaceWindow>}
             {renderModeWindow(myPalsMode)}
             {renderModeWindow(loungeMode)}
             <WorkspaceWindow id="tools" title="Legacy Show Services tools" icon={<Wrench className="size-4" />} open={toolsOpen} onClose={() => setToolsOpen(false)} resetVersion={resetVersion}>

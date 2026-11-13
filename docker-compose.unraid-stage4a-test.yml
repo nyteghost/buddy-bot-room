@@ -1,0 +1,74 @@
+# Pixel Pals Stage 4A — OFFLINE/ISOLATED PERSONAL TEST, NOT PRODUCTION
+# NEVER copy production Compose/env or attach this project to a production network.
+# The exact image MUST be pinned by sha256 in a PRIVATE local env file.
+# Do not use "latest", "beta", tag-only images, host networking or shared appdata.
+name: pixelpals-stage4a-test
+services:
+  stage4a:
+    image: ${STAGE4A_IMAGE:?Set a verified ghcr.io/nyteghost/buddy-bot-room@sha256 DIGEST before installation}
+    pull_policy: always
+    restart: "no"
+    init: true
+    ports:
+      # Default localhost-only. To browse from a LAN PC, explicitly set STAGE4A_BIND_IP
+      # to Unraid's private LAN address, NEVER 0.0.0.0 or a public address.
+      - "${STAGE4A_BIND_IP:-127.0.0.1}:8091:8090"
+    environment:
+      BUDDY_SELF_HOSTED: "1"
+      BUDDY_ACCOUNTS: "1"
+      BUDDY_PASSWORD: ${STAGE4A_SETUP_CODE:?Use a NEW disposable 12+ character test setup code}
+      BUDDY_DATA_DIR: /data
+      BUDDY_BACKUP_DIR: /backups
+      OBSIDIAN_VAULT_DIR: /vault
+      BUDDY_TZ: America/New_York
+      # Internet, local LLM endpoints, schedulers, notifications and providers are disabled.
+      # Combined with a private internal-only bridge this prevents reaching real services.
+      LOCAL_ONLY_AI: "on"
+      STRATA_ENABLED: "off"
+      OLLAMA_URL: ""
+      STRATA_URL: ""
+      STRATA_API_KEY: ""
+      SEARXNG_URL: ""
+      PROVIDER_FEED: "0"
+      MODEL_FEED: "0"
+      UPDATE_CHECK: "0"
+      GITHUB_JOURNAL_ENABLED: "0"
+      GITHUB_TOKEN: ""
+      TODAY_NUDGES: "off"
+      NTFY_URL: ""
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+      DISCORD_BOT_TOKEN: ""
+      IMAP_HOST: ""
+      M365_CLIENT_ID: ""
+      UNRAID_URL: ""
+      UNRAID_API_KEY: ""
+      WHISPER_URL: ""
+      RADICALE_URL: ""
+      NVIDIA_VISIBLE_DEVICES: none
+    volumes:
+      # Docker creates these fresh under THIS Compose project, never /mnt/user/appdata/pixelpals.
+      - stage4a-data:/data
+      - stage4a-backups:/backups
+      - stage4a-vault:/vault
+    networks:
+      - stage4a-private
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8090/__health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+networks:
+  stage4a-private:
+    driver: bridge
+    internal: true
+volumes:
+  stage4a-data: {}
+  stage4a-backups: {}
+  stage4a-vault: {}

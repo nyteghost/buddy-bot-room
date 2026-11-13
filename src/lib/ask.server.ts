@@ -3,7 +3,9 @@ import { readOllamaHealth } from "./ollama-health.server";
 import { installedName, modelProblem } from "./ollama-health";
 import { generateText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { engineFromJson, freeModels, localServerProvider, turnProviders, type EngineSettings, type TurnProvider } from "./engine";
+import { engineFromJson, freeModels, localServerProvider, strataServerProvider, turnProviders, type EngineSettings, type TurnProvider } from "./engine";
+import { strataConfigured, strataFallbackOllama, strataReadyModel, strataChat, strataConnection, StrataError } from "./strata.server";
+import { assertStrataAuthority, StrataOwnerError, type StrataAuthority } from "./strata-authority.server";
 import { accountFileName } from "./local-account";
 import { ownerName } from "./accounts.server";
 import { ollamaBase, resolveLocalModel } from "./ollama.server";
@@ -50,6 +52,10 @@ function modelFor(p: TurnProvider): { base: string; model: string; key: string }
 
 /** The engines an unattended question may use, in order. In Local-Only mode (or when asked to stay local) that is the stack's own Ollama and nothing else. */
 export function askChain(s: EngineSettings, prompt: string, forceLocal = false): TurnProvider[] {
+  if (s.kind === "strata-server") {
+    if (!strataConfigured()) return [];
+    return [strataServerProvider(s), ...(strataFallbackOllama() && ollamaBase() && s.localChat ? [localServerProvider(s, { text: prompt })] : [])];
+  }
   const local = s.kind === "local-server" || forceLocal || localOnlyOn();
   const chain: TurnProvider[] = local ? [] : turnProviders(s, true).filter((p) => modelFor(p));
   if ((local || chain.length) && ollamaBase() && s.localChat) chain.push(localServerProvider(s, { text: prompt }));
@@ -58,14 +64,20 @@ export function askChain(s: EngineSettings, prompt: string, forceLocal = false):
 
 export type AskResult = { ok: true; text: string; via: string } | { ok: false; error: string };
 
-export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean; signal?: AbortSignal | undefined } = {}): Promise<AskResult> {
+export async function askPals(prompt: string, opts: { system?: string; maxTokens?: number; localOnly?: boolean; signal?: AbortSignal | undefined; authority?: StrataAuthority } = {}): Promise<AskResult> {
   prompt=scrubChatText(prompt,{maskIdentifiers:process.env["CHAT_MASK_IDENTIFIERS"]==="on"});
   if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
   const raw = await ownerEngineJson();
   if (!raw) return { ok: false, error: "No saved settings yet. Sign in, add a free key or set up Local AI, and open the room once so your settings sync to the server." };
   const s = engineFromJson(raw);
+  if (s.kind === "strata-server") {
+    try { await assertStrataAuthority(opts.authority); }
+    catch (error) {
+      return { ok: false, error: error instanceof StrataOwnerError ? error.message : "Protected Strata authorization unavailable." };
+    }
+  }
   const chain = askChain(s, prompt, opts.localOnly === true);
-  if (!chain.length) return { ok: false, error: opts.localOnly || localOnlyOn() ? "Local-Only AI mode is on and Local AI (Ollama) isn't available on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
+  if (!chain.length) return { ok: false, error: opts.localOnly || localOnlyOn() ? "Local-Only AI mode is on and protected Strata or Ollama is unavailable on this server." : "No free key or Local AI is saved for the owner account. Add one in engine settings." };
 
   let system = opts.system ?? "You are the Pixel Pals assistant answering a scheduled or phone request for the owner. Reply in plain text, no markdown headings, under 150 words unless asked for more. Be concrete. If you don't know something current, say so instead of guessing.";
   system += `\nNow: ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`;
@@ -80,6 +92,22 @@ export async function askPals(prompt: string, opts: { system?: string; maxTokens
   let lastError = "";
   for (const original of chain) {
     if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
+    if (original.kind === "strata-server") {
+      try {
+        const model = await strataReadyModel();
+        assertInferenceAllowed("strata-server", strataConnection().base, ollamaBase());
+        const result = await strataChat([{ role: "system", content: system }, { role: "user", content: user }], model, fetch,
+          { maxTokens: Math.min(4000, Math.max(1, Math.floor(opts.maxTokens ?? 2400))), ...(opts.signal ? { signal: opts.signal } : {}) });
+        const output = scrubChatText(result.text.trim());
+        if (output) return { ok: true, text: result.truncated ? output + "\n\n[Strata reached its token limit; the answer may be incomplete.]" : output,
+          via: "Strata · " + result.model };
+        lastError = "Strata returned an empty answer.";
+      } catch (e) {
+        if (opts.signal?.aborted) return { ok: false, error: "Request cancelled." };
+        lastError = e instanceof StrataError ? e.message : "Strata local inference unavailable.";
+      }
+      continue;
+    }
     const p = original.kind === "ollama-server" ? { ...original, model: (await resolveLocalModel(original.model ?? "")) ?? "" } : original;
     if (p.kind === "ollama-server") {
       const health = await readOllamaHealth(opts.signal);
