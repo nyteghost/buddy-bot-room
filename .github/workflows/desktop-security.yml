@@ -1,0 +1,42 @@
+name: Desktop wrapper security
+
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - "src-tauri/**"
+      - "packaging/**"
+      - "docs/security/**"
+      - ".github/workflows/desktop-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux Tauri build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libxdo-dev patchelf \
+            build-essential pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - name: Cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+      - name: Cargo clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Cargo tests and negative security regressions
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Packaging scripts syntax
+        run: |
+          bash -n packaging/install.sh
+          bash -n packaging/pull.sh
