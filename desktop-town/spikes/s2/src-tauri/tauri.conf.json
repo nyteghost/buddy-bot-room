@@ -10,7 +10,12 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Pixel Pals S2", "width": 1000, "height": 700, "transparent": true, "decorations": true, "backgroundColor": "#00000000" }],
+    "windows": [{
+      "title": "Pixel Pals S2",
+      "width": 1000, "height": 700,
+      "transparent": true, "decorations": false,
+      "backgroundColor": "#00000000"
+    }],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'",
       "devCsp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:14222; object-src 'none'; base-uri 'none'"

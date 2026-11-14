@@ -1,0 +1,42 @@
+# This is a TEMPLATE, not an active workflow.
+# Activation under .github/workflows/s2-renderer.yml requires PM approval.
+name: Pixel Pals S2 isolated renderer
+on:
+  pull_request:
+    paths:
+      - desktop-town/spikes/s2/**
+      - .github/workflows/s2-renderer.yml
+  workflow_dispatch:
+jobs:
+  linux-s2:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: desktop-town/spikes/s2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop-town/spikes/s2/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-town/spikes/s2/src-tauri
+      - name: Install Linux Tauri dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf libgtk-3-dev
+      - name: Frozen frontend dependencies, typecheck, Vitest, build
+        run: npm ci && npm run typecheck && npm test && npm run build
+      - name: No-dependency deterministic tests
+        run: npm run test:offline
+      - name: Rust formatting, check, clippy, tests
+        run: |
+          cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+          cargo check --manifest-path src-tauri/Cargo.toml --locked
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Bundled desktop app compilation (no installer)
+        run: npm run tauri:build

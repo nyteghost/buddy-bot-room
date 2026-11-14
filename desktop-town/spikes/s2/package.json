@@ -1,20 +1,22 @@
 {
   "name": "pixel-pals-desktop-s2-canvas-spike",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
+  "engines": { "node": ">=22.6" },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 14222 --strictPort",
     "build": "vite build --base ./ --outDir dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:offline": "node --experimental-strip-types --test scripts/offline-test.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build --no-bundle"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.0",
-    "vitest": "^3.2.0"
+    "@tauri-apps/cli": "2.10.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "vitest": "3.2.4"
   }
 }
