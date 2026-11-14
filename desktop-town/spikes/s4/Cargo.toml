@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 publish = false
+# Dependency versions are resolved by the committed Cargo.lock; build with --locked.
+rust-version = "1.88"
+build = "build.rs"
 
 [[bin]]
 name = "PixelPals"
@@ -11,17 +14,22 @@ path = "src/main.rs"
 
 [dependencies]
 bytemuck = { version = "1.16", features = ["derive"] }
-pollster = "0.3"
+pollster = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wgpu = "0.19"
-winit = "0.29"
 
 [target.'cfg(windows)'.dependencies]
 raw-window-handle = "0.6"
+# wgpu 27: D3D12 DirectComposition presentation (Dx12SwapchainKind::DxgiFromVisual)
+# is required for a transparent D3D12 swapchain; wgpu 0.19 HWND swapchains are opaque-only.
+wgpu = "27"
+winit = "0.29"
 windows-sys = { version = "0.52", features = [
-  "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi",
-  "Win32_UI_WindowsAndMessaging"
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 
 [profile.release]

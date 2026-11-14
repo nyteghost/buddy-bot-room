@@ -1,0 +1,145 @@
+name: Desktop Town S4 (Windows portable spike)
+
+# Isolated CI for desktop-town/spikes/s4 ONLY. Read-only token, no secrets,
+# no deployment, no publishing, no Unraid access. Builds and smoke-tests the
+# portable ZIP on a GitHub-hosted Windows runner (software/virtual GPU): this is
+# CI evidence, NOT physical-device or hardware acceptance.
+on:
+  pull_request:
+    paths:
+      - "desktop-town/spikes/s4/**"
+      - ".github/workflows/desktop-town-s4-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-town-s4-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+
+defaults:
+  run:
+    working-directory: desktop-town/spikes/s4
+
+jobs:
+  unit-linux:
+    name: fmt + clippy + unit tests (Linux, pure logic)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install && rustc --version && cargo --version
+      - name: Lockfile (generate and print if missing)
+        shell: bash
+        run: |
+          if [ -f Cargo.lock ]; then
+            echo "Cargo.lock present"; cargo metadata --locked --format-version 1 > /dev/null
+          else
+            cargo generate-lockfile
+            echo "::warning title=Cargo.lock missing::Generated in CI; commit it. Base64 follows between markers."
+            echo "BEGIN-CARGO-LOCK-BASE64"; base64 -w 0 Cargo.lock | fold -w 4000; echo; echo "END-CARGO-LOCK-BASE64"
+            echo "LOCK_GENERATED=1" >> "$GITHUB_ENV"
+          fi
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - name: Fail if Cargo.lock was not committed
+        if: env.LOCK_GENERATED == '1'
+        run: echo "::error::Cargo.lock is not committed" && exit 1
+
+  windows-portable:
+    name: Windows build + portable ZIP smoke (CI runner, not hardware QA)
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      TARGET: x86_64-pc-windows-msvc
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        shell: pwsh
+        run: |
+          rustup toolchain install
+          rustup target add $env:TARGET
+          rustc -vV
+          cargo --version
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            desktop-town/spikes/s4/target
+          key: s4-win-${{ hashFiles('desktop-town/spikes/s4/Cargo.lock', 'desktop-town/spikes/s4/rust-toolchain.toml') }}
+          restore-keys: s4-win-
+      - name: Lockfile (generate if missing)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path Cargo.lock)) { cargo generate-lockfile; "LOCK_GENERATED=1" >> $env:GITHUB_ENV }
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+      - name: cargo check (Windows target)
+        run: cargo check --locked --target ${{ env.TARGET }}
+      - name: cargo clippy -D warnings (Windows target, all targets)
+        run: cargo clippy --locked --target ${{ env.TARGET }} --all-targets -- -D warnings
+      - name: cargo test (Windows target)
+        run: cargo test --locked --target ${{ env.TARGET }}
+      - name: Release build (static CRT, embedded asInvoker manifest)
+        run: cargo build --locked --release --target ${{ env.TARGET }}
+      - name: Package portable ZIP
+        shell: pwsh
+        run: ./scripts/pack-portable.ps1 -Target $env:TARGET -Commit $env:HEAD_SHA
+      - name: Extract ZIP to a fresh writable folder and run portable smoke tests
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'extract-test'
+          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+          Expand-Archive -LiteralPath dist/PixelPals-Portable.zip -DestinationPath $dest
+          $folder = Join-Path $dest 'PixelPals-Portable'
+          Get-ChildItem -Recurse $folder | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 300 | Write-Host
+          ./scripts/test-portable.ps1 -ExtractedFolder $folder -ResultsPath (Join-Path $env:RUNNER_TEMP 'portable-results.json')
+      - name: Evidence summary
+        if: always()
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP 'extract-test/PixelPals-Portable'
+          foreach ($f in @('dist/PixelPals-Portable.zip.sha256', "$folder/BUILD-INFO.txt", "$folder/Data/s4-smoke.json", "$folder/Data/s4-render-sample.json", "$folder/Data/s4-last-run.log", (Join-Path $env:RUNNER_TEMP 'portable-results.json'))) {
+            if (Test-Path -LiteralPath $f) { Write-Host "===== $f"; Get-Content -LiteralPath $f | Write-Host }
+          }
+          New-Item -ItemType Directory -Force -Path evidence | Out-Null
+          foreach ($f in @("$folder/Data/s4-smoke.json", "$folder/Data/s4-render-sample.json", "$folder/Data/s4-last-run.log", "$folder/BUILD-INFO.txt", (Join-Path $env:RUNNER_TEMP 'portable-results.json'))) {
+            if (Test-Path -LiteralPath $f) { Copy-Item -LiteralPath $f -Destination evidence/ }
+          }
+      - name: Upload portable ZIP (CI build, NOT hardware-accepted)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixelPals-Portable-${{ env.HEAD_SHA }}
+          path: |
+            desktop-town/spikes/s4/dist/PixelPals-Portable.zip
+            desktop-town/spikes/s4/dist/PixelPals-Portable.zip.sha256
+          retention-days: 30
+          if-no-files-found: error
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s4-windows-ci-evidence-${{ env.HEAD_SHA }}
+          path: desktop-town/spikes/s4/evidence/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Fail if Cargo.lock was not committed
+        if: env.LOCK_GENERATED == '1'
+        shell: pwsh
+        run: Write-Host "::error::Cargo.lock is not committed"; exit 1
