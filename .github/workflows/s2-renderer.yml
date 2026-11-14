@@ -23,22 +23,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop-town/spikes/s2/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Resolve initial lockfiles for F2 review (bootstrap only)
-        run: |
-          set -eu
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          (cd src-tauri && cargo generate-lockfile)
-          for entry in package-lock.json src-tauri/Cargo.lock; do
-            tag=$(echo "$entry" | tr '/.-' '___')
-            echo "S2_LOCK_START_${tag}"
-            base64 -w 0 "$entry" | fold -w 256
-            echo
-            echo "S2_LOCK_END_${tag}"
-            wc -c "$entry"
-          done
       - name: Linux Tauri development dependencies
         run: |
           sudo apt-get update -qq

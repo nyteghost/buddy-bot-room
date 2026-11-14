@@ -29,11 +29,8 @@ From repository root:
 
 ```sh
 cd desktop-town/spikes/s2
-# One-time maintainer lockfile generation on a network-connected build environment:
-npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-(cd src-tauri && cargo generate-lockfile)
-# IMPORTANT: have independent reviewer inspect and commit BOTH exact lockfiles
-# before running the frozen CI/QA build.
+# Both S2 lockfiles are committed. Never regenerate them during a frozen CI build.
+# A separate intentional dependency update may regenerate/review the locks.
 npm ci
 npm run typecheck
 npm test
@@ -47,7 +44,7 @@ npm run build
 npm run tauri:build
 ```
 
-**Current limitation:** `package-lock.json` and `src-tauri/Cargo.lock` cannot be generated or reviewed in the developer's disconnected runtime. The repository's unrelated root `bun.lock` and `src-tauri/Cargo.lock` are **not substitutes**. `npm ci` correctly fails without a matching lockfile. The isolated CI definition is staged at `ci/s2-renderer.yml.example`; placing it in `.github/workflows/` is out of S2's authorized path and explicitly requires PM approval. The existing root CI does not build or test S2. **Do not mark reproducible build/CI PASS until an S2-targeted run succeeds on exact locked SHA.**
+**Lockfile provenance:** S2 `package-lock.json` (npm lockfile v3) and `src-tauri/Cargo.lock` (Cargo v4) were resolved by the isolated Ubuntu 24.04 CI runner on 2026-11-14; the dependency graphs and integrity/checksum metadata were inspected before commit. PP-DT-005 approved `.github/workflows/s2-renderer.yml`. The active isolated workflow now runs `npm ci` and Cargo with `--locked`; it has `contents: read` permissions and no production secrets or deployment steps. The repository's unrelated root `bun.lock` and root `src-tauri/Cargo.lock` are **not substitutes**. Distinguish the isolated S2 CI result at the current exact SHA from the generic web-application CI and from physical GPU/Wayland evidence.
 
 ## Owner-run benchmark (Linux KDE Plasma 6 / Wayland / NVIDIA)
 

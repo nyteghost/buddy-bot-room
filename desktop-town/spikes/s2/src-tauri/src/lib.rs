@@ -16,12 +16,10 @@ mod tests {
         assert_eq!(config["app"]["windows"][0]["decorations"], false);
         assert_eq!(config["app"]["windows"][0]["backgroundColor"], "#00000000");
         assert_eq!(config["bundle"]["active"], false);
-        assert!(
-            config["app"]["security"]["csp"]
-                .as_str()
-                .unwrap()
-                .contains("connect-src 'none'")
-        );
+        assert!(config["app"]["security"]["csp"]
+            .as_str()
+            .unwrap()
+            .contains("connect-src 'none'"));
         assert!(config["app"]["security"]["dangerousRemoteDomainIpcAccess"].is_null());
     }
 }
