@@ -743,7 +743,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     }
 
     let launched = Instant::now();
-    let smoke_deadline = options
+    let mut smoke_deadline = options
         .smoke_ms
         .map(|ms| launched + Duration::from_millis(ms));
     let smoke_click = options.smoke_click;

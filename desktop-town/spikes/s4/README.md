@@ -1,36 +1,114 @@
-# Pixel Pals — S4 Windows 11 Portable wgpu/Win32 Feasibility Spike
+# Pixel Pals — S4 Windows 11 Portable wgpu/Win32 Spike
 
-Status: **research prototype / NOT COMPILED OR HARDWARE-ACCEPTED**. Branch based on immutable beta 099f0698bddc494a5cdfd819f0d32944a766e341. Only files within desktop-town/spikes/s4/. No production dependency or Unraid connection.
+Status: **compiles and passes automated checks on a GitHub-hosted Windows CI runner; NOT HARDWARE-ACCEPTED.**
+Isolated spike under `desktop-town/spikes/s4/` (plus one isolated CI workflow, see below). No production
+dependency, no Unraid connection, no installer, no network use.
 
-## Build on an authorized Windows 11 development machine
+## What this prototype is
 
-Required for the *builder*, not the app user: Rust MSVC target and Windows C++ Build Tools. Working directory: desktop-town/spikes/s4/.
+A transparent, always-on-top, non-activating Win32 window (640x360 logical pixels, scaled per monitor DPI)
+draws one small Pal silhouette with native wgpu. Left-click the Pal to start/stop walking; right-click the
+Pal to save and exit. Everything outside the silhouette is removed from the window with `SetWindowRgn`, so
+clicks there go to the application underneath. There is no WebView2 dependency.
 
-    cargo fmt --all -- --check
-    cargo check --target x86_64-pc-windows-msvc
-    cargo clippy --target x86_64-pc-windows-msvc --all-targets -- -D warnings
-    cargo test --target x86_64-pc-windows-msvc
-    cargo build --release --target x86_64-pc-windows-msvc
-    ./scripts/pack-portable.ps1
+* **Rendering:** wgpu 27, Direct3D 12 first. D3D12 presents through a DirectComposition visual
+  (`Dx12SwapchainKind::DxgiFromVisual`) because an HWND flip-model swapchain only supports opaque alpha.
+  Vulkan and GL are tried next; any backend that only offers an opaque swapchain is refused and the app
+  exits instead of showing a black rectangle. Shaders compile with FXC (`d3dcompiler_47.dll`, part of
+  Windows), so no `dxcompiler.dll`/`dxil.dll` is shipped.
+* **Input:** the window region is the union of the silhouette rectangles, computed by the same function that
+  produces the GPU quads (`geometry::pal_shapes`), so the drawn and clickable shapes cannot drift apart.
+  Region clipping is also visual clipping: nothing outside the silhouette is drawn.
+* **DPI:** PerMonitorV2 (embedded manifest and runtime opt-in). Geometry is stored in logical pixels and
+  converted with the window's scale factor; `WM_DPICHANGED` resizes the window and rebuilds the region.
+  The overlay is placed inside the chosen monitor's work area (negative virtual coordinates supported).
+* **Fullscreen safety:** every 500 ms (1 s while hidden) the overlay hides when Windows reports an exclusive
+  Direct3D app or presentation mode, or when a caption-less window covers the overlay's monitor. The desktop
+  wallpaper (`Progman`/`WorkerW`) and maximised captioned windows do not count as fullscreen.
+* **Idle:** rendering is event-driven. With the Pal idle, no frames are drawn and the only timer is the
+  fullscreen probe; while walking, a 33 ms tick drives movement. Hidden overlays stop animating.
+* **Launch safety:** the window is created hidden, the input region is applied and a transparent frame is
+  presented before it is shown with `SW_SHOWNOACTIVATE`. It never takes focus and has no taskbar button.
 
-Output when compilation/packing succeeds: dist/PixelPals-Portable.zip. The ZIP must be independently verified on an approved clean Windows 11 system, offline, without elevation and without any VC runtime or other installer. Do not represent source code as a built ZIP.
+## Portable layout
 
-## Prototype
+```
+PixelPals-Portable/
+  PixelPals.exe        GUI-subsystem exe, static CRT, embedded asInvoker manifest
+  BUILD-INFO.txt       source commit, compiler, target, exe SHA-256
+  README.txt  QA-WINDOWS.md  PERFORMANCE.md
+  Data/                all persistent state, created/used beside the exe
+    settings.json        version, Pal position, click count, walking flag (no secrets)
+    s4-last-run.log      diagnostics from the most recent run
+    s4-render-sample.json  CPU-side render call timings (not GPU/FPS)
+```
 
-A transparent 640x360 Win32 window renders a small moving 2.5D-style Pal silhouette with native wgpu. Left-click Pal to start/stop walking; right-click Pal to save and exit. Empty overlay area is excluded with SetWindowRgn, not just rendered transparent. Use --monitor-index=1 for the second monitor (zero-based) or --self-test for the headless settings round-trip. Native wgpu uses D3D12 first; Vulkan and GL are attempted when a safe non-opaque surface is available. Rendering stops rather than using an opaque swapchain. Selected backend/adapter are printed to stderr. There is no webview and no WebView2 requirement for this native experiment.
+* No installer, administrator rights, registry keys, services, AppData fallback or network.
+* Settings are written to a temporary file in `Data/` and renamed over `settings.json`.
+* Corrupt or unknown settings → the app exits with code 1 and leaves the file untouched.
+* Unwritable `Data/` (read-only media, ACL) → the app runs without persistence and logs a warning; it never
+  writes anywhere else.
+* Update = replace **only** `PixelPals.exe`; keep `Data/`.
 
-Region clipping is also **visual clipping**: effects beyond the region are not drawn. Final roaming characters may require a separate non-interactive rendering window or more sophisticated hit-testing. wgpu does not manage desktops, transparency policies, display scaling or focus. The shared world simulation, app connections, AI and voice remain external contracts, not part of S4.
+Future sign-in must use Windows DPAPI or Credential Manager with re-authentication when moved between PCs;
+never plaintext secrets in `Data/`. The spike implements no credentials.
 
-## Portable state and security
+## Command line and exit codes
 
-Data/settings.json lives beside PixelPals.exe. Only a version, a Pal location, its click count and motion state are serialized. Nothing in S4 accepts or stores passwords, API keys, auth tokens, credentials or networking endpoints. Settings writes use a same-directory temporary file followed by rename; corrupted settings fail closed rather than being reset. On non-writable media, state must remain read-only with a visible stderr warning: no installer, admin, registry, service, hidden fallback to AppData or Unraid. Remove/replace only the executable for an update, keeping Data/ intact. USB/removable execution requires an independently authorized validation run.
+```
+PixelPals.exe [--monitor-index=N] [--self-test] [--smoke-test-ms=N [--smoke-click]]
+```
 
-Future sign-in must use Windows DPAPI or Credential Manager, with reauthentication when moved between PCs; never store secrets in plaintext portable Data/. The native S4 spike does not implement credential handling.
+| Flag | Purpose |
+| --- | --- |
+| `--monitor-index=N` | zero-based monitor; default is the primary monitor |
+| `--self-test` | headless Data/ round-trip in an isolated sub-folder; no window |
+| `--smoke-test-ms=N` | automation: run the real overlay for N ms, save, write `Data/s4-smoke.json`, exit |
+| `--smoke-click` | automation: count one synthetic Pal click before the smoke exit (not OS mouse evidence) |
 
-A later Tauri/webview application must separately investigate WebView2 runtime presence and offline bundling. The native S4 experiment **does not** prove Tauri or WebView2 portability. Windows OS graphics stack, GPU drivers, signing/SmartScreen/AppLocker/WDAC policies and DX12 shader compiler availability are outstanding release gates. Do not bypass employer IT policies.
+Exit codes: 0 success, 1 fail-closed (no safe transparent GPU path, corrupt settings, Win32 failure),
+2 usage error, 3 smoke run presented no frames.
 
-## Verification evidence
+## Reproducible Windows build
 
-Unit tests cover pure silhouette geometry, validation and basic persistence. The 100/100 and 30/30 unit samples are not OS click tests. This environment has neither cargo/rustc nor Windows hardware. No cargo fmt, check, clippy, cargo test, compiled artifact, GPU benchmark, real transparency, 20-cycle stability or 100/100 OS click evidence is claimed. See QA-WINDOWS.md and PERFORMANCE.md for required independent tests.
+Builder requirements (not needed by users of the ZIP): Windows 10/11 x64, Visual Studio 2022 Build Tools
+with the "Desktop development with C++" workload (MSVC linker + Windows SDK), rustup, git, PowerShell 7.
+The compiler is pinned by `rust-toolchain.toml` (1.97.0) and every dependency by `Cargo.lock`.
 
-No merge, deployment, installation to managed hardware, background services, production credentials or Unraid changes.
+```powershell
+git clone https://github.com/nyteghost/buddy-bot-room
+cd buddy-bot-room
+git checkout <exact commit SHA under test>
+cd desktop-town/spikes/s4
+rustup toolchain install            # installs the pinned toolchain from rust-toolchain.toml
+cargo fmt --all -- --check
+cargo check  --locked --target x86_64-pc-windows-msvc
+cargo clippy --locked --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+cargo test   --locked --target x86_64-pc-windows-msvc
+cargo build  --locked --release --target x86_64-pc-windows-msvc
+./scripts/pack-portable.ps1 -Commit (git rev-parse HEAD)
+# Extract and run the automated portable checks on the build/QA machine:
+Expand-Archive dist/PixelPals-Portable.zip -DestinationPath $env:TEMP\pp-test
+./scripts/test-portable.ps1 -ExtractedFolder $env:TEMP\pp-test\PixelPals-Portable
+```
+
+`.cargo/config.toml` links the C runtime statically (`+crt-static`), and `build.rs` embeds
+`windows/PixelPals.exe.manifest` through the MSVC linker. Pure logic tests also run on Linux with
+`cargo test --locked`.
+
+## Continuous integration
+
+`.github/workflows/desktop-town-s4-windows.yml` (read-only token, no secrets, path-filtered to this spike)
+runs on every pull-request update:
+
+* Linux: `cargo fmt --check`, `cargo clippy --all-targets -D warnings`, `cargo test`.
+* `windows-2025`: fmt, check, clippy, test for `x86_64-pc-windows-msvc`, release build, `pack-portable.ps1`,
+  extraction to a fresh folder and `test-portable.ps1`; uploads `PixelPals-Portable-<sha>` (ZIP + SHA-256)
+  and `s4-windows-ci-evidence-<sha>` artifacts.
+
+The hosted runner has no physical GPU (Direct3D 12 runs on the WARP software adapter), runs as an
+administrator, uses 100% scaling on one virtual display and has no human input. CI results are **build and
+smoke evidence only**; they are not overlay, click-through, DPI, fullscreen, focus or performance acceptance.
+See `QA-WINDOWS.md`.
+
+No merge, deployment, installation on managed hardware, background services, credentials or Unraid changes.

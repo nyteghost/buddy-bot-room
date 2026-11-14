@@ -1,30 +1,86 @@
-# Independent Windows 11 QA — pending real hardware
+# Independent Windows 11 hardware QA — S4 portable overlay
 
-Do not test on employer-managed hardware without IT approval. Every item must be marked PASS, FAIL, or NOT TESTED with screenshot/log, device model, GPU driver, DPI, test ZIP hash and exact commit SHA.
+**Status: NOT STARTED on physical hardware.** CI (GitHub-hosted `windows-2025`, WARP software adapter,
+admin account, single virtual display at 100%) only proves the items marked *CI* below.
 
-## Native overlay
+Do **not** test on employer-managed hardware without written IT approval. Do not bypass SmartScreen,
+AppLocker, WDAC, antivirus or other policies; record what they do.
 
-- [ ] Unprivileged clean Windows 11 extraction, double-click launch, no installation, elevation, registry or mandatory background service; record any system DLL/DXC shader dependency.
-- [ ] Disconnect network. Open/toggle/close/relaunch; confirm Data/settings.json survives and no Unraid is required; run scripts/test-portable.ps1 as supplementary round-trip check.
-- [ ] Real 100/100 empty-area clicks fall through to buttons on **a different process** behind the overlay. Sample across silhouette and outside the region, record coordinates.
-- [ ] Real 30/30 silhouette clicks register in PAL_CLICK logs; underlying application receives none.
-- [ ] Twenty full launch/hide/close/relaunch cycles, no crashes, focus theft, black region, stuck topmost window or opaque rectangle.
-- [ ] Test ordinary windows, borderless fullscreen presentation/game, exclusive fullscreen game if permitted, video player; no unintended overlay during presentation.
-- [ ] Test --monitor-index=0 and =1 when available, monitors with negative virtual screen coordinates, monitor hotplug and taskbar changes.
-- [ ] Test 100/125/150/175/200% DPI where available, across mixed-DPI monitors; record window/sprite physical bounds and click registration before and after scale change.
-- [ ] Verify NOACTIVATE focus behavior with keyboard typing in the underlying process.
+For every item record PASS / FAIL / NOT TESTED plus: device model, Windows build, GPU + driver version,
+monitor layout and per-monitor scaling, exact commit SHA, `PixelPals-Portable.zip` SHA-256 (from
+`PixelPals-Portable.zip.sha256`), and the `Data/s4-last-run.log` + screenshots/video.
 
-## Portability & security
+## 0. Preparation
 
-- [ ] Take the ZIP to a clean offline Windows 11 account; run with no admin and no installer, capture SmartScreen/WDAC/AppLocker outcomes without bypass.
-- [ ] Binary-only replacement retains Data state. Roll back executable without altering data; test schema version behavior.
-- [ ] Writable USB/removable-drive extraction/run, state remains after disconnect/reconnect while process is stopped.
-- [ ] ACL-denied/read-only directory: no elevation, alternate write path, silent data loss or overwrite. Verify warning and explicit inability to persist.
-- [ ] Corrupt settings: startup fails closed without deleting Data/settings.json.
-- [ ] Inspect archive and Data/ for passwords/tokens: none expected or supported. Future DPAPI secure credential scheme is NOT implemented here.
-- [ ] Native spike does not require WebView2; separately record whether clean host has WebView2 for future Tauri prototype.
-- [ ] Confirm repository change scope is desktop-town/spikes/s4/** only, no production settings, deployment or Unraid mutations.
+- [ ] Download the CI artifact `PixelPals-Portable-<sha>` from the PR's "Desktop Town S4" workflow run; verify
+      the ZIP SHA-256 and `BUILD-INFO.txt` commit.
+- [ ] Use a standard (non-administrator) Windows 11 account. Optionally disconnect the network.
+
+## 1. Portable launch (requirements 1–6)
+
+- [ ] Extract to a writable folder (e.g. `Documents\PixelPals-Portable`). Double-click `PixelPals.exe`.
+      Expect: no UAC prompt, no console window, no installer, Pal appears near the top-left of the primary
+      monitor's work area. Record SmartScreen/WDAC outcome without bypassing.
+- [ ] Run `scripts\test-portable.ps1 -ExtractedFolder <folder>` from the source tree (or copy the script) as
+      the standard user. All checks PASS (read-only check may report SKIPPED only on privileged accounts).
+      *CI: passes as admin on WARP.*
+- [ ] Network disconnected: launch, toggle walking, right-click exit, relaunch. Pal position/click count persist.
+- [ ] `Data\s4-last-run.log` shows `backend=Dx12`, the real adapter name, `alpha=PreMultiplied`. Record it.
+      If D3D12 is refused, record the full fail-closed message (no black/opaque rectangle may appear).
+- [ ] Task Manager: no service, no child processes, no elevated token (Details → "Elevated" column = No).
+- [ ] Autoruns/registry check: no Run keys, services or scheduled tasks created.
+
+## 2. Transparency and click-through (A6)
+
+- [ ] Over a white and a dark wallpaper, the overlay shows only the Pal; no black, grey or white rectangle,
+      including right after launch, after hide/show and after a DPI change.
+- [ ] **100/100 empty-area clicks** inside the 640x360 overlay bounds but outside the silhouette reach a button
+      in **another process** behind it (e.g. a test page or Notepad). Record coordinates.
+- [ ] **30/30 Pal clicks** register (`PAL_CLICK n` in the log) and the app underneath receives none.
+- [ ] Hover/scroll outside the silhouette goes to the underlying app.
+
+## 3. Focus and z-order
+
+- [ ] Type continuously in Notepad while clicking the Pal 10 times: keystrokes all land in Notepad
+      (`WS_EX_NOACTIVATE`), Alt+Tab never shows Pixel Pals, no taskbar button.
+- [ ] Overlay stays above ordinary windows; it does not cover the Start menu or UAC secure desktop.
+
+## 4. Fullscreen and presentation suppression
+
+- [ ] Borderless-fullscreen video (browser F11 / video player) on the overlay's monitor → overlay hides within
+      ~0.5 s and returns after leaving fullscreen.
+- [ ] Exclusive-fullscreen game (if permitted) → hidden; record game FPS with/without S4 (see PERFORMANCE.md).
+- [ ] PowerPoint slideshow / Windows presentation settings → hidden.
+- [ ] Clicking the desktop wallpaper or maximising Notepad (with and without auto-hide taskbar) → stays visible.
+- [ ] Fullscreen app on a *different* monitor → overlay stays visible on its own monitor (exclusive D3D apps
+      hide it everywhere by design).
+
+## 5. DPI and monitors
+
+- [ ] 100 / 125 / 150 / 175 / 200 % scaling where available: Pal physical size scales, region matches the drawn
+      silhouette (repeat a 10-click sample at the edges of each part), log shows the correct `scale=`.
+- [ ] Change scaling while running; move the overlay's monitor between mixed-DPI displays if possible.
+- [ ] `--monitor-index=0` and `--monitor-index=1`; a monitor left of/above the primary (negative coordinates).
+- [ ] Unplug/replug the overlay's monitor and change taskbar position/size: no crash, overlay stays on-screen.
+
+## 6. Lifecycle and persistence (A12, A17, A18)
+
+- [ ] 20 launch → walk → right-click-exit → relaunch cycles: no crash, focus theft, stuck topmost window or
+      opaque rectangle; state persists each time.
+- [ ] Replace only `PixelPals.exe` with a newer build: `Data\` state preserved. Roll back: still loads.
+- [ ] Corrupt `Data\settings.json`: app exits (code 1), file unchanged, no window flash.
+- [ ] Read-only folder (deny write on `Data\` for the standard user, or read-only USB): app runs, log/stderr warns,
+      no writes anywhere else (check `%APPDATA%`, `%LOCALAPPDATA%`).
+- [ ] Writable USB drive: extract, run, stop, eject/reinsert, run again → state preserved.
+- [ ] Sleep/resume and lock/unlock while running: overlay still transparent and clickable.
+
+## 7. Security and scope
+
+- [ ] Archive and `Data\` contain no passwords, tokens or account data.
+- [ ] PR diff touches only `desktop-town/spikes/s4/**` and `.github/workflows/desktop-town-s4-windows.yml`.
+- [ ] Record whether the clean machine has WebView2 (relevant only for a future Tauri build; S4 does not use it).
 
 ## Handoff
 
-Unit tests are synthetic. No test on this list has been executed on an actual Windows machine yet. Independent QA must provide exact SHA, build logs, screenshot links, pass/fail matrix, performance sheet, compiler/runner version, and release recommendation to PM. No Phase 1 integration until explicit PM/owner release gate.
+Provide the SHA, ZIP hash, filled checklist, logs, screenshots/video, performance sheet and a release
+recommendation to PM. No Phase 1 integration until an explicit PM/owner gate.
