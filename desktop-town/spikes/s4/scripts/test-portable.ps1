@@ -22,6 +22,7 @@ $exe = Join-Path $folder 'PixelPals.exe'
 $data = Join-Path $folder 'Data'
 $settings = Join-Path $data 'settings.json'
 $results = [System.Collections.Generic.List[object]]::new()
+$script:aclDenied = $null
 
 function Add-Result([string]$Name, [string]$Status, [string]$Detail) {
   $results.Add([pscustomobject]@{ test = $Name; status = $Status; detail = $Detail })
@@ -48,6 +49,42 @@ function Write-Settings([int]$Clicks) {
 
 function Get-Clicks { return [int64]((Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json).pal_clicks) }
 
+# Minimal PE32+ import-table reader: lists DLLs the loader must resolve at
+# start-up (no dumpbin/Visual Studio needed on the QA machine).
+function Get-PeImports([byte[]]$Pe) {
+  $pe32 = [BitConverter]::ToInt32($Pe, 0x3C)
+  if ([BitConverter]::ToUInt32($Pe, $pe32) -ne 0x4550) { throw 'not a PE file' }
+  $coff = $pe32 + 4
+  $sections = [BitConverter]::ToUInt16($Pe, $coff + 2)
+  $optSize = [BitConverter]::ToUInt16($Pe, $coff + 16)
+  $opt = $coff + 20
+  if ([BitConverter]::ToUInt16($Pe, $opt) -ne 0x20B) { throw 'not PE32+ (x64)' }
+  $importRva = [BitConverter]::ToUInt32($Pe, $opt + 112 + 8)  # data directory 1
+  $table = $opt + $optSize
+  $toOffset = {
+    param([uint32]$Rva)
+    for ($i = 0; $i -lt $sections; $i++) {
+      $h = $table + 40 * $i
+      $va = [BitConverter]::ToUInt32($Pe, $h + 12)
+      $size = [Math]::Max([BitConverter]::ToUInt32($Pe, $h + 8), [BitConverter]::ToUInt32($Pe, $h + 16))
+      if ($Rva -ge $va -and $Rva -lt $va + $size) { return [int]($Rva - $va + [BitConverter]::ToUInt32($Pe, $h + 20)) }
+    }
+    throw "RVA $Rva outside sections"
+  }
+  $names = @()
+  if ($importRva -eq 0) { return $names }
+  $d = & $toOffset $importRva
+  while ($true) {
+    $nameRva = [BitConverter]::ToUInt32($Pe, $d + 12)
+    if ($nameRva -eq 0) { break }
+    $o = & $toOffset $nameRva
+    $end = [Array]::IndexOf($Pe, [byte]0, $o)
+    $names += [System.Text.Encoding]::ASCII.GetString($Pe, $o, $end - $o)
+    $d += 20
+  }
+  return $names
+}
+
 function Assert-True([bool]$Condition, [string]$Name, [string]$Detail) {
   if ($Condition) { Add-Result $Name 'PASS' $Detail } else { Add-Result $Name 'FAIL' $Detail }
 }
@@ -60,10 +97,11 @@ try {
   Assert-True ($ascii.Contains('asInvoker') -and -not $ascii.Contains('requireAdministrator') -and -not $ascii.Contains('highestAvailable')) `
     'manifest-asInvoker' 'embedded manifest requests asInvoker, never elevation'
   Assert-True ($ascii.Contains('PerMonitorV2')) 'manifest-dpi' 'embedded manifest declares PerMonitorV2'
-  $vcDeps = @('VCRUNTIME140.dll', 'MSVCP140.dll', 'vcruntime140_1.dll') | Where-Object { $ascii.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 }
-  Assert-True (@($vcDeps).Count -eq 0) 'no-vc-redist-import' ("VC++ redistributable imports: " + ($(if (@($vcDeps).Count) { $vcDeps -join ',' } else { 'none' })))
-  $dxc = @('dxcompiler.dll', 'dxil.dll', 'WebView2Loader.dll') | Where-Object { $ascii.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 }
-  Assert-True (@($dxc).Count -eq 0) 'no-dxc-webview2-dependency' ("dxc/webview2 references: " + ($(if (@($dxc).Count) { $dxc -join ',' } else { 'none' })))
+  $imports = @(Get-PeImports $bytes)
+  Add-Result 'pe-imports' 'INFO' ($imports -join ',')
+  $nonOs = @($imports | Where-Object { $_ -match '^(vcruntime|msvcp|ucrtbase|api-ms-win-crt|dxcompiler|dxil|WebView2Loader)' })
+  Assert-True ($imports.Count -gt 0 -and $nonOs.Count -eq 0) 'no-redistributable-imports' `
+    ("static imports outside Windows itself: " + $(if ($nonOs.Count) { $nonOs -join ',' } else { 'none' }) + " (d3d12/dxgi/dcomp/d3dcompiler_47 are loaded at runtime from Windows)")
   $unexpected = Get-ChildItem -LiteralPath $folder -Recurse -File | Where-Object {
     $_.Name -notin @('PixelPals.exe', 'README.txt', 'QA-WINDOWS.md', 'PERFORMANCE.md', 'BUILD-INFO.txt') -and
     -not ($_.DirectoryName -eq $data)
@@ -118,17 +156,21 @@ try {
 
     # 7. Unwritable Data/ runs read-only, never redirects or overwrites -----
     $acct = "$env:USERDOMAIN\$env:USERNAME"
-    & icacls $data /deny "${acct}:(OI)(CI)(W,D,DC)" | Out-Null
+    # Specific rights only: generic W would also deny SYNCHRONIZE and block reads.
+    & icacls $data /deny "${acct}:(OI)(CI)(WD,AD,WEA,WA)" | Out-Null
+    $script:aclDenied = $acct
     $canWrite = $true
     try { [System.IO.File]::WriteAllText((Join-Path $data "probe-$PID.txt"), 'x') } catch { $canWrite = $false }
     if ($canWrite) {
       Remove-Item -LiteralPath (Join-Path $data "probe-$PID.txt") -Force -ErrorAction SilentlyContinue
       & icacls $data /remove:d $acct | Out-Null
+      $script:aclDenied = $null
       Add-Result 'read-only-data' 'SKIPPED' 'deny ACE did not block writes for this account (privileged runner)'
     } else {
       $before = (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
       $code = Invoke-Pals @("--smoke-test-ms=$SmokeMs", '--smoke-click')
       & icacls $data /remove:d $acct | Out-Null
+      $script:aclDenied = $null
       $after = (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
       $appData = Get-ChildItem -LiteralPath $env:APPDATA, $env:LOCALAPPDATA -Directory -ErrorAction SilentlyContinue | Where-Object Name -match 'pixel'
       Assert-True ($code -eq 0 -and $before -eq $after -and -not $appData) 'read-only-data' "exit=$code settings_unchanged=$($before -eq $after) appdata_fallback=$([bool]$appData)"
@@ -136,6 +178,8 @@ try {
   }
 } catch {
   Add-Result 'harness' 'FAIL' $_.Exception.Message
+} finally {
+  if ($script:aclDenied) { & icacls $data /remove:d $script:aclDenied | Out-Null }
 }
 
 if ($ResultsPath) { $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ResultsPath -Encoding utf8 }

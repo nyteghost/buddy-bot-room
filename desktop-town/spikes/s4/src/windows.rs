@@ -761,12 +761,17 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     let mut next_tick = Instant::now();
     let mut last_step = Instant::now();
     let mut log = std::mem::replace(log, RunLog::stderr_only());
+    // winit may still dispatch events (including AboutToWait) after exit() is
+    // requested; nothing may run twice once shutdown has started.
+    let mut exiting = false;
 
     event_loop.run(move |event, target| match event {
+        _ if exiting => {}
         Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
             WindowEvent::CloseRequested => {
                 save_state(&mut store, &state, &mut log);
                 frame_stats.save(&store, &renderer, &mut log);
+                exiting = true;
                 target.exit();
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -784,6 +789,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                     log.line("PAL_EXIT right-click");
                     save_state(&mut store, &state, &mut log);
                     frame_stats.save(&store, &renderer, &mut log);
+                    exiting = true;
                     target.exit();
                 } else if button == MouseButton::Left {
                     state.click();
@@ -792,6 +798,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                     if let Err(error) = apply_pal_region(handle, &state, scale) {
                         hide_on_failure(handle, &mut log, &error.to_string());
                         exit_code_in_loop.set(EXIT_FATAL);
+                        exiting = true;
                         target.exit();
                     }
                     window.request_redraw();
@@ -803,6 +810,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                 if let Err(error) = apply_pal_region(handle, &state, scale) {
                     hide_on_failure(handle, &mut log, &error.to_string());
                     exit_code_in_loop.set(EXIT_FATAL);
+                    exiting = true;
                     target.exit();
                 }
                 window.request_redraw();
@@ -821,6 +829,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                 if let Err(error) = apply_pal_region(handle, &state, scale) {
                     hide_on_failure(handle, &mut log, &error.to_string());
                     exit_code_in_loop.set(EXIT_FATAL);
+                    exiting = true;
                     target.exit();
                 }
                 window.request_redraw();
@@ -833,6 +842,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                     Err(error) => {
                         hide_on_failure(handle, &mut log, &error.to_string());
                         exit_code_in_loop.set(EXIT_FATAL);
+                        exiting = true;
                         target.exit();
                     }
                 }
@@ -842,6 +852,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
         Event::AboutToWait => {
             let now = Instant::now();
             if smoke_deadline.is_some_and(|deadline| now >= deadline) {
+                smoke_deadline = None;
                 if smoke_click {
                     state.record_click();
                 }
@@ -865,6 +876,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                 if frame_stats.presented == 0 {
                     exit_code_in_loop.set(EXIT_SMOKE_NO_FRAMES);
                 }
+                exiting = true;
                 target.exit();
                 return;
             }
@@ -899,6 +911,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                         if let Err(error) = apply_pal_region(handle, &state, scale) {
                             hide_on_failure(handle, &mut log, &error.to_string());
                             exit_code_in_loop.set(EXIT_FATAL);
+                            exiting = true;
                             target.exit();
                             return;
                         }
