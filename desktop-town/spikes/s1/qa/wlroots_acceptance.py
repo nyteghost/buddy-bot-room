@@ -261,6 +261,27 @@ def empty_points(rect: dict, centre: tuple[float, float], n: int) -> list[tuple[
     return pts[:n]
 
 
+def stats_lines(proc: Proc) -> list[dict[str, str]]:
+    return [dict(kv.split("=", 1) for kv in l.split()[1:] if "=" in kv) for l in proc.lines("S1_STATS")]
+
+
+def disc_centroid(image: Path, box: tuple[int, int, int, int]) -> tuple[float, float, int] | None:
+    """Centroid of Pal-blue pixels (RGB ~ 56,201,250) inside `box` (physical px)."""
+    from PIL import Image  # optional dependency
+
+    img = Image.open(image).convert("RGB")
+    x0, y0, w, h = box
+    sx = sy = n = 0
+    for y in range(max(0, y0), min(img.size[1], y0 + h)):
+        for x in range(max(0, x0), min(img.size[0], x0 + w)):
+            r, g, b = img.getpixel((x, y))
+            if abs(r - 56) < 30 and abs(g - 201) < 30 and abs(b - 250) < 30:
+                sx += x
+                sy += y
+                n += 1
+    return (sx / n + 0.5, sy / n + 0.5, n) if n else None
+
+
 def counts(*procs: Proc) -> dict[str, int]:
     tally = {"underlay": 0, "pal": 0, "spurious": 0}
     for p in procs:
@@ -431,6 +452,27 @@ def run(args) -> int:
         else:
             s.record("G4-transparency", "UNVERIFIED", "grim screenshot unavailable")
 
+        # Gate 4b: drawn disc centre == input-region centre (coordinate transform
+        # from logical surface px to physical framebuffer px, incl. fractional).
+        if during:
+            try:
+                o = outputs[primary]
+                sc = float(o.get("scale") or 1.0)
+                cx, cy = centres[primary]
+                lx, ly = cx - o["rect"]["x"], cy - o["rect"]["y"]
+                box = (int((lx - RADIUS - 6) * sc), int((ly - RADIUS - 6) * sc),
+                       int((2 * RADIUS + 12) * sc), int((2 * RADIUS + 12) * sc))
+                found = disc_centroid(during, box)
+                if found is None:
+                    s.record("G4b-art-hitbox-alignment", "FAIL", "no Pal-coloured pixels found at the hitbox")
+                else:
+                    px, py, n = found
+                    err = math.dist((px, py), (lx * sc, ly * sc))
+                    s.record("G4b-art-hitbox-alignment", "PASS" if err <= 1.5 else "FAIL",
+                             f"disc centroid vs region centre = {err:.2f} physical px (scale {sc}, {n} px)")
+            except ImportError:
+                s.record("G4b-art-hitbox-alignment", "UNVERIFIED", "python Pillow not installed")
+
         # Gate 2b: moving hitbox (input region follows the Pal).
         overlay.stop()
         moving = s.spawn("overlay-moving", "--require-overlay", "--speed", "8", "--seconds", "900",
@@ -567,6 +609,34 @@ def run(args) -> int:
                 pass
             time.sleep(1.0)
             s.refresh_extent()
+
+        # Gate 10: idle Pal → no timer, no repaint, no region commits.
+        idle = s.spawn("overlay-idle-stats", "--require-overlay", "--speed", "0", "--seconds", "900",
+                       "--stats", "2", "--monitor", primary)
+        idle.wait_for("S1_STATS", 5, timeout=20)
+        lines = stats_lines(idle)
+        later = lines[1:]
+        ok = len(later) >= 3 and all(m.get("frames") == "0" and m.get("region_updates") == "0" for m in later)
+        last = lines[-1] if lines else {}
+        s.record("G10-idle-no-repaint", "PASS" if ok else "FAIL",
+                 f"{len(later)} idle windows after first paint: frames={[m.get('frames') for m in later]}, "
+                 f"region_updates={[m.get('region_updates') for m in later]}; CI-only process figures "
+                 f"cpu_pct={last.get('cpu_pct')} pss_kib={last.get('pss_kib')} renderer={last.get('renderer')}")
+        idle.stop()
+
+        # Gate 11 (INFO, CI software rendering): moving pacing at --fps 30.
+        mov = s.spawn("overlay-pacing-stats", "--require-overlay", "--speed", "4", "--fps", "30",
+                      "--seconds", "900", "--stats", "3", "--monitor", primary)
+        mov.wait_for("S1_STATS", 3, timeout=20)
+        lines = stats_lines(mov)
+        last = lines[-1] if lines else {}
+        moving_ok = bool(lines) and int(last.get("frames", "0")) > 0 and mov.count("S1_SPURIOUS_CLICK") == 0
+        s.record("G11-moving-pacing", "PASS" if moving_ok else "FAIL",
+                 f"CI software rendering, NOT hardware: fps={last.get('fps')} p50_ms={last.get('p50_ms')} "
+                 f"p95_ms={last.get('p95_ms')} max_ms={last.get('max_ms')} region_updates="
+                 f"{last.get('region_updates')} cpu_pct={last.get('cpu_pct')} pss_kib={last.get('pss_kib')}",
+                 stats=last)
+        mov.stop()
 
         # Gate 5 (informational on sway): fullscreen window vs top/bottom layer.
         for layer in ("top", "bottom"):

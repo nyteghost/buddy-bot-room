@@ -84,6 +84,7 @@ fn case_require_overlay(layer_shell: bool) -> Result<(), String> {
             && r.out.contains("S1_READY")
             && r.out.contains("S1_ALLOCATED")
             && r.out.contains("S1_TIMEOUT_EXIT")
+            && r.out.contains("S1_RELEASED count=1 reason=timeout")
             && no_runtime_warnings(&r.out);
         if ok { Ok(()) } else { Err(r.out) }
     } else {
@@ -125,6 +126,54 @@ fn case_unknown_connector(_: bool) -> Result<(), String> {
     if r.code == Some(2) && !r.out.contains("S1_READY") { Ok(()) } else { Err(r.out) }
 }
 
+/// `S1_STATS` key=value fields, one map per line.
+fn stats_lines(out: &str) -> Vec<std::collections::HashMap<String, String>> {
+    out.lines()
+        .filter(|l| l.starts_with("S1_STATS "))
+        .map(|l| {
+            l.split_whitespace()
+                .skip(1)
+                .filter_map(|kv| kv.split_once('='))
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect()
+        })
+        .collect()
+}
+
+fn case_idle_has_no_repaints(layer_shell: bool) -> Result<(), String> {
+    if !layer_shell {
+        return Ok(()); // overlay-only property
+    }
+    let r = run_with(
+        &["--require-overlay", "--speed", "0", "--stats", "1", "--seconds", "5"],
+        None,
+        Duration::from_secs(15),
+    );
+    let lines = stats_lines(&r.out);
+    // Window 1 contains map + first paint; every later window must be silent.
+    let silent = lines.len() >= 3
+        && lines[1..].iter().all(|m| m.get("frames").map(String::as_str) == Some("0"))
+        && lines[1..].iter().all(|m| m.get("region_updates").map(String::as_str) == Some("0"));
+    if r.code == Some(0) && silent && no_runtime_warnings(&r.out) { Ok(()) } else { Err(r.out) }
+}
+
+fn case_moving_paints_and_updates_region(layer_shell: bool) -> Result<(), String> {
+    if !layer_shell {
+        return Ok(());
+    }
+    let r = run_with(
+        &["--require-overlay", "--speed", "4", "--fps", "30", "--stats", "2", "--seconds", "5"],
+        None,
+        Duration::from_secs(15),
+    );
+    let lines = stats_lines(&r.out);
+    let moving = lines.iter().any(|m| {
+        m.get("frames").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0) > 0
+            && m.get("region_updates").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0) > 0
+    });
+    if r.code == Some(0) && moving && no_runtime_warnings(&r.out) { Ok(()) } else { Err(r.out) }
+}
+
 fn case_lifecycle_5(layer_shell: bool) -> Result<(), String> {
     for n in 1..=5 {
         case_require_overlay(layer_shell).map_err(|e| format!("cycle {n}: {e}"))?;
@@ -138,8 +187,10 @@ fn main() {
         return;
     }
     let layer_shell = std::env::var("S1_EXPECT_LAYER_SHELL").as_deref() != Ok("0");
-    let cases: [Case; 6] = [
+    let cases: [Case; 8] = [
         ("require_overlay", case_require_overlay),
+        ("idle_has_no_repaints", case_idle_has_no_repaints),
+        ("moving_paints_and_updates_region", case_moving_paints_and_updates_region),
         ("default_mode_bounded", case_fallback_window),
         ("town_only", case_town_only),
         ("sigterm_clean_exit", case_sigterm),

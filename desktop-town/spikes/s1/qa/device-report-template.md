@@ -14,17 +14,17 @@
 
 | Section (DEVICE-QA-CHECKLIST.md) | Result PASS / FAIL / UNVERIFIED | Evidence location / observations |
 | --- | --- | --- |
-| A Environment + `$H smoke` | UNVERIFIED | |
-| B 100/100 click-through (static) + 20 moving | UNVERIFIED | |
-| C 30/30 Pal clicks + rim probe (+ moving hits /20) | UNVERIFIED | |
-| D 20/20 lifecycle, nothing left behind | UNVERIFIED | |
-| E KDE/KWin: panel, Overview, virtual desktops, Alt+Tab, lock screen, bottom layer, OSD | UNVERIFIED | |
-| F NVIDIA transparency (ngl / vulkan / cairo), no Xid/reset | UNVERIFIED | |
-| G Multi-monitor placement, per-output clicks, hotplug | UNVERIFIED | |
-| H Fractional scale(s) tested: ___ ; live scale change outcome | UNVERIFIED | |
-| I Fullscreen games: borderless / exclusive × top / bottom | UNVERIFIED | visible? intercepted? |
-| J Focus preservation (typing, Pal clicks, no taskbar/Alt+Tab entry) | UNVERIFIED | |
-| K Fail-closed: SIGTERM, SIGKILL, X11/strict, town-only, unknown monitor | UNVERIFIED | |
+| A Environment + `$H smoke`; renderer = ___ | UNVERIFIED | |
+| B NVIDIA transparency (ngl / vulkan / cairo), journal clean | UNVERIFIED | |
+| C 100/100 click-through (+ 20 moving) | UNVERIFIED | |
+| D 30/30 Pal clicks + rim probe (moving hits ___/20) | UNVERIFIED | |
+| E 20/20 lifecycle + fail-closed + nothing running | UNVERIFIED | |
+| F KDE/KWin: panel, Overview, desktops, Alt+Tab, lock, OSD, bottom layer | UNVERIFIED | |
+| G Focus preservation | UNVERIFIED | |
+| H Fullscreen video / borderless / exclusive (visible? intercepted?) + MangoHud deltas | UNVERIFIED | |
+| I Multi-monitor placement, per-output clicks, hotplug | UNVERIFIED | |
+| J Fractional scale(s) ___ ; live scale change outcome | UNVERIFIED | |
+| K Idle cpu_pct ___ / pss_kib ___ ; walking fps ___ p95_ms ___ ; power per phase | UNVERIFIED | |
 
 - Screenshot/recording before, during, after:
 - Any compositor crash, persistent input interception or black overlay? (automatic FAIL):

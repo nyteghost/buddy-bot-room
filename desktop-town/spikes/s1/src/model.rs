@@ -136,24 +136,132 @@ impl Motion {
         Self { x: f64::from(width.max(0)) / 2.0, direction: 1.0, speed }
     }
 
+    /// One legacy 80 ms step (`speed` pixels). Kept for CLI/test compatibility.
     pub fn advance(&mut self, width: i32, radius: f64) {
-        if width <= 0 || !self.speed.is_finite() || self.speed < 0.0 {
-            return;
+        let _ = self.advance_by(width, radius, LEGACY_TICK_SECONDS);
+    }
+
+    /// Time-based motion: `speed` is pixels per 80 ms (the original CLI unit),
+    /// so the walk looks the same at any frame rate. `dt` is clamped to
+    /// [0, `MAX_STEP_SECONDS`] so a stall (suspend, compositor throttling while
+    /// hidden under a fullscreen game) can never teleport the hitbox.
+    /// Returns true when the position changed.
+    pub fn advance_by(&mut self, width: i32, radius: f64, dt: f64) -> bool {
+        if width <= 0 || !self.speed.is_finite() || self.speed < 0.0 || !dt.is_finite() {
+            return false;
         }
+        let before = self.x;
         let left = radius;
         let right = (f64::from(width) - radius).max(left);
         if right <= left {
             self.x = f64::from(width) / 2.0;
-            return;
+            return (self.x - before).abs() > f64::EPSILON;
         }
+        let step = self.speed * dt.clamp(0.0, MAX_STEP_SECONDS) / LEGACY_TICK_SECONDS;
         // Avoid overshoot creating offscreen hitboxes during resize/hotplug.
-        self.x = (self.x + self.direction * self.speed).clamp(left, right);
+        self.x = (self.x + self.direction * step).clamp(left, right);
         if self.x >= right {
             self.direction = -1.0;
         }
         if self.x <= left {
             self.direction = 1.0;
         }
+        (self.x - before).abs() > f64::EPSILON
+    }
+
+    /// Re-clamp after the surface shrinks (scale/mode change) even when the
+    /// Pal is idle, so art and hitbox never end up outside the surface.
+    pub fn clamp_to(&mut self, width: i32, radius: f64) -> bool {
+        self.advance_by(width, radius, 0.0)
+    }
+}
+
+/// Original S1 tick; `--speed` is expressed in pixels per this interval.
+pub const LEGACY_TICK_SECONDS: f64 = 0.08;
+/// Largest motion step after a stall.
+pub const MAX_STEP_SECONDS: f64 = 0.25;
+/// Transparent margin around the Pal art widget (logical px).
+pub const ART_PAD: i32 = 2;
+
+/// Integer placement of the small Pal art widget. The disc is drawn at the
+/// sub-pixel centre `(pal.x - x, pal.y - y)` inside it, so art and the input
+/// region share one centre; the widget always contains every region row.
+#[must_use]
+pub fn art_rect(pal: Pal) -> Rect {
+    let x = (pal.x - pal.radius).floor() as i32 - ART_PAD;
+    let y = (pal.y - pal.radius).floor() as i32 - ART_PAD;
+    let side = (2.0 * pal.radius).ceil() as i32 + 2 * ART_PAD + 1;
+    Rect { x, y, width: side, height: side }
+}
+
+/// Faint "home" marker below the surface centre: decoration only, never input.
+#[must_use]
+pub fn home_rect(surface: Size) -> Rect {
+    Rect { x: surface.width / 2 - 20, y: surface.height / 2 + 40, width: 40, height: 16 }
+}
+
+/// Logical geometry of one output as reported by GDK.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MonitorInfo {
+    pub connector: Option<String>,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub scale: f64,
+}
+
+impl MonitorInfo {
+    /// Usable for an overlay: positive size within sane bounds and a finite
+    /// scale. KWin itself closes layer surfaces with invalid geometry; S1
+    /// refuses them up front instead (fail closed → town-only/exit 2).
+    #[must_use]
+    pub fn is_usable(&self) -> bool {
+        (1..=16_384).contains(&self.width)
+            && (1..=16_384).contains(&self.height)
+            && self.scale.is_finite()
+            && (0.25..=8.0).contains(&self.scale)
+    }
+}
+
+/// Which GDK monitor indices to cover. Unknown connector, out-of-range index
+/// or an unusable output selects nothing (caller falls back safely).
+#[must_use]
+pub fn select_monitors(choice: &crate::cli::MonitorChoice, monitors: &[MonitorInfo]) -> Vec<usize> {
+    use crate::cli::MonitorChoice;
+    let picked: Vec<usize> = match choice {
+        MonitorChoice::All => (0..monitors.len()).collect(),
+        MonitorChoice::Index(i) => (*i < monitors.len()).then_some(*i).into_iter().collect(),
+        MonitorChoice::Connector(name) => {
+            monitors.iter().position(|m| m.connector.as_deref() == Some(name.as_str())).into_iter().collect()
+        }
+    };
+    if picked.iter().all(|&i| monitors[i].is_usable()) { picked } else { Vec::new() }
+}
+
+/// Inputs to the overlay-vs-fallback decision, as observed at startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Capabilities {
+    pub forced_town_only: bool,
+    pub wayland_display: bool,
+    pub layer_shell: bool,
+    pub input_shapes: bool,
+}
+
+/// `None` = overlay allowed; otherwise the reason to use the safe fallback.
+/// Order matters: an explicit town-only request wins over everything.
+#[must_use]
+pub fn fallback_reason(c: Capabilities) -> Option<&'static str> {
+    if c.forced_town_only {
+        Some("Forced by --town-only")
+    } else if !c.wayland_display {
+        Some("Not a native Wayland GDK display")
+    } else if !c.layer_shell {
+        Some("Compositor lacks layer-shell protocol")
+    } else if !c.input_shapes {
+        Some("Input regions not supported by GDK backend")
+    } else {
+        None
     }
 }
 
@@ -163,6 +271,115 @@ mod tests {
 
     fn raster_hit(rows: &[Rect], x: i32, y: i32) -> bool {
         rows.iter().any(|r| x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
+    }
+
+    #[test]
+    fn time_based_motion_matches_legacy_speed_and_caps_stalls() {
+        let mut a = Motion::new(1000, 4.0);
+        let mut b = Motion::new(1000, 4.0);
+        a.advance(1000, 24.0); // one legacy 80 ms tick
+        for _ in 0..8 {
+            b.advance_by(1000, 24.0, 0.01); // eight 10 ms frames
+        }
+        assert!((a.x - b.x).abs() < 1e-9, "{} vs {}", a.x, b.x);
+        let mut stalled = Motion::new(1000, 4.0);
+        assert!(stalled.advance_by(1000, 24.0, 30.0)); // 30 s stall
+        assert!((stalled.x - (500.0 + 4.0 * MAX_STEP_SECONDS / LEGACY_TICK_SECONDS)).abs() < 1e-9);
+        let mut idle = Motion::new(1000, 0.0);
+        assert!(!idle.advance_by(1000, 24.0, 0.033));
+        assert!(!idle.advance_by(1000, 24.0, f64::NAN));
+    }
+
+    #[test]
+    fn clamp_on_shrink_keeps_idle_pal_inside_surface() {
+        let mut m = Motion::new(3440, 0.0); // x = 1720 on a 3440-wide output
+        assert!(!m.clamp_to(1966, 24.0), "3440 @175% = 1966 logical still contains x"); // no move needed
+        assert!(m.clamp_to(1280, 24.0)); // mode change to 1280 wide
+        assert!(m.x <= 1280.0 - 24.0 && m.x >= 24.0);
+        assert!(!m.clamp_to(1280, 24.0));
+        m.clamp_to(30, 24.0); // narrower than the Pal: centred, never NaN
+        assert!((m.x - 15.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn art_widget_contains_every_region_row_for_subpixel_centres() {
+        for i in 0..200 {
+            let f = f64::from(i) / 200.0;
+            let pal = Pal { x: 300.0 + f * 3.7, y: 200.0 + f * 1.3, radius: 24.0 };
+            let rows = pal.input_rows(Size { width: 1000, height: 1000 });
+            let bb = bounding_box(&rows).unwrap();
+            let art = art_rect(pal);
+            assert!(bb.x >= art.x && bb.y >= art.y, "{bb:?} {art:?}");
+            assert!(bb.x + bb.width <= art.x + art.width && bb.y + bb.height <= art.y + art.height);
+            // drawn centre inside the widget is within the padded square
+            let (cx, cy) = (pal.x - f64::from(art.x), pal.y - f64::from(art.y));
+            assert!(cx - pal.radius >= 0.0 && cy - pal.radius >= 0.0);
+            assert!(cx + pal.radius <= f64::from(art.width) && cy + pal.radius <= f64::from(art.height));
+        }
+    }
+
+    #[test]
+    fn home_marker_never_overlaps_pal_hitbox_at_rest() {
+        for (w, h) in [(1280, 720), (1463, 823), (853, 480), (3440, 1440)] {
+            let pal = Pal { x: f64::from(w) / 2.0, y: f64::from(h) / 2.0, radius: 24.0 };
+            let rows = pal.input_rows(Size { width: w, height: h });
+            let home = home_rect(Size { width: w, height: h });
+            assert!(rows.iter().all(|r| r.y + r.height <= home.y), "{w}x{h}");
+        }
+    }
+
+    fn mon(connector: &str, w: i32, h: i32, scale: f64) -> MonitorInfo {
+        MonitorInfo { connector: Some(connector.into()), x: 0, y: 0, width: w, height: h, scale }
+    }
+
+    #[test]
+    fn monitor_selection_is_strict_and_fails_closed() {
+        use crate::cli::MonitorChoice;
+        let ms = vec![mon("DP-1", 2560, 1440, 1.0), mon("HDMI-A-1", 1707, 960, 1.5)];
+        assert_eq!(select_monitors(&MonitorChoice::Index(1), &ms), vec![1]);
+        assert!(select_monitors(&MonitorChoice::Index(2), &ms).is_empty());
+        assert_eq!(select_monitors(&MonitorChoice::Connector("HDMI-A-1".into()), &ms), vec![1]);
+        assert!(select_monitors(&MonitorChoice::Connector("DP-2".into()), &ms).is_empty());
+        assert_eq!(select_monitors(&MonitorChoice::All, &ms), vec![0, 1]);
+        assert!(select_monitors(&MonitorChoice::All, &[]).is_empty());
+        let bad = vec![mon("DP-1", 2560, 1440, 1.0), mon("DP-2", 0, 1440, 1.0)];
+        assert!(select_monitors(&MonitorChoice::All, &bad).is_empty(), "one bad output blocks --all-monitors");
+        assert_eq!(select_monitors(&MonitorChoice::Index(0), &bad), vec![0]);
+        assert!(!mon("X", 100, 100, f64::NAN).is_usable());
+        assert!(!mon("X", 100, 100, 0.0).is_usable());
+        assert!(!mon("X", 20_000, 100, 1.0).is_usable());
+    }
+
+    #[test]
+    fn fallback_decision_order_and_overlay_only_when_all_present() {
+        let all =
+            Capabilities { forced_town_only: false, wayland_display: true, layer_shell: true, input_shapes: true };
+        assert_eq!(fallback_reason(all), None);
+        assert_eq!(fallback_reason(Capabilities { forced_town_only: true, ..all }), Some("Forced by --town-only"));
+        assert_eq!(
+            fallback_reason(Capabilities { wayland_display: false, layer_shell: false, ..all }),
+            Some("Not a native Wayland GDK display")
+        );
+        assert_eq!(
+            fallback_reason(Capabilities { layer_shell: false, ..all }),
+            Some("Compositor lacks layer-shell protocol")
+        );
+        assert_eq!(
+            fallback_reason(Capabilities { input_shapes: false, ..all }),
+            Some("Input regions not supported by GDK backend")
+        );
+        // exhaustive: overlay is allowed in exactly one of 16 combinations
+        let mut allowed = 0;
+        for bits in 0..16_u8 {
+            let c = Capabilities {
+                forced_town_only: bits & 1 != 0,
+                wayland_display: bits & 2 != 0,
+                layer_shell: bits & 4 != 0,
+                input_shapes: bits & 8 != 0,
+            };
+            allowed += usize::from(fallback_reason(c).is_none());
+        }
+        assert_eq!(allowed, 1);
     }
 
     #[test]

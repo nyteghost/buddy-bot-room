@@ -118,6 +118,27 @@ Owner-run physical procedure expanded: `qa/DEVICE-QA-CHECKLIST.md`
 sections A–K (adds KDE/KWin behaviour, NVIDIA transparency per GSK renderer,
 focus preservation, fail-closed) and helper `qa/owner_kde_gates.sh`.
 
+## Hardware-QA preparation increment — pre-commit probe run [43628975966](https://github.com/nyteghost/buddy-bot-room/actions/runs/43628975966)
+
+Probe `2806b21` (`75ccc0f` + this increment's source/tests; docs were
+finalised afterwards; no `src/`, `tests/`, `Cargo.*` or `qa/*.py|*.sh`
+change after it). Conclusion: **success, every step**; 87 PASS / 0 FAIL
+across the 6 wlroots scenarios; GTK runtime 8/8 on sway and 8/8 on weston.
+
+| New / changed check | Result (all 6 scenarios unless noted) |
+| --- | --- |
+| Unit tests | 28 lib tests (was 16): time-based motion + stall cap, shrink re-clamp, art/hitbox containment for 200 sub-pixel centres, home marker vs hitbox, monitor selection/geometry validation, fallback decision table (16 combinations), `--fps`/`--stats` CLI, percentiles, `/proc` parsers |
+| `qa/test_mangohud_compare.py` | 5/5 |
+| GTK runtime `idle_has_no_repaints`, `moving_paints_and_updates_region` | PASS on sway; N/A-pass on weston |
+| `S1_RELEASED count=1 reason=timeout` on exit | PASS |
+| G4b drawn disc centroid vs hitbox centre | 0.15 px @100 %, 0.20 px @125 %, 0.42 px @150 % (limit 1.5 physical px) |
+| G10 idle: frames / region commits per 2 s window after first paint | 0 / 0 in every window |
+| G11 moving at `--fps 30` (INFO — Mesa software GL `GskGLRenderer` on a cloud VM) | fps 30.0–30.3, p50 = p95 = 33.3 ms, CPU 5.7–6.0 % of one core, PSS 74–94 MiB |
+| All earlier gates (G0–G9, G3c, G6, G8) | unchanged PASS |
+
+The CPU/PSS/fps figures above are **CI environment observations, not
+hardware results**; they do not predict NVIDIA behaviour.
+
 ## Still UNVERIFIED (owner hardware, `qa/DEVICE-QA-CHECKLIST.md`)
 
 KWin/Plasma 6 input-region honouring on layer surfaces · NVIDIA driver /

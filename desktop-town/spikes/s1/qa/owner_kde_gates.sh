@@ -9,6 +9,8 @@
 #   bash qa/owner_kde_gates.sh smoke        # Gate 0 ready/allocated/exit
 #   bash qa/owner_kde_gates.sh lifecycle    # Gate 3 20 cycles
 #   bash qa/owner_kde_gates.sh failclosed   # SIGTERM, SIGKILL, X11 + strict fallback
+#   bash qa/owner_kde_gates.sh idle         # 60 s idle Pal: CPU %, PSS, repaint count
+#   bash qa/owner_kde_gates.sh power        # NVIDIA: 3×60 s no-overlay / idle / moving via nvidia-smi
 #   bash qa/owner_kde_gates.sh run [ARGS]   # interactive overlay, logged (Gates 1,2,4–8)
 #   bash qa/owner_kde_gates.sh summary      # counts from the logs of this session
 #
@@ -75,6 +77,50 @@ case ${1:-help} in
     grep -c S1_TOWN_ONLY_READY "$log" | xargs echo "town-only windows shown (expect 2):" | tee -a "$log"
     echo "log: $log"
     ;;
+  idle)
+    require_wayland
+    log=$out/idle-$(stamp).log
+    echo "Leave the mouse alone for ~70 s. Logging to $log"
+    "$bin" --require-overlay --speed 0 --stats 10 --seconds 65 2>&1 | tee "$log"
+    echo "--- idle windows after the first (expect frames=0 region_updates=0; target cpu_pct <= 2.00):"
+    grep S1_STATS "$log" | tail -n +2 | awk '{print $4, $9, $10, $11}'
+    ;;
+  power)
+    require_wayland
+    command -v nvidia-smi >/dev/null || { echo "nvidia-smi not found (NVIDIA driver utilities)"; exit 2; }
+    csv=$out/power-$(stamp).csv
+    log=$out/power-$(stamp).log
+    echo "Close games/videos; leave the desktop idle for ~3.5 minutes. CSV: $csv"
+    nvidia-smi --query-gpu=timestamp,power.draw,utilization.gpu,clocks.gr,memory.used,pstate \
+      --format=csv,noheader,nounits -l 1 >"$csv" & smi=$!
+    trap 'kill "$smi" 2>/dev/null || true' EXIT
+    mark() { echo "PHASE $1 $(date +%s)" | tee -a "$log"; }
+    mark baseline-no-overlay; sleep 60
+    mark idle-pal; "$bin" --require-overlay --speed 0 --stats 20 --seconds 60 >>"$log" 2>&1
+    mark moving-pal; "$bin" --require-overlay --speed 4 --stats 20 --seconds 60 >>"$log" 2>&1
+    mark end; sleep 2; kill "$smi" 2>/dev/null || true
+    python3 - "$csv" "$log" <<'PY'
+import sys, datetime
+csv, log = sys.argv[1], sys.argv[2]
+marks = [(l.split()[1], int(l.split()[2])) for l in open(log) if l.startswith("PHASE ")]
+rows = []
+for line in open(csv):
+    p = [x.strip() for x in line.split(",")]
+    try:
+        t = datetime.datetime.strptime(p[0], "%Y/%m/%d %H:%M:%S.%f").timestamp()
+        rows.append((t, float(p[1]), float(p[2]), float(p[3]), float(p[4]), p[5]))
+    except (ValueError, IndexError):
+        pass
+for (name, start), (_, end) in zip(marks, marks[1:]):
+    sel = [r for r in rows if start + 3 <= r[0] < end]  # skip 3 s settle
+    if not sel:
+        print(f"{name}: no samples"); continue
+    avg = lambda i: sum(r[i] for r in sel) / len(sel)
+    print(f"{name:20s} n={len(sel):3d} power_W={avg(1):6.1f} util%={avg(2):5.1f} "
+          f"clock_MHz={avg(3):6.0f} mem_MiB={avg(4):6.0f} pstates={sorted({r[5] for r in sel})}")
+PY
+    echo "Compare idle-pal / moving-pal against baseline-no-overlay. Single run: repeat 3x."
+    ;;
   run)
     require_wayland
     shift
@@ -92,6 +138,6 @@ case ${1:-help} in
     echo "evidence folder: $out"
     ;;
   *)
-    sed -n '2,16p' "$0"
+    sed -n '2,18p' "$0"
     ;;
 esac

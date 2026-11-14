@@ -3,3 +3,4 @@
 //! fully unit-testable without a display.
 pub mod cli;
 pub mod model;
+pub mod stats;

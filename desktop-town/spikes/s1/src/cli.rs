@@ -35,6 +35,10 @@ pub struct Options {
     pub require_overlay: bool,
     pub mode: Mode,
     pub trace_region: bool,
+    /// Motion/region update rate while the Pal moves (frames per second).
+    pub fps: u32,
+    /// Emit `S1_STATS` every N seconds (0 = off).
+    pub stats_seconds: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -53,6 +57,8 @@ pub const HELP: &str = "Pixel Pals S1 Wayland overlay spike (research prototype)
   --town-only           Safe normal-window mode, no layer shell
   --require-overlay     Exit 2 instead of falling back (QA automation)
   --trace-region        Log every input-region change (QA evidence)
+  --fps N               Motion/hitbox update rate while moving, 1..60 (default 30)
+  --stats N             Log frame pacing, CPU and PSS every N seconds (1..600)
   --qa-underlay         QA: ordinary click-counting window, not an overlay
   --qa-fullscreen       QA: with --qa-underlay, request fullscreen
 No keyboard grab, no exclusive zone, no desktop/window enumeration.";
@@ -67,6 +73,8 @@ impl Default for Options {
             require_overlay: false,
             mode: Mode::Overlay,
             trace_region: false,
+            fps: 30,
+            stats_seconds: 0,
         }
     }
 }
@@ -141,6 +149,20 @@ impl Options {
                         _ => return Err("--layer must be top or bottom".into()),
                     };
                 }
+                "--fps" => {
+                    let v = args.next().ok_or("--fps requires 1..=60")?;
+                    opt.fps = v.parse::<u32>().map_err(|_| "invalid --fps")?;
+                    if !(1..=60).contains(&opt.fps) {
+                        return Err("--fps must be 1..=60".into());
+                    }
+                }
+                "--stats" => {
+                    let v = args.next().ok_or("--stats requires 1..=600 seconds")?;
+                    opt.stats_seconds = v.parse::<u32>().map_err(|_| "invalid --stats")?;
+                    if !(1..=600).contains(&opt.stats_seconds) {
+                        return Err("--stats must be 1..=600".into());
+                    }
+                }
                 "--require-overlay" => opt.require_overlay = true,
                 "--town-only" => town_only = true,
                 "--trace-region" => opt.trace_region = true,
@@ -200,6 +222,11 @@ mod tests {
             &["--layer", "overlay"],
             &["--monitor", "DP-1;rm"],
             &["--monitor", ""],
+            &["--fps", "0"],
+            &["--fps", "61"],
+            &["--fps", "30.5"],
+            &["--stats", "0"],
+            &["--stats", "601"],
             &["--bogus"],
         ] {
             assert!(parse(bad).is_err(), "{bad:?}");
@@ -224,6 +251,9 @@ mod tests {
         let u = parse(&["--qa-underlay", "--qa-fullscreen"]).unwrap();
         assert_eq!(u.mode, Mode::QaUnderlay { fullscreen: true });
         assert_eq!(parse(&["--town-only"]).unwrap().mode, Mode::TownOnly);
+        let f = parse(&["--fps", "60", "--stats", "5"]).unwrap();
+        assert_eq!((f.fps, f.stats_seconds), (60, 5));
+        assert_eq!((parse(&[]).unwrap().fps, parse(&[]).unwrap().stats_seconds), (30, 0));
     }
 
     #[test]
