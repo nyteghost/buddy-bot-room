@@ -1,174 +1,243 @@
 //! Spike S1: standalone native GTK4 layer-shell window; deliberately NO Tauri,
 //! browser, HTTP, system hooks, production data access, or privileged APIs.
-mod model;
+//!
+//! Every line the QA harness relies on is prefixed `S1_` and printed to
+//! stdout (normal events) or stderr (fallback/failure events).
 
 use std::cell::{Cell, RefCell};
-use std::env;
 use std::f64::consts::TAU;
+use std::process::ExitCode;
 use std::rc::Rc;
 use std::time::Duration;
 
 use gtk::cairo;
 use gtk::gdk;
+use gtk::glib;
 use gtk::prelude::*;
 use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
-use model::{Motion, Pal, Size};
+use pixel_pals_s1::cli::{HELP, LayerChoice, Mode, MonitorChoice, Options, Parsed};
+use pixel_pals_s1::model::{Motion, Pal, Rect, Size, bounding_box, region_contains, to_surface_rows};
 
 const RADIUS: f64 = 24.0;
 const TICK_MILLIS: u64 = 80;
+/// Exit status when `--require-overlay` cannot obtain a verified overlay.
+const EXIT_OVERLAY_UNAVAILABLE: u8 = 2;
+const SIGINT: i32 = 2;
+const SIGTERM: i32 = 15;
 
-#[derive(Clone, Debug)]
-struct Options {
-    seconds: u32,
-    speed: f64,
-    all_monitors: bool,
-    monitor_index: usize,
-    layer: LayerChoice,
-    require_overlay: bool,
-    town_only: bool,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum LayerChoice { Top, Bottom }
-
-impl Options {
-    fn parse() -> Result<Self, String> {
-        let mut opt = Self {
-            seconds: 300,
-            speed: 4.0,
-            all_monitors: false,
-            monitor_index: 0,
-            layer: LayerChoice::Top,
-            require_overlay: false,
-            town_only: false,
-        };
-        let mut args = env::args().skip(1);
-        while let Some(arg) = args.next() {
-            match arg.as_str() {
-                "--seconds" => {
-                    let v = args.next().ok_or("--seconds requires 1..=3600")?;
-                    opt.seconds = v.parse::<u32>().map_err(|_| "invalid --seconds")?;
-                    if !(1..=3600).contains(&opt.seconds) { return Err("--seconds must be 1..=3600".into()); }
-                }
-                "--speed" => {
-                    let v = args.next().ok_or("--speed requires 0..=24")?;
-                    opt.speed = v.parse::<f64>().map_err(|_| "invalid --speed")?;
-                    if !opt.speed.is_finite() || !(0.0..=24.0).contains(&opt.speed) {
-                        return Err("--speed must be a finite number 0..=24".into());
-                    }
-                }
-                "--monitor-index" => {
-                    opt.monitor_index = args.next().ok_or("--monitor-index requires integer")?
-                        .parse::<usize>().map_err(|_| "invalid --monitor-index")?;
-                }
-                "--all-monitors" => opt.all_monitors = true,
-                "--layer" => {
-                    opt.layer = match args.next().as_deref() {
-                        Some("top") => LayerChoice::Top,
-                        Some("bottom") => LayerChoice::Bottom,
-                        _ => return Err("--layer must be top or bottom".into()),
-                    };
-                }
-                "--require-overlay" => opt.require_overlay = true,
-                "--town-only" => opt.town_only = true,
-                "--help" | "-h" => {
-                    println!("Pixel Pals S1 Wayland overlay spike\n\
-                        --seconds N           Self-close after N seconds (default 300, max 3600)\n\
-                        --speed N             Pal pixels per 80ms tick, 0..24 (default 4)\n\
-                        --monitor-index N     GDK monitor index (default 0)\n\
-                        --all-monitors        One independently clipped layer surface per output\n\
-                        --layer top|bottom    Default top; bottom may be hidden behind windows\n\
-                        --town-only           Safe normal-window mode, no layer shell\n\
-                        --require-overlay    Error instead of fallback for QA instrumentation\n\
-                        No keyboard grab, no exclusive zone, no desktop enumeration.");
-                    std::process::exit(0);
-                }
-                _ => return Err(format!("unknown argument: {arg}")),
-            }
+fn main() -> ExitCode {
+    let (options, parsed) = match Options::parse(std::env::args().skip(1)) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("S1_ARGS_ERROR {e}");
+            return ExitCode::from(2);
         }
-        if opt.town_only && opt.require_overlay {
-            return Err("--town-only and --require-overlay are mutually exclusive".into());
-        }
-        Ok(opt)
-    }
-}
-
-fn main() {
-    let options = match Options::parse() {
-        Ok(o) => o,
-        Err(e) => { eprintln!("S1_ARGS_ERROR {e}"); std::process::exit(2); }
     };
+    if parsed == Parsed::Help {
+        println!("{HELP}");
+        return ExitCode::SUCCESS;
+    }
     // NON_UNIQUE permits reliable parallel launches / lifecycle regression runs.
-    let app = gtk::Application::new(Some("org.pixelpals.spike.s1"), gtk::gio::ApplicationFlags::NON_UNIQUE);
-    app.connect_activate(move |app| activate(app, &options));
-    let result = app.run_with_args(&[] as &[&str]);
-    std::process::exit(result.into());
+    let app = gtk::Application::builder()
+        .application_id("org.pixelpals.spike.s1")
+        .flags(gtk::gio::ApplicationFlags::NON_UNIQUE)
+        .build();
+    let forced_exit = Rc::new(Cell::new(None::<u8>));
+    app.connect_activate({
+        let forced_exit = forced_exit.clone();
+        move |app| activate(app, &options, &forced_exit)
+    });
+    // Never forward our own argv to GApplication: it would reject our flags.
+    let status = app.run_with_args(&[] as &[&str]);
+    if let Some(code) = forced_exit.get() {
+        return ExitCode::from(code);
+    }
+    if status == glib::ExitCode::SUCCESS { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }
 
-fn activate(app: &gtk::Application, options: &Options) {
+fn activate(app: &gtk::Application, options: &Options, forced_exit: &Rc<Cell<Option<u8>>>) {
+    install_lifetime_guards(app, options.seconds);
+
+    if let Mode::QaUnderlay { fullscreen } = options.mode {
+        show_qa_underlay(app, fullscreen);
+        return;
+    }
+
+    let fail_or_fallback = |reason: &str| {
+        eprintln!("S1_SAFE_FALLBACK reason={reason}");
+        if options.require_overlay {
+            eprintln!("S1_REQUIRE_OVERLAY_EXIT code={EXIT_OVERLAY_UNAVAILABLE}");
+            forced_exit.set(Some(EXIT_OVERLAY_UNAVAILABLE));
+            app.quit();
+        } else {
+            show_town_only(app, reason);
+        }
+    };
+
     let Some(display) = gdk::Display::default() else {
-        eprintln!("S1_NO_DISPLAY");
-        if options.require_overlay { std::process::exit(2); }
-        show_town_only(app, "No graphical display available");
+        fail_or_fallback("No graphical display available");
         return;
     };
 
-    let wayland = env::var("XDG_SESSION_TYPE").ok().as_deref() == Some("wayland")
-        && env::var_os("WAYLAND_DISPLAY").is_some();
-    if options.town_only || !wayland || !gtk4_layer_shell::is_supported() || !display.supports_input_shapes() {
-        let reason = if options.town_only { "Forced by --town-only" }
-            else if !wayland { "Not a Wayland session" }
-            else if !gtk4_layer_shell::is_supported() { "Compositor lacks layer-shell protocol" }
-            else { "Input regions not supported by GDK backend" };
-        eprintln!("S1_SAFE_FALLBACK reason={reason}");
-        if options.require_overlay { std::process::exit(2); }
-        show_town_only(app, reason);
+    // Ask GDK which backend it actually chose; env vars can lie (e.g.
+    // GDK_BACKEND=x11 inside a Wayland session).
+    let wayland = display.type_().name() == "GdkWaylandDisplay";
+    if options.mode == Mode::TownOnly {
+        fail_or_fallback("Forced by --town-only");
+        return;
+    }
+    if !wayland {
+        fail_or_fallback("Not a native Wayland GDK display");
+        return;
+    }
+    if !gtk4_layer_shell::is_supported() {
+        fail_or_fallback("Compositor lacks layer-shell protocol");
+        return;
+    }
+    if !display.supports_input_shapes() {
+        fail_or_fallback("Input regions not supported by GDK backend");
         return;
     }
 
     let provider = gtk::CssProvider::new();
-    provider.load_from_data("window.pp-s1-overlay, window.pp-s1-overlay > * { background: transparent; background-image: none; box-shadow: none; border: none; }");
+    provider.load_from_string(
+        "window.pp-s1-overlay, window.pp-s1-overlay > * { background: transparent; \
+         background-image: none; box-shadow: none; border: none; }",
+    );
     gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
     let monitors = display.monitors();
-    let count = monitors.n_items() as usize;
-    if count == 0 || (!options.all_monitors && options.monitor_index >= count) {
-        eprintln!("S1_SAFE_FALLBACK reason=Requested monitor unavailable count={count}");
-        if options.require_overlay { std::process::exit(2); }
-        show_town_only(app, "No matching monitor");
+    let all: Vec<gdk::Monitor> = (0..monitors.n_items())
+        .filter_map(|i| monitors.item(i).and_then(|o| o.downcast::<gdk::Monitor>().ok()))
+        .collect();
+    let chosen: Vec<(usize, gdk::Monitor)> = match &options.monitor {
+        MonitorChoice::All => all.iter().cloned().enumerate().collect(),
+        MonitorChoice::Index(i) => all.get(*i).cloned().map(|m| vec![(*i, m)]).unwrap_or_default(),
+        MonitorChoice::Connector(name) => all
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.connector().as_deref() == Some(name.as_str()))
+            .map(|(i, m)| (i, m.clone()))
+            .collect(),
+    };
+    for (i, m) in all.iter().enumerate() {
+        println!(
+            "S1_OUTPUT index={i} connector={} geometry={}x{}+{}+{} scale={:.3} scale_factor={}",
+            m.connector().as_deref().unwrap_or("unknown"),
+            m.geometry().width(),
+            m.geometry().height(),
+            m.geometry().x(),
+            m.geometry().y(),
+            m.scale(),
+            m.scale_factor()
+        );
+    }
+    if chosen.is_empty() {
+        fail_or_fallback(&format!("Requested monitor unavailable count={}", all.len()));
         return;
     }
-    let chosen: Vec<usize> = if options.all_monitors { (0..count).collect() } else { vec![options.monitor_index] };
-    for index in chosen {
-        let Some(monitor) = monitors.item(index as u32).and_then(|item| item.downcast::<gdk::Monitor>().ok()) else {
-            eprintln!("S1_OUTPUT_ERROR index={index}");
-            app.quit();
-            return;
-        };
-        create_overlay(app, &monitor, index, options);
+    for (index, monitor) in &chosen {
+        create_overlay(app, monitor, *index, options);
     }
 
-    // Unexpected hotplug/removal: quit and release *all* input regions; relaunch
-    // explicitly. Reallocation across monitors is a separate integration gate.
-    let app_for_hotplug = app.clone();
-    monitors.connect_items_changed(move |_, _, _, _| {
-        eprintln!("S1_HOTPLUG_EXIT monitor model changed; releasing surfaces");
-        app_for_hotplug.quit();
+    // Output added/removed: quit and release *all* input regions; relaunch
+    // explicitly. Live re-targeting across outputs is a separate gate.
+    monitors.connect_items_changed({
+        let app = app.clone();
+        move |_, _, removed, added| {
+            println!("S1_HOTPLUG_EXIT removed={removed} added={added} releasing all surfaces");
+            app.quit();
+        }
     });
+}
 
-    let app_for_deadline = app.clone();
-    let seconds = options.seconds;
-    gtk::glib::timeout_add_seconds_local(seconds, move || {
-        eprintln!("S1_TIMEOUT_EXIT seconds={seconds}");
-        app_for_deadline.quit();
-        gtk::glib::ControlFlow::Break
+/// Bounded lifetime in every mode (overlay, town-only, QA underlay) plus clean
+/// exit on SIGINT/SIGTERM so a stuck overlay can always be removed.
+fn install_lifetime_guards(app: &gtk::Application, seconds: u32) {
+    glib::timeout_add_seconds_local(seconds, {
+        let app = app.clone();
+        move || {
+            println!("S1_TIMEOUT_EXIT seconds={seconds}");
+            app.quit();
+            glib::ControlFlow::Break
+        }
     });
+    for (signum, name) in [(SIGINT, "SIGINT"), (SIGTERM, "SIGTERM")] {
+        glib_unix::unix_signal_add_local(signum, {
+            let app = app.clone();
+            move || {
+                println!("S1_SIGNAL_EXIT signal={name}");
+                app.quit();
+                glib::ControlFlow::Break
+            }
+        });
+    }
+}
+
+struct Overlay {
+    label: String,
+    window: gtk::ApplicationWindow,
+    drawing: gtk::DrawingArea,
+    motion: RefCell<Motion>,
+    rows: RefCell<Vec<Rect>>,
+    last_bbox: Cell<Option<Rect>>,
+    trace: bool,
+    clicks: Cell<u64>,
+}
+
+impl Overlay {
+    fn pal(&self) -> Pal {
+        Pal { x: self.motion.borrow().x, y: f64::from(self.drawing.height()) / 2.0, radius: RADIUS }
+    }
+
+    /// Recompute the Pal hitbox and hand it to GDK. Never passes a "full"
+    /// region: an empty list stays an empty (fully click-through) region.
+    fn update_region(&self) {
+        let Some(surface) = self.window.surface() else { return };
+        let widget_rows = self.pal().input_rows(Size { width: self.drawing.width(), height: self.drawing.height() });
+        // Drawing-area origin in surface coordinates (window CSS/CSD offset
+        // plus the native surface transform). Unknown → fail closed (empty).
+        let origin = self.drawing.compute_point(&self.window, &gtk::graphene::Point::new(0.0, 0.0)).map(|p| {
+            let (tx, ty) = self.window.surface_transform();
+            (f64::from(p.x()) + tx, f64::from(p.y()) + ty)
+        });
+        let surface_rows = match origin {
+            Some((ox, oy)) => {
+                to_surface_rows(&widget_rows, ox, oy, Size { width: surface.width(), height: surface.height() })
+            }
+            None => Vec::new(),
+        };
+        let rects: Vec<cairo::RectangleInt> =
+            surface_rows.iter().map(|r| cairo::RectangleInt::new(r.x, r.y, r.width, r.height)).collect();
+        // Always Some(..): GDK treats None as "whole surface accepts input".
+        surface.set_input_region(Some(&cairo::Region::create_rectangles(&rects)));
+        let bbox = bounding_box(&surface_rows);
+        if self.trace && bbox != self.last_bbox.get() {
+            match bbox {
+                Some(b) => println!(
+                    "S1_REGION monitor={} rows={} bbox={},{},{},{} surface={}x{}",
+                    self.label,
+                    surface_rows.len(),
+                    b.x,
+                    b.y,
+                    b.width,
+                    b.height,
+                    surface.width(),
+                    surface.height()
+                ),
+                None => println!("S1_REGION monitor={} rows=0 bbox=empty", self.label),
+            }
+        }
+        self.last_bbox.set(bbox);
+        *self.rows.borrow_mut() = widget_rows;
+    }
 }
 
 fn create_overlay(app: &gtk::Application, monitor: &gdk::Monitor, index: usize, opts: &Options) {
     let geometry = monitor.geometry();
+    let label = monitor.connector().map_or_else(|| format!("index{index}"), |c| c.to_string());
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .title("Pixel Pals S1 transparent overlay")
@@ -176,12 +245,16 @@ fn create_overlay(app: &gtk::Application, monitor: &gdk::Monitor, index: usize, 
         .default_width(geometry.width())
         .default_height(geometry.height())
         .build();
-    window.set_css_classes(&["pp-s1-overlay"]);
-    // CRITICAL: these must be configured before the first realize/map.
+    window.add_css_class("pp-s1-overlay");
+    // CRITICAL: layer-shell must be configured before the first realize/map.
     window.init_layer_shell();
     window.set_namespace(Some("pixel-pals-spike-s1"));
-    window.set_layer(match opts.layer { LayerChoice::Top => Layer::Top, LayerChoice::Bottom => Layer::Bottom });
+    window.set_layer(match opts.layer {
+        LayerChoice::Top => Layer::Top,
+        LayerChoice::Bottom => Layer::Bottom,
+    });
     window.set_keyboard_mode(KeyboardMode::None);
+    // 0 = do not reserve space and stay clear of panels' exclusive zones.
     window.set_exclusive_zone(0);
     for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         window.set_anchor(edge, true);
@@ -192,19 +265,28 @@ fn create_overlay(app: &gtk::Application, monitor: &gdk::Monitor, index: usize, 
     drawing.set_hexpand(true);
     drawing.set_vexpand(true);
     window.set_child(Some(&drawing));
-    let motion = Rc::new(RefCell::new(Motion::new(geometry.width(), opts.speed)));
-    let clicks = Rc::new(Cell::new(0_u64));
+
+    let overlay = Rc::new(Overlay {
+        label: label.clone(),
+        window: window.clone(),
+        drawing: drawing.clone(),
+        motion: RefCell::new(Motion::new(geometry.width(), opts.speed)),
+        rows: RefCell::new(Vec::new()),
+        last_bbox: Cell::new(None),
+        trace: opts.trace_region,
+        clicks: Cell::new(0),
+    });
 
     drawing.set_draw_func({
-        let motion = motion.clone();
+        let overlay = Rc::downgrade(&overlay);
         move |_, cr, width, height| {
-            // The surface must have transparent pixels everywhere except visible art.
+            // Transparent pixels everywhere except the visible art.
             cr.set_operator(cairo::Operator::Clear);
             let _ = cr.paint();
             cr.set_operator(cairo::Operator::Over);
-            let m = *motion.borrow();
-            let pal = Pal { x: m.x, y: f64::from(height) / 2.0, radius: RADIUS };
-            // The very faint home marker is decoration ONLY, never a hit target.
+            let Some(overlay) = overlay.upgrade() else { return };
+            let pal = overlay.pal();
+            // Very faint home marker: decoration ONLY, never a hit target.
             cr.set_source_rgba(0.1, 0.9, 0.8, 0.22);
             cr.rectangle(f64::from(width) / 2.0 - 20.0, f64::from(height) / 2.0 + 40.0, 40.0, 16.0);
             let _ = cr.fill();
@@ -221,69 +303,99 @@ fn create_overlay(app: &gtk::Application, monitor: &gdk::Monitor, index: usize, 
 
     let click = gtk::GestureClick::new();
     click.connect_pressed({
-        let clicks = clicks.clone();
-        let motion = motion.clone();
-        let drawing = drawing.clone();
+        let overlay = Rc::downgrade(&overlay);
         move |_, _, x, y| {
-            let pal = Pal { x: motion.borrow().x, y: f64::from(drawing.height()) / 2.0, radius: RADIUS };
-            if pal.contains(x, y) {
-                let next = clicks.get() + 1;
-                clicks.set(next);
-                println!("S1_PAL_CLICK monitor={index} count={next} x={x:.1} y={y:.1}");
+            let Some(o) = overlay.upgrade() else { return };
+            // Same pixel membership rule the compositor uses for the region.
+            if region_contains(&o.rows.borrow(), x, y) {
+                let next = o.clicks.get() + 1;
+                o.clicks.set(next);
+                println!("S1_PAL_CLICK monitor={} count={next} x={x:.1} y={y:.1}", o.label);
             } else {
-                // Unexpected interception is a manual QA failure and must be visible.
-                eprintln!("S1_SPURIOUS_CLICK monitor={index} x={x:.1} y={y:.1}");
+                // Delivered outside the region we set: click-through FAILED.
+                eprintln!("S1_SPURIOUS_CLICK monitor={} x={x:.1} y={y:.1}", o.label);
             }
         }
     });
     drawing.add_controller(click);
 
-    // Initial region is deliberately EMPTY until the surface is allocated.
-    // Never permit a default full-window pointer region for a visible overlay.
+    // Before allocation the region is EMPTY (zero-size rows), never "None".
     window.connect_realize({
-        let drawing = drawing.clone();
-        let motion = motion.clone();
-        move |window| update_regions(window, &drawing, *motion.borrow())
-    });
-    drawing.connect_resize({
-        let window = window.clone();
-        let drawing = drawing.clone();
-        let motion = motion.clone();
-        move |_, _, _| update_regions(&window, &drawing, *motion.borrow())
-    });
-    let scale_factor = monitor.scale_factor();
-    let selected_layer = opts.layer;
-    window.connect_map(move |_| {
-        println!("S1_READY monitor={index} logical={}x{} scale_factor={} layer={selected_layer:?}",
-            geometry.width(), geometry.height(), scale_factor);
-    });
-
-    gtk::glib::timeout_add_local(Duration::from_millis(TICK_MILLIS), {
-        let drawing = drawing.clone();
-        let window = window.clone();
-        let motion = motion.clone();
-        move || {
-            let width = drawing.width();
-            let mut m = motion.borrow_mut();
-            m.advance(width, RADIUS);
-            update_regions(&window, &drawing, *m);
-            drawing.queue_draw();
-            gtk::glib::ControlFlow::Continue
+        let overlay = Rc::downgrade(&overlay);
+        move |_| {
+            if let Some(o) = overlay.upgrade() {
+                o.update_region();
+            }
         }
     });
-    window.present();
-}
+    let allocated_once = Cell::new(false);
+    drawing.connect_resize({
+        let overlay = Rc::downgrade(&overlay);
+        move |_, width, height| {
+            let Some(o) = overlay.upgrade() else { return };
+            o.update_region();
+            let scale = o.window.surface().map_or(0.0, |s| s.scale());
+            let tag = if allocated_once.replace(true) { "S1_RESIZED" } else { "S1_ALLOCATED" };
+            println!("{tag} monitor={} width={width} height={height} surface_scale={scale:.3}", o.label);
+        }
+    });
+    window.connect_map({
+        let overlay = Rc::downgrade(&overlay);
+        let layer = opts.layer;
+        let monitor = monitor.clone();
+        move |w| {
+            let Some(o) = overlay.upgrade() else { return };
+            println!(
+                "S1_READY monitor={} index={index} logical={}x{} monitor_scale={:.3} layer={layer:?}",
+                o.label,
+                monitor.geometry().width(),
+                monitor.geometry().height(),
+                monitor.scale()
+            );
+            if let Some(surface) = w.surface() {
+                // Fractional/integer scale changes keep logical coordinates
+                // but force a fresh region commit for the new buffer scale.
+                let weak = Rc::downgrade(&o);
+                surface.connect_notify_local(Some("scale"), move |s, _| {
+                    if let Some(o) = weak.upgrade() {
+                        println!("S1_SCALE_CHANGED monitor={} surface_scale={:.3}", o.label, s.scale());
+                        o.update_region();
+                    }
+                });
+            }
+        }
+    });
+    // Same output changes mode/scale without hotplug: log it; GTK re-allocates
+    // and `resize` re-applies the region. Output invalidated: fail closed.
+    monitor.connect_notify_local(Some("geometry"), {
+        let label = label.clone();
+        move |m, _| {
+            let g = m.geometry();
+            println!("S1_MONITOR_GEOMETRY monitor={label} logical={}x{}", g.width(), g.height());
+        }
+    });
+    monitor.connect_notify_local(Some("scale"), {
+        let label = label.clone();
+        move |m, _| println!("S1_MONITOR_SCALE monitor={label} scale={:.3}", m.scale())
+    });
+    monitor.connect_invalidate({
+        let app = app.clone();
+        move |_| {
+            println!("S1_HOTPLUG_EXIT monitor={label} invalidated; releasing all surfaces");
+            app.quit();
+        }
+    });
 
-fn update_regions(window: &gtk::ApplicationWindow, drawing: &gtk::DrawingArea, m: Motion) {
-    let Some(surface) = window.surface() else { return; };
-    let pal = Pal { x: m.x, y: f64::from(drawing.height()) / 2.0, radius: RADIUS };
-    let rows = pal.input_rows(Size { width: drawing.width(), height: drawing.height() });
-    let rectangles: Vec<cairo::RectangleInt> = rows.into_iter()
-        .map(|r| cairo::RectangleInt::new(r.x, r.y, r.width, r.height)).collect();
-    let input_region = cairo::Region::create_rectangles(&rectangles);
-    let empty_opaque_region = cairo::Region::create();
-    surface.set_opaque_region(Some(&empty_opaque_region));
-    surface.set_input_region(Some(&input_region));
+    // The motion tick owns the only strong reference to the overlay state; it
+    // lives until the process quits (every exit path quits the application).
+    glib::timeout_add_local(Duration::from_millis(TICK_MILLIS), move || {
+        let width = overlay.drawing.width();
+        overlay.motion.borrow_mut().advance(width, RADIUS);
+        overlay.update_region();
+        overlay.drawing.queue_draw();
+        glib::ControlFlow::Continue
+    });
+    window.present();
 }
 
 fn show_town_only(app: &gtk::Application, reason: &str) {
@@ -303,9 +415,56 @@ fn show_town_only(app: &gtk::Application, reason: &str) {
     vbox.append(&gtk::Label::new(Some(reason)));
     vbox.append(&gtk::Label::new(Some("Roaming disabled. Other desktop windows are untouched.")));
     let button = gtk::Button::with_label("Close");
-    let app_for_button = app.clone();
-    button.connect_clicked(move |_| app_for_button.quit());
+    button.connect_clicked({
+        let app = app.clone();
+        move |_| app.quit()
+    });
     vbox.append(&button);
     window.set_child(Some(&vbox));
+    window.connect_map(|_| println!("S1_TOWN_ONLY_READY"));
+    window.present();
+}
+
+/// QA aid: an ordinary application window standing in for "the desktop".
+/// Every primary click that reaches it is printed, so pass-through can be
+/// counted without trusting the overlay's own logs.
+fn show_qa_underlay(app: &gtk::Application, fullscreen: bool) {
+    let window = gtk::ApplicationWindow::builder()
+        .application(app)
+        .title("S1 QA underlay (NOT the overlay)")
+        .default_width(800)
+        .default_height(600)
+        .build();
+    let drawing = gtk::DrawingArea::new();
+    drawing.set_hexpand(true);
+    drawing.set_vexpand(true);
+    // Fixed 32 px magenta/dark-green checkerboard: easy to diff in screenshots.
+    drawing.set_draw_func(|_, cr, width, height| {
+        for row in 0..=(height / 32) {
+            for col in 0..=(width / 32) {
+                if (row + col) % 2 == 0 {
+                    cr.set_source_rgb(0.85, 0.1, 0.75);
+                } else {
+                    cr.set_source_rgb(0.05, 0.3, 0.12);
+                }
+                cr.rectangle(f64::from(col * 32), f64::from(row * 32), 32.0, 32.0);
+                let _ = cr.fill();
+            }
+        }
+    });
+    let count = Rc::new(Cell::new(0_u64));
+    let click = gtk::GestureClick::new();
+    click.connect_pressed(move |_, _, x, y| {
+        let next = count.get() + 1;
+        count.set(next);
+        println!("S1_UNDERLAY_CLICK count={next} x={x:.1} y={y:.1}");
+    });
+    drawing.add_controller(click);
+    drawing.connect_resize(|_, w, h| println!("S1_UNDERLAY_SIZE width={w} height={h}"));
+    window.set_child(Some(&drawing));
+    if fullscreen {
+        window.fullscreen();
+    }
+    window.connect_map(|_| println!("S1_UNDERLAY_READY"));
     window.present();
 }

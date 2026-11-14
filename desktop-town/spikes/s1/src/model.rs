@@ -64,6 +64,65 @@ impl Pal {
     }
 }
 
+/// True when the integer pixel containing `(x, y)` is part of `rows`. This is
+/// the same membership rule the compositor applies to the input region, so a
+/// pointer event the overlay receives *outside* it means the region was not
+/// honoured (a real click-through failure, not a rounding artefact).
+#[must_use]
+pub fn region_contains(rows: &[Rect], x: f64, y: f64) -> bool {
+    if !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    let (px, py) = (x.floor(), y.floor());
+    rows.iter().any(|r| {
+        px >= f64::from(r.x) && px < f64::from(r.x + r.width) && py >= f64::from(r.y) && py < f64::from(r.y + r.height)
+    })
+}
+
+/// Bounding box of a region; `None` for an empty (fully click-through) region.
+#[must_use]
+pub fn bounding_box(rows: &[Rect]) -> Option<Rect> {
+    let first = rows.first()?;
+    let (mut x0, mut y0) = (first.x, first.y);
+    let (mut x1, mut y1) = (first.x + first.width, first.y + first.height);
+    for r in rows {
+        x0 = x0.min(r.x);
+        y0 = y0.min(r.y);
+        x1 = x1.max(r.x + r.width);
+        y1 = y1.max(r.y + r.height);
+    }
+    Some(Rect { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+}
+
+/// Converts widget-local rows into GDK *surface* coordinates (the space
+/// `gdk_surface_set_input_region` uses) and clips them to the surface. A
+/// non-finite offset or empty surface fails closed to an empty region.
+#[must_use]
+pub fn to_surface_rows(rows: &[Rect], offset_x: f64, offset_y: f64, surface: Size) -> Vec<Rect> {
+    if !offset_x.is_finite()
+        || !offset_y.is_finite()
+        || offset_x.abs() > 16_384.0
+        || offset_y.abs() > 16_384.0
+        || surface.width <= 0
+        || surface.height <= 0
+    {
+        return Vec::new();
+    }
+    // Offsets are whole logical pixels for an undecorated layer surface; round
+    // rather than truncate so a 0.9999 transform does not shift the hitbox.
+    let dx = offset_x.round() as i32;
+    let dy = offset_y.round() as i32;
+    rows.iter()
+        .filter_map(|r| {
+            let x0 = (r.x + dx).clamp(0, surface.width);
+            let x1 = (r.x + r.width + dx).clamp(0, surface.width);
+            let y0 = (r.y + dy).clamp(0, surface.height);
+            let y1 = (r.y + r.height + dy).clamp(0, surface.height);
+            (x1 > x0 && y1 > y0).then_some(Rect { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+        })
+        .collect()
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Motion {
     pub x: f64,
@@ -89,8 +148,12 @@ impl Motion {
         }
         // Avoid overshoot creating offscreen hitboxes during resize/hotplug.
         self.x = (self.x + self.direction * self.speed).clamp(left, right);
-        if self.x >= right { self.direction = -1.0; }
-        if self.x <= left { self.direction = 1.0; }
+        if self.x >= right {
+            self.direction = -1.0;
+        }
+        if self.x <= left {
+            self.direction = 1.0;
+        }
     }
 }
 
@@ -100,6 +163,55 @@ mod tests {
 
     fn raster_hit(rows: &[Rect], x: i32, y: i32) -> bool {
         rows.iter().any(|r| x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)
+    }
+
+    #[test]
+    fn region_contains_matches_raster_and_rejects_non_finite() {
+        let pal = Pal { x: 40.0, y: 40.0, radius: 24.0 };
+        let rows = pal.input_rows(Size { width: 100, height: 100 });
+        for y in 0..100 {
+            for x in 0..100 {
+                let fx = f64::from(x) + 0.37;
+                let fy = f64::from(y) + 0.81;
+                assert_eq!(region_contains(&rows, fx, fy), raster_hit(&rows, x, y));
+            }
+        }
+        assert!(!region_contains(&rows, f64::NAN, 40.0));
+        assert!(!region_contains(&[], 40.0, 40.0));
+    }
+
+    #[test]
+    fn bounding_box_covers_circle_and_empty_is_none() {
+        let rows = Pal { x: 50.0, y: 50.0, radius: 10.0 }.input_rows(Size { width: 200, height: 200 });
+        let bb = bounding_box(&rows).unwrap();
+        assert_eq!((bb.x, bb.y, bb.width, bb.height), (40, 40, 20, 20));
+        assert!(bounding_box(&[]).is_none());
+    }
+
+    #[test]
+    fn surface_translation_offsets_and_clips() {
+        let rows = vec![Rect { x: 0, y: 0, width: 10, height: 1 }, Rect { x: 95, y: 5, width: 10, height: 1 }];
+        let out = to_surface_rows(&rows, 3.0, 2.0, Size { width: 100, height: 100 });
+        assert_eq!(out[0], Rect { x: 3, y: 2, width: 10, height: 1 });
+        assert_eq!(out[1], Rect { x: 98, y: 7, width: 2, height: 1 });
+        assert!(to_surface_rows(&rows, f64::NAN, 0.0, Size { width: 100, height: 100 }).is_empty());
+        assert!(to_surface_rows(&rows, 0.0, 0.0, Size { width: 0, height: 100 }).is_empty());
+        assert!(to_surface_rows(&rows, -500.0, 0.0, Size { width: 100, height: 100 }).is_empty());
+    }
+
+    #[test]
+    fn fractional_scale_logical_sizes_stay_bounded() {
+        // 2560x1440 at 125%/150%/175% → logical surfaces; region must stay a
+        // small disc inside each and never cover the output.
+        for (w, h) in [(2048, 1152), (1707, 960), (1463, 823), (1536, 864)] {
+            let pal = Pal { x: f64::from(w) / 2.0, y: f64::from(h) / 2.0, radius: 24.0 };
+            let rows = pal.input_rows(Size { width: w, height: h });
+            let area: i32 = rows.iter().map(|r| r.width * r.height).sum();
+            assert!((1700..1900).contains(&area), "area={area} for {w}x{h}");
+            let bb = bounding_box(&rows).unwrap();
+            // A half-pixel centre on odd logical sizes can span 2r+1 rows/columns.
+            assert!(bb.width <= 49 && bb.height <= 49, "{bb:?}");
+        }
     }
 
     #[test]
@@ -133,7 +245,12 @@ mod tests {
     fn region_never_extends_outside_monitor() {
         for pal in [Pal { x: 0.0, y: 0.0, radius: 24.0 }, Pal { x: 99.0, y: 49.0, radius: 24.0 }] {
             let rows = pal.input_rows(Size { width: 100, height: 50 });
-            assert!(rows.iter().all(|r| r.x >= 0 && r.y >= 0 && r.width > 0 && r.height == 1 && r.x + r.width <= 100 && r.y + r.height <= 50));
+            assert!(rows.iter().all(|r| r.x >= 0
+                && r.y >= 0
+                && r.width > 0
+                && r.height == 1
+                && r.x + r.width <= 100
+                && r.y + r.height <= 50));
         }
     }
 
@@ -155,7 +272,9 @@ mod tests {
             let prev = m.direction;
             m.advance(200, 24.0);
             assert!((24.0..=176.0).contains(&m.x));
-            if prev != m.direction { direction_changes += 1; }
+            if prev != m.direction {
+                direction_changes += 1;
+            }
         }
         assert!(direction_changes >= 2);
     }

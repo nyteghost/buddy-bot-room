@@ -1,0 +1,68 @@
+# Maintainer: Pixel Pals S1 spike (development prototype — NOT a release)
+#
+# Builds the S1 overlay from THIS git checkout (no network source), so the
+# package always corresponds to the commit you checked out:
+#   git -C <repo> checkout <exact SHA>
+#   cd desktop-town/spikes/s1/packaging/arch && makepkg -si
+# Remove completely with:  sudo pacman -Rns pixel-pals-s1-overlay-dev
+# Installs no services, autostart entries, desktop files or config.
+pkgname=pixel-pals-s1-overlay-dev
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Pixel Pals S1 research spike: GTK4 layer-shell click-through overlay (disposable dev build)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/nyteghost/buddy-bot-room"
+license=('MIT')
+depends=('gtk4' 'gtk4-layer-shell' 'glib2' 'cairo' 'graphene' 'glibc' 'libgcc' 'bash')
+makedepends=('cargo' 'git' 'pkgconf')
+optdepends=('python: qa/underlay_click_counter.py'
+            'tk: qa/underlay_click_counter.py'
+            'wayland-utils: environment report (wayland-info)'
+            'spectacle: screenshot evidence')
+options=('!lto' '!debug')
+source=()
+sha256sums=()
+
+_crate="$(realpath "${startdir}/../..")"
+
+pkgver() {
+  local base count sha
+  base=$(sed -n 's/^version = "\(.*\)"/\1/p' "${_crate}/Cargo.toml" | head -n1)
+  count=$(git -C "${_crate}" rev-list --count HEAD 2>/dev/null || echo 0)
+  sha=$(git -C "${_crate}" rev-parse --short=12 HEAD 2>/dev/null || echo nogit)
+  printf '%s.r%s.g%s' "${base}" "${count}" "${sha}"
+}
+
+prepare() {
+  # Fails if Cargo.lock is missing or stale: the reviewed lockfile is the
+  # supply-chain boundary for this prototype.
+  cd "${_crate}"
+  export CARGO_HOME="${srcdir}/cargo-home"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "${_crate}"
+  export CARGO_HOME="${srcdir}/cargo-home" CARGO_TARGET_DIR="${srcdir}/target"
+  cargo build --frozen --release --bin pixel-pals-s1-kwin-overlay
+}
+
+check() {
+  cd "${_crate}"
+  export CARGO_HOME="${srcdir}/cargo-home" CARGO_TARGET_DIR="${srcdir}/target"
+  cargo test --frozen --release
+}
+
+package() {
+  cd "${_crate}"
+  install -Dm755 "${srcdir}/target/release/pixel-pals-s1-kwin-overlay" \
+    "${pkgdir}/usr/bin/pixel-pals-s1-kwin-overlay"
+  install -d "${pkgdir}/usr/share/pixel-pals-s1/qa"
+  install -m755 qa/environment.sh qa/lifecycle_20.sh qa/underlay_click_counter.py \
+    "${pkgdir}/usr/share/pixel-pals-s1/qa/"
+  install -m644 qa/device-report-template.md qa/DEVICE-QA-CHECKLIST.md \
+    "${pkgdir}/usr/share/pixel-pals-s1/qa/"
+  install -Dm644 README.md INSTALL-CACHYOS.md -t "${pkgdir}/usr/share/doc/${pkgname}/"
+  # NOTE: the repository has no LICENSE file yet; license=('MIT') mirrors
+  # Cargo.toml only. Resolve before any distribution beyond the owner's PC.
+}

@@ -1,0 +1,198 @@
+# S1 Linux build + headless runtime verification.
+#
+# Stored inside the S1 spike path on purpose: PP-DT-001 limits S1 to
+# desktop-town/spikes/s1/**. It only runs when copied to .github/workflows/
+# (e.g. on a disposable `ci-probe/s1-*` branch). Adding it to beta/main is a
+# separate owner/PM decision. It needs no secrets and only `contents: read`.
+name: S1 Linux overlay (Arch, headless Wayland)
+
+on:
+  push:
+    branches: ["ci-probe/s1-**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s1-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arch:
+    name: Arch Linux (CachyOS package base)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: archlinux:base-devel
+    env:
+      S1: desktop-town/spikes/s1
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Install Arch toolchain and Wayland test tools
+        run: |
+          pacman -Syu --noconfirm --needed git rust pkgconf gtk4 gtk4-layer-shell \
+            sway grim weston python python-pillow xorg-server-xvfb mesa ttf-dejavu namcap dbus cargo-audit
+          # Arch ships sway with file capabilities (cap_sys_nice); exec of such a
+          # binary fails with EPERM inside an unprivileged CI container.
+          setcap -r /usr/bin/sway
+          # GLib/GTK need a machine-id to reach a session bus (dbus-run-session below).
+          systemd-machine-id-setup || dbus-uuidgen --ensure=/etc/machine-id
+          useradd -m builder
+      - uses: actions/checkout@v4
+      - name: Record environment and source identity
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          chown -R builder "$GITHUB_WORKSPACE"
+          echo "commit=$(git rev-parse HEAD)"
+          echo "s1_tree=$(git rev-parse HEAD:$S1)"
+          rustc --version; cargo --version
+          pacman -Q gtk4 gtk4-layer-shell sway weston mesa rust
+      - name: Lockfiles (generate only if absent; artifact is reviewed before commit)
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          for d in . qa/wlr-clicker; do
+            if [ -f "$d/Cargo.lock" ]; then echo "$d: committed Cargo.lock"; else
+              echo "$d: GENERATING Cargo.lock (not yet committed)"; (cd "$d" && cargo generate-lockfile); fi
+          done
+          cargo tree --locked -e normal --prefix depth > qa/evidence-cargo-tree.txt || cargo tree -e normal > qa/evidence-cargo-tree.txt
+          # Print lockfiles into the log as well, so reviewers without artifact
+          # access can reproduce them byte-for-byte (verify with sha256).
+          for f in Cargo.lock qa/wlr-clicker/Cargo.lock; do
+            echo "S1LOCK-SHA256 $(sha256sum "$f")"
+            sed "s|^|S1LOCK[$f]|" "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s1-cargo-locks
+          path: |
+            ${{ env.S1 }}/Cargo.lock
+            ${{ env.S1 }}/qa/wlr-clicker/Cargo.lock
+            ${{ env.S1 }}/qa/evidence-cargo-tree.txt
+      - name: fmt / check / clippy / test / build (overlay)
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          cargo fmt --all -- --check
+          cargo check --locked --all-targets
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+          cargo build --locked
+      - name: RustSec advisory audit (both lockfiles)
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          cargo audit --deny warnings
+          (cd qa/wlr-clicker && cargo audit --deny warnings)
+      - name: fmt / clippy / build (QA virtual-pointer clicker)
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1/qa/wlr-clicker"
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo build --locked
+      - name: Static checks (shell, python)
+        if: ${{ !cancelled() }}
+        run: |
+          cd "$S1"
+          bash -n qa/environment.sh qa/lifecycle_20.sh qa/ci/headless_session.sh
+          python3 -m py_compile qa/underlay_click_counter.py qa/wlroots_acceptance.py
+      - name: GTK runtime tests on headless sway (layer-shell present)
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder, S1_GTK_RUNTIME_TESTS: "1" }
+        run: cd "$S1" && dbus-run-session -- bash qa/ci/headless_session.sh sway -- cargo test --locked --test gtk_runtime
+      - name: GTK runtime tests on headless weston (no wlr-layer-shell → fallback)
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder, S1_GTK_RUNTIME_TESTS: "1", S1_EXPECT_LAYER_SHELL: "0" }
+        run: cd "$S1" && dbus-run-session -- bash qa/ci/headless_session.sh weston -- cargo test --locked --test gtk_runtime
+      - name: X11 session fallback (Xvfb)
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          bin=target/debug/pixel-pals-s1-kwin-overlay
+          set +e
+          xvfb-run -a dbus-run-session -- env GDK_BACKEND=x11 XDG_SESSION_TYPE=x11 "$bin" --require-overlay --seconds 2 >x11-strict.log 2>&1
+          strict=$?
+          xvfb-run -a dbus-run-session -- env GDK_BACKEND=x11 XDG_SESSION_TYPE=x11 "$bin" --seconds 2 >x11-fallback.log 2>&1
+          fallback=$?
+          set -e
+          cat x11-strict.log x11-fallback.log
+          test "$strict" -eq 2
+          grep -q 'S1_SAFE_FALLBACK reason=Not a native Wayland GDK display' x11-strict.log
+          test "$fallback" -eq 0
+          grep -q S1_TOWN_ONLY_READY x11-fallback.log
+          ! grep -q 'S1_READY ' x11-fallback.log
+      - name: wlroots acceptance — 1 output @ 100%
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          dbus-run-session -- python3 qa/wlroots_acceptance.py --label "1x 100%" --scale 1.0 --lifecycle 20 \
+            --bin target/debug/pixel-pals-s1-kwin-overlay --clicker qa/wlr-clicker/target/debug/s1-wlr-clicker \
+            --out qa/evidence/wlroots-100
+      - name: wlroots acceptance — 1 output @ 125%
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          dbus-run-session -- python3 qa/wlroots_acceptance.py --label "1x 125%" --scale 1.25 --lifecycle 3 \
+            --bin target/debug/pixel-pals-s1-kwin-overlay --clicker qa/wlr-clicker/target/debug/s1-wlr-clicker \
+            --out qa/evidence/wlroots-125
+      - name: wlroots acceptance — 1 output @ 150%
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          dbus-run-session -- python3 qa/wlroots_acceptance.py --label "1x 150%" --scale 1.5 --lifecycle 3 \
+            --bin target/debug/pixel-pals-s1-kwin-overlay --clicker qa/wlr-clicker/target/debug/s1-wlr-clicker \
+            --out qa/evidence/wlroots-150
+      - name: wlroots acceptance — 2 outputs, mixed 100% + 150%, hotplug
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          dbus-run-session -- python3 qa/wlroots_acceptance.py --label "2x mixed 100%+150%" --scale 1.0 --second-output-scale 1.5 \
+            --lifecycle 3 --bin target/debug/pixel-pals-s1-kwin-overlay \
+            --clicker qa/wlr-clicker/target/debug/s1-wlr-clicker --out qa/evidence/wlroots-mixed
+      - name: Arch package (makepkg from this checkout) + namcap
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1/packaging/arch"
+          makepkg --printsrcinfo > /tmp/SRCINFO && cat /tmp/SRCINFO
+          makepkg --cleanbuild --force --nodeps
+          ls -l ./*.pkg.tar.zst
+          pacman -Qlp ./*.pkg.tar.zst
+          namcap PKGBUILD ./*.pkg.tar.zst || true
+      - name: Summaries
+        if: always()
+        run: |
+          cd "$S1"
+          for f in qa/evidence/*/summary.md; do [ -f "$f" ] && cat "$f" && echo; done | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s1-wlroots-evidence
+          path: |
+            ${{ env.S1 }}/qa/evidence/
+            ${{ env.S1 }}/x11-*.log
+          if-no-files-found: warn
+
+  # Ubuntu 24.04 does not package gtk4-layer-shell (libgtk4-layer-shell-dev
+  # is absent from noble), so a second-distro compile job is not included.
+  # The GTK floor implied by the `v4_14` feature is therefore untested.

@@ -1,3 +1,9 @@
 /target/
+/qa/wlr-clicker/target/
 *.log
 qa/evidence/
+qa/evidence-cargo-tree.txt
+packaging/arch/src/
+packaging/arch/pkg/
+packaging/arch/*.pkg.tar.*
+__pycache__/

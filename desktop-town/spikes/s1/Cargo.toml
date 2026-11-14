@@ -2,14 +2,36 @@
 name = "pixel-pals-s1-kwin-overlay"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.93"
+# Effective floor of the reviewed Cargo.lock: gtk-rs 0.22 / gtk4 0.11 crates
+# declare rust-version 1.92. Arch/CachyOS `rust` is newer.
+rust-version = "1.92"
 publish = false
 license = "MIT"
 description = "Isolated KDE/Wayland GTK4 layer-shell input-region feasibility spike"
 
+[lib]
+name = "pixel_pals_s1"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pixel-pals-s1-kwin-overlay"
+path = "src/main.rs"
+
+[[test]]
+# Runs real GTK windows; needs a Wayland session (headless wlroots in CI).
+# Without S1_GTK_RUNTIME_TESTS=1 it reports SKIP and exits 0.
+name = "gtk_runtime"
+path = "tests/gtk_runtime.rs"
+harness = false
+
 [dependencies]
-gtk4 = "0.11"
-gtk4-layer-shell = "=0.8.1"
+# v4_14: GdkMonitor:scale (fractional), GdkSurface:scale, compute_point,
+# CssProvider::load_from_string. CachyOS/Arch ship GTK >= 4.18.
+gtk4 = { version = "0.11", features = ["v4_14"] }
+gtk4-layer-shell = "0.8"
+# SIGINT/SIGTERM → clean quit (glib 0.22 moved this out of `glib`). Default
+# features required: 0.22.8 fails to build with default-features = false.
+glib-unix = "0.22"
 
 [profile.dev]
 debug = 1
