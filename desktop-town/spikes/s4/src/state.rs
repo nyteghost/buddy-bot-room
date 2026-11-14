@@ -72,8 +72,10 @@ mod tests {
 
     #[test]
     fn version_and_bounds_reject_corruption() {
-        let mut state = DemoState::default();
-        state.version = 999;
+        let mut state = DemoState {
+            version: 999,
+            ..DemoState::default()
+        };
         assert!(state.validate().is_err());
         state.version = STATE_VERSION;
         state.pal_x = -99;

@@ -158,7 +158,7 @@ fn instance_for(backends: wgpu::Backends) -> wgpu::Instance {
         backend_options: wgpu::BackendOptions {
             dx12: wgpu::Dx12BackendOptions {
                 shader_compiler: wgpu::Dx12Compiler::Fxc,
-                presentation_system: wgpu::Dx12SwapchainKind::DxgiFromVisual,
+                presentation_system: wgpu_types::Dx12SwapchainKind::DxgiFromVisual,
                 ..Default::default()
             },
             ..Default::default()
