@@ -1,46 +1,40 @@
-# Pixel Pals desktop (CachyOS / Arch)
+# Pixel Pals legacy desktop shell (CachyOS / Arch)
 
-## Clone
-GitHub doesn't accept account passwords in the terminal. Log in once first:
-```bash
-sudo pacman -S github-cli
-gh auth login
-gh repo clone nyteghost/buddy-bot-room
-cd buddy-bot-room
-```
+**Security change:** The native wrapper now uses a small bundled informational UI.
+It does not embed the web application, expose terminal/file commands or update itself.
+The existing web application remains unchanged; open its normal address (for example
+http://localhost:8090) in a regular browser to use all web features.
 
-## One-step install (any shell, including fish)
-```bash
-bash packaging/install.sh
-```
-Installs missing tools, sets up Rust, fixes icons, builds, and adds Pixel Pals
-to your app menu and desktop. Then right-click it in the menu → Add to Favorites.
+## Build / install from an already reviewed checkout
 
-## Update later
-```bash
-cd ~/buddy-bot-room
-bash packaging/install.sh
-```
-That one command fetches the newest code from GitHub, rebuilds, and reinstalls.
-The app's own update popup runs exactly this. To only fetch code (no rebuild):
-`bash packaging/pull.sh`. If your own edits are in the way, the script says so —
-keep them with `git stash`, or take GitHub's copy with
-`FORCE=1 bash packaging/pull.sh`.
+Clone the repository using your normal authenticated GitHub workflow. Review the
+**exact commit** you intend to build. From the checked-out repository root:
 
+    bash packaging/install.sh
 
-## Or as a pacman package
-```bash
-cd packaging/arch
-makepkg -si
-```
-Builds from your local copy (no GitHub login). Remove with `sudo pacman -R pixelpals`.
+This installer builds what is already on disk. It **does not fetch updates**.
+It may install missing system build dependencies and the resulting local binary;
+review the script before running it. To avoid changing an installed binary, use
+a normal local Tauri build command instead.
 
-## AppImage
-After building: `src-tauri/target/release/bundle/appimage/`
+## Updates — manual review required
+
+The old packaging/pull.sh path is disabled, including FORCE mode. The in-app
+git-pull-and-build action no longer exists. For a future update, obtain the
+candidate revision with git manually, inspect its changes and security checks,
+record the exact approved SHA, check out that revision, and only then build it.
+**There is no signed automatic release/update channel.** Do not treat an
+unverified branch tip as a trusted update.
 
 ## Ollama
-```bash
-ollama pull qwen2.5:7b
-OLLAMA_ORIGINS="*" ollama serve
-```
-Run these separately, then pick "Local Server / Ollama" in the AI engine settings.
+
+The desktop shell does not start or manage Ollama. Existing web/server-side
+Ollama connections are unaffected by this native wrapper change. When an
+explicit browser-to-Ollama CORS allowance is required, grant only the origins
+you actually use. Example for a localhost-only web app:
+
+    OLLAMA_ORIGINS="http://localhost:8090,http://127.0.0.1:8090" ollama serve
+
+Do not use a wildcard origin. Avoid exposing the Ollama port to untrusted
+interfaces. See docs/security/desktop-wrapper-hardening.md for compatibility
+notes, verification steps and remaining limitations.

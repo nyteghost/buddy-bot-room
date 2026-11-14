@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Pixel Pals installer for Arch / CachyOS. Works from any shell (fish, zsh, bash):
-#   bash packaging/install.sh
+# Pixel Pals installer for Arch / CachyOS. Builds only the checkout already
+# present on disk. No automatic fetch, pull or remote execution is performed.
+# Run explicitly from any shell: bash packaging/install.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Grab the newest code from GitHub first, so this script is the only command
-# needed to update. Set SKIP_PULL=1 to build exactly what is on disk.
-if [ "${SKIP_PULL:-0}" != "1" ]; then
-  bash "$(dirname "$0")/pull.sh"
-fi
+echo "==> Building the currently checked-out Pixel Pals source only."
+echo "==> Review and pin any source changes yourself before running this installer."
 
 need() { command -v "$1" >/dev/null 2>&1; }
 missing=()
@@ -38,7 +36,7 @@ for f in os.listdir(d):
 PY
 
 echo "==> Building (first build takes a few minutes)"
-bun install
+bun install --frozen-lockfile
 bunx tauri build --bundles deb,appimage
 
 echo "==> Installing"
@@ -53,6 +51,6 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 ver="1.0.$(git rev-list --count HEAD 2>/dev/null || echo 0)"
 commit="$(git rev-parse --short HEAD 2>/dev/null || echo local)"
-echo "==> Done. Installed Pixel Pals v${ver} (${commit})."
+echo "==> Done. Installed secure Pixel Pals shell v${ver} (${commit})."
 echo "    Launch 'Pixel Pals' from your app menu or desktop, or run: pixelpals"
-echo "    To pin it: open your app menu, right-click Pixel Pals, Add to Favorites."
+echo "    The full web app remains accessible from your normal browser."
