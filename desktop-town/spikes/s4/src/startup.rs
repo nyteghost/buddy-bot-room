@@ -124,14 +124,11 @@ pub fn first_frame(port: &mut dyn OverlayPort, policy: RetryPolicy, show: bool) 
             }
         }
     }
-    fail_closed(
-        port,
-        attempts,
-        format!(
-            "no frame presented after {attempts} attempt(s) in {:?} (last: {last})",
-            port.elapsed()
-        ),
-    )
+    let reason = format!(
+        "no frame presented after {attempts} attempt(s) in {:?} (last: {last})",
+        port.elapsed()
+    );
+    fail_closed(port, attempts, reason)
 }
 
 /// Runtime re-show (e.g. after a fullscreen app closes): one non-blocking
