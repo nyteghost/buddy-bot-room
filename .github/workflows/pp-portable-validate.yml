@@ -1,0 +1,47 @@
+name: PP Windows Portable Validation (manual isolated CI only)
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: "Existing S4 workflow run ID (leave 0 to skip explicitly)"
+        required: false
+        default: "0"
+      artifact_name:
+        description: "Exact PixelPals-Portable-<sha> artifact name"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: No artifact specified — explicit NOT TESTED
+        if: inputs.artifact_run_id == '0' || inputs.artifact_name == ''
+        shell: pwsh
+        run: |
+          "NOT TESTED: artifact not present/specified; no executable was launched." >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/download-artifact@v4
+        if: inputs.artifact_run_id != '0' && inputs.artifact_name != ''
+        with:
+          name: ${{ inputs.artifact_name }}
+          run-id: ${{ inputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/pp-artifact
+      - name: Validate portable ZIP as ephemeral non-admin local user
+        if: inputs.artifact_run_id != '0' && inputs.artifact_name != ''
+        shell: pwsh
+        run: |
+          ./tools/guard/validate-portable.ps1 -ArtifactDir "$env:RUNNER_TEMP/pp-artifact"
+      - name: Explain hardware limitation
+        if: always()
+        shell: pwsh
+        run: |
+          "This is Windows hosted-runner validation; GPU/display/fullscreen and owner-device acceptance remain NOT TESTED." >> $env:GITHUB_STEP_SUMMARY

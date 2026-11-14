@@ -1,0 +1,71 @@
+name: PP Relay Claim Verification (read-only, no AI)
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  verify-relay:
+    if: github.event.issue.number == 37 && contains(github.event.comment.body, 'pixel-pals-relay:v1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: extract
+        name: Parse bounded relay fields without shell interpolation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          data = json.load(open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8"))
+          body = data.get("comment", {}).get("body", "")
+          def field(name):
+              match = re.search(r"(?im)^" + name + r"\s*:\s*([^\r\n]+)", body)
+              return match.group(1).strip().strip(chr(96)) if match else ""
+          agent, branch = field("From"), field("Branch")
+          sha = ""
+          for label in ("Commit", "Exact commit", "Exact SHA"):
+              token = field(label)
+              if re.fullmatch(r"[a-f0-9]{40}", token):
+                  sha = token
+                  break
+          good = (bool(re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", agent))
+                  and bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,199}", branch))
+                  and ".." not in branch.split("/")
+                  and bool(sha))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"valid={'true' if good else 'false'}\n")
+              if good:
+                  out.write(f"agent={agent}\nbranch={branch}\nsha={sha}\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("## Pixel Pals relay verification\n")
+              if not good:
+                  out.write("**UNVERIFIED:** v1 envelope lacks canonical From/Branch/40-character Commit fields.\n")
+          PY
+      - name: Check if verified core tooling exists on default branch
+        id: core
+        shell: bash
+        run: |
+          if [ -f tools/core/verify-claim ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '**UNVERIFIED:** tools/core/verify-claim is not present on default branch.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Verify claim using the trusted default-branch script
+        if: steps.extract.outputs.valid == 'true' && steps.core.outputs.present == 'true'
+        shell: bash
+        env:
+          PP_AGENT: ${{ steps.extract.outputs.agent }}
+          PP_BRANCH: ${{ steps.extract.outputs.branch }}
+          PP_SHA: ${{ steps.extract.outputs.sha }}
+        run: |
+          python3 tools/core/verify-claim --branch "$PP_BRANCH" --sha "$PP_SHA" --agent "$PP_AGENT" --json
+      - name: Non-automated status
+        if: steps.extract.outputs.valid != 'true' || steps.core.outputs.present != 'true'
+        run: echo 'No verified claim; workflow made no GitHub changes.' >> "$GITHUB_STEP_SUMMARY"
