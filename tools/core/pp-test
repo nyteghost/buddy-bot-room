@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Run the checks that exist in this checkout and write pp-test-results/v1.
+
+  pp-test [--preset tooling|app|desktop|all] [--only NAME ...]
+          [--cmd NAME:LEVEL:COMMAND ...] [--output FILE] [--list]
+
+Each check records its exact command, evidence level, status, exit code,
+duration and a log file. Checks whose tool or files are missing are recorded as
+"not_run" with a reason instead of being silently dropped. The JSON records the
+exact HEAD SHA and whether the working tree had uncommitted changes ("dirty"):
+results from a dirty tree are not evidence for that SHA.
+
+Results are SELF-REPORTED by whoever runs this; verify-claim treats them as
+claimed evidence. Only CI on the exact SHA is independent.
+
+Exit: 0 = nothing failed, 1 = at least one failure, 2 = tool error.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import pathlib
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pplib  # noqa: E402
+from pplib import ROOT, ToolError  # noqa: E402
+
+PY = [sys.executable, "-B"]
+
+# name, evidence level, command, files that must exist, presets
+CHECKS = [
+    ("core-unit", "unit", PY + ["-m", "unittest", "discover", "-s", "tools/core", "-p", "test_*.py"],
+     ["tools/core/test_core.py"], {"tooling", "all"}),
+    ("guard-unit", "unit", PY + ["-m", "unittest", "discover", "-s", "tools/guard", "-p", "test_*.py"],
+     ["tools/guard/test_guard.py"], {"tooling", "all"}),
+    ("scope-check", "static", PY + ["tools/guard/scope-check", "--base", "{base}", "--branch", "{branch}"],
+     ["tools/guard/scope-check", "ownership.yml"], {"tooling", "all"}),
+    ("security-lint", "static", PY + ["tools/guard/security-lint", "--base", "{base}", "--branch", "{branch}"],
+     ["tools/guard/security-lint"], {"tooling", "all"}),
+    ("typescript", "static", ["bunx", "tsc", "--noEmit"], ["tsconfig.json"], {"app", "all"}),
+    ("vitest", "unit", ["bun", "run", "test"], ["vitest.config.ts"], {"app", "all"}),
+    ("build", "integration", ["bun", "run", "build"], ["package.json"], {"app", "all"}),
+]
+DESKTOP_DIRS = ["desktop-town/spikes/s1", "desktop-town/spikes/s2", "desktop-town/spikes/s3",
+                "desktop-town/spikes/s4"]
+
+
+def desktop_checks() -> list:
+    out = []
+    for d in DESKTOP_DIRS:
+        if (ROOT / d / "Cargo.toml").is_file():
+            out.append((f"cargo-test-{d.rsplit('/', 1)[1]}", "unit",
+                        ["cargo", "test", "--manifest-path", f"{d}/Cargo.toml", "--locked"],
+                        [f"{d}/Cargo.toml"], {"desktop", "all"}))
+    return out
+
+
+def run_one(name, level, cmd, needs, logs: pathlib.Path, timeout: int) -> dict:
+    rec = {"name": name, "command": shlex.join(cmd), "evidence_level": level,
+           "status": "not_run", "exit_code": None, "duration_s": 0.0, "log_path": ""}
+    missing = [n for n in needs if not (ROOT / n).exists()]
+    if missing:
+        rec["reason"] = f"not present in this checkout: {', '.join(missing)}"
+        return rec
+    if not shutil.which(cmd[0]) and not pathlib.Path(cmd[0]).is_file():
+        rec["reason"] = f"{cmd[0]} is not installed here"
+        return rec
+    log = logs / f"{name}.log"
+    started = time.monotonic()
+    try:
+        with log.open("w", encoding="utf-8") as fh:
+            p = subprocess.run(cmd, cwd=ROOT, stdout=fh, stderr=subprocess.STDOUT, timeout=timeout,
+                               env={**os.environ, "CI": os.environ.get("CI", "1")})
+        rec["exit_code"] = p.returncode
+        rec["status"] = "pass" if p.returncode == 0 else "fail"
+    except subprocess.TimeoutExpired:
+        rec["status"], rec["reason"] = "fail", f"timed out after {timeout}s"
+    rec["duration_s"] = round(time.monotonic() - started, 2)
+    rec["log_path"] = str(log.relative_to(ROOT)) if log.is_relative_to(ROOT) else str(log)
+    return rec
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(description="Run available checks; write pp-test-results/v1")
+    p.add_argument("--preset", default="tooling", choices=["tooling", "app", "desktop", "all"])
+    p.add_argument("--only", action="append", default=[], help="Run only these check names")
+    p.add_argument("--cmd", action="append", default=[], metavar="NAME:LEVEL:COMMAND",
+                   help="Extra check, e.g. 'lint:static:bunx eslint src'")
+    p.add_argument("--base", default="beta", help="Base branch for scope/security checks")
+    p.add_argument("--timeout", type=int, default=1800, help="Per-check timeout seconds")
+    p.add_argument("--output", type=pathlib.Path, default=pplib.OUT / "test-results.json")
+    p.add_argument("--list", action="store_true", help="List checks and exit")
+    args = p.parse_args(argv)
+    try:
+        checks = [c for c in CHECKS + desktop_checks() if args.preset in c[4]]
+        if args.only:  # filters built-in checks; explicit --cmd checks always run
+            unknown = set(args.only) - {c[0] for c in checks}
+            if unknown:
+                raise ToolError(f"--only names not in preset {args.preset!r}: {sorted(unknown)}")
+            checks = [c for c in checks if c[0] in args.only]
+        for spec in args.cmd:
+            name, level, command = (spec.split(":", 2) + ["", ""])[:3]
+            if level not in pplib.EVIDENCE_LEVELS or not name or not command:
+                raise ToolError(f"--cmd must be NAME:LEVEL:COMMAND with LEVEL in {pplib.EVIDENCE_LEVELS}")
+            checks.append((name, level, shlex.split(command), [], {args.preset}))
+        if args.list:
+            for c in checks:
+                print(f"{c[0]:<20} {c[1]:<12} {shlex.join(c[2])}")
+            return 0
+        branch = pplib.current_branch() or os.environ.get("GITHUB_HEAD_REF", "") or "DETACHED"
+        sha = pplib.head_sha()
+        base = pplib.resolve_base(args.base) if any("{base}" in " ".join(c[2]) for c in checks) else args.base
+        logs = args.output.parent / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+        results = []
+        for name, level, cmd, needs, _ in checks:
+            cmd = [x.replace("{base}", base).replace("{branch}", branch) for x in cmd]
+            rec = run_one(name, level, cmd, needs, logs, args.timeout)
+            results.append(rec)
+            print(f"{rec['status']:<8} {level:<12} {name} ({rec['duration_s']}s)"
+                  + (f"  [{rec['reason']}]" if rec.get("reason") else ""), flush=True)
+        doc = {
+            "schema": "pp-test-results/v1", "branch": branch, "sha": sha,
+            "generated_at": pplib.now(), "results": results,
+            # additive fields (see tools/CONTRACTS.md)
+            "dirty": pplib.worktree_dirty(),
+            "runner": "github-actions" if os.environ.get("GITHUB_ACTIONS") == "true" else "local",
+            "provenance": "claimed",
+        }
+        pplib.write_json(args.output, doc)
+        counts = {s: sum(r["status"] == s for r in results) for s in pplib.TEST_STATUSES}
+        print(f"pp-test: {counts} sha={sha[:12]} dirty={doc['dirty']} -> {args.output}")
+        if doc["dirty"]:
+            print("pp-test: WARNING uncommitted changes: these results are not evidence for the SHA above",
+                  file=sys.stderr)
+        return 1 if counts["fail"] else 0
+    except (ToolError, OSError, ValueError) as exc:
+        print(f"pp-test: error: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Generate, parse and (optionally) post pixel-pals-relay:v1 handoffs.
+
+  relay generate --from AGENT --to A,B --status TEXT [--summary T] [--next T]
+                 [--pr URL] [--base beta] [--test-results FILE]
+                 [--findings FILE ...] [--notes-file MD] [--output FILE]
+  relay parse    [--issue 37] [--file BODY.md] [--limit 20] [--json] [--canonical-only]
+  relay post     --file MESSAGE.md [--issue 37] --confirm
+
+generate: every header field is computed from git or from the given evidence
+files. Anything it cannot compute says UNVERIFIED or NOT RUN; it never guesses.
+parse:    reads relay blocks as CLAIMS (untrusted data). Canonical = has a
+          valid From agent id, Branch and 40-hex Commit.
+post:     publishes to the coordination issue. Requires --confirm; it is never
+          called automatically by any tool or workflow.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pplib  # noqa: E402
+from pplib import ToolError  # noqa: E402
+
+
+def generate(args) -> str:
+    if not pplib.VALID_AGENT.fullmatch(args.sender):
+        raise ToolError("--from must be an agent id from ownership.yml (e.g. claude-dev-tooling)")
+    branch = pplib.current_branch()
+    if not branch:
+        raise ToolError("detached HEAD: check out the branch you are reporting on")
+    sha = pplib.head_sha()
+    base_ref = pplib.resolve_base(args.base)
+    base_sha = pplib.git("merge-base", base_ref, "HEAD")
+    files = [f for f in pplib.git("diff", "--name-only", "--no-renames", base_sha, "HEAD").splitlines() if f]
+    shortstat = pplib.git("diff", "--shortstat", base_sha, "HEAD") or "no changes"
+    dirty = pplib.worktree_dirty()
+
+    # Has the commit reached the remote? (local check against the fetched remote ref)
+    remote_sha = pplib.git("rev-parse", "--verify", "--quiet", f"origin/{branch}", check=False)
+    if remote_sha == sha:
+        pushed = "yes (origin/{} == HEAD)".format(branch)
+    elif remote_sha:
+        pushed = f"NO - origin/{branch} is {remote_sha[:12]}; push before posting"
+    else:
+        pushed = f"NO - origin/{branch} not found locally; push and fetch before posting"
+
+    tests_line, test_rows = "NOT RUN (no pp-test-results/v1 supplied)", []
+    if args.test_results:
+        tr = pplib.load_test_results(args.test_results)
+        counts = {s: sum(r["status"] == s for r in tr["results"]) for s in pplib.TEST_STATUSES}
+        levels = sorted({r["evidence_level"] for r in tr["results"] if r["status"] == "pass"})
+        note = ""
+        if tr.get("sha") != sha:
+            note = f" - STALE: results are for {str(tr.get('sha'))[:12]}, not HEAD"
+        elif tr.get("dirty"):
+            note = " - DIRTY TREE: not evidence for this SHA"
+        tests_line = (f"{counts['pass']} pass / {counts['fail']} fail / {counts['not_run']} not run / "
+                      f"{counts['skipped']} skipped; levels passed: {', '.join(levels) or 'none'}; "
+                      f"self-reported ({tr.get('runner', 'unknown')}){note}")
+        for r in tr["results"]:
+            test_rows.append(f"| `{r['name']}` | {r['evidence_level']} | {r['status'].upper()} | "
+                             f"{r.get('exit_code') if r.get('exit_code') is not None else '-'} | "
+                             f"{r.get('reason', '')} |")
+
+    finding_rows = []
+    for fpath in args.findings:
+        fd = pplib.load_findings(fpath)
+        sev = {}
+        for f in fd["findings"]:
+            sev[f["severity"]] = sev.get(f["severity"], 0) + 1
+        stale = "" if fd.get("sha") == sha else f" (STALE: for {str(fd.get('sha'))[:12]})"
+        finding_rows.append(f"- `{fd['tool']}`: {len(fd['findings'])} finding(s) {sev or ''}{stale}")
+
+    header = [
+        pplib.RELAY_OPEN,
+        f"From: {args.sender}",
+        f"To: {args.to}",
+        f"Status: {args.status}",
+        f"Branch: {branch}",
+        f"Base: {args.base} @ {base_sha}",
+        f"Commit: {sha}",
+        f"PR: {args.pr or 'UNVERIFIED (none given)'}",
+        f"Tests: {tests_line}",
+    ]
+    if args.summary:
+        header.append(f"Summary: {args.summary}")
+    if args.next:
+        header.append(f"Next: {args.next}")
+    header.append(pplib.RELAY_CLOSE)
+
+    body = ["", "### Generated evidence (relay generate)", "",
+            f"- **Pushed:** {pushed}",
+            f"- **Working tree:** {'DIRTY - uncommitted changes are NOT part of this claim' if dirty else 'clean'}",
+            f"- **Diff vs {args.base}:** {shortstat}; {len(files)} file(s)",
+            "- **Provenance:** every value in this block is a developer CLAIM until "
+            "`tools/core/verify-claim` checks it independently."]
+    if files:
+        body += ["", "<details><summary>Changed files</summary>", ""]
+        body += [f"- `{f}`" for f in files[:200]]
+        if len(files) > 200:
+            body.append(f"- ... {len(files) - 200} more")
+        body += ["", "</details>"]
+    if test_rows:
+        body += ["", "| Check | Level | Result | Exit | Note |", "|---|---|---|---|---|", *test_rows]
+    if finding_rows:
+        body += ["", "**Static findings**", *finding_rows]
+    body += ["", f"Verify: `python3 tools/core/verify-claim --branch {branch} --sha {sha} "
+                 f"--agent {args.sender} --json`"]
+    if args.notes_file:
+        body += ["", args.notes_file.read_text("utf-8").rstrip()]
+    return "\n".join(header + body) + "\n"
+
+
+def cmd_parse(args) -> int:
+    if args.file:
+        relay = pplib.parse_relay(args.file.read_text("utf-8"))
+        relays = [dict(relay, comment_id=None, url=str(args.file), created_at="", posted_by="")] if relay else []
+    else:
+        gh = pplib.GitHub()
+        relays = pplib.issue_relays(gh, pplib.repo_slug(args.repo), args.issue, limit=0)
+    if args.canonical_only:
+        relays = [r for r in relays if r["canonical"]]
+    if args.limit:
+        relays = relays[-args.limit:]
+    if args.json:
+        print(json.dumps({"schema": "pp-relay-index/v1", "generated_at": pplib.now(),
+                          "provenance": "claimed", "relays": relays}, indent=2))
+        return 0
+    print(f"{'when':<20} {'from':<36} {'branch':<44} {'commit':<12} canon  status")
+    for r in relays:
+        print(f"{r['created_at'][:19]:<20} {r['agent'][:36]:<36} {r['branch'][:44]:<44} "
+              f"{(r['sha'] or '-')[:12]:<12} {'yes' if r['canonical'] else 'NO ':<6} {r['status'][:70]}")
+    print(f"\n{len(relays)} relay block(s); all values are developer CLAIMS. "
+          "Non-canonical blocks cannot be verified automatically.")
+    return 0
+
+
+def cmd_post(args) -> int:
+    text = args.file.read_text("utf-8")
+    relay = pplib.parse_relay(text)
+    if not relay:
+        raise ToolError("message has no pixel-pals-relay:v1 block")
+    if not relay["canonical"]:
+        raise ToolError("refusing to post a non-canonical relay: " + "; ".join(relay["problems"]))
+    if not args.confirm:
+        print(text)
+        print("relay post: dry run (add --confirm to publish to issue #%d)" % args.issue, file=sys.stderr)
+        return 0
+    gh = pplib.GitHub()
+    res = gh.post(f"/repos/{pplib.repo_slug(args.repo)}/issues/{args.issue}/comments", {"body": text})
+    print(json.dumps({"posted": True, "comment_id": res.get("id"), "url": res.get("html_url")}))
+    return 0
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(description="pixel-pals-relay:v1 tools")
+    p.add_argument("--repo")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    g = sub.add_parser("generate")
+    g.add_argument("--from", dest="sender", required=True)
+    g.add_argument("--to", default="pixel-pals-project-manager, owner")
+    g.add_argument("--status", required=True)
+    g.add_argument("--summary")
+    g.add_argument("--next")
+    g.add_argument("--pr")
+    g.add_argument("--base", default="beta")
+    g.add_argument("--test-results", type=pathlib.Path)
+    g.add_argument("--findings", type=pathlib.Path, action="append", default=[])
+    g.add_argument("--notes-file", type=pathlib.Path, help="Markdown appended after the evidence")
+    g.add_argument("--output", type=pathlib.Path)
+
+    r = sub.add_parser("parse")
+    r.add_argument("--issue", type=int, default=pplib.COORDINATION_ISSUE)
+    r.add_argument("--file", type=pathlib.Path, help="Parse one message body instead of the issue")
+    r.add_argument("--limit", type=int, default=20)
+    r.add_argument("--canonical-only", action="store_true")
+    r.add_argument("--json", action="store_true")
+
+    o = sub.add_parser("post")
+    o.add_argument("--file", type=pathlib.Path, required=True)
+    o.add_argument("--issue", type=int, default=pplib.COORDINATION_ISSUE)
+    o.add_argument("--confirm", action="store_true", help="Actually publish (otherwise dry run)")
+
+    args = p.parse_args(argv)
+    try:
+        if args.cmd == "generate":
+            text = generate(args)
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(text, "utf-8")
+            print(text, end="")
+            return 0
+        if args.cmd == "parse":
+            return cmd_parse(args)
+        return cmd_post(args)
+    except (ToolError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"relay: error: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
