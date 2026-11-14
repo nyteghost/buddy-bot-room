@@ -26,10 +26,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Linux Tauri development dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf libgtk-3-dev
       - name: Resolve initial lockfiles for F2 review (bootstrap only)
         run: |
           set -eu
@@ -38,10 +34,14 @@ jobs:
           for entry in package-lock.json src-tauri/Cargo.lock; do
             tag=$(echo "$entry" | tr '/.-' '___')
             echo "S2_LOCK_START_${tag}"
-            gzip -9 -c "$entry" | base64 -w 0 | fold -w 256
+            base64 -w 0 "$entry" | fold -w 256
             echo
             echo "S2_LOCK_END_${tag}"
             wc -c "$entry"
+      - name: Linux Tauri development dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf libgtk-3-dev
           done
       - name: Clean locked frontend install
         run: npm ci --no-audit --no-fund
