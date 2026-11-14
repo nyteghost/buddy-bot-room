@@ -85,13 +85,13 @@ def sha() -> str:
 
 def changed_files(base: str | None, staged: bool = False) -> list[str]:
     if staged:
-        args = ("diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z")
+        args = ("diff", "--no-renames", "--cached", "--name-only", "--diff-filter=ACMRTD", "-z")
     else:
         if not base:
             raise GuardError("pass --base (for example origin/beta) or use --staged")
         # An explicit merge base compares only this branch's changes to its base.
         merge_base = git("merge-base", base, "HEAD")
-        args = ("diff", "--name-only", "--diff-filter=ACMRT", "-z", merge_base, "HEAD")
+        args = ("diff", "--no-renames", "--name-only", "--diff-filter=ACMRTD", "-z", merge_base, "HEAD")
     p = subprocess.run(["git", *args], cwd=ROOT, capture_output=True)
     if p.returncode:
         raise GuardError(p.stderr.decode("utf-8", errors="replace")[:600])
