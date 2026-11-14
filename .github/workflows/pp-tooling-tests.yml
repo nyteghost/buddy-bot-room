@@ -1,0 +1,40 @@
+name: PP Guardrail Tests (no AI)
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - ownership.yml
+      - tools/guard/**
+      - .github/workflows/pp-*.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Offline Python unit tests
+        run: python3 -B -m unittest discover -s tools/guard -p 'test_*.py' -v
+      - name: Scope check entire branch against beta
+        if: github.event_name == 'pull_request'
+        env:
+          PP_BRANCH: ${{ github.head_ref }}
+        run: python3 -B tools/guard/scope-check --branch "$PP_BRANCH" --base origin/beta
+      - name: Security tripwires on changed files
+        if: github.event_name == 'pull_request'
+        env:
+          PP_BRANCH: ${{ github.head_ref }}
+        run: python3 -B tools/guard/security-lint --branch "$PP_BRANCH" --base origin/beta
+      - name: Summary
+        if: always()
+        run: |
+          echo 'Guardrails are static and do not replace independent adversarial QA.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No LLM calls, deployments, or repository writes were performed.' >> "$GITHUB_STEP_SUMMARY"
