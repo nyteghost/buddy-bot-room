@@ -193,6 +193,33 @@ class Session:
         self.sway.stop()
 
 
+def output_of_pid(tree: dict, pid: int, output: str | None = None) -> str | None:
+    """Name of the sway output whose subtree holds a view with this pid."""
+    if tree.get("type") == "output":
+        output = tree.get("name")
+    if tree.get("pid") == pid:
+        return output
+    for child in tree.get("nodes", []) + tree.get("floating_nodes", []):
+        found = output_of_pid(child, pid, output)
+        if found:
+            return found
+    return None
+
+
+def place(s: "Session", proc: Proc, output: str) -> bool:
+    """Deterministically move a client's window to `output` and verify it.
+
+    `focus output` before spawning is racy for placement, so every QA window
+    is moved by pid and checked against the compositor tree."""
+    pid = proc.p.pid
+    for _ in range(3):
+        s.swaymsg(f"[pid={pid}] move container to output {output}")
+        time.sleep(0.3)
+        if output_of_pid(s.swaymsg("get_tree", json_out=True), pid) == output:
+            return True
+    return False
+
+
 def pal_centres(overlay: Proc, outputs: dict[str, dict]) -> dict[str, tuple[float, float]]:
     """Latest Pal centre per connector in *layout* coordinates from S1_REGION."""
     centres = {}
@@ -272,8 +299,14 @@ def run(args) -> int:
             if not u.wait_for("S1_UNDERLAY_SIZE"):
                 s.record("setup", "FAIL", f"underlay on {name} never allocated")
                 return 1
+            if not place(s, u, name):
+                s.record("setup", "FAIL", f"underlay could not be placed on {name}")
+                return 1
             underlays.append(u)
         time.sleep(0.3)
+        tree = s.swaymsg("get_tree", json_out=True)
+        s.record("setup", "INFO", "underlay placement verified from compositor tree",
+                 placement={n: output_of_pid(tree, u.p.pid) for n, u in zip(outputs, underlays)})
         before = s.screenshot("transparency-0-before", primary)
 
         multi = len(outputs) > 1
@@ -431,6 +464,7 @@ def run(args) -> int:
             s.swaymsg(f"focus output {primary}")
             fs = s.spawn(f"underlay-fullscreen-{layer}", "--qa-underlay", "--qa-fullscreen", "--seconds", "900")
             fs.wait_for("S1_UNDERLAY_SIZE")
+            place(s, fs, primary)
             time.sleep(0.4)
             ov = s.spawn(f"overlay-fullscreen-{layer}", "--require-overlay", "--speed", "0", "--seconds", "900",
                          "--monitor", primary, "--layer", layer)

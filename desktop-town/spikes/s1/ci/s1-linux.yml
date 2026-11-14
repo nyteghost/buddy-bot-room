@@ -168,6 +168,17 @@ jobs:
           dbus-run-session -- python3 qa/wlroots_acceptance.py --label "2x mixed 100%+150%" --scale 1.0 --second-output-scale 1.5 \
             --lifecycle 3 --bin target/debug/pixel-pals-s1-kwin-overlay \
             --clicker qa/wlr-clicker/target/debug/s1-wlr-clicker --out qa/evidence/wlroots-mixed
+      - name: wlroots acceptance — mixed-DPI stability repeats (2 more runs)
+        if: ${{ !cancelled() }}
+        shell: runuser -u builder -- bash -e {0}
+        env: { HOME: /home/builder }
+        run: |
+          cd "$S1"
+          for n in 2 3; do
+            dbus-run-session -- python3 qa/wlroots_acceptance.py --label "2x mixed repeat $n" --scale 1.0 \
+              --second-output-scale 1.5 --lifecycle 3 --bin target/debug/pixel-pals-s1-kwin-overlay \
+              --clicker qa/wlr-clicker/target/debug/s1-wlr-clicker --out "qa/evidence/wlroots-mixed-$n"
+          done
       - name: Arch package (makepkg from this checkout) + namcap
         if: ${{ !cancelled() }}
         shell: runuser -u builder -- bash -e {0}
