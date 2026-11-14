@@ -1,0 +1,5 @@
+# Pinned compiler for reproducible S4 builds (CI and authorized Windows builders).
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

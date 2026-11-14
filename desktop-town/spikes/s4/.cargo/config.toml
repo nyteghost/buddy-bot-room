@@ -1,0 +1,4 @@
+# Static VC runtime: a portable ZIP must not require installing VC++ redistributables.
+# GPU/OS driver and shader compiler dependencies remain Windows acceptance gates.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

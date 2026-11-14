@@ -1,0 +1,6 @@
+/target/
+/dist/
+/Data/
+*.csv
+*.log
+/evidence/
