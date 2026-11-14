@@ -1,0 +1,18 @@
+[package]
+name = "pixel-pals-desktop-s2"
+version = "0.0.2"
+edition = "2021"
+description = "Isolated Pixel Pals Canvas 2D performance spike"
+
+[lib]
+name = "pixel_pals_s2"
+path = "src/lib.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[dev-dependencies]
+serde_json = "1"

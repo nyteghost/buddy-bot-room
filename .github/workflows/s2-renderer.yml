@@ -1,0 +1,54 @@
+name: S2 Canvas Renderer — isolated Linux build
+on:
+  pull_request:
+    paths:
+      - 'desktop-town/spikes/s2/**'
+      - '.github/workflows/s2-renderer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  s2:
+    name: S2 Linux Tauri / Canvas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: desktop-town/spikes/s2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop-town/spikes/s2/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Linux Tauri development dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf libgtk-3-dev
+      - name: Clean locked frontend install
+        run: npm ci --no-audit --no-fund
+      - name: TypeScript typecheck
+        run: npm run typecheck
+      - name: Vitest
+        run: npm test
+      - name: Vite production build
+        run: npm run build
+      - name: Offline deterministic regressions
+        run: npm run test:offline && python3 -B scripts/test_measure_linux.py
+      - name: Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+      - name: Rust check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+      - name: Rust Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Tauri app build without installers
+        run: npm run tauri:build
