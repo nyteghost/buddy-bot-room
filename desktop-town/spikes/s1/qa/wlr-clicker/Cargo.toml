@@ -1,0 +1,15 @@
+[package]
+name = "s1-wlr-clicker"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "MIT"
+description = "QA-only: synthesise pointer clicks on a wlroots compositor via zwlr_virtual_pointer_v1"
+
+# Standalone crate: not a dependency of the overlay and never packaged.
+[workspace]
+
+[dependencies]
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
