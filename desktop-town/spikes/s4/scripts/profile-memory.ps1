@@ -57,9 +57,9 @@ while (-not $proc.HasExited -and $watch.Elapsed.TotalSeconds -lt $Seconds) {
   $cpu = $proc.TotalProcessorTime.TotalSeconds
   $cpuPct = if ($null -ne $lastCpu -and $wall -gt $lastWall) { [Math]::Round(100.0 * ($cpu - $lastCpu) / ($wall - $lastWall), 2) } else { $null }
   $lastCpu = $cpu; $lastWall = $wall
-  $perf = Get-PerfRow 'Win32_PerfFormattedData_PerfProc_Process' "IDProcess=$procId"
-  $gpuMem = Get-PerfRow 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory' "Name LIKE 'pid_$($procId)_%'"
-  $gpuEng = Get-PerfRow 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine' "Name LIKE 'pid_$($procId)_%engtype_3D'"
+  $perf = @(Get-PerfRow 'Win32_PerfFormattedData_PerfProc_Process' "IDProcess=$procId")
+  $gpuMem = @(Get-PerfRow 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory' "Name LIKE 'pid_$($procId)_%'")
+  $gpuEng = @(Get-PerfRow 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine' "Name LIKE 'pid_$($procId)_%engtype_3D'")
   $rows.Add([pscustomobject]@{
       t_s                  = [Math]::Round($wall, 1)
       private_bytes_mib    = [Math]::Round($proc.PrivateMemorySize64 / 1MB, 2)
@@ -78,7 +78,8 @@ $rows | Export-Csv -LiteralPath $CsvPath -NoTypeInformation -Encoding utf8
 function Stat([string]$Column) {
   $values = @($rows | Where-Object { $null -ne $_.$Column } | ForEach-Object { [double]$_.$Column })
   if (-not $values.Count) { return $null }
-  $sorted = $values | Sort-Object
+  # @() everywhere: PowerShell unrolls single-element arrays.
+  $sorted = @($values | Sort-Object)
   return [ordered]@{
     first = $values[0]; last = $values[-1]; min = $sorted[0]; max = $sorted[-1]
     median = $sorted[[int][Math]::Floor(($sorted.Count - 1) / 2)]
