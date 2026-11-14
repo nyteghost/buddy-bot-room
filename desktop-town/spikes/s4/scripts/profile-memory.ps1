@@ -16,7 +16,7 @@
 #
 # Usage (from the extracted PixelPals-Portable folder):
 #   # Launch and profile a 10-minute walking soak, CSV + summary in Data\:
-#   .\QA\profile-memory.ps1 -Exe .\PixelPals.exe -Arguments '--smoke-test-ms=600000','--qa-walk' -Seconds 610
+#   .\QA\profile-memory.ps1 -Exe .\PixelPals.exe -Arguments '--smoke-test-ms=600000','--qa-walk' -Seconds 610 -WarmupSeconds 10
 #   # Attach to an already running, interactively used PixelPals.exe for 30 min:
 #   .\QA\profile-memory.ps1 -AttachName PixelPals -Seconds 1800
 # If the script is blocked as "downloaded from the internet", run
@@ -28,6 +28,9 @@ param(
   [Parameter(ParameterSetName = 'Attach', Mandatory = $true)][string]$AttachName,
   [int]$Seconds = 60,
   [int]$IntervalMs = 1000,
+  # Samples taken before this many seconds stay in the CSV but are excluded
+  # from the summary statistics (start-up is not steady state).
+  [double]$WarmupSeconds = 0,
   [string]$CsvPath = '',
   [string]$SummaryPath = ''
 )
@@ -81,7 +84,7 @@ if ($PSCmdlet.ParameterSetName -eq 'Launch' -and -not $proc.HasExited) { $null =
 $rows | Export-Csv -LiteralPath $CsvPath -NoTypeInformation -Encoding utf8
 
 function Stat([string]$Column) {
-  $values = @($rows | Where-Object { $null -ne $_.$Column } | ForEach-Object { [double]$_.$Column })
+  $values = @($rows | Where-Object { $_.t_s -ge $WarmupSeconds -and $null -ne $_.$Column } | ForEach-Object { [double]$_.$Column })
   if (-not $values.Count) { return $null }
   # @() everywhere: PowerShell unrolls single-element arrays.
   $sorted = @($values | Sort-Object)
@@ -95,6 +98,8 @@ $summary = [ordered]@{
   note             = 'Process-scoped samples; CPU is % of ONE logical core; GPU memory from GPU Process Memory counters. Null = counter unavailable.'
   pid              = $procId
   samples          = $rows.Count
+  warmup_seconds   = $WarmupSeconds
+  steady_samples   = @($rows | Where-Object { $_.t_s -ge $WarmupSeconds }).Count
   interval_ms      = $IntervalMs
   process_exited   = $proc.HasExited
   exit_code        = $(if ($proc.HasExited) { $proc.ExitCode } else { $null })

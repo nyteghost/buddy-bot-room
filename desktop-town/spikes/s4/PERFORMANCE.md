@@ -79,7 +79,7 @@ copy .\Data\s4-memory.json .\Data\s4-memory-performance.json
 .\QA\profile-memory.ps1 -Exe .\PixelPals.exe -Arguments '--smoke-test-ms=60000' -Seconds 65 -SummaryPath .\Data\ab-memory.json
 copy .\Data\s4-memory.json .\Data\s4-memory-memoryusage.json
 # Walking soak, 10 minutes:
-.\QA\profile-memory.ps1 -Exe .\PixelPals.exe -Arguments '--smoke-test-ms=600000','--qa-walk' -Seconds 610 -SummaryPath .\Data\soak.json
+.\QA\profile-memory.ps1 -Exe .\PixelPals.exe -Arguments '--smoke-test-ms=600000','--qa-walk' -Seconds 610 -WarmupSeconds 10 -SummaryPath .\Data\soak.json
 # Normal interactive use, attach for 30 minutes:
 .\QA\profile-memory.ps1 -AttachName PixelPals -Seconds 1800 -SummaryPath .\Data\interactive.json
 ```
