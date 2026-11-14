@@ -42,6 +42,58 @@ function Invoke-Pals([string[]]$Arguments, [int]$TimeoutMs = 120000) {
   return $p.ExitCode
 }
 
+# External observer: watches the overlay HWND from another process while the
+# executable runs, sampling visibility and window-region type every ~5 ms.
+# Region types: 0 = no region (whole window), 1 = empty, 2/3 = Pal silhouette.
+Add-Type -Namespace S4Qa -Name Win32 -MemberDefinition @'
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+[System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public static extern System.IntPtr FindWindowW(string className, string title);
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern bool IsWindowVisible(System.IntPtr hwnd);
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+public static extern int GetWindowRgnBox(System.IntPtr hwnd, out RECT rect);
+'@
+$OverlayTitle = 'Pixel Pals S4 prototype'
+
+function Invoke-PalsWatched([string[]]$Arguments, [int]$TimeoutMs = 120000) {
+  $p = Start-Process -FilePath $exe -ArgumentList $Arguments -WorkingDirectory $folder -PassThru `
+    -RedirectStandardError (Join-Path $env:TEMP 'pals-stderr.txt') `
+    -RedirectStandardOutput (Join-Path $env:TEMP 'pals-stdout.txt')
+  $null = $p.Handle
+  $watch = [System.Diagnostics.Stopwatch]::StartNew()
+  $found = $false; $everVisible = $false; $palRegion = $false; $unsafe = 0; $samples = 0
+  while (-not $p.HasExited) {
+    if ($watch.ElapsedMilliseconds -gt $TimeoutMs) { $p.Kill(); throw "PixelPals.exe $Arguments did not exit within $TimeoutMs ms" }
+    $hwnd = [S4Qa.Win32]::FindWindowW($null, $OverlayTitle)
+    if ($hwnd -ne [System.IntPtr]::Zero) {
+      $found = $true; $samples++
+      $rect = New-Object S4Qa.Win32+RECT
+      $type = [S4Qa.Win32]::GetWindowRgnBox($hwnd, [ref]$rect)
+      $visible = [S4Qa.Win32]::IsWindowVisible($hwnd)
+      if ($type -ge 2) { $palRegion = $true }
+      if ($visible) {
+        $everVisible = $true
+        # A visible overlay must always carry the Pal-shaped region.
+        if ($type -lt 2) { $unsafe++ }
+      }
+    }
+    Start-Sleep -Milliseconds 5
+  }
+  $p.WaitForExit()
+  return [pscustomobject]@{
+    ExitCode = $p.ExitCode; WindowSeen = $found; EverVisible = $everVisible
+    PalRegionSeen = $palRegion; VisibleWithoutPalRegion = $unsafe; Samples = $samples
+  }
+}
+
+function Read-Smoke {
+  $smoke = Join-Path $data 's4-smoke.json'
+  if (Test-Path -LiteralPath $smoke) { return Get-Content -LiteralPath $smoke -Raw | ConvertFrom-Json }
+  return $null
+}
+
 function Write-Settings([int]$Clicks) {
   $json = @{ version = 1; pal_x = 123; pal_y = 150; pal_clicks = $Clicks; animate = $false } | ConvertTo-Json -Compress
   [System.IO.File]::WriteAllText($settings, $json)
@@ -146,7 +198,35 @@ try {
     $code = Invoke-Pals @("--smoke-test-ms=$SmokeMs", '--smoke-click')
     Assert-True ($before -eq $after -and $code -eq 0 -and (Get-Clicks) -eq 10) 'data-survives-exe-replacement' "exit=$code pal_clicks=$(Get-Clicks) (expected 10)"
 
-    # 6. Corrupt settings fail closed and are not overwritten ---------------
+    # 6. F5 first-frame safety on the real executable (QA fault injection) --
+    #    Never-presenting surfaces must fail closed with exit 4 and the overlay
+    #    must never become visible or receive a Pal input region.
+    foreach ($kind in @('timeout', 'lost', 'outdated', 'fatal')) {
+      $spec = if ($kind -eq 'fatal') { 'fatal:1' } else { "${kind}:never" }
+      $before = (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
+      Remove-Item -LiteralPath (Join-Path $data 's4-smoke.json') -ErrorAction SilentlyContinue
+      $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs", "--qa-fault-first-frame=$spec")
+      $report = Read-Smoke
+      $after = (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
+      Assert-True ($r.ExitCode -eq 4 -and -not $r.EverVisible -and -not $r.PalRegionSeen -and $report -and $report.result -eq 'FAIL_CLOSED_FIRST_FRAME' -and $before -eq $after) `
+        "first-frame-$kind-fails-closed" ("exit=$($r.ExitCode) window_seen=$($r.WindowSeen) samples=$($r.Samples) ever_visible=$($r.EverVisible) pal_region=$($r.PalRegionSeen) attempts=$(if ($report) { $report.startup_attempts } else { 'n/a' }) settings_unchanged=$($before -eq $after)")
+    }
+    #    Transient skips recover: shown only after a real present, always with
+    #    the Pal region, never visible with an empty/full-window region.
+    foreach ($kind in @('timeout', 'lost', 'outdated')) {
+      Remove-Item -LiteralPath (Join-Path $data 's4-smoke.json') -ErrorAction SilentlyContinue
+      $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs", "--qa-fault-first-frame=${kind}:3")
+      $report = Read-Smoke
+      Assert-True ($r.ExitCode -eq 0 -and $report -and $report.result -eq 'PASS' -and $report.startup_attempts -eq 4 -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
+        "first-frame-$kind-recovers" ("exit=$($r.ExitCode) attempts=$(if ($report) { $report.startup_attempts } else { 'n/a' }) frames=$(if ($report) { $report.frames_presented } else { 'n/a' }) ever_visible=$($r.EverVisible) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)")
+    }
+    #    Unfaulted launch observed externally obeys the same invariant.
+    $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs")
+    $report = Read-Smoke
+    Assert-True ($r.ExitCode -eq 0 -and $report.startup_attempts -ge 1 -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
+      'normal-launch-never-visible-without-pal-region' "exit=$($r.ExitCode) attempts=$($report.startup_attempts) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)"
+
+    # 7. Corrupt settings fail closed and are not overwritten ---------------
     $good = [System.IO.File]::ReadAllBytes($settings)
     [System.IO.File]::WriteAllText($settings, '{no json}')
     $code = Invoke-Pals @("--smoke-test-ms=$SmokeMs")
@@ -154,7 +234,7 @@ try {
     Assert-True ($code -eq 1 -and $kept -eq '{no json}') 'corrupt-settings-fail-closed' "exit=$code file_unchanged=$($kept -eq '{no json}')"
     [System.IO.File]::WriteAllBytes($settings, $good)
 
-    # 7. Unwritable Data/ runs read-only, never redirects or overwrites -----
+    # 8. Unwritable Data/ runs read-only, never redirects or overwrites -----
     $acct = "$env:USERDOMAIN\$env:USERNAME"
     # Specific rights only: generic W would also deny SYNCHRONIZE and block reads.
     & icacls $data /deny "${acct}:(OI)(CI)(WD,AD,WEA,WA)" | Out-Null

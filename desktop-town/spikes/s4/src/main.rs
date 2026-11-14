@@ -18,6 +18,9 @@ mod geometry;
 mod portable;
 #[cfg(any(windows, test))]
 #[cfg_attr(not(windows), allow(dead_code))]
+mod startup;
+#[cfg(any(windows, test))]
+#[cfg_attr(not(windows), allow(dead_code))]
 mod state;
 
 #[cfg(windows)]

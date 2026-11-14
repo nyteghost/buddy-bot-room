@@ -1,6 +1,8 @@
 //! Command-line options. Unknown arguments are rejected (exit code 2) rather
 //! than ignored, so a mistyped QA flag can never silently run a different test.
 
+use crate::startup::FaultPlan;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Options {
     /// Headless Data/ round-trip in an isolated sub-folder; no window.
@@ -14,10 +16,15 @@ pub struct Options {
     /// restart test can prove state written by run N is loaded by run N+1.
     /// This is NOT evidence of OS mouse delivery.
     pub smoke_click: bool,
+    /// QA only: force the first N first-frame presentation attempts (or all,
+    /// with `never`) to report Timeout/Lost/Outdated/fatal, to exercise the
+    /// fail-closed startup handshake on a real Windows desktop.
+    pub fault_first_frame: Option<FaultPlan>,
 }
 
 pub const USAGE: &str = "PixelPals.exe [--monitor-index=N] [--self-test] \
-[--smoke-test-ms=N [--smoke-click]]";
+[--smoke-test-ms=N [--smoke-click]] \
+[--qa-fault-first-frame=timeout|lost|outdated|fatal[:COUNT|:never]]";
 
 /// Upper bound for automation runs so a broken harness cannot leave an
 /// always-on-top window behind indefinitely.
@@ -43,6 +50,8 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Options, String>
                 return Err(format!("smoke duration must be 1..={MAX_SMOKE_MS} ms"));
             }
             options.smoke_ms = Some(ms);
+        } else if let Some(value) = arg.strip_prefix("--qa-fault-first-frame=") {
+            options.fault_first_frame = Some(FaultPlan::parse(value)?);
         } else {
             return Err(format!("unknown argument {arg:?}; usage: {USAGE}"));
         }
@@ -50,8 +59,8 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Options, String>
     if options.smoke_click && options.smoke_ms.is_none() {
         return Err("--smoke-click requires --smoke-test-ms".to_owned());
     }
-    if options.self_test && options.smoke_ms.is_some() {
-        return Err("--self-test cannot be combined with --smoke-test-ms".to_owned());
+    if options.self_test && (options.smoke_ms.is_some() || options.fault_first_frame.is_some()) {
+        return Err("--self-test cannot be combined with overlay options".to_owned());
     }
     Ok(options)
 }
@@ -90,5 +99,21 @@ mod tests {
         assert!(parse(args(&["--selftest"])).is_err());
         assert!(parse(args(&["--smoke-click"])).is_err());
         assert!(parse(args(&["--self-test", "--smoke-test-ms=5"])).is_err());
+        assert!(parse(args(&["--qa-fault-first-frame=boom"])).is_err());
+        assert!(parse(args(&["--self-test", "--qa-fault-first-frame=lost:1"])).is_err());
+    }
+
+    #[test]
+    fn parses_first_frame_fault_injection() {
+        let options = parse(args(&[
+            "--smoke-test-ms=100",
+            "--qa-fault-first-frame=lost:3",
+        ]))
+        .unwrap();
+        let plan = options.fault_first_frame.unwrap();
+        assert_eq!(plan.outcome, crate::startup::FrameOutcome::Lost);
+        assert_eq!(plan.remaining, Some(3));
+        let never = parse(args(&["--qa-fault-first-frame=timeout:never"])).unwrap();
+        assert_eq!(never.fault_first_frame.unwrap().remaining, None);
     }
 }

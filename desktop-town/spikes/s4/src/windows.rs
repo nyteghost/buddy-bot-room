@@ -12,6 +12,10 @@ use crate::{
     fullscreen::{self, Foreground, ShellState},
     geometry::{self, Rect},
     portable::{self, Store},
+    startup::{
+        self, FaultPlan, FrameOutcome, OverlayPort, RedrawAction, RetryPolicy, Reveal, SkipTracker,
+        Startup,
+    },
     state::DemoState,
 };
 use bytemuck::{Pod, Zeroable};
@@ -61,6 +65,9 @@ const EXIT_OK: i32 = 0;
 const EXIT_FATAL: i32 = 1;
 const EXIT_USAGE: i32 = 2;
 const EXIT_SMOKE_NO_FRAMES: i32 = 3;
+/// No frame could be presented during the bounded first-frame handshake; the
+/// overlay was never shown and its input region stayed empty.
+const EXIT_FIRST_FRAME_FAILED: i32 = 4;
 
 const ANIMATION_TICK: Duration = Duration::from_millis(33);
 const FULLSCREEN_POLL_VISIBLE: Duration = Duration::from_millis(500);
@@ -72,7 +79,7 @@ const RENDER_SAMPLE: &str = "s4-render-sample.json";
 
 /// Entry point used by `main`. Never panics on expected failures; returns a
 /// documented exit code (0 ok, 1 fatal/fail-closed, 2 usage, 3 smoke without
-/// any presented frame).
+/// any presented frame, 4 first frame never presented).
 pub fn main_exit_code() -> i32 {
     let options = match cli::parse(std::env::args().skip(1)) {
         Ok(options) => options,
@@ -274,17 +281,19 @@ impl Renderer {
         self.surface.configure(&self.device, &self.config);
     }
 
-    /// Returns `Ok(true)` when a frame was presented, `Ok(false)` when the
-    /// frame was skipped (timeout / reconfigure) and should be retried.
-    fn render(&mut self, state: &DemoState, scale: f64) -> Result<bool, wgpu::SurfaceError> {
+    fn reconfigure(&mut self) {
+        self.surface.configure(&self.device, &self.config);
+    }
+
+    /// One render+present attempt. Skipped frames (Timeout/Lost/Outdated) are
+    /// reported, not hidden: the caller decides on reconfigure/retry/visibility.
+    fn render(&mut self, state: &DemoState, scale: f64) -> FrameOutcome {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
-            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                self.surface.configure(&self.device, &self.config);
-                return Ok(false);
-            }
-            Err(wgpu::SurfaceError::Timeout) => return Ok(false),
-            Err(error) => return Err(error),
+            Err(wgpu::SurfaceError::Lost) => return FrameOutcome::Lost,
+            Err(wgpu::SurfaceError::Outdated) => return FrameOutcome::Outdated,
+            Err(wgpu::SurfaceError::Timeout) => return FrameOutcome::Timeout,
+            Err(error) => return FrameOutcome::Fatal(error.to_string()),
         };
         let view = frame
             .texture
@@ -326,9 +335,9 @@ impl Renderer {
         let suboptimal = frame.suboptimal;
         frame.present();
         if suboptimal {
-            self.surface.configure(&self.device, &self.config);
+            self.reconfigure();
         }
-        Ok(true)
+        FrameOutcome::Presented
     }
 }
 
@@ -448,6 +457,73 @@ fn apply_pal_region(handle: HWND, state: &DemoState, scale: f64) -> Result<(), B
     Ok(())
 }
 
+/// Installs an EMPTY window region: no pixel of the window can be hit-tested,
+/// so even a visible window could not intercept a click. Used from creation
+/// until the first successful present, and whenever presentation fails.
+fn apply_empty_region(handle: HWND) -> Result<(), String> {
+    // SAFETY: same ownership rules as apply_pal_region.
+    unsafe {
+        let empty = CreateRectRgn(0, 0, 0, 0);
+        if empty == 0 {
+            return Err("CreateRectRgn(empty) failed".to_owned());
+        }
+        if SetWindowRgn(handle, empty, 1) == 0 {
+            DeleteObject(empty);
+            return Err("SetWindowRgn(empty) failed".to_owned());
+        }
+    }
+    Ok(())
+}
+
+/// Production [`OverlayPort`]: real wgpu presentation and Win32 visibility /
+/// input-region changes, plus optional QA fault injection.
+struct LivePort<'a> {
+    renderer: &'a mut Renderer,
+    handle: HWND,
+    state: &'a DemoState,
+    scale: f64,
+    stats: &'a mut FrameStats,
+    fault: Option<&'a mut FaultPlan>,
+    started: Instant,
+}
+
+impl OverlayPort for LivePort<'_> {
+    fn present(&mut self) -> FrameOutcome {
+        if let Some(injected) = self.fault.as_mut().and_then(|plan| plan.next()) {
+            return injected;
+        }
+        let start = Instant::now();
+        let outcome = self.renderer.render(self.state, self.scale);
+        if outcome == FrameOutcome::Presented {
+            self.stats.push(start.elapsed());
+        }
+        outcome
+    }
+    fn reconfigure(&mut self) {
+        self.renderer.reconfigure();
+    }
+    fn activate_input(&mut self) -> Result<(), String> {
+        apply_pal_region(self.handle, self.state, self.scale).map_err(|error| error.to_string())
+    }
+    fn deactivate_input(&mut self) {
+        // The window is hidden on every path that calls this, so a failure
+        // here cannot expose an input region.
+        let _ = apply_empty_region(self.handle);
+    }
+    fn show(&mut self) {
+        show(self.handle, true);
+    }
+    fn hide(&mut self) {
+        show(self.handle, false);
+    }
+    fn elapsed(&self) -> Duration {
+        self.started.elapsed()
+    }
+    fn sleep(&mut self, duration: Duration) {
+        std::thread::sleep(duration);
+    }
+}
+
 fn show(handle: HWND, visible: bool) {
     // SAFETY: only our own live HWND; SW_SHOWNOACTIVATE never steals focus.
     unsafe {
@@ -458,6 +534,7 @@ fn show(handle: HWND, visible: bool) {
 fn hide_on_failure(handle: HWND, log: &mut RunLog, message: &str) {
     log.line(format!("FATAL OVERLAY SAFETY: {message}"));
     show(handle, false);
+    let _ = apply_empty_region(handle);
 }
 
 fn rect_from(rect: RECT) -> Rect {
@@ -711,7 +788,8 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
             geometry::scale_length(geometry::OVERLAY_LOGICAL_HEIGHT, scale),
         ));
     }
-    apply_pal_region(handle, &state, scale)?;
+    // Input region is EMPTY from creation until a frame has been presented.
+    apply_empty_region(handle)?;
 
     let mut renderer = match pollster::block_on(Renderer::new(window.clone())) {
         Ok(renderer) => renderer,
@@ -729,17 +807,62 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
         renderer.config.format
     ));
 
+    // F5: bounded first-frame handshake. Hidden + empty region until a frame
+    // is presented; then the Pal region is installed and (unless a fullscreen
+    // app is active) the window is shown without activation.
     let mut frame_stats = FrameStats::default();
-    // First transparent frame is presented while hidden, then shown without
-    // activation. A failed first frame means the window is never shown.
-    let start = Instant::now();
-    match renderer.render(&state, scale) {
-        Ok(true) => frame_stats.push(start.elapsed()),
-        Ok(false) => log.line("first frame skipped; will retry on redraw"),
-        Err(error) => {
-            hide_on_failure(handle, log, &format!("first frame failed: {error}"));
-            return Err(error.to_string().into());
+    let want_visible = !fullscreen::should_hide(shell_state(), foreground_facts(handle).as_ref());
+    let mut fault = options.fault_first_frame.clone();
+    if let Some(plan) = &fault {
+        log.line(format!(
+            "QA fault injection active for first frame: {plan:?}"
+        ));
+    }
+    let startup_result = startup::first_frame(
+        &mut LivePort {
+            renderer: &mut renderer,
+            handle,
+            state: &state,
+            scale,
+            stats: &mut frame_stats,
+            fault: fault.as_mut(),
+            started: Instant::now(),
+        },
+        RetryPolicy::STARTUP,
+        want_visible,
+    );
+    let (startup_attempts, mut visible) = match startup_result {
+        Startup::Ready { attempts, shown } => {
+            log.line(format!(
+                "first frame presented after {attempts} attempt(s); input region active; \
+                 shown={shown}"
+            ));
+            (attempts, shown)
         }
+        Startup::FailedClosed { attempts, reason } => {
+            log.line(format!(
+                "FIRST FRAME FAIL-CLOSED after {attempts} attempt(s): {reason}. \
+                 Overlay was never shown and its input region stayed empty."
+            ));
+            if options.smoke_ms.is_some() && store.writable {
+                let report = serde_json::json!({
+                    "result": "FAIL_CLOSED_FIRST_FRAME",
+                    "startup_attempts": attempts,
+                    "reason": reason,
+                    "frames_presented": frame_stats.presented,
+                    "ever_shown": false,
+                    "backend": renderer.backend,
+                    "alpha_mode": format!("{:?}", renderer.config.alpha_mode),
+                });
+                write_json(&store, SMOKE_REPORT, &report, log);
+            }
+            return Ok(EXIT_FIRST_FRAME_FAILED);
+        }
+    };
+    let mut input_active = true;
+    let mut skips = SkipTracker::default();
+    if !visible {
+        log.line("fullscreen/presentation detected at launch: starting hidden");
     }
 
     let launched = Instant::now();
@@ -750,13 +873,6 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     let exit_code = Rc::new(Cell::new(EXIT_OK));
     let exit_code_in_loop = exit_code.clone();
     let mut pointer = PhysicalPosition::new(-1i32, -1i32);
-    let mut visible = !fullscreen::should_hide(shell_state(), foreground_facts(handle).as_ref());
-    show(handle, visible);
-    if visible {
-        window.request_redraw();
-    } else {
-        log.line("fullscreen/presentation detected at launch: starting hidden");
-    }
     let mut next_fullscreen_check = Instant::now() + FULLSCREEN_POLL_VISIBLE;
     let mut next_tick = Instant::now();
     let mut last_step = Instant::now();
@@ -765,176 +881,226 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     // requested; nothing may run twice once shutdown has started.
     let mut exiting = false;
 
-    event_loop.run(move |event, target| match event {
-        _ if exiting => {}
-        Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested => {
-                save_state(&mut store, &state, &mut log);
-                frame_stats.save(&store, &renderer, &mut log);
-                exiting = true;
-                target.exit();
-            }
-            WindowEvent::CursorMoved { position, .. } => {
-                pointer = PhysicalPosition::new(position.x as i32, position.y as i32);
-            }
-            WindowEvent::MouseInput {
-                state: ElementState::Pressed,
-                button,
-                ..
-            } => {
-                if !geometry::hits_pal(pointer.x, pointer.y, state.pal_x, state.pal_y, scale) {
-                    return;
-                }
-                if button == MouseButton::Right {
-                    log.line("PAL_EXIT right-click");
+    event_loop.run(move |event, target| {
+        if exiting {
+            return;
+        }
+        // Fail closed: hide, empty the input region, record exit code, stop.
+        let fatal = |log: &mut RunLog, message: &str| {
+            hide_on_failure(handle, log, message);
+            exit_code_in_loop.set(EXIT_FATAL);
+            target.exit();
+        };
+        match event {
+            Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
+                WindowEvent::CloseRequested => {
                     save_state(&mut store, &state, &mut log);
                     frame_stats.save(&store, &renderer, &mut log);
                     exiting = true;
                     target.exit();
-                } else if button == MouseButton::Left {
-                    state.click();
-                    last_step = Instant::now();
-                    save_state(&mut store, &state, &mut log);
-                    if let Err(error) = apply_pal_region(handle, &state, scale) {
-                        hide_on_failure(handle, &mut log, &error.to_string());
-                        exit_code_in_loop.set(EXIT_FATAL);
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    pointer = PhysicalPosition::new(position.x as i32, position.y as i32);
+                }
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button,
+                    ..
+                } => {
+                    if !input_active
+                        || !geometry::hits_pal(pointer.x, pointer.y, state.pal_x, state.pal_y, scale)
+                    {
+                        return;
+                    }
+                    if button == MouseButton::Right {
+                        log.line("PAL_EXIT right-click");
+                        save_state(&mut store, &state, &mut log);
+                        frame_stats.save(&store, &renderer, &mut log);
                         exiting = true;
                         target.exit();
-                    }
-                    window.request_redraw();
-                    log.line(format!("PAL_CLICK {}", state.pal_clicks));
-                }
-            }
-            WindowEvent::Resized(size) => {
-                renderer.resize(size);
-                if let Err(error) = apply_pal_region(handle, &state, scale) {
-                    hide_on_failure(handle, &mut log, &error.to_string());
-                    exit_code_in_loop.set(EXIT_FATAL);
-                    exiting = true;
-                    target.exit();
-                }
-                window.request_redraw();
-            }
-            WindowEvent::ScaleFactorChanged {
-                scale_factor,
-                mut inner_size_writer,
-            } => {
-                scale = geometry::sanitize_scale(scale_factor);
-                let size = PhysicalSize::new(
-                    geometry::scale_length(geometry::OVERLAY_LOGICAL_WIDTH, scale),
-                    geometry::scale_length(geometry::OVERLAY_LOGICAL_HEIGHT, scale),
-                );
-                let _ = inner_size_writer.request_inner_size(size);
-                log.line(format!("DPI change: scale={scale} size={size:?}"));
-                if let Err(error) = apply_pal_region(handle, &state, scale) {
-                    hide_on_failure(handle, &mut log, &error.to_string());
-                    exit_code_in_loop.set(EXIT_FATAL);
-                    exiting = true;
-                    target.exit();
-                }
-                window.request_redraw();
-            }
-            WindowEvent::RedrawRequested if visible => {
-                let start = Instant::now();
-                match renderer.render(&state, scale) {
-                    Ok(true) => frame_stats.push(start.elapsed()),
-                    Ok(false) => window.request_redraw(),
-                    Err(error) => {
-                        hide_on_failure(handle, &mut log, &error.to_string());
-                        exit_code_in_loop.set(EXIT_FATAL);
-                        exiting = true;
-                        target.exit();
-                    }
-                }
-            }
-            _ => {}
-        },
-        Event::AboutToWait => {
-            let now = Instant::now();
-            if smoke_deadline.is_some_and(|deadline| now >= deadline) {
-                smoke_deadline = None;
-                if smoke_click {
-                    state.record_click();
-                }
-                save_state(&mut store, &state, &mut log);
-                frame_stats.save(&store, &renderer, &mut log);
-                let mut report = frame_stats.summary(&renderer);
-                report["result"] = if frame_stats.presented > 0 {
-                    "PASS".into()
-                } else {
-                    "FAIL_NO_FRAMES".into()
-                };
-                report["visible_at_exit"] = visible.into();
-                report["scale"] = scale.into();
-                report["pal_clicks"] = state.pal_clicks.into();
-                report["data_writable"] = store.writable.into();
-                report["runtime_ms"] = (launched.elapsed().as_millis() as u64).into();
-                log.line(format!("SMOKE {report}"));
-                if store.writable {
-                    write_json(&store, SMOKE_REPORT, &report, &mut log);
-                }
-                if frame_stats.presented == 0 {
-                    exit_code_in_loop.set(EXIT_SMOKE_NO_FRAMES);
-                }
-                exiting = true;
-                target.exit();
-                return;
-            }
-            if now >= next_fullscreen_check {
-                let hide =
-                    fullscreen::should_hide(shell_state(), foreground_facts(handle).as_ref());
-                if hide == visible {
-                    visible = !hide;
-                    log.line(format!(
-                        "fullscreen policy: overlay {}",
-                        if visible { "shown" } else { "hidden" }
-                    ));
-                    show(handle, visible);
-                    if visible {
-                        last_step = now;
-                        window.request_redraw();
-                    }
-                }
-                next_fullscreen_check = now
-                    + if visible {
-                        FULLSCREEN_POLL_VISIBLE
-                    } else {
-                        FULLSCREEN_POLL_HIDDEN
-                    };
-            }
-            if visible && state.animate {
-                if now >= next_tick {
-                    let elapsed = now.duration_since(last_step);
-                    last_step = now;
-                    next_tick = now + ANIMATION_TICK;
-                    if state.step(elapsed.as_millis() as u64) {
+                    } else if button == MouseButton::Left {
+                        state.click();
+                        last_step = Instant::now();
+                        save_state(&mut store, &state, &mut log);
                         if let Err(error) = apply_pal_region(handle, &state, scale) {
-                            hide_on_failure(handle, &mut log, &error.to_string());
-                            exit_code_in_loop.set(EXIT_FATAL);
                             exiting = true;
-                            target.exit();
+                            fatal(&mut log, &error.to_string());
                             return;
                         }
                         window.request_redraw();
-                    }
-                    if !state.animate {
-                        save_state(&mut store, &state, &mut log);
+                        log.line(format!("PAL_CLICK {}", state.pal_clicks));
                     }
                 }
-            } else {
-                // Idle suspension: no timers besides the fullscreen probe.
-                last_step = now;
+                WindowEvent::Resized(size) => {
+                    renderer.resize(size);
+                    if input_active {
+                        if let Err(error) = apply_pal_region(handle, &state, scale) {
+                            exiting = true;
+                            fatal(&mut log, &error.to_string());
+                            return;
+                        }
+                    }
+                    window.request_redraw();
+                }
+                WindowEvent::ScaleFactorChanged {
+                    scale_factor,
+                    mut inner_size_writer,
+                } => {
+                    scale = geometry::sanitize_scale(scale_factor);
+                    let size = PhysicalSize::new(
+                        geometry::scale_length(geometry::OVERLAY_LOGICAL_WIDTH, scale),
+                        geometry::scale_length(geometry::OVERLAY_LOGICAL_HEIGHT, scale),
+                    );
+                    let _ = inner_size_writer.request_inner_size(size);
+                    log.line(format!("DPI change: scale={scale} size={size:?}"));
+                    if input_active {
+                        if let Err(error) = apply_pal_region(handle, &state, scale) {
+                            exiting = true;
+                            fatal(&mut log, &error.to_string());
+                            return;
+                        }
+                    }
+                    window.request_redraw();
+                }
+                WindowEvent::RedrawRequested if visible => {
+                    let start = Instant::now();
+                    let outcome = renderer.render(&state, scale);
+                    if outcome == FrameOutcome::Presented {
+                        frame_stats.push(start.elapsed());
+                    }
+                    match skips.record(&outcome) {
+                        RedrawAction::Done => {}
+                        RedrawAction::Retry { reconfigure } => {
+                            if reconfigure {
+                                renderer.reconfigure();
+                            }
+                            window.request_redraw();
+                        }
+                        RedrawAction::HideUntilPresented => {
+                            // Never leave a window on screen that cannot be
+                            // painted: hide it and empty its input region until
+                            // a fresh frame is presented (see reveal()).
+                            log.line(format!(
+                                "presentation failing ({outcome:?}); overlay hidden until a frame presents"
+                            ));
+                            show(handle, false);
+                            let _ = apply_empty_region(handle);
+                            input_active = false;
+                            visible = false;
+                        }
+                        RedrawAction::Fatal => {
+                            exiting = true;
+                            fatal(&mut log, &format!("render failed: {outcome:?}"));
+                        }
+                    }
+                }
+                _ => {}
+            },
+            Event::AboutToWait => {
+                let now = Instant::now();
+                if smoke_deadline.is_some_and(|deadline| now >= deadline) {
+                    smoke_deadline = None;
+                    if smoke_click {
+                        state.record_click();
+                    }
+                    save_state(&mut store, &state, &mut log);
+                    frame_stats.save(&store, &renderer, &mut log);
+                    let mut report = frame_stats.summary(&renderer);
+                    report["result"] = if frame_stats.presented > 0 {
+                        "PASS".into()
+                    } else {
+                        "FAIL_NO_FRAMES".into()
+                    };
+                    report["startup_attempts"] = startup_attempts.into();
+                    report["visible_at_exit"] = visible.into();
+                    report["input_active_at_exit"] = input_active.into();
+                    report["scale"] = scale.into();
+                    report["pal_clicks"] = state.pal_clicks.into();
+                    report["data_writable"] = store.writable.into();
+                    report["runtime_ms"] = (launched.elapsed().as_millis() as u64).into();
+                    log.line(format!("SMOKE {report}"));
+                    if store.writable {
+                        write_json(&store, SMOKE_REPORT, &report, &mut log);
+                    }
+                    if frame_stats.presented == 0 {
+                        exit_code_in_loop.set(EXIT_SMOKE_NO_FRAMES);
+                    }
+                    exiting = true;
+                    target.exit();
+                    return;
+                }
+                if now >= next_fullscreen_check {
+                    let want_visible =
+                        !fullscreen::should_hide(shell_state(), foreground_facts(handle).as_ref());
+                    if want_visible && !visible {
+                        // Re-show only after a fresh frame has been presented.
+                        let result = startup::reveal(&mut LivePort {
+                            renderer: &mut renderer,
+                            handle,
+                            state: &state,
+                            scale,
+                            stats: &mut frame_stats,
+                            fault: None,
+                            started: now,
+                        });
+                        match result {
+                            Reveal::Shown => {
+                                visible = true;
+                                input_active = true;
+                                last_step = now;
+                                log.line("overlay shown (fresh frame presented)");
+                            }
+                            Reveal::StayHidden => {}
+                            Reveal::Fatal(error) => {
+                                exiting = true;
+                                fatal(&mut log, &format!("reveal failed: {error}"));
+                                return;
+                            }
+                        }
+                    } else if !want_visible && visible {
+                        show(handle, false);
+                        visible = false;
+                        log.line("fullscreen policy: overlay hidden");
+                    }
+                    next_fullscreen_check = now
+                        + if visible {
+                            FULLSCREEN_POLL_VISIBLE
+                        } else {
+                            FULLSCREEN_POLL_HIDDEN
+                        };
+                }
+                if visible && state.animate {
+                    if now >= next_tick {
+                        let elapsed = now.duration_since(last_step);
+                        last_step = now;
+                        next_tick = now + ANIMATION_TICK;
+                        if state.step(elapsed.as_millis() as u64) {
+                            if let Err(error) = apply_pal_region(handle, &state, scale) {
+                                exiting = true;
+                                fatal(&mut log, &error.to_string());
+                                return;
+                            }
+                            window.request_redraw();
+                        }
+                        if !state.animate {
+                            save_state(&mut store, &state, &mut log);
+                        }
+                    }
+                } else {
+                    // Idle suspension: no timers besides the fullscreen probe.
+                    last_step = now;
+                }
+                let mut wake = next_fullscreen_check;
+                if visible && state.animate {
+                    wake = wake.min(next_tick);
+                }
+                if let Some(deadline) = smoke_deadline {
+                    wake = wake.min(deadline);
+                }
+                target.set_control_flow(ControlFlow::WaitUntil(wake));
             }
-            let mut wake = next_fullscreen_check;
-            if visible && state.animate {
-                wake = wake.min(next_tick);
-            }
-            if let Some(deadline) = smoke_deadline {
-                wake = wake.min(deadline);
-            }
-            target.set_control_flow(ControlFlow::WaitUntil(wake));
+            _ => {}
         }
-        _ => {}
     })?;
     Ok(exit_code.get())
 }

@@ -27,8 +27,14 @@ clicks there go to the application underneath. There is no WebView2 dependency.
   wallpaper (`Progman`/`WorkerW`) and maximised captioned windows do not count as fullscreen.
 * **Idle:** rendering is event-driven. With the Pal idle, no frames are drawn and the only timer is the
   fullscreen probe; while walking, a 33 ms tick drives movement. Hidden overlays stop animating.
-* **Launch safety:** the window is created hidden, the input region is applied and a transparent frame is
-  presented before it is shown with `SW_SHOWNOACTIVATE`. It never takes focus and has no taskbar button.
+* **Launch safety (QA finding F5):** the window is created hidden **with an empty window region**, so it can
+  neither be seen nor hit-tested. `src/startup.rs` then runs a bounded first-frame handshake: up to 8
+  present attempts within 3 s, exponential backoff 16→250 ms, reconfiguring the surface after Lost/Outdated
+  and retrying after Timeout. Only after a frame is successfully presented is the Pal region installed and
+  the window shown with `SW_SHOWNOACTIVATE`. If no frame can be presented (or a fatal surface error or
+  region failure occurs) the app exits with code 4 and the overlay was never visible or clickable.
+  At runtime, 5 consecutive failed presents hide the overlay and empty its region; it is re-shown only
+  after a fresh frame is presented. It never takes focus and has no taskbar button.
 
 ## Portable layout
 
@@ -57,6 +63,7 @@ never plaintext secrets in `Data/`. The spike implements no credentials.
 
 ```
 PixelPals.exe [--monitor-index=N] [--self-test] [--smoke-test-ms=N [--smoke-click]]
+              [--qa-fault-first-frame=timeout|lost|outdated|fatal[:COUNT|:never]]
 ```
 
 | Flag | Purpose |
@@ -65,9 +72,10 @@ PixelPals.exe [--monitor-index=N] [--self-test] [--smoke-test-ms=N [--smoke-clic
 | `--self-test` | headless Data/ round-trip in an isolated sub-folder; no window |
 | `--smoke-test-ms=N` | automation: run the real overlay for N ms, save, write `Data/s4-smoke.json`, exit |
 | `--smoke-click` | automation: count one synthetic Pal click before the smoke exit (not OS mouse evidence) |
+| `--qa-fault-first-frame=…` | QA only: the first COUNT (or all, `never`) first-frame presents report the given failure, to exercise the fail-closed handshake on a real desktop |
 
 Exit codes: 0 success, 1 fail-closed (no safe transparent GPU path, corrupt settings, Win32 failure),
-2 usage error, 3 smoke run presented no frames.
+2 usage error, 3 smoke run presented no frames, 4 first frame never presented (overlay never shown).
 
 ## Reproducible Windows build
 
@@ -103,7 +111,8 @@ runs on every pull-request update:
 
 * Linux: `cargo fmt --check`, `cargo clippy --all-targets -D warnings`, `cargo test`.
 * `windows-2025`: fmt, check, clippy, test for `x86_64-pc-windows-msvc`, release build, `pack-portable.ps1`,
-  extraction to a fresh folder and `test-portable.ps1`; uploads `PixelPals-Portable-<sha>` (ZIP + SHA-256)
+  extraction to a fresh folder and `test-portable.ps1` (including F5 fault injection observed from a second
+  process via `IsWindowVisible`/`GetWindowRgnBox`); uploads `PixelPals-Portable-<sha>` (ZIP + SHA-256)
   and `s4-windows-ci-evidence-<sha>` artifacts.
 
 The hosted runner has no physical GPU (Direct3D 12 runs on the WARP software adapter), runs as an

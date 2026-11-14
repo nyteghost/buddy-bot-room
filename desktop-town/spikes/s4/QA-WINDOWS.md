@@ -30,6 +30,21 @@ monitor layout and per-monitor scaling, exact commit SHA, `PixelPals-Portable.zi
 - [ ] Task Manager: no service, no child processes, no elevated token (Details → "Elevated" column = No).
 - [ ] Autoruns/registry check: no Run keys, services or scheduled tasks created.
 
+## 1a. First-frame safety (F5) on the real GPU
+
+Run from a PowerShell prompt in the extracted folder, with a visible app (e.g. Notepad) behind the overlay
+position, and screen-record each run:
+
+- [ ] `(Start-Process .\PixelPals.exe -ArgumentList '--smoke-test-ms=4000','--qa-fault-first-frame=timeout:never' -Wait -PassThru).ExitCode`
+      → prints 4 within ~3 s (PixelPals.exe is a GUI-subsystem exe, so use `Start-Process -Wait`, not
+      `$LASTEXITCODE`); **nothing appears**; clicks/typing in Notepad at the overlay position are
+      unaffected throughout; `Data\s4-last-run.log` says `FIRST FRAME FAIL-CLOSED`; settings.json unchanged.
+- [ ] Repeat with `lost:never`, `outdated:never`, `fatal:1`.
+- [ ] `--qa-fault-first-frame=lost:3` (and `timeout:3`, `outdated:3`) → Pal appears normally after the
+      retries, log shows `first frame presented after 4 attempt(s)`; no black/opaque/white flash beforehand.
+- [ ] Optional: `test-portable.ps1` section 6 performs the same checks automatically with an external
+      `IsWindowVisible`/`GetWindowRgnBox` observer; record its output on the physical machine.
+
 ## 2. Transparency and click-through (A6)
 
 - [ ] Over a white and a dark wallpaper, the overlay shows only the Pal; no black, grey or white rectangle,
@@ -72,7 +87,9 @@ monitor layout and per-monitor scaling, exact commit SHA, `PixelPals-Portable.zi
 - [ ] Read-only folder (deny write on `Data\` for the standard user, or read-only USB): app runs, log/stderr warns,
       no writes anywhere else (check `%APPDATA%`, `%LOCALAPPDATA%`).
 - [ ] Writable USB drive: extract, run, stop, eject/reinsert, run again → state preserved.
-- [ ] Sleep/resume and lock/unlock while running: overlay still transparent and clickable.
+- [ ] Sleep/resume, lock/unlock and display off/on while running: overlay still transparent and clickable; if
+      presentation fails it must disappear (log: `overlay hidden until a frame presents`) rather than show
+      a stale/black rectangle, and reappear only after a fresh frame.
 
 ## 7. Security and scope
 
