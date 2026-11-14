@@ -300,7 +300,7 @@ try {
     Add-Result 'walking-soak-30s' 'INFO' ("samples=$($soak.samples) private_bytes_MiB first/max/last=$($soak.private_bytes_mib.first)/$($soak.private_bytes_mib.max)/$($soak.private_bytes_mib.last) private_ws_MiB median=$(if ($soak.private_ws_mib) { $soak.private_ws_mib.median } else { 'n/a' }) cpu_pct_one_core median/max=$(if ($soak.cpu_pct_one_core) { "$($soak.cpu_pct_one_core.median)/$($soak.cpu_pct_one_core.max)" } else { 'n/a' }) gpu_dedicated_MiB=$(if ($soak.gpu_dedicated_mib) { $soak.gpu_dedicated_mib.max } else { 'n/a' }) frames=$(if ($report) { $report.frames_presented } else { 'n/a' })")
     # Tripwire for an obvious per-frame leak (~900 frames): not a memory budget.
     $growth = if ($soak.private_bytes_mib) { [double]$soak.private_bytes_mib.last - [double]$soak.private_bytes_mib.min } else { $null }
-    Assert-True ($soak.exit_code -eq 0 -and $null -ne $growth -and $growth -lt 64 -and $report -and $report.frames_presented -gt 100) 'walking-soak-leak-tripwire' "exit=$($soak.exit_code) private_bytes growth (last-min)=$growth MiB over ~$($report.frames_presented) walking frames"
+    Assert-True ($soak.exit_code -eq 0 -and $null -ne $growth -and [double]$soak.private_bytes_mib.min -gt 0 -and $soak.samples -ge 10 -and $growth -lt 64 -and $report -and $report.frames_presented -gt 100) 'walking-soak-leak-tripwire' "exit=$($soak.exit_code) private_bytes growth (last-min)=$growth MiB over ~$($report.frames_presented) walking frames"
 
     #     20 launch/exit cycles: every run exits 0, state stays valid, no
     #     orphaned processes or temp files.

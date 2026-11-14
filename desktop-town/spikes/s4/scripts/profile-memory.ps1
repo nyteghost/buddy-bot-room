@@ -54,6 +54,8 @@ $watch = [System.Diagnostics.Stopwatch]::StartNew()
 $lastCpu = $null; $lastWall = 0.0
 while (-not $proc.HasExited -and $watch.Elapsed.TotalSeconds -lt $Seconds) {
   $proc.Refresh()
+  # A process that is exiting reports zero counters: never record those.
+  if ($proc.HasExited -or $proc.PrivateMemorySize64 -le 0) { break }
   $wall = $watch.Elapsed.TotalSeconds
   $cpu = $proc.TotalProcessorTime.TotalSeconds
   $cpuPct = if ($null -ne $lastCpu -and $wall -gt $lastWall) { [Math]::Round(100.0 * ($cpu - $lastCpu) / ($wall - $lastWall), 2) } else { $null }
