@@ -1154,7 +1154,12 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
         if exiting {
             return;
         }
+        // Graceful exit: hide the overlay and empty its input region FIRST,
+        // so nothing can be visible or clickable while the renderer, the
+        // DirectComposition surface and the window are torn down.
         let record_exit = |renderer: &Renderer| {
+            show(handle, false);
+            let _ = apply_empty_region(handle);
             let mut t = trace_in_loop.borrow_mut();
             t.mark("exit");
             t.allocator("exit", renderer);

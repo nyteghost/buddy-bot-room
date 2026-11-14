@@ -49,7 +49,8 @@ clicks there go to the application underneath. There is no WebView2 dependency.
   the window shown with `SW_SHOWNOACTIVATE`. If no frame can be presented (or a fatal surface error or
   region failure occurs) the app exits with code 4 and the overlay was never visible or clickable.
   At runtime, 5 consecutive failed presents hide the overlay and empty its region; it is re-shown only
-  after a fresh frame is presented. It never takes focus and has no taskbar button.
+  after a fresh frame is presented. On every graceful exit (right-click, close, smoke end) the overlay is hidden and
+  its region emptied before GPU objects and the window are released. It never takes focus and has no taskbar button.
 
 ## Portable layout
 
