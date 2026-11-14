@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Bounded static security tripwires. Findings are leads, not proof of safety.
+
+Scan changed source/config files by default; use --file to scan a specific path.
+Never emit a suspected secret's value. CI/static scanning cannot validate native IPC
+origin boundaries, provider behavior, signed releases or physical devices.
+"""
+from __future__ import annotations
+import argparse
+import json
+import pathlib
+import re
+import sys
+from guardlib import (GuardError, branch_name, changed_files, cli_error, finding,
+                      normalize_path, result, sha, write_result, ROOT)
+
+SCANNABLE = {".rs", ".toml", ".json", ".jsonc", ".json5", ".yaml", ".yml",
+             ".ts", ".tsx", ".js", ".mjs", ".cjs", ".py", ".sh", ".ps1",
+             ".html", ".htm", ".xml"}
+MAX_BYTES = 1_000_000
+# Case-insensitive patterns with deliberately specific anchors to minimize false positives.
+RULES = [
+    ("wildcard-network-origin", "blocker", re.compile(
+        r"""(?:\b(?:OLLAMA_ORIGINS|CORS_ORIGINS?|ALLOW_ORIGIN)\s*=\s*["']?\*["']?|\ballow_origin\(\s*["']\*["']|Access-Control-Allow-Origin\s*[:=]\s*["']?\*["']?)""", re.I),
+     "Wildcard network origin: restrict to approved loopback or explicitly authorized sources"),
+    ("permissive-csp", "blocker", re.compile(
+        r"""(?:(?:["']?csp["']?|Content-Security-Policy)\s*[:=]\s*(?:null|None|["']\*["']))""", re.I),
+     "CSP is null/unrestricted: enforce a minimal local-only content security policy"),
+    ("remote-frontend", "high", re.compile(
+        r"""["'](?:frontendDist|distDir)["']\s*:\s*["']https?://[^"']+""", re.I),
+     "Tauri packaged frontend points at a remote URL: review remote-origin trust boundary"),
+    ("native-privileged-ipc", "high", re.compile(
+        r"""(?s)(?:generate_handler!|invoke_handler\s*\().{0,700}\b(?:pty_spawn|pty_write|read_text|list_dir|write_note)\b""", re.I),
+     "Privileged IPC handler exposed: verify no untrusted/remote origin can call it"),
+    ("unsigned-auto-update", "high", re.compile(
+        r"""(?:\bcurl\b[^\n]{0,150}\|\s*(?:sh|bash)\b|\bwget\b[^\n]{0,150}\|\s*(?:sh|bash)\b)""", re.I),
+     "Piped remote shell updater: verify signatures, pinned integrity and explicit authorization"),
+    ("cloud-bypass-local-only", "high", re.compile(
+        r"""(?is)\b(?:localOnly|keepLocal|local.only)\b.{0,280}\b(?:fallback|retry)\b.{0,180}\b(?:openai|anthropic|gemini|cloud.provider)\b"""),
+     "Possible cloud fallback in local-only path: verify fail-closed local provider policy"),
+    ("hardcoded-credential", "high", re.compile(
+        r"""(?i)\b(?:api[_-]?key|auth[_-]?token|access[_-]?token|client[_-]?secret|password)\b\s*[:=]\s*["']([A-Za-z0-9_+/=-]{24,})["']"""),
+     "Possible hardcoded credential; redact and inspect securely (value deliberately omitted)")
+]
+
+def scan_text(path: str, content: str) -> list[dict]:
+    findings = []
+    lines = content.splitlines(keepends=True)
+    for rule, severity, regex, message in RULES:
+        # Bounded whole-file search preserves multi-line security contexts.
+        count = 0
+        for match in regex.finditer(content):
+            matched = match.group(0)
+            if rule == "hardcoded-credential":
+                value = match.group(1)
+                if value.lower().startswith(("example", "placeholder", "changeme", "your_", "test_")):
+                    continue
+            line = content.count("\n", 0, match.start()) + 1
+            # Avoid reporting an obvious comment/documentation-only line as a blocker.
+            line_text = lines[line - 1].strip() if line <= len(lines) else ""
+            if line_text.startswith(("#", "//", "*", "<!--")) and rule != "hardcoded-credential":
+                continue
+            findings.append(finding(rule, severity, path, line, message))
+            count += 1
+            if count >= 20:
+                break
+    return findings
+
+def scan_paths(paths: list[str], root: pathlib.Path = ROOT) -> list[dict]:
+    findings: list[dict] = []
+    for raw in sorted(set(paths)):
+        name = normalize_path(raw)
+        location = root / name
+        if location.suffix.lower() not in SCANNABLE or not location.is_file():
+            continue
+        # Avoid scanning symlink targets outside the repository checkout.
+        if not location.resolve().is_relative_to(root.resolve()):
+            findings.append(finding("unsafe-symlink", "blocker", name, 0, "Symlink escapes repository"))
+            continue
+        if location.stat().st_size > MAX_BYTES:
+            findings.append(finding("unscanned-large-file", "medium", name, 0,
+                                    "File exceeds bounded scanner limit; manual inspection required"))
+            continue
+        try:
+            content = location.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            findings.append(finding("undecodable-source", "medium", name, 0,
+                                    "Source cannot be scanned as UTF-8"))
+            continue
+        findings.extend(scan_text(name, content))
+    return findings
+
+def run(argv=None) -> int:
+    p = argparse.ArgumentParser()
+    p.add_argument("--base", help="Base ref for branch changes, e.g. origin/beta")
+    p.add_argument("--branch", help="Explicit branch for detached CI checkout")
+    p.add_argument("--file", action="append", default=[], help="Scan explicit file; repeatable")
+    p.add_argument("--output")
+    args = p.parse_args(argv)
+    try:
+        files = [normalize_path(x) for x in args.file] if args.file else changed_files(args.base)
+        findings = scan_paths(files)
+        out = result("security-lint", args.branch or branch_name(), sha(), findings)
+        write_result("security-lint", out, args.output)
+        print(json.dumps(out, indent=2))
+        return 1 if findings else 0
+    except (GuardError, OSError, ValueError) as exc:
+        return cli_error("security-lint", exc, args.output)
+
+if __name__ == "__main__":
+    sys.exit(run())
