@@ -213,11 +213,14 @@ def place(s: "Session", proc: Proc, output: str) -> bool:
     is moved by pid and checked against the compositor tree."""
     pid = proc.p.pid
     for _ in range(3):
-        s.swaymsg(f"[pid={pid}] move container to output {output}")
-        time.sleep(0.3)
         if output_of_pid(s.swaymsg("get_tree", json_out=True), pid) == output:
             return True
-    return False
+        try:
+            s.swaymsg(f"[pid={pid}] move container to output {output}")
+        except RuntimeError:
+            pass  # sway errors on no-op moves; the tree check below decides
+        time.sleep(0.3)
+    return output_of_pid(s.swaymsg("get_tree", json_out=True), pid) == output
 
 
 def pal_centres(overlay: Proc, outputs: dict[str, dict]) -> dict[str, tuple[float, float]]:
