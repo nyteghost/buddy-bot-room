@@ -20,7 +20,7 @@ The prototype now requests `MemoryHints::MemoryUsage`. The overlay allocates onl
 smaller blocks cost no measurable rendering performance. Use `--qa-memory-hints=performance` to
 reproduce the old behaviour for A/B comparison.
 
-Other checks made while investigating:
+Other checks made while investigating (details in §3):
 * **Per-frame buffer creation removed.** One persistent vertex buffer is rewritten with
   `queue.write_buffer`.
 * **No idle render loop.** Frames are drawn only on state change.
@@ -86,24 +86,47 @@ copy .\Data\s4-memory.json .\Data\s4-memory-memoryusage.json
 
 Attach `Data\*.json`, the CSVs printed in the summaries, and `Data\s4-last-run.log` to the QA report.
 
-## 2. CPU / GPU / frame pacing
+## 2. Memory categories — what each number is
 
-* **Idle:** rendering is event-driven. The CI 10-second idle run presented 2 frames: the start-up
-  frame and one after showing. Idle wake-ups are at most 2 per second (fullscreen probe), and at most
-  1 per second while hidden.
-* **Walking:** a 33 ms tick, about 30 frames per second.
-* **Hidden:** fully paused (no animation, no frames).
+| Category | Where it comes from in S4 | How to see it |
+| --- | --- | --- |
+| **Private committed bytes** | wgpu D3D12 suballocation heaps (main item; see §1), wgpu/driver CPU-side state, Rust heap | `private_bytes` per stage in `s4-memory.json`; `private_bytes_mib` in profile-memory |
+| **Private working set** (Task Manager "Memory") | the resident part of the above | `private_working_set` per stage; `private_ws_mib` |
+| **Shared working set** | resident DLL images: D3D12, DXGI, DirectComposition, GPU user-mode driver, FXC, winit/Win32 | `shared_working_set` per stage (= working set − private working set); `shared_ws_mib` |
+| **wgpu initialisation** | private-bytes delta `window → first-frame` (logged as `MEM wgpu/driver initialisation`) | `gpu_init_private_mib` in `s4-memory.json` |
+| **DirectX 12 heaps** | wgpu allocator report: reserved vs allocated bytes and block sizes | `gpu_allocator` in `s4-memory.json` |
+| **Surface / swapchain** | 640x360 BGRA8 × (latency + 1) buffers = 1.76 MiB at 100 % (7.03 MiB at 200 %); in GPU/shared memory, not private bytes | `swapchain_estimate_bytes` (estimate); `gpu_shared_mib` / `gpu_dedicated_mib` |
+| **GPU-local / shared GPU memory** | swapchain, heaps placed in video memory | `gpu_dedicated_mib`, `gpu_shared_mib` (GPU Process Memory counters) |
+
+## 3. Rendering efficiency and power — decisions
+
+| Topic | Current behaviour | Decision and reason |
+| --- | --- | --- |
+| Idle rendering | No frames while idle (CI: 2 frames in 10 s idle) | Keep. Redraw only on state change, resize or DPI change. |
+| Paused / hidden | Hidden overlay: no animation ticks, no frames; probe slows to 1 Hz | Keep. Unit-tested in `schedule.rs`. |
+| Frame pacing (walking) | 33 ms timer tick → one redraw → `Fifo` present | Keep. About 30 fps; Fifo never tears and blocks at most one vblank. Present-interval p95 must be measured with PresentMon on hardware. |
+| Swapchain depth | **Changed** from `desired_maximum_frame_latency` 2 to **1** (3 → 2 buffers) | On-demand ≤30 fps rendering gains nothing from a second queued frame. This saves one buffer (0.9 MiB at 100 %) and a frame of latency. |
+| GPU submissions | One submit per presented frame; one `write_buffer` of ≤1.1 KiB; no per-frame buffer creation | Keep. Allocation churn was removed in the previous revision. |
+| Buffers/textures | 1 vertex buffer, swapchain images only; no staging or readback resources retained | Keep. |
+| Fullscreen probe | 2 Hz while visible, 1 Hz while hidden | Keep polling. An event hook on foreground change would miss in-place fullscreen (YouTube resizes its existing window). A location-change hook fires system-wide on every window/cursor move, which would cost more wake-ups than the poll. |
+| Working-set trimming (`EmptyWorkingSet`) | not used | **Rejected.** It only moves pages to standby and makes Task Manager look smaller, at the cost of page faults. It does not reduce commit. |
+| Shutdown | Event-loop closure (device, surface, window) dropped before the final sample; `gpu_released_before_final_sample=true` in CI | Keep. Verified by the CI check `gpu-objects-released-on-exit`. |
+
+Power consumption itself (package power, GPU power state) was **not measured**. It needs hardware tools
+(e.g. Windows Energy usage, HWiNFO or Intel Power Gadget, as approved). The wake-up bounds above are the
+software-side input to that measurement: ≤2 wake-ups/s idle, ≤1/s hidden, ≤32/s walking.
 
 `Data/s4-render-sample.json` holds CPU-side render+submit+present call durations only. These are not
 GPU time, FPS or present-to-present pacing.
 
-## 3. Hardware results table (fill only from real device logs)
+## 4. Hardware results table (fill only from real device logs)
 
 Budgets are the provisional PP-DT-001 Phase 0 targets, not new targets.
 
 | Metric | Desktop baseline | S4 idle | S4 walking | PP-DT-001 target | Result |
 | --- | --- | --- | --- | --- | --- |
 | CPU % of one logical core | — | TBD | TBD | idle ≤2 %, walking ≤5 % | NOT TESTED |
+| Shared working set MiB (driver/runtime DLLs) | — | TBD | TBD | report | NOT TESTED |
 | Private working set MiB (Task Manager) | — | TBD (`MemoryUsage`) / ~421 (`Performance`, owner) | TBD | ≤350 MiB | PENDING re-test |
 | Private bytes MiB | — | TBD | TBD | report | NOT TESTED |
 | GPU dedicated / shared MiB | TBD | TBD | TBD | report delta | NOT TESTED |

@@ -262,11 +262,13 @@ try {
         exit = $code; hints = $(if ($mem) { $mem.context.memory_hints } else { $null })
         private_mib = $(if ($first) { [Math]::Round($first.counters.private_bytes / 1MB, 1) } else { $null })
         private_ws_mib = $(if ($first -and $first.counters.private_working_set) { [Math]::Round($first.counters.private_working_set / 1MB, 1) } else { $null })
+        shared_ws_mib = $(if ($first -and $null -ne $first.shared_working_set) { [Math]::Round($first.shared_working_set / 1MB, 1) } else { $null })
+        swapchain_mib = $(if ($mem -and $mem.context.swapchain_estimate_bytes) { [Math]::Round($mem.context.swapchain_estimate_bytes / 1MB, 2) } else { $null })
         reserved_mib = $(if ($null -ne (Get-AllocatorReserved $mem 'first-frame')) { [Math]::Round((Get-AllocatorReserved $mem 'first-frame') / 1MB, 1) } else { $null })
         stages = $(if ($mem) { (@($mem.samples | ForEach-Object { '{0}={1:N1}' -f $_.stage, ($_.counters.private_bytes / 1MB) }) -join ' ') } else { '' })
         released = $(if ($mem) { $mem.context.gpu_released_before_final_sample } else { $null })
       }
-      Add-Result "memory-stages-$hint" 'INFO' ("hints=$($ab[$hint].hints) private_bytes_MiB_by_stage: $($ab[$hint].stages) | allocator_reserved_MiB=$($ab[$hint].reserved_mib) private_ws_MiB=$($ab[$hint].private_ws_mib) gpu_released_before_final_sample=$($ab[$hint].released)")
+      Add-Result "memory-stages-$hint" 'INFO' ("hints=$($ab[$hint].hints) private_bytes_MiB_by_stage: $($ab[$hint].stages) | allocator_reserved_MiB=$($ab[$hint].reserved_mib) private_ws_MiB=$($ab[$hint].private_ws_mib) shared_ws_MiB=$($ab[$hint].shared_ws_mib) swapchain_estimate_MiB=$($ab[$hint].swapchain_mib) gpu_released_before_final_sample=$($ab[$hint].released)")
     }
     Assert-True ($ab['memory'].exit -eq 0 -and $ab['performance'].exit -eq 0 -and $ab['memory'].hints -eq 'MemoryUsage' -and $ab['performance'].hints -eq 'Performance') `
       'memory-report-written' 'both hint modes ran and wrote Data/s4-memory.json with per-stage samples'

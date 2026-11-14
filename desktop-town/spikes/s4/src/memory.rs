@@ -28,11 +28,32 @@ pub struct Counters {
     pub peak_working_set: u64,
 }
 
+impl Counters {
+    /// Resident pages that are NOT private to the process: shared DLL images
+    /// (D3D12 runtime, DXGI, DirectComposition, the GPU user-mode driver,
+    /// FXC) and other shareable mappings. `None` without EX2 counters.
+    pub fn shared_working_set(&self) -> Option<u64> {
+        self.private_working_set
+            .map(|private| self.working_set.saturating_sub(private))
+    }
+}
+
+/// Estimated swapchain image memory: width x height x 4 bytes (BGRA8) per
+/// buffer. wgpu's D3D12 backend creates `maximum_frame_latency + 1` buffers
+/// (clamped to at least 2). Swapchain images live in GPU/shared memory, not in
+/// process private bytes; this is an accounting aid, not a measurement.
+pub fn swapchain_estimate_bytes(width: u32, height: u32, maximum_frame_latency: u32) -> u64 {
+    let buffers = u64::from(maximum_frame_latency.saturating_add(1).max(2));
+    u64::from(width) * u64::from(height) * 4 * buffers
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Sample {
     pub stage: String,
     pub elapsed_ms: u64,
     pub counters: Counters,
+    /// Working set minus private working set (shared DLL/driver pages).
+    pub shared_working_set: Option<u64>,
     /// Private-bytes change since the previous sample, in MiB.
     pub private_delta_mib: f64,
 }
@@ -87,6 +108,7 @@ impl Profile {
             stage: stage.to_owned(),
             elapsed_ms,
             counters,
+            shared_working_set: counters.shared_working_set(),
             private_delta_mib: delta,
         });
     }
@@ -159,6 +181,33 @@ mod tests {
             Some(296.0)
         );
         assert_eq!(profile.delta_mib("missing", "first-frame"), None);
+    }
+
+    #[test]
+    fn shared_working_set_is_working_set_minus_private() {
+        let c = counters(10);
+        assert_eq!(c.shared_working_set(), Some(10 * 1024 * 1024));
+        let no_ex2 = Counters {
+            private_working_set: None,
+            ..c
+        };
+        assert_eq!(no_ex2.shared_working_set(), None);
+        let odd = Counters {
+            working_set: 1,
+            private_working_set: Some(5),
+            ..c
+        };
+        assert_eq!(odd.shared_working_set(), Some(0));
+    }
+
+    #[test]
+    fn swapchain_estimate_counts_latency_plus_one_buffers() {
+        // 640x360 BGRA8 = 921,600 bytes per buffer.
+        assert_eq!(swapchain_estimate_bytes(640, 360, 1), 2 * 921_600);
+        assert_eq!(swapchain_estimate_bytes(640, 360, 2), 3 * 921_600);
+        assert_eq!(swapchain_estimate_bytes(640, 360, 0), 2 * 921_600);
+        // 200 % scaling.
+        assert_eq!(swapchain_estimate_bytes(1280, 720, 1), 2 * 3_686_400);
     }
 
     #[test]

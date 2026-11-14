@@ -5,6 +5,7 @@
 #   * Working set (incl. shared DLL pages) Get-Process WorkingSet64
 #   * Private working set                  Win32_PerfFormattedData_PerfProc_Process.WorkingSetPrivate
 #                                          (= Task Manager "Memory" column)
+#   * Shared working set                   working set - private working set (driver/runtime DLL pages)
 #   * GPU dedicated / shared memory        Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory
 #                                          (summed over this PID's adapters)
 #   * CPU % of ONE logical core            TotalProcessorTime delta / wall time
@@ -65,6 +66,8 @@ while (-not $proc.HasExited -and $watch.Elapsed.TotalSeconds -lt $Seconds) {
       private_bytes_mib    = [Math]::Round($proc.PrivateMemorySize64 / 1MB, 2)
       working_set_mib      = [Math]::Round($proc.WorkingSet64 / 1MB, 2)
       private_ws_mib       = $(if ($perf.Count) { [Math]::Round([double]$perf[0].WorkingSetPrivate / 1MB, 2) } else { $null })
+      # Shared resident pages: DLL images (D3D12/DXGI/DComp/GPU driver) and other shareable mappings.
+      shared_ws_mib        = $(if ($perf.Count) { [Math]::Round(($proc.WorkingSet64 - [double]$perf[0].WorkingSetPrivate) / 1MB, 2) } else { $null })
       gpu_dedicated_mib    = $(if ($gpuMem.Count) { [Math]::Round(($gpuMem | Measure-Object -Property DedicatedUsage -Sum).Sum / 1MB, 2) } else { $null })
       gpu_shared_mib       = $(if ($gpuMem.Count) { [Math]::Round(($gpuMem | Measure-Object -Property SharedUsage -Sum).Sum / 1MB, 2) } else { $null })
       cpu_pct_one_core     = $cpuPct
@@ -96,6 +99,7 @@ $summary = [ordered]@{
   private_bytes_mib = Stat 'private_bytes_mib'
   working_set_mib  = Stat 'working_set_mib'
   private_ws_mib   = Stat 'private_ws_mib'
+  shared_ws_mib    = Stat 'shared_ws_mib'
   gpu_dedicated_mib = Stat 'gpu_dedicated_mib'
   gpu_shared_mib   = Stat 'gpu_shared_mib'
   cpu_pct_one_core = Stat 'cpu_pct_one_core'

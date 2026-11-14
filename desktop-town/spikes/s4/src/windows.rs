@@ -152,6 +152,7 @@ struct Vertex {
 
 /// Pal silhouette (6 parts) + 2 eyes, 6 vertices per quad.
 const MAX_VERTICES: usize = 8 * 6;
+const SWAPCHAIN_FRAME_LATENCY: u32 = 1;
 
 struct Renderer {
     surface: wgpu::Surface<'static>,
@@ -326,7 +327,10 @@ impl Renderer {
                 width: size.width.max(1),
                 height: size.height.max(1),
                 present_mode: wgpu::PresentMode::Fifo,
-                desired_maximum_frame_latency: 2,
+                // One queued frame: the overlay renders on demand at <=30 fps,
+                // so a second queued frame only adds a swapchain buffer
+                // (wgpu D3D12 uses latency + 1 buffers) and input latency.
+                desired_maximum_frame_latency: SWAPCHAIN_FRAME_LATENCY,
                 alpha_mode,
                 view_formats: vec![],
             };
@@ -1034,6 +1038,16 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
         t.profile.set(
             "surface",
             format!("{}x{}", renderer.config.width, renderer.config.height),
+        );
+        t.profile
+            .set("swapchain_frame_latency", SWAPCHAIN_FRAME_LATENCY);
+        t.profile.set(
+            "swapchain_estimate_bytes",
+            memory::swapchain_estimate_bytes(
+                renderer.config.width,
+                renderer.config.height,
+                SWAPCHAIN_FRAME_LATENCY,
+            ),
         );
     }
 

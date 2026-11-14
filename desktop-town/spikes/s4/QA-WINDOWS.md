@@ -78,8 +78,9 @@ Optionally, first run `.\QA\test-portable.ps1 -ExtractedFolder .`, which perform
 ## 4. Memory (re-test of the ~421 MiB observation)
 
 Run the A/B and soak commands in PERFORMANCE.md §1, and record Task Manager "Memory" too.
-- [ ] Compare `Data\s4-memory-performance.json` with `Data\s4-memory-memoryusage.json`. Report `private_bytes`
-      and `private_working_set` at `gpu-device` and `first-frame`, and the `gpu_allocator` reserved bytes.
+- [ ] Compare `Data\s4-memory-performance.json` with `Data\s4-memory-memoryusage.json`. Report `private_bytes`,
+      `private_working_set` and `shared_working_set` at `gpu-device` and `first-frame`, the `gpu_allocator`
+      reserved bytes, and `gpu_init_private_mib`.
 - [ ] Task Manager "Memory" for the default (MemoryUsage) build after 1 minute idle.
 - [ ] Extended stability: a 10-minute walking soak plus a 30-minute interactive attach (`-AttachName PixelPals`).
 
@@ -112,6 +113,10 @@ Walking run: the same command with `'--qa-walk'` added to the arguments.
 GPU dedicated/shared MiB. **Fail:** above target.
 
 Frame pacing: use PresentMon (approved tooling only) while walking. The p95 present interval must be ≤33.3 ms.
+
+Power (optional, approved tools only): compare package/GPU power for desktop idle, S4 idle and S4 walking
+(e.g. Windows Settings → System → Power & battery → Battery usage on laptops, or HWiNFO). Report only;
+there is no PP-DT-001 power target.
 
 ## 7. Multiple monitors
 
