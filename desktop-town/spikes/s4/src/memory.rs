@@ -11,6 +11,7 @@
 //! * `private_bytes`       commit charge private to the process (PrivateUsage)
 //! * `working_set`         physical pages mapped, incl. shared DLL pages
 //! * `private_working_set` physical pages private to the process (Task Manager)
+//!
 //! GPU-local video memory is NOT in these counters; use the GPU Process Memory
 //! performance counters (scripts/profile-memory.ps1).
 

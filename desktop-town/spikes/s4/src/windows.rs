@@ -1071,6 +1071,12 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
             t.mark("first-frame");
             t.allocator("first-frame", &renderer);
             log.line(t.profile.summary_line());
+            if let Some(gpu_init) = t.profile.delta_mib("window", "first-frame") {
+                log.line(format!(
+                    "MEM wgpu/driver initialisation (window -> first frame): {gpu_init:+.1} MiB private bytes"
+                ));
+                t.profile.set("gpu_init_private_mib", gpu_init);
+            }
             (attempts, shown)
         }
         Startup::FailedClosed { attempts, reason } => {

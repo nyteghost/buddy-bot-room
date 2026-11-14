@@ -35,8 +35,9 @@ pub fn next_wake<T: Ord + Copy>(
         .fold(fullscreen_poll, Ord::min)
 }
 
-/// Upper bound on wake-ups per second for a state, used by tests and QA to
-/// reason about idle cost (each wake-up is one AboutToWait iteration).
+/// Upper bound on wake-ups per second for a state, used by tests to pin the
+/// idle cost (each wake-up is one AboutToWait iteration).
+#[cfg(test)]
 pub fn max_wakeups_per_second(visible: bool, walking: bool) -> u32 {
     let poll = 1000 / fullscreen_poll_interval(visible).as_millis() as u32;
     if animation_active(visible, walking) {
