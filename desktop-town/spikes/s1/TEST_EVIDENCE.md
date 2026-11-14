@@ -94,6 +94,30 @@ Underlay placement per output verified from the sway tree in every scenario.
 No overlay source code changed between `70a0243` and `7e4fa22`; only the QA
 harness, CI definition and docs.
 
+## Exact-head evidence policy (from the commit after `729ca7e`)
+
+Committing a run result into this file would move the head away from the
+revision the run tested. From now on, **the exact-head CI run, SHA and S1
+tree hash are reported in the PR #46 description and the Issue #37
+`pixel-pals-relay:v1` comment, not in this file.** The probe branch is always
+`<PR head> + .github/workflows/s1-probe.yml` only; `git diff <head> <probe>`
+must list exactly that one file.
+
+## Added gates (PP-DT-005 follow-up) — pre-commit probe run [43617354301](https://github.com/nyteghost/buddy-bot-room/actions/runs/43617354301)
+
+Same S1 sources as the following commit except this file. Conclusion: success, 69 PASS / 0 FAIL across 6 scenarios.
+
+| Gate | What it proves on headless sway | Result (all 6 scenarios) |
+| --- | --- | --- |
+| G8 focus preserved | keyboard-focused window pid is unchanged by overlay map and by 30 Pal clicks | PASS ×6 |
+| G3c SIGKILL fail-closed | after `kill -9` (no cleanup code runs) the former Pal spot reaches the underlay | PASS ×6 |
+| G9 live scale change (→175 %) | overlay stays up, logs `S1_SCALE_CHANGED`/`S1_RESIZED`/`S1_MONITOR_*`, re-applies region; Pal 5/5 at new centre, empty 10/10, 0 spurious | PASS ×6 |
+| G9 live mode change (1600×900) | same, logs `S1_MONITOR_GEOMETRY`/`S1_RESIZED` | PASS ×6 |
+
+Owner-run physical procedure expanded: `qa/DEVICE-QA-CHECKLIST.md`
+sections A–K (adds KDE/KWin behaviour, NVIDIA transparency per GSK renderer,
+focus preservation, fail-closed) and helper `qa/owner_kde_gates.sh`.
+
 ## Still UNVERIFIED (owner hardware, `qa/DEVICE-QA-CHECKLIST.md`)
 
 KWin/Plasma 6 input-region honouring on layer surfaces · NVIDIA driver /

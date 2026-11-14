@@ -8,7 +8,7 @@ permissions, network, user data, Unraid or AI provider usage.
 | Need | Go to |
 | --- | --- |
 | Install / build on CachyOS | [`INSTALL-CACHYOS.md`](INSTALL-CACHYOS.md) |
-| Owner hardware QA (100/30/20, monitors, DPI, games, NVIDIA, fallback) | [`qa/DEVICE-QA-CHECKLIST.md`](qa/DEVICE-QA-CHECKLIST.md) |
+| Owner hardware QA (100/30/20, KWin, NVIDIA alpha, monitors, DPI, games, focus, fail-closed) | [`qa/DEVICE-QA-CHECKLIST.md`](qa/DEVICE-QA-CHECKLIST.md) + helper `qa/owner_kde_gates.sh` |
 | Report form for Independent Desktop QA | [`qa/device-report-template.md`](qa/device-report-template.md) |
 | What was actually run, with CI links | [`TEST_EVIDENCE.md`](TEST_EVIDENCE.md) |
 
@@ -80,6 +80,9 @@ package build, and `qa/wlroots_acceptance.py`:
 - lifecycle cycles followed by a click proving no residual input region;
 - 100 %, 125 %, 150 % and a **mixed 100 % + 150 % dual-output** run with
   output unplug (hotplug fail-closed);
+- keyboard focus unchanged by overlay map and Pal clicks (sway tree);
+- SIGKILL leaves no surface/region; live scale and mode changes on the same
+  output (overlay re-applies its region, or exits fail-closed);
 - fullscreen-window interaction recorded as information.
 
 `qa/wlr-clicker/` is the QA-only virtual pointer (zwlr_virtual_pointer_v1).

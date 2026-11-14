@@ -10,24 +10,21 @@
 - Outputs — connector / resolution / refresh / scale (per output):
 - `XDG_SESSION_TYPE` / `zwlr_layer_shell_v1` present:
 - Cargo fmt / check / clippy / test result and logs (path B):
+- Headless CI run consulted (URL) — informational only, not hardware evidence:
 
-| Gate | Result PASS / FAIL / UNVERIFIED | Evidence location / observations |
+| Section (DEVICE-QA-CHECKLIST.md) | Result PASS / FAIL / UNVERIFIED | Evidence location / observations |
 | --- | --- | --- |
-| G0 environment + `S1_READY`/`S1_ALLOCATED` | UNVERIFIED | |
-| G1 100/100 empty-region click-through | UNVERIFIED | |
-| G2 30/30 Pal clicks (static) + rim probe | UNVERIFIED | |
-| G2b moving hitbox (hits / 20, vacated spot passes) | UNVERIFIED | |
-| G3 20/20 lifecycle cycles + no residual surface | UNVERIFIED | |
-| G3b SIGTERM clean exit | UNVERIFIED | |
-| G4 transparency / no black or opaque surface | UNVERIFIED | |
-| G5 fullscreen borderless — top / bottom | UNVERIFIED | visible? input intercepted? |
-| G5 fullscreen exclusive — top / bottom | UNVERIFIED | visible? input intercepted? |
-| G6 multi-monitor placement (`--all-monitors`, `--monitor`) | UNVERIFIED | |
-| G6 hotplug → `S1_HOTPLUG_EXIT`, nothing left behind | UNVERIFIED | |
-| G7 fractional scale(s) tested: ___ | UNVERIFIED | |
-| G7 live scale change | UNVERIFIED | |
-| G8 NVIDIA stability (no Xid / reset / KWin restart) | UNVERIFIED | |
-| G9 town-only / X11 / `--require-overlay` exit 2 | UNVERIFIED | |
+| A Environment + `$H smoke` | UNVERIFIED | |
+| B 100/100 click-through (static) + 20 moving | UNVERIFIED | |
+| C 30/30 Pal clicks + rim probe (+ moving hits /20) | UNVERIFIED | |
+| D 20/20 lifecycle, nothing left behind | UNVERIFIED | |
+| E KDE/KWin: panel, Overview, virtual desktops, Alt+Tab, lock screen, bottom layer, OSD | UNVERIFIED | |
+| F NVIDIA transparency (ngl / vulkan / cairo), no Xid/reset | UNVERIFIED | |
+| G Multi-monitor placement, per-output clicks, hotplug | UNVERIFIED | |
+| H Fractional scale(s) tested: ___ ; live scale change outcome | UNVERIFIED | |
+| I Fullscreen games: borderless / exclusive × top / bottom | UNVERIFIED | visible? intercepted? |
+| J Focus preservation (typing, Pal clicks, no taskbar/Alt+Tab entry) | UNVERIFIED | |
+| K Fail-closed: SIGTERM, SIGKILL, X11/strict, town-only, unknown monitor | UNVERIFIED | |
 
 - Screenshot/recording before, during, after:
 - Any compositor crash, persistent input interception or black overlay? (automatic FAIL):

@@ -101,7 +101,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           cd "$S1"
-          bash -n qa/environment.sh qa/lifecycle_20.sh qa/ci/headless_session.sh
+          bash -n qa/environment.sh qa/lifecycle_20.sh qa/owner_kde_gates.sh qa/ci/headless_session.sh
           python3 -m py_compile qa/underlay_click_counter.py qa/wlroots_acceptance.py
       - name: GTK runtime tests on headless sway (layer-shell present)
         if: ${{ !cancelled() }}

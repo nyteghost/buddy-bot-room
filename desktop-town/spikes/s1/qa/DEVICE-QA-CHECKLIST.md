@@ -1,97 +1,118 @@
-# S1 device QA checklist — CachyOS · KDE Plasma 6 · Wayland · NVIDIA
+# S1 physical acceptance — CachyOS · KDE Plasma 6 · KWin Wayland · NVIDIA
 
-Only evidence gathered **on the physical machine** counts here. Headless
-wlroots CI results (`qa/wlroots_acceptance.py`) show the code works on *a*
-layer-shell compositor; they are **not** KWin or NVIDIA evidence.
+**Only evidence gathered on the physical machine counts here.** The headless
+CI (sway/weston/Xvfb, software rendering, virtual pointer) shows the code
+works on *a* layer-shell compositor; it is **not** KWin, Plasma or NVIDIA
+evidence. Installing the build on the owner's PC needs the owner's separate
+authorization (see `../INSTALL-CACHYOS.md`).
 
-Binary below = `pixel-pals-s1-kwin-overlay` (installed) or
-`cargo run --locked --` (checkout). Evidence folder:
-`mkdir -p ~/pixel-pals-s1-evidence && cd ~/pixel-pals-s1-evidence`.
-Fill `device-report-template.md` as you go. Mask notifications/usernames.
+## Before you start
 
-Kill switch for every step: `pkill -TERM -f pixel-pals-s1-kwin-overlay`
-(second terminal or Ctrl+Alt+F3 TTY).
+| Item | Command / note |
+| --- | --- |
+| Exact build | `git rev-parse HEAD` in the checkout, or `pacman -Q pixel-pals-s1-overlay-dev` (version ends in `.g<SHA>`) |
+| Helper | `H="bash qa/owner_kde_gates.sh"` (installed: `bash /usr/share/pixel-pals-s1/qa/owner_kde_gates.sh`) |
+| Evidence folder | `~/pixel-pals-s1-evidence/<date>/` (created by the helper) |
+| Kill switch | `pkill -TERM -f pixel-pals-s1-kwin-overlay` from a 2nd Konsole; if the desktop is unusable: Ctrl+Alt+F3 → log in → same command |
+| Screenshots | `spectacle -b -n -o <file>.png` (mask notifications/usernames) |
+| Report | fill `device-report-template.md` as you go |
 
-## Gate 0 — environment and build
+Stop immediately and record **FAIL** on: any `S1_SPURIOUS_CLICK`, a click
+that does not reach the window under an empty area, any black/grey/opaque
+rectangle, a KWin crash/restart, or keyboard focus moving to the overlay.
 
-- [ ] `bash qa/environment.sh | tee env.log` (installed: `/usr/share/pixel-pals-s1/qa/environment.sh`)
-- [ ] `env.log` shows `SESSION_TYPE: wayland`, Plasma/KWin versions, NVIDIA driver, `zwlr_layer_shell_v1`, per-output scale
-- [ ] `git rev-parse HEAD` (or `pacman -Q pixel-pals-s1-overlay-dev`) recorded
-- [ ] Path B only: fmt/check/clippy/test all exit 0 (save output)
-- [ ] `BIN --require-overlay --seconds 5 --speed 0 2>&1 | tee g0.log` prints `S1_READY` and `S1_ALLOCATED`, exits 0
+## A. Environment (Gate 0)
 
-## Gate 1 — 100 empty-region click-through trials
+- [ ] `$H env` → `env.log` shows `SESSION_TYPE: wayland`, Plasma/KWin version, NVIDIA driver, `zwlr_layer_shell_v1`, every output with scale
+- [ ] `$H smoke` → `G0 PASS`; you saw the Pal appear and vanish after 5 s
 
-1. Terminal A: `python3 qa/underlay_click_counter.py | tee g1-underlay.log`
-   (fullscreen grid; it runs via XWayland — that is fine, it is the "desktop").
-2. Terminal B: `BIN --speed 0 --layer top --seconds 900 --trace-region 2>&1 | tee g1-overlay.log`
-3. Click each of the 100 numbered cells once, **outside** the Pal.
+## B. 100 click-through trials (Gate 1)
 
-- [ ] underlay shows `Pass-through: 100/100`, `unique target cells: 100/100`
-- [ ] `grep -c S1_SPURIOUS_CLICK g1-overlay.log` → `0`
-- [ ] `grep -c S1_PAL_CLICK g1-overlay.log` → `0`
+1. Konsole A: `python3 qa/underlay_click_counter.py | tee ~/pixel-pals-s1-evidence/<date>/g1-underlay.log`
+   (grid of 100 numbered targets; runs via XWayland — it is "the desktop").
+   If it hides the Pal (fullscreen X11 stacking), press Esc and maximise it instead; record which.
+2. Konsole B: `$H run --speed 0 --layer top --seconds 900`
+3. Click every numbered cell once, **outside** the Pal.
 
-> If the underlay sits *above* the top-layer overlay (KWin stacking for
-> fullscreen X11 windows), the Pal will not be visible: record it and repeat
-> with the underlay un-fullscreened (Esc, then maximise) — note which you used.
+- [ ] underlay: `Pass-through: 100/100`, `unique target cells: 100/100`
+- [ ] `$H summary` → `pal=0 spurious=0` for that run
+- [ ] Moving variant: restart with `--speed 4`; click 20 cells the Pal has just left → all counted by the underlay, `spurious=0`
 
-## Gate 2 — 30 Pal hitbox clicks (+ moving hitbox)
+## C. 30 Pal hitbox interactions (Gate 2)
 
-- [ ] With `--speed 0`: 30 clicks on the blue disc → `grep -c S1_PAL_CLICK` = 30; underlay count unchanged; 0 spurious
-- [ ] Edge probe: 8 clicks just inside the rim → Pal; 8 clicks ~5 px outside → underlay
-- [ ] `BIN --speed 4 --seconds 120 --trace-region`: 20 attempts to click the moving Pal; record hits; click repeatedly where the Pal **was** → must reach the underlay (0 spurious)
+With `$H run --speed 0 --seconds 900`:
 
-## Gate 3 — 20 overlay lifecycle cycles
+- [ ] 30 clicks on the blue disc → `pal=30`, underlay count unchanged, `spurious=0`
+- [ ] Rim: 8 clicks just inside the edge → Pal; 8 clicks ~5 px outside → underlay
+- [ ] Moving: `$H run --speed 4 --seconds 120`; 20 attempts on the moving Pal; record hits/20 (timing-dependent, not pass/fail on its own)
 
-- [ ] `bash qa/lifecycle_20.sh` (installed: `S1_BIN=/usr/bin/pixel-pals-s1-kwin-overlay bash /usr/share/pixel-pals-s1/qa/lifecycle_20.sh`) → `20/20`
-- [ ] After the run: no Pal remains on screen, desktop clicks work where the Pal was, no KWin restart/notification
-- [ ] `BIN --seconds 600` then `pkill -TERM -f pixel-pals-s1-kwin-overlay` → `S1_SIGNAL_EXIT`, surface disappears
+## D. 20 overlay lifecycle cycles (Gate 3)
 
-## Gate 4 — transparency
+- [ ] `$H lifecycle` → `20/20 process lifecycle cycles succeeded`
+- [ ] Afterwards: no Pal anywhere, clicks work where it was, no KWin notification/restart
 
-- [ ] Patterned wallpaper or window behind. `spectacle -b -n -o before.png`; start overlay `--speed 0`; `spectacle -b -n -o during.png`; quit; `spectacle -b -n -o after.png`
-- [ ] Only the Pal and faint home marker differ; no black/grey rectangle, no flicker at any time
-- [ ] If Spectacle cannot capture layer surfaces, record that and use an OBS screencast instead — **do not mark PASS without an image**
+## E. KDE / KWin behaviour (KWin-specific, not covered by CI)
 
-## Gate 5 — fullscreen game behaviour (save your game first)
+With `$H run --speed 4 --seconds 900` running, check and note each:
 
-For each of `--layer top` and `--layer bottom`, and for **borderless** then **exclusive** fullscreen:
+- [ ] Plasma panel: Pal never covers the panel; panel stays clickable (surface uses `exclusive_zone=0`)
+- [ ] Overview / Desktop Grid (Meta+W / Meta+G): no crash; note whether the Pal is shown
+- [ ] Virtual desktop switch (Ctrl+F1..F4 or Meta+Ctrl+arrows): Pal stays, no stuck input
+- [ ] Alt+Tab and Meta (launcher) open and work normally over the Pal
+- [ ] Lock screen (Meta+L) then unlock: Pal not visible on the lock screen; works after unlock
+- [ ] `--layer bottom`: Pal hidden behind normal windows; visible on an empty desktop; clicks on it work only where it is visible
+- [ ] Notifications/OSD (volume keys) appear normally
 
-- [ ] Is the Pal visible over the game? (yes/no)
-- [ ] Game mouse + keyboard work everywhere, including where the Pal is drawn
-- [ ] Alt+Tab out and back works; no focus theft; no stutter/tearing you did not see without the overlay
-- [ ] Any `S1_PAL_CLICK` while clicking in-game at the Pal spot? (record — that is interception)
+## F. NVIDIA transparency (Gate 4 + 8)
 
-Any game input interception = **FAIL** → stop overlay; the safe mode is `--town-only` / quit.
+Put a patterned wallpaper or a window with fine detail behind the Pal.
 
-## Gate 6 — multi-monitor + hotplug
+- [ ] `before.png` → `$H run --speed 0 --seconds 120` → `during.png` → stop → `after.png`: only Pal + faint home marker differ; no black/grey box, no halo, no flicker
+- [ ] Repeat with each GTK renderer and note differences:
+      `GSK_RENDERER=ngl …`, `GSK_RENDERER=vulkan …`, `GSK_RENDERER=cairo …` (prefix the `$H run` command)
+- [ ] `nvidia-smi` before/after; `journalctl -b --since "-20 min" | grep -iE 'nvidia|NVRM|Xid|kwin'` saved — no Xid, GPU reset or kwin_wayland crash
+- [ ] If Spectacle cannot capture layer surfaces: record that and use an OBS screencast; no image = **UNVERIFIED**, never PASS
 
-- [ ] `BIN --all-monitors --speed 0 --trace-region`: one `S1_READY`/`S1_ALLOCATED` per output; Pal centred on each
-- [ ] Repeat Gate 1 (≥20 clicks) and Gate 2 (≥10 clicks) on **each** output
-- [ ] `--monitor <CONNECTOR>` places the Pal on the named output
-- [ ] Unplug/disable one output (System Settings → Display, or cable) → `S1_HOTPLUG_EXIT`, process exits, **no Pal left on any output**, clicks fine everywhere
+## G. Multiple monitors + hotplug (Gate 6)
 
-## Gate 7 — fractional DPI
+- [ ] `$H run --all-monitors --speed 0`: one `S1_READY` + `S1_ALLOCATED` per output, Pal centred on each
+- [ ] On **each** output: ≥20 empty-area clicks reach the window below; ≥10 Pal clicks log `S1_PAL_CLICK monitor=<connector>`
+- [ ] `--monitor <CONNECTOR>` (names from `S1_OUTPUT` lines) places the Pal on that output only
+- [ ] Disable/unplug one output (System Settings → Display or cable): `S1_HOTPLUG_EXIT`, process exits, **no Pal left on any output**, clicks fine everywhere
 
-For each scale you actually use (100 %, 125 %, 150 %, 175 % …) and a mixed-scale pair if you have one:
+## H. Fractional scaling (Gate 7)
 
-- [ ] `S1_ALLOCATED … surface_scale=` matches the output scale
-- [ ] Gate 1 (≥20) + Gate 2 edge probe pass; art and hitbox line up (no offset, no gap ring)
-- [ ] Change scale **while running** → `S1_SCALE_CHANGED`/`S1_RESIZED`; hitbox still lines up
+For each scale you actually use (100/125/150/175 %) and a mixed-scale pair if available:
 
-## Gate 8 — NVIDIA driver
+- [ ] `S1_ALLOCATED … surface_scale=` equals the output scale
+- [ ] 20 empty clicks + rim probe pass; art and hitbox line up (no offset, no gap ring)
+- [ ] Change scale **while running** (System Settings → Display → Scale → Apply): either the overlay stays up and logs `S1_SCALE_CHANGED`/`S1_RESIZED` with a correctly aligned hitbox, or it exits with `S1_HOTPLUG_EXIT` leaving nothing behind — record which
 
-- [ ] `nvidia-smi` before/after and `journalctl -b --since "-15 min" | grep -iE 'nvidia|kwin|xid'` saved
-- [ ] No black overlay, Xid errors, GPU reset, kwin_wayland crash or restart during Gates 1–7
+## I. Fullscreen games (Gate 5) — save your game first
 
-## Gate 9 — safe fallback
+For `--layer top` and `--layer bottom`, each with **borderless** and **exclusive** fullscreen:
 
-- [ ] `BIN --town-only --seconds 30` → small normal window only; desktop fully usable
-- [ ] Plasma (X11) session, if available: `BIN --seconds 30` → `S1_SAFE_FALLBACK reason=Not a native Wayland GDK display` + town window; `--require-overlay` exits code 2
-- [ ] `GDK_BACKEND=x11 BIN --require-overlay --seconds 5; echo $?` inside Wayland → `2`
+- [ ] Is the Pal visible over the game? (yes/no; headless sway: no)
+- [ ] Mouse + keyboard work everywhere in the game, including where the Pal would be
+- [ ] `$H summary`: no `S1_PAL_CLICK` while you were only clicking in-game
+- [ ] Alt+Tab out/in works; no stutter/tearing beyond the no-overlay baseline (compare a run without S1)
+
+Any in-game input interception = **FAIL**; mitigation is quit / `--town-only`.
+
+## J. Focus preservation (Gate 8)
+
+- [ ] Click into a text editor (Kate) and start typing; in another Konsole launch `$H run --speed 4 --seconds 120` **without clicking anything** → typing continues in Kate uninterrupted
+- [ ] Click the Pal 5 times, then type immediately → text goes to Kate (the Pal never takes keyboard focus; layer keyboard mode is `None`)
+- [ ] The task bar never shows an entry for the overlay; Alt+Tab never offers it
+
+## K. Fail-closed behaviour (Gates 6, 9)
+
+- [ ] `$H failclosed`: SIGTERM PASS; after SIGKILL the Pal is gone and the spot is clickable (answer `y`); `strict-x11-exit=2`; `default-x11-exit=0` with a town-only window; `town-only-exit=0`; `unknown-monitor-exit=2`; "town-only windows shown (expect 2): 2"
+- [ ] Plasma X11 session (if installed): `pixel-pals-s1-kwin-overlay --seconds 20` → `S1_SAFE_FALLBACK reason=Not a native Wayland GDK display` + small town window only
 
 ## Verdict
 
-Copy results into `device-report-template.md`: PASS / FAIL / UNVERIFIED per
-gate, exact SHA, versions, log + image filenames. Persistent interception,
-black/opaque overlay or compositor crash anywhere = **automatic FAIL**.
+Record PASS / FAIL / UNVERIFIED per section in `device-report-template.md`
+with the exact SHA, versions, log and image filenames. Persistent
+interception, a black/opaque overlay, focus theft or a compositor crash
+anywhere = **automatic FAIL** / NO-GO.

@@ -58,7 +58,7 @@ package() {
   install -Dm755 "${srcdir}/target/release/pixel-pals-s1-kwin-overlay" \
     "${pkgdir}/usr/bin/pixel-pals-s1-kwin-overlay"
   install -d "${pkgdir}/usr/share/pixel-pals-s1/qa"
-  install -m755 qa/environment.sh qa/lifecycle_20.sh qa/underlay_click_counter.py \
+  install -m755 qa/environment.sh qa/lifecycle_20.sh qa/owner_kde_gates.sh qa/underlay_click_counter.py \
     "${pkgdir}/usr/share/pixel-pals-s1/qa/"
   install -m644 qa/device-report-template.md qa/DEVICE-QA-CHECKLIST.md \
     "${pkgdir}/usr/share/pixel-pals-s1/qa/"

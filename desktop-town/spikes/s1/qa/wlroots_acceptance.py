@@ -223,6 +223,17 @@ def place(s: "Session", proc: Proc, output: str) -> bool:
     return output_of_pid(s.swaymsg("get_tree", json_out=True), pid) == output
 
 
+def focused_pid(tree: dict) -> int | None:
+    """pid of the view holding keyboard focus (layer surfaces never appear)."""
+    if tree.get("focused") and tree.get("pid"):
+        return tree["pid"]
+    for child in tree.get("nodes", []) + tree.get("floating_nodes", []):
+        found = focused_pid(child)
+        if found:
+            return found
+    return None
+
+
 def pal_centres(overlay: Proc, outputs: dict[str, dict]) -> dict[str, tuple[float, float]]:
     """Latest Pal centre per connector in *layout* coordinates from S1_REGION."""
     centres = {}
@@ -311,6 +322,7 @@ def run(args) -> int:
         s.record("setup", "INFO", "underlay placement verified from compositor tree",
                  placement={n: output_of_pid(tree, u.p.pid) for n, u in zip(outputs, underlays)})
         before = s.screenshot("transparency-0-before", primary)
+        focus_pre = focused_pid(s.swaymsg("get_tree", json_out=True))
 
         multi = len(outputs) > 1
         ov_args = ["--require-overlay", "--speed", "0", "--seconds", "900", "--trace-region", "--layer", "top"]
@@ -341,7 +353,13 @@ def run(args) -> int:
                  f"{c['underlay'] - base['underlay']}/{total} underlay clicks, pal={c['pal'] - base['pal']}, "
                  f"spurious={c['spurious']}")
 
+        # Gate 8a: launching/mapping the overlay must not take keyboard focus.
+        focus_before_overlay = focus_pre
+        focus_after_map = focused_pid(s.swaymsg("get_tree", json_out=True))
         # Gate 2: clicks on the Pal (jittered inside radius-6).
+        s.swaymsg(f"[pid={underlays[0].p.pid}] focus")
+        time.sleep(0.2)
+        focus_before_pal = focused_pid(s.swaymsg("get_tree", json_out=True))
         base = counts(overlay, *underlays)
         per_output_pal = max(1, args.pal_clicks // len(outputs))
         for name in outputs:
@@ -357,6 +375,14 @@ def run(args) -> int:
         s.record("G2-pal-hitbox", "PASS" if ok else "FAIL",
                  f"{c['pal'] - base['pal']}/{total} Pal clicks, underlay={c['underlay'] - base['underlay']}, "
                  f"spurious={c['spurious']}")
+        focus_after_pal = focused_pid(s.swaymsg("get_tree", json_out=True))
+        underlay_pids = {u.p.pid for u in underlays}
+        ok = (focus_before_overlay in underlay_pids and focus_after_map == focus_before_overlay
+              and focus_before_pal in underlay_pids and focus_after_pal == focus_before_pal)
+        s.record("G8-focus-preserved", "PASS" if ok else "FAIL",
+                 f"keyboard focus pid before overlay={focus_before_overlay}, after map={focus_after_map}; "
+                 f"before Pal clicks={focus_before_pal}, after {total} Pal clicks={focus_after_pal} "
+                 f"(underlays={sorted(underlay_pids)})")
 
         # Gate 7 (scaling): hitbox edge precision, 8 directions per output.
         base = counts(overlay, *underlays)
@@ -461,6 +487,86 @@ def run(args) -> int:
         s.record("G3-lifecycle", "PASS" if ok else "FAIL",
                  f"{args.lifecycle - len(failures)}/{args.lifecycle} clean cycles (failed={failures}); "
                  f"no residual input region={residual_ok}; screen identical after exit={after_ok}")
+
+        # Gate 3c: SIGKILL (no cleanup code runs) must still leave nothing behind.
+        killed = s.spawn("overlay-sigkill", "--require-overlay", "--speed", "0", "--seconds", "900",
+                         "--monitor", primary)
+        mapped = killed.wait_for("S1_ALLOCATED")
+        time.sleep(0.3)
+        b0 = counts(killed, *underlays)
+        s.click(*centres[primary])
+        took_click = counts(killed, *underlays)["pal"] - b0["pal"] == 1
+        killed.p.kill()
+        killed.p.wait(5)
+        time.sleep(0.3)
+        b1 = counts(*underlays)
+        s.click(*centres[primary])
+        released = counts(*underlays)["underlay"] - b1["underlay"] == 1
+        ok = mapped and took_click and released
+        s.record("G3c-sigkill-fail-closed", "PASS" if ok else "FAIL",
+                 f"overlay mapped={mapped}, Pal took click while alive={took_click}; after SIGKILL the same "
+                 f"spot reached the underlay={released}")
+
+        # Gate 9: live monitor changes on the same output (no hotplug).
+        orig_scale = float(outputs[primary].get("scale") or 1.0)
+        changes = [("scale", f"scale {1.75 if abs(orig_scale - 1.75) > 0.01 else 1.0}"),
+                   ("mode", "mode --custom 1600x900@60Hz")]
+        for kind, command in changes:
+            live = s.spawn(f"overlay-live-{kind}", "--require-overlay", "--speed", "0", "--seconds", "900",
+                           "--trace-region", "--monitor", primary)
+            live.wait_for("S1_REGION")
+            time.sleep(0.3)
+            regions_before = live.count("S1_REGION")
+            try:
+                s.swaymsg(f"output {primary} {command}")
+            except RuntimeError as exc:
+                s.record(f"G9-live-{kind}", "INFO", f"compositor rejected '{command}': {exc}")
+                live.stop()
+                continue
+            time.sleep(1.5)
+            s.refresh_extent()
+            now = {o["name"]: o for o in s.outputs()}
+            if live.p.poll() is not None:
+                # Fail-closed path: process quit; nothing may remain interactive.
+                b0 = counts(*underlays)
+                s.click(*pal_centres(live, outputs).get(primary, centres[primary]))
+                released = counts(*underlays)["underlay"] - b0["underlay"] == 1
+                ok = "S1_HOTPLUG_EXIT" in live.text() and live.p.returncode == 0 and released
+                s.record(f"G9-live-{kind}", "PASS" if ok else "FAIL",
+                         f"'{command}': overlay exited fail-closed (code={live.p.returncode}); "
+                         f"old Pal spot passes through={released}")
+            else:
+                time.sleep(0.4)
+                new_centre = pal_centres(live, now)[primary]
+                b0 = counts(live, *underlays)
+                for k in range(5):
+                    s.click(new_centre[0] + (k - 2) * 4, new_centre[1])
+                pal_hits = counts(live, *underlays)["pal"] - b0["pal"]
+                b1 = counts(live, *underlays)
+                for (x, y) in empty_points(now[primary]["rect"], new_centre, 10):
+                    s.click(x, y)
+                passed = counts(live, *underlays)["underlay"] - b1["underlay"]
+                c = counts(live, *underlays)
+                logged = [l.split()[0] for l in live.text().splitlines()
+                          if l.startswith(("S1_SCALE_CHANGED", "S1_RESIZED", "S1_MONITOR_"))]
+                ok = (pal_hits == 5 and passed == 10 and c["spurious"] == 0
+                      and live.count("S1_REGION") > regions_before)
+                s.record(f"G9-live-{kind}", "PASS" if ok else "FAIL",
+                         f"'{command}': overlay stayed up, region re-applied (S1_REGION {regions_before}->"
+                         f"{live.count('S1_REGION')}); Pal at new centre {pal_hits}/5; empty {passed}/10; "
+                         f"spurious={c['spurious']}; events={sorted(set(logged))}",
+                         rect=now[primary]["rect"], scale=now[primary].get("scale"))
+            live.stop()
+            # restore the original output configuration for the remaining gates
+            restore = f"scale {orig_scale}" if kind == "scale" else (
+                f"mode --custom {outputs[primary]['current_mode']['width']}x"
+                f"{outputs[primary]['current_mode']['height']}@60Hz")
+            try:
+                s.swaymsg(f"output {primary} {restore}")
+            except RuntimeError:
+                pass
+            time.sleep(1.0)
+            s.refresh_extent()
 
         # Gate 5 (informational on sway): fullscreen window vs top/bottom layer.
         for layer in ("top", "bottom"):

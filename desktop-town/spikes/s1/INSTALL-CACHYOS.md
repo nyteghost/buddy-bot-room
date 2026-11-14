@@ -89,4 +89,7 @@ cargo run --locked -- --help
 Useful flags: `--monitor DP-1` (connector from `S1_OUTPUT` lines),
 `--all-monitors`, `--layer bottom`, `--town-only`, `--require-overlay`.
 
-Then continue with [`qa/DEVICE-QA-CHECKLIST.md`](qa/DEVICE-QA-CHECKLIST.md).
+Then continue with [`qa/DEVICE-QA-CHECKLIST.md`](qa/DEVICE-QA-CHECKLIST.md). The helper
+`qa/owner_kde_gates.sh` (installed under `/usr/share/pixel-pals-s1/qa/`) runs
+the automatable parts (`env`, `smoke`, `lifecycle`, `failclosed`) and logs
+interactive runs (`run …`) to `~/pixel-pals-s1-evidence/<date>/`.
