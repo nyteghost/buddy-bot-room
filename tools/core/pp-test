@@ -99,13 +99,16 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     try:
         checks = [c for c in CHECKS + desktop_checks() if args.preset in c[4]]
+        if args.only:  # filters built-in checks; explicit --cmd checks always run
+            unknown = set(args.only) - {c[0] for c in checks}
+            if unknown:
+                raise ToolError(f"--only names not in preset {args.preset!r}: {sorted(unknown)}")
+            checks = [c for c in checks if c[0] in args.only]
         for spec in args.cmd:
             name, level, command = (spec.split(":", 2) + ["", ""])[:3]
             if level not in pplib.EVIDENCE_LEVELS or not name or not command:
                 raise ToolError(f"--cmd must be NAME:LEVEL:COMMAND with LEVEL in {pplib.EVIDENCE_LEVELS}")
             checks.append((name, level, shlex.split(command), [], {args.preset}))
-        if args.only:
-            checks = [c for c in checks if c[0] in args.only]
         if args.list:
             for c in checks:
                 print(f"{c[0]:<20} {c[1]:<12} {shlex.join(c[2])}")

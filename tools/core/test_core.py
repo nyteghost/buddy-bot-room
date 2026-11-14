@@ -284,6 +284,25 @@ class Lifecycle(unittest.TestCase):
         code, doc, checks = self.verify(got, "--test-results", str(results))
         self.assertEqual((1, "failed"), (code, checks["claimed-tests"]["status"]))
 
+    def test_pp_test_only_keeps_custom_checks_and_records_not_run(self):
+        # security-lint (ChatGPT tool) runs for real against the synthetic branch
+        r = self.tool("pp-test", "--only", "security-lint", "--cmd", "extra:static:git --version",
+                      "--cmd", "missing:unit:definitely-not-installed-xyz", "--output", "tools/out/t.json")
+        doc = json.loads((self.repo / "tools" / "out" / "t.json").read_text())
+        by = {x["name"]: x for x in doc["results"]}
+        self.assertEqual({"security-lint", "extra", "missing"}, set(by))
+        self.assertEqual("pass", by["security-lint"]["status"])
+        self.assertEqual("pass", by["extra"]["status"])
+        self.assertEqual("not_run", by["missing"]["status"])
+        self.assertIn("not installed", by["missing"]["reason"])
+        self.assertEqual(0, r.returncode, r.stdout)
+        self.assertEqual(2, self.tool("pp-test", "--only", "nope").returncode)
+
+    def test_dirty_tree_is_flagged(self):
+        (self.repo / "app" / "feature.txt").write_text("uncommitted\n")
+        self.tool("pp-test", "--preset", "desktop", "--cmd", "x:unit:git --version", "--output", "tools/out/d.json")
+        self.assertTrue(json.loads((self.repo / "tools" / "out" / "d.json").read_text())["dirty"])
+
     def test_invalid_sha_is_tool_error(self):
         r = self.tool("verify-claim", "--branch", self.BRANCH, "--sha", "abc", "--agent", self.AGENT, "--json")
         self.assertEqual(2, r.returncode)
