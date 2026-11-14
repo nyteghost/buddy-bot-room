@@ -22,9 +22,24 @@ clicks there go to the application underneath. There is no WebView2 dependency.
 * **DPI:** PerMonitorV2 (embedded manifest and runtime opt-in). Geometry is stored in logical pixels and
   converted with the window's scale factor; `WM_DPICHANGED` resizes the window and rebuilds the region.
   The overlay is placed inside the chosen monitor's work area (negative virtual coordinates supported).
-* **Fullscreen safety:** every 500 ms (1 s while hidden) the overlay hides when Windows reports an exclusive
-  Direct3D app or presentation mode, or when a caption-less window covers the overlay's monitor. The desktop
-  wallpaper (`Progman`/`WorkerW`) and maximised captioned windows do not count as fullscreen.
+* **Fullscreen safety (explicit policy, not z-order):** the overlay is a *topmost* window, so ordinary
+  stacking would keep it above a non-topmost fullscreen browser or game. It disappears because
+  `fullscreen::hide_reason` asks it to. Every 500 ms (1 s while hidden) it hides when Windows reports an
+  exclusive Direct3D app (`ExclusiveD3d`) or presentation mode (`PresentationMode`), or when a
+  caption-less foreground window covers the overlay's monitor (`CoversMonitor { class_name }`, e.g.
+  `Chrome_WidgetWin_1` for fullscreen YouTube). The reason is logged as
+  `fullscreen policy: overlay hidden, reason=…`. The desktop wallpaper (`Progman`/`WorkerW`) and maximised
+  captioned windows do not count. Only browser video has been owner-observed; games are not yet validated.
+* **GPU adapter policy (explicit):** all adapters are enumerated and logged (`adapter candidate: …`).
+  Only those with a supported surface **and** a transparent alpha mode are eligible.
+  - Default `--gpu-preference=low-power`: integrated > discrete > virtual > other > software.
+  - `--gpu-preference=high-performance`: discrete first.
+  - The default keeps the discrete GPU free for games and avoids waking it on hybrid laptops. The owner's
+    machine therefore selected "Intel(R) Graphics (IntegratedGpu)".
+  - Whether integrated rendering costs extra when the monitor is wired to a discrete GPU (cross-adapter
+    copy by DWM) must be measured. See QA-WINDOWS.md §9.
+* **Memory:** wgpu `MemoryHints::MemoryUsage` (8/4 MiB D3D12 suballocation blocks instead of 256/64 MiB).
+  Every run writes `Data/s4-memory.json` with a per-stage breakdown. See PERFORMANCE.md §1.
 * **Idle:** rendering is event-driven. With the Pal idle, no frames are drawn and the only timer is the
   fullscreen probe; while walking, a 33 ms tick drives movement. Hidden overlays stop animating.
 * **Launch safety (QA finding F5):** the window is created hidden **with an empty window region**, so it can
@@ -47,6 +62,10 @@ PixelPals-Portable/
     settings.json        version, Pal position, click count, walking flag (no secrets)
     s4-last-run.log      diagnostics from the most recent run
     s4-render-sample.json  CPU-side render call timings (not GPU/FPS)
+    s4-memory.json       per-stage process memory + wgpu suballocator report
+  QA/
+    test-portable.ps1    automated portable checks (read-only apart from Data/)
+    profile-memory.ps1   read-only CPU/memory/GPU-memory sampler (PERFORMANCE.md)
 ```
 
 * No installer, administrator rights, registry keys, services, AppData fallback or network.
@@ -64,6 +83,7 @@ never plaintext secrets in `Data/`. The spike implements no credentials.
 ```
 PixelPals.exe [--monitor-index=N] [--self-test] [--smoke-test-ms=N [--smoke-click]]
               [--qa-fault-first-frame=timeout|lost|outdated|fatal[:COUNT|:never]]
+              [--gpu-preference=low-power|high-performance] [--qa-memory-hints=memory|performance] [--qa-walk]
 ```
 
 | Flag | Purpose |
@@ -72,6 +92,9 @@ PixelPals.exe [--monitor-index=N] [--self-test] [--smoke-test-ms=N [--smoke-clic
 | `--self-test` | headless Data/ round-trip in an isolated sub-folder; no window |
 | `--smoke-test-ms=N` | automation: run the real overlay for N ms, save, write `Data/s4-smoke.json`, exit |
 | `--smoke-click` | automation: count one synthetic Pal click before the smoke exit (not OS mouse evidence) |
+| `--gpu-preference=…` | adapter ordering; default `low-power` (integrated first) |
+| `--qa-memory-hints=…` | QA A/B: `performance` restores wgpu's 256/64 MiB suballocation blocks |
+| `--qa-walk` | QA soak (smoke runs only): start walking and restart at the boundary |
 | `--qa-fault-first-frame=…` | QA only: the first COUNT (or all, `never`) first-frame presents report the given failure, to exercise the fail-closed handshake on a real desktop |
 
 Exit codes: 0 success, 1 fail-closed (no safe transparent GPU path, corrupt settings, Win32 failure),

@@ -1,103 +1,168 @@
-# Independent Windows 11 hardware QA — S4 portable overlay
-
-**Status: NOT STARTED on physical hardware.** CI (GitHub-hosted `windows-2025`, WARP software adapter,
-admin account, single virtual display at 100%) only proves the items marked *CI* below.
+# Windows 11 hardware QA — S4 portable overlay
 
 Do **not** test on employer-managed hardware without written IT approval. Do not bypass SmartScreen,
-AppLocker, WDAC, antivirus or other policies; record what they do.
+AppLocker, WDAC or antivirus; record what they do.
 
-For every item record PASS / FAIL / NOT TESTED plus: device model, Windows build, GPU + driver version,
-monitor layout and per-monitor scaling, exact commit SHA, `PixelPals-Portable.zip` SHA-256 (from
-`PixelPals-Portable.zip.sha256`), and the `Data/s4-last-run.log` + screenshots/video.
+For every item, record PASS / FAIL / NOT TESTED, plus:
+* device model and Windows build;
+* every GPU and its driver, and which GPU drives each monitor;
+* monitor layout and per-monitor scaling;
+* exact commit SHA and `PixelPals-Portable.zip` SHA-256;
+* `Data\s4-last-run.log`, `Data\s4-memory.json`, and screenshots/video.
 
-## 0. Preparation
+All helper scripts are read-only apart from `Data\` and ship in the ZIP under `QA\`.
+`PixelPals.exe` is a GUI-subsystem program, so read exit codes with
+`(Start-Process .\PixelPals.exe -ArgumentList … -Wait -PassThru).ExitCode`.
 
-- [ ] Download the CI artifact `PixelPals-Portable-<sha>` from the PR's "Desktop Town S4" workflow run; verify
-      the ZIP SHA-256 and `BUILD-INFO.txt` commit.
-- [ ] Use a standard (non-administrator) Windows 11 account. Optionally disconnect the network.
+## Evidence status
 
-## 1. Portable launch (requirements 1–6)
+| Area | CI runner (windows-2025, WARP, admin, 1024x768 @100 %) | Owner hardware (PP-DT-WIN-HW-001, `24ab26d`) | Still required on hardware |
+| --- | --- | --- | --- |
+| Portable launch, no installer/admin, Data/ beside exe | PASS (asInvoker manifest, extracted ZIP) | PASS (Documents/OneDrive folder) | standard-user account + SmartScreen/WDAC record |
+| D3D12 + DirectComposition PreMultiplied alpha | PASS (WARP) | PASS (Intel integrated) | discrete GPU, other vendors |
+| First-frame fail-closed (F5) | PASS (fault injection + external HWND observer) | not run | §1 |
+| Transparent-area click-through | not testable | PASS (browser control) | §3 100/100 count, other processes |
+| Pal hit-testing while moving | unit tests only | left/right click PASS | §3 30/30 + moving sample |
+| Fullscreen hiding | policy unit tests | PASS (YouTube browser fullscreen) | §5 games, exclusive fullscreen, slideshow |
+| Persistence across restart / exe replacement | PASS | PASS (restart) | USB, read-only |
+| 20 launch/exit cycles | PASS (20/20, no orphans or temp files) | not run | §2 |
+| Memory | per-stage report; MemoryUsage 84.7 MiB vs Performance 392.4 MiB private bytes at first frame; 30 s walking soak +0.9 MiB | ~421 MiB Task Manager (Performance-hints build) | §4 re-measure new build + A/B |
+| CPU/GPU idle and walking | WARP numbers only (not meaningful) | 0 % at sampled instants | §6 with profile-memory.ps1 |
+| Multi-monitor / mixed DPI / hotplug | geometry + placement unit tests | single 3440x1440 @100 % | §7, §8 |
+| Gaming FPS / frametime / VRAM | none | none | §10 |
+| Integrated vs discrete selection | policy unit tests | Intel integrated selected | §9 |
 
-- [ ] Extract to a writable folder (e.g. `Documents\PixelPals-Portable`). Double-click `PixelPals.exe`.
-      Expect: no UAC prompt, no console window, no installer, Pal appears near the top-left of the primary
-      monitor's work area. Record SmartScreen/WDAC outcome without bypassing.
-- [ ] Run `scripts\test-portable.ps1 -ExtractedFolder <folder>` from the source tree (or copy the script) as
-      the standard user. All checks PASS (read-only check may report SKIPPED only on privileged accounts).
-      *CI: passes as admin on WARP.*
-- [ ] Network disconnected: launch, toggle walking, right-click exit, relaunch. Pal position/click count persist.
-- [ ] `Data\s4-last-run.log` shows `backend=Dx12`, the real adapter name, `alpha=PreMultiplied`. Record it.
-      If D3D12 is refused, record the full fail-closed message (no black/opaque rectangle may appear).
-- [ ] Task Manager: no service, no child processes, no elevated token (Details → "Elevated" column = No).
-- [ ] Autoruns/registry check: no Run keys, services or scheduled tasks created.
+## 1. First-frame safety (F5)
 
-## 1a. First-frame safety (F5) on the real GPU
+Keep Notepad open behind the overlay position and screen recording on.
+- [ ] `--smoke-test-ms=4000 --qa-fault-first-frame=timeout:never` → exit code **4** within ~3 s.
+      Nothing ever appears, and typing and clicking in Notepad are unaffected.
+      The log contains `FIRST FRAME FAIL-CLOSED`, and `settings.json` is unchanged.
+      Repeat with `lost:never`, `outdated:never` and `fatal:1`.
+- [ ] `--qa-fault-first-frame=lost:3` (and `timeout:3`, `outdated:3`) → the Pal appears normally.
+      The log shows `first frame presented after 4 attempt(s)`, with no black, white or opaque flash before it.
+- [ ] Or run `.\QA\test-portable.ps1 -ExtractedFolder .`; its section 6 automates this with an external observer.
 
-Run from a PowerShell prompt in the extracted folder, with a visible app (e.g. Notepad) behind the overlay
-position, and screen-record each run:
+**Pass:** every case behaves as stated. **Fail:** any visible rectangle, any intercepted click, or any other exit code.
 
-- [ ] `(Start-Process .\PixelPals.exe -ArgumentList '--smoke-test-ms=4000','--qa-fault-first-frame=timeout:never' -Wait -PassThru).ExitCode`
-      → prints 4 within ~3 s (PixelPals.exe is a GUI-subsystem exe, so use `Start-Process -Wait`, not
-      `$LASTEXITCODE`); **nothing appears**; clicks/typing in Notepad at the overlay position are
-      unaffected throughout; `Data\s4-last-run.log` says `FIRST FRAME FAIL-CLOSED`; settings.json unchanged.
-- [ ] Repeat with `lost:never`, `outdated:never`, `fatal:1`.
-- [ ] `--qa-fault-first-frame=lost:3` (and `timeout:3`, `outdated:3`) → Pal appears normally after the
-      retries, log shows `first frame presented after 4 attempt(s)`; no black/opaque/white flash beforehand.
-- [ ] Optional: `test-portable.ps1` section 6 performs the same checks automatically with an external
-      `IsWindowVisible`/`GetWindowRgnBox` observer; record its output on the physical machine.
+## 2. 20 launch/exit cycles
 
-## 2. Transparency and click-through (A6)
+Repeat 20 times:
+1. Double-click `PixelPals.exe` and wait until the Pal is visible.
+2. Left-click the Pal so it walks, and wait 5 s.
+3. Right-click the Pal to exit.
+4. Confirm in Task Manager that `PixelPals.exe` is gone.
 
-- [ ] Over a white and a dark wallpaper, the overlay shows only the Pal; no black, grey or white rectangle,
-      including right after launch, after hide/show and after a DPI change.
-- [ ] **100/100 empty-area clicks** inside the 640x360 overlay bounds but outside the silhouette reach a button
-      in **another process** behind it (e.g. a test page or Notepad). Record coordinates.
-- [ ] **30/30 Pal clicks** register (`PAL_CLICK n` in the log) and the app underneath receives none.
-- [ ] Hover/scroll outside the silhouette goes to the underlying app.
+Optionally, first run `.\QA\test-portable.ps1 -ExtractedFolder .`, which performs 20 automated smoke cycles.
 
-## 3. Focus and z-order
+**Pass:**
+- 20/20 launches show the Pal within 3 s, and 20/20 right-clicks exit.
+- No orphan process, crash dialog, black/opaque rectangle, focus theft or stuck topmost window.
+- The Pal's position is restored each time.
+- No `.settings-*.tmp` file is left in `Data\`.
 
-- [ ] Type continuously in Notepad while clicking the Pal 10 times: keystrokes all land in Notepad
-      (`WS_EX_NOACTIVATE`), Alt+Tab never shows Pixel Pals, no taskbar button.
-- [ ] Overlay stays above ordinary windows; it does not cover the Start menu or UAC secure desktop.
+**Fail:** any single violation. Record the cycle number and the log.
 
-## 4. Fullscreen and presentation suppression
+## 3. Click-through and moving hitboxes
 
-- [ ] Borderless-fullscreen video (browser F11 / video player) on the overlay's monitor → overlay hides within
-      ~0.5 s and returns after leaving fullscreen.
-- [ ] Exclusive-fullscreen game (if permitted) → hidden; record game FPS with/without S4 (see PERFORMANCE.md).
+- [ ] **100/100 empty-area clicks:** inside the 640x360 overlay bounds but outside the Pal, click a button in
+      another application 100 times. Vary positions, including the 1–3 px ring around the Pal.
+      **Pass:** 100/100 reach the underlying app. **Fail:** any click swallowed.
+- [ ] **30/30 Pal clicks** on a stationary Pal (ears, body, legs): each logs `PAL_CLICK n`, and the underlying
+      app receives none. **Pass:** 30/30.
+- [ ] **Moving hitbox:** while the Pal walks, click its body 20 times and the space it just left 20 times.
+      **Pass:** body clicks toggle walking (logged), and clicks on the vacated space reach the app underneath.
+- [ ] **Focus:** type continuously in Notepad while clicking the Pal 10 times.
+      **Pass:** no keystroke is lost, there is no taskbar button, and Alt+Tab never lists Pixel Pals.
+
+## 4. Memory (re-test of the ~421 MiB observation)
+
+Run the A/B and soak commands in PERFORMANCE.md §1, and record Task Manager "Memory" too.
+- [ ] Compare `Data\s4-memory-performance.json` with `Data\s4-memory-memoryusage.json`. Report `private_bytes`
+      and `private_working_set` at `gpu-device` and `first-frame`, and the `gpu_allocator` reserved bytes.
+- [ ] Task Manager "Memory" for the default (MemoryUsage) build after 1 minute idle.
+- [ ] Extended stability: a 10-minute walking soak plus a 30-minute interactive attach (`-AttachName PixelPals`).
+
+**Pass:** private working set ≤350 MiB (the PP-DT-001 provisional target), and no sustained upward trend
+(`growth_last_minus_first` within a few MiB after the first minute).
+**Fail:** above the target, or steady growth across the soak. Report the numbers either way; do not round them to a verdict.
+
+## 5. Fullscreen applications and games
+
+The overlay hides because of an explicit policy, not z-order. The log says
+`fullscreen policy: overlay hidden, reason=…`.
+- [ ] Browser fullscreen video (YouTube) → hidden within ~0.5 s with `reason=CoversMonitor`, and returns after exit.
 - [ ] PowerPoint slideshow / Windows presentation settings → hidden.
-- [ ] Clicking the desktop wallpaper or maximising Notepad (with and without auto-hide taskbar) → stays visible.
-- [ ] Fullscreen app on a *different* monitor → overlay stays visible on its own monitor (exclusive D3D apps
-      hide it everywhere by design).
+- [ ] Borderless-fullscreen game → hidden (`CoversMonitor`).
+- [ ] Exclusive-fullscreen game, if one is available → hidden (`ExclusiveD3d`).
+- [ ] Wallpaper click and maximised Notepad (with and without an auto-hide taskbar) → **stays visible**.
+- [ ] Fullscreen app on a different monitor → the overlay stays visible on its own monitor.
+      By design, an exclusive D3D app hides it on every monitor.
 
-## 5. DPI and monitors
+**Pass:** every case behaves as stated and logs the stated reason.
+**Fail:** the overlay is visible over a fullscreen app, or hidden for an ordinary window.
 
-- [ ] 100 / 125 / 150 / 175 / 200 % scaling where available: Pal physical size scales, region matches the drawn
-      silhouette (repeat a 10-click sample at the edges of each part), log shows the correct `scale=`.
-- [ ] Change scaling while running; move the overlay's monitor between mixed-DPI displays if possible.
-- [ ] `--monitor-index=0` and `--monitor-index=1`; a monitor left of/above the primary (negative coordinates).
-- [ ] Unplug/replug the overlay's monitor and change taskbar position/size: no crash, overlay stays on-screen.
+## 6. CPU and GPU usage, idle and walking
 
-## 6. Lifecycle and persistence (A12, A17, A18)
+Idle run:
+`.\QA\profile-memory.ps1 -Exe .\PixelPals.exe -Arguments '--smoke-test-ms=300000' -Seconds 305`
+Walking run: the same command with `'--qa-walk'` added to the arguments.
 
-- [ ] 20 launch → walk → right-click-exit → relaunch cycles: no crash, focus theft, stuck topmost window or
-      opaque rectangle; state persists each time.
-- [ ] Replace only `PixelPals.exe` with a newer build: `Data\` state preserved. Roll back: still loads.
-- [ ] Corrupt `Data\settings.json`: app exits (code 1), file unchanged, no window flash.
-- [ ] Read-only folder (deny write on `Data\` for the standard user, or read-only USB): app runs, log/stderr warns,
-      no writes anywhere else (check `%APPDATA%`, `%LOCALAPPDATA%`).
-- [ ] Writable USB drive: extract, run, stop, eject/reinsert, run again → state preserved.
-- [ ] Sleep/resume, lock/unlock and display off/on while running: overlay still transparent and clickable; if
-      presentation fails it must disappear (log: `overlay hidden until a frame presents`) rather than show
-      a stale/black rectangle, and reappear only after a fresh frame.
+**Pass:** idle median `cpu_pct_one_core` ≤2 % and walking ≤5 % (PP-DT-001). Report `gpu_3d_pct` (no target) and
+GPU dedicated/shared MiB. **Fail:** above target.
 
-## 7. Security and scope
+Frame pacing: use PresentMon (approved tooling only) while walking. The p95 present interval must be ≤33.3 ms.
 
-- [ ] Archive and `Data\` contain no passwords, tokens or account data.
-- [ ] PR diff touches only `desktop-town/spikes/s4/**` and `.github/workflows/desktop-town-s4-windows.yml`.
-- [ ] Record whether the clean machine has WebView2 (relevant only for a future Tauri build; S4 does not use it).
+## 7. Multiple monitors
+
+- [ ] `--monitor-index=0` and `--monitor-index=1`, including a monitor left of or above the primary (negative coordinates).
+
+**Pass:** the overlay appears inside the chosen monitor's work area (log line `monitor=… work=… overlay=…@x,y`),
+and click-through and hitboxes behave as in §3 on that monitor.
+
+## 8. Mixed DPI and display disconnect/reconnect
+
+- [ ] Test 100 / 125 / 150 / 175 / 200 % where available. Change scaling while running, and move between mixed-DPI
+      monitors if possible.
+      **Pass:** the Pal's physical size scales, the log shows `DPI change: scale=…`, a 10-click edge sample per part
+      registers (§3), and there is no blur, black or opaque area.
+- [ ] Unplug and replug the overlay's monitor; sleep/resume; lock/unlock; display off/on.
+      **Pass:** no crash, and the overlay ends up on a connected monitor. If presentation fails, it hides
+      (`overlay hidden until a frame presents`) and returns only after a fresh frame.
+
+## 9. Integrated vs discrete GPU selection
+
+The log lists every `adapter candidate:` and the `adapter policy=`.
+- [ ] Default (`low-power`): record the chosen adapter. Expected: the integrated GPU when one is present.
+- [ ] `--gpu-preference=high-performance`: record the chosen adapter. Expected: the discrete GPU when one is present.
+- [ ] On a machine whose monitor is wired to the discrete GPU, compare both preferences using §4, §6 and §10.
+      An integrated adapter may need a cross-adapter copy by DWM.
+
+**Pass:** the selection matches the documented policy, and both modes stay transparent and click-through.
+Recommend a default only from these measurements.
+
+## 10. Gaming FPS, frametime and VRAM
+
+Pick one approved game and repeat each run 3 times:
+- (a) no Pixel Pals;
+- (b) Pixel Pals idle on another monitor, or hidden by the fullscreen policy;
+- (c) Pixel Pals walking on a non-game monitor.
+
+Record, for both GPU preferences:
+- average FPS and 1 % low FPS;
+- frametime p95 (PresentMon or the game's own tool);
+- dedicated VRAM (Task Manager, or `gpu_dedicated_mib` from profile-memory).
+
+**Pass:** average FPS loss ≤3 % and 1 %-low loss ≤5 % compared with (a) (PP-DT-001).
+**Fail:** above those limits, or the overlay visible over the game.
+
+## 11. Portability and security (unchanged)
+
+- [ ] Standard user: no UAC prompt; Task Manager "Elevated" = No; no services, Run keys or scheduled tasks.
+- [ ] Read-only `Data\`, USB, exe replacement and corrupt settings behave as documented in README.md.
+- [ ] The archive and `Data\` contain no passwords, tokens or account data.
 
 ## Handoff
 
-Provide the SHA, ZIP hash, filled checklist, logs, screenshots/video, performance sheet and a release
-recommendation to PM. No Phase 1 integration until an explicit PM/owner gate.
+Provide the SHA, ZIP hash, filled checklist, logs, JSON/CSV files, screenshots/video and a recommendation to PM.
+No Phase 1 integration until an explicit PM/owner gate.
