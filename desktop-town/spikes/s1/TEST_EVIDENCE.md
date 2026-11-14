@@ -40,10 +40,25 @@ byte-for-byte by SHA-256 (run 43612413371), then reviewed:
 | `Cargo.lock` | `ace166be6286199904d60ed1666ac8073d280baedbd7408f51dd98f52b07fc54` | 74 crates.io + 1 local | all checksummed; no git/path deps; gtk-rs 0.22/gtk4 0.11, gtk4-layer-shell 0.8.1, glib-unix 0.22.8, standard proc-macro/toml/futures crates; MSRV 1.92 |
 | `qa/wlr-clicker/Cargo.lock` | `75ba217ebb544093626288b1728276ff17c9e547428f022310eb2895f6a78858` | 24 crates.io + 1 local | QA-only; Smithay wayland-client 0.31 / wayland-protocols-wlr 0.3 |
 
-RustSec: `cargo audit --deny warnings` is a CI step from this commit on; see
-the PR #46 relay for its result.
+## Results on the committed sources — run [43613334371](https://github.com/nyteghost/buddy-bot-room/actions/runs/43613334371)
 
-## Results — run [43611656042](https://github.com/nyteghost/buddy-bot-room/actions/runs/43611656042) (probe `f09930a9`, identical S1 sources, lock generated in-run)
+Tested commit `70a0243009a639befdac56034b0ccb83c2aa7913` (S1 tree
+`3131310abf50c6cbaee17ba063af1eaa848062cd`) via probe `2a5d63be`
+(= that commit + the workflow file). **Conclusion: success, every step.**
+
+- Both lockfiles used as committed (`--locked`/`--frozen`), SHA-256 as above.
+- `cargo audit --deny warnings`: **0 advisories** (Cargo.lock 75 entries,
+  clicker 25 entries).
+- fmt / check / clippy `-D warnings` / test / build: PASS.
+- GTK runtime: sway 6/6, weston 6/6; X11 fallback PASS.
+- wlroots acceptance: identical PASS matrix to the table below (100 %
+  scenario with 20/20 lifecycle; 125 %, 150 %, dual mixed-DPI + hotplug).
+- `makepkg`: PASS (`0.1.0.r1.g2a5d63beeda7-1`); namcap: license E (no repo
+  LICENSE), informational W only (`bash`/`python3` script interpreters, ld.so).
+
+The commit after `70a0243` changes only this file.
+
+## Earlier run — [43611656042](https://github.com/nyteghost/buddy-bot-room/actions/runs/43611656042) (probe `f09930a9`, same S1 sources before lock commit; lock generated in-run)
 
 | Check | Result |
 | --- | --- |
