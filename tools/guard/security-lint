@@ -70,6 +70,11 @@ def scan_paths(paths: list[str], root: pathlib.Path = ROOT) -> list[dict]:
     findings: list[dict] = []
     for raw in sorted(set(paths)):
         name = normalize_path(raw)
+        # This one test module contains intentional insecure code samples as fixture
+        # strings. The samples are exercised by the scanner unit tests; do not
+        # report the fixture literals as live application vulnerabilities.
+        if name == "tools/guard/test_guard.py":
+            continue
         location = root / name
         if location.suffix.lower() not in SCANNABLE or not location.is_file():
             continue
