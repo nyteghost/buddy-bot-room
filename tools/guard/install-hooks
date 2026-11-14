@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""Opt-in, non-destructive pre-commit installer. Does not overwrite existing hooks."""
+from pathlib import Path
+import subprocess
+import sys
+
+def main() -> int:
+    root = Path(__file__).resolve().parents[2]
+    proc = subprocess.run(["git", "rev-parse", "--git-path", "hooks"], cwd=root,
+                          text=True, capture_output=True)
+    if proc.returncode:
+        print("Git hooks path unavailable", file=sys.stderr)
+        return 2
+    hooks = Path(proc.stdout.strip())
+    if not hooks.is_absolute():
+        hooks = root / hooks
+    hook = hooks / "pre-commit"
+    if hook.exists() or hook.is_symlink():
+        print(f"Refusing to overwrite existing hook: {hook}", file=sys.stderr)
+        return 1
+    hooks.mkdir(parents=True, exist_ok=True)
+    hook.write_text("#!/bin/sh\nset -eu\n"
+                    "if command -v python3 >/dev/null 2>&1; then\n"
+                    "  exec python3 tools/guard/scope-check --staged\n"
+                    "fi\n"
+                    "exec python tools/guard/scope-check --staged\n", encoding="utf-8")
+    hook.chmod(0o755)
+    print(f"Installed optional scope check at {hook}")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

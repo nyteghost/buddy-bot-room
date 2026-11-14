@@ -1,0 +1,39 @@
+# YAML 1.2 JSON-flow mapping so Python stdlib and YAML readers can both parse it.
+# UNCONFIRMED: ownership paths are a provisional mirror of Issue #37; owner must ratify future changes.
+# UNCONFIRMED: docs/security/desktop-wrapper-hardening.md was modified in approved security PR #45.
+# Its exact-path exemption below is limited to that security workstream.
+# UNCONFIRMED: future cross-platform integration owner/path assignments are not authorized here.
+{
+  "version": 1,
+  "agents": {
+    "claude-dev-tooling": {
+      "branches": ["claude/dev-tooling"],
+      "paths": ["tools/core/**", "tools/CONTRACTS.md"]
+    },
+    "chatgpt-dev-tooling": {
+      "branches": ["chatgpt/dev-tooling"],
+      "paths": ["tools/guard/**", ".github/workflows/pp-*.yml", "ownership.yml"]
+    },
+    "security-developer": {
+      "branches": ["security/desktop-wrapper-ipc-hardening-20261114"],
+      "paths": ["src-tauri/**", "packaging/**", ".github/workflows/desktop-security.yml", "docs/security/desktop-wrapper-hardening.md"]
+    },
+    "linux-desktop-integration-developer": {
+      "branches": ["spike/desktop-town-kwin-overlay-20261114"],
+      "paths": ["desktop-town/spikes/s1/**", "desktop-town/README.md"]
+    },
+    "rendering-performance-developer": {
+      "branches": ["spike/desktop-town-canvas-perf-20261114"],
+      "paths": ["desktop-town/spikes/s2/**", ".github/workflows/s2-renderer.yml"]
+    },
+    "windows-desktop-developer": {
+      "branches": ["spike/desktop-town-wgpu-windows-20261114"],
+      "paths": ["desktop-town/spikes/s4/**", ".github/workflows/desktop-town-s4-windows.yml"]
+    },
+    "ai-inference-developer": {
+      "branches": ["spike/desktop-town-local-ai-20261114"],
+      "paths": ["desktop-town/spikes/s3/**"]
+    }
+  },
+  "shared_readonly": ["docs/**"]
+}
