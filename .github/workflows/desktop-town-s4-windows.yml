@@ -114,11 +114,11 @@ jobs:
         shell: pwsh
         run: |
           $folder = Join-Path $env:RUNNER_TEMP 'extract-test/PixelPals-Portable'
-          foreach ($f in @('dist/PixelPals-Portable.zip.sha256', "$folder/BUILD-INFO.txt", "$folder/Data/s4-smoke.json", "$folder/Data/s4-render-sample.json", "$folder/Data/s4-last-run.log", (Join-Path $env:RUNNER_TEMP 'portable-results.json'))) {
+          foreach ($f in @('dist/PixelPals-Portable.zip.sha256', "$folder/BUILD-INFO.txt", "$folder/Data/s4-smoke.json", "$folder/Data/s4-render-sample.json", "$folder/Data/s4-last-run.log", "$folder/Data/s4-memory.json", (Join-Path $env:RUNNER_TEMP 'portable-results.json'))) {
             if (Test-Path -LiteralPath $f) { Write-Host "===== $f"; Get-Content -LiteralPath $f -ErrorAction Continue | Write-Host }
           }
           New-Item -ItemType Directory -Force -Path evidence | Out-Null
-          foreach ($f in @("$folder/Data/s4-smoke.json", "$folder/Data/s4-render-sample.json", "$folder/Data/s4-last-run.log", "$folder/BUILD-INFO.txt", (Join-Path $env:RUNNER_TEMP 'portable-results.json'))) {
+          foreach ($f in @("$folder/Data/s4-smoke.json", "$folder/Data/s4-render-sample.json", "$folder/Data/s4-last-run.log", "$folder/Data/s4-memory.json", "$folder/BUILD-INFO.txt", (Join-Path $env:RUNNER_TEMP 'portable-results.json'))) {
             if (Test-Path -LiteralPath $f) { Copy-Item -LiteralPath $f -Destination evidence/ -ErrorAction Continue }
           }
       - name: Upload portable ZIP (CI build, NOT hardware-accepted)

@@ -186,6 +186,67 @@ mod tests {
         }
     }
 
+    /// Every drawn pixel is inside the input region (eyes sit on the body) and
+    /// the region contains nothing that is not drawn (region == body parts),
+    /// so there is neither unclickable Pal nor invisible clickable area.
+    #[test]
+    fn drawn_pixels_and_input_region_coincide() {
+        for scale in SCALES {
+            let parts = pal_shapes(140, 120, scale);
+            for eye in pal_eyes(140, 120, scale) {
+                for y in eye.y..eye.bottom() {
+                    for x in eye.x..eye.right() {
+                        assert!(
+                            parts.iter().any(|p| p.contains(x, y)),
+                            "eye ({x},{y}) @ {scale}"
+                        );
+                    }
+                }
+            }
+            for x in 0..scale_length(OVERLAY_LOGICAL_WIDTH, scale) as i32 {
+                for y in 0..scale_length(OVERLAY_LOGICAL_HEIGHT, scale) as i32 {
+                    let in_region = hits_pal(x, y, 140, 120, scale);
+                    let drawn = parts.iter().any(|p| p.contains(x, y));
+                    assert_eq!(in_region, drawn, "({x},{y}) @ {scale}");
+                }
+            }
+        }
+    }
+
+    /// The moving hitbox stays fully inside the overlay window for every
+    /// position the deterministic walk and saved settings can produce.
+    #[test]
+    fn moving_hitbox_stays_inside_overlay_at_every_scale() {
+        for scale in SCALES {
+            let width = scale_length(OVERLAY_LOGICAL_WIDTH, scale) as i32;
+            let height = scale_length(OVERLAY_LOGICAL_HEIGHT, scale) as i32;
+            for pal_x in (0..=500).step_by(5) {
+                for pal_y in (0..=250).step_by(5) {
+                    for part in pal_shapes(pal_x, pal_y, scale) {
+                        assert!(
+                            part.x >= 0
+                                && part.y >= 0
+                                && part.right() <= width
+                                && part.bottom() <= height,
+                            "{part:?} outside {width}x{height} at ({pal_x},{pal_y}) @ {scale}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Hit-testing follows the Pal as it moves: the old position stops
+    /// capturing input and the new one starts.
+    #[test]
+    fn hitbox_follows_movement() {
+        let body = PAL_PARTS[2];
+        let (cx, cy) = (body.x + body.width / 2, body.y + body.height / 2);
+        assert!(hits_pal(100 + cx, 170 + cy, 100, 170, 1.0));
+        assert!(!hits_pal(100 + cx, 170 + cy, 300, 170, 1.0));
+        assert!(hits_pal(300 + cx, 170 + cy, 300, 170, 1.0));
+    }
+
     #[test]
     fn placement_respects_negative_monitor_coordinates() {
         // Secondary monitor to the left of the primary, 150% scaling.

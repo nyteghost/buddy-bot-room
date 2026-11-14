@@ -30,6 +30,10 @@ Copy-Item -LiteralPath $exe -Destination (Join-Path $stage 'PixelPals.exe')
 Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination (Join-Path $stage 'README.txt')
 Copy-Item -LiteralPath (Join-Path $root 'QA-WINDOWS.md') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $root 'PERFORMANCE.md') -Destination $stage
+# Read-only QA helpers for owner/independent hardware testing (not run automatically).
+New-Item -ItemType Directory -Force -Path (Join-Path $stage 'QA') | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'scripts/test-portable.ps1') -Destination (Join-Path $stage 'QA')
+Copy-Item -LiteralPath (Join-Path $root 'scripts/profile-memory.ps1') -Destination (Join-Path $stage 'QA')
 # Placeholder keeps Data/ in the archive (some ZIP tools drop empty folders).
 @(
   'Pixel Pals portable data folder.',

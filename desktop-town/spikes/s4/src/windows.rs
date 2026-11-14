@@ -8,10 +8,13 @@
 //!   visual (`Dx12SwapchainKind::DxgiFromVisual`) because an HWND flip-model
 //!   swapchain only supports opaque alpha. Opaque swapchains are refused.
 use crate::{
+    adapter_policy::{self, AdapterKind, Candidate, GpuPreference},
     cli::{self, Options},
     fullscreen::{self, Foreground, ShellState},
     geometry::{self, Rect},
+    memory::{self, Profile},
     portable::{self, Store},
+    schedule,
     startup::{
         self, FaultPlan, FrameOutcome, OverlayPort, RedrawAction, RetryPolicy, Reveal, SkipTracker,
         Startup,
@@ -21,7 +24,7 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     error::Error,
     fmt::Display,
     fs,
@@ -30,12 +33,17 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use wgpu::util::DeviceExt;
 use windows_sys::Win32::{
     Foundation::{HWND, RECT},
     Graphics::Gdi::{
         CombineRgn, CreateRectRgn, DeleteObject, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn,
         HMONITOR, MONITORINFO, MONITOR_DEFAULTTONULL, RGN_OR,
+    },
+    System::{
+        ProcessStatus::{
+            K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX,
+        },
+        Threading::GetCurrentProcess,
     },
     UI::{
         HiDpi::{
@@ -69,12 +77,9 @@ const EXIT_SMOKE_NO_FRAMES: i32 = 3;
 /// overlay was never shown and its input region stayed empty.
 const EXIT_FIRST_FRAME_FAILED: i32 = 4;
 
-const ANIMATION_TICK: Duration = Duration::from_millis(33);
-const FULLSCREEN_POLL_VISIBLE: Duration = Duration::from_millis(500);
-const FULLSCREEN_POLL_HIDDEN: Duration = Duration::from_millis(1000);
-
 const RUN_LOG: &str = "s4-last-run.log";
 const SMOKE_REPORT: &str = "s4-smoke.json";
+const MEMORY_REPORT: &str = "s4-memory.json";
 const RENDER_SAMPLE: &str = "s4-render-sample.json";
 
 /// Entry point used by `main`. Never panics on expected failures; returns a
@@ -145,15 +150,30 @@ struct Vertex {
     color: [f32; 4],
 }
 
+/// Pal silhouette (6 parts) + 2 eyes, 6 vertices per quad.
+const MAX_VERTICES: usize = 8 * 6;
+
 struct Renderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
+    /// One persistent vertex buffer, rewritten per frame (no per-frame
+    /// buffer creation / staging allocation churn).
+    vertex_buffer: wgpu::Buffer,
     backend: String,
     adapter: String,
     device_type: String,
+    memory_hints: &'static str,
+    adapters_seen: Vec<String>,
+}
+
+/// GPU initialisation choices, from the command line.
+#[derive(Clone, Copy)]
+struct GpuChoice {
+    preference: GpuPreference,
+    memory_hints_performance: bool,
 }
 
 fn instance_for(backends: wgpu::Backends) -> wgpu::Instance {
@@ -174,15 +194,40 @@ fn instance_for(backends: wgpu::Backends) -> wgpu::Instance {
     })
 }
 
+fn adapter_kind(device_type: wgpu::DeviceType) -> AdapterKind {
+    match device_type {
+        wgpu::DeviceType::IntegratedGpu => AdapterKind::Integrated,
+        wgpu::DeviceType::DiscreteGpu => AdapterKind::Discrete,
+        wgpu::DeviceType::VirtualGpu => AdapterKind::Virtual,
+        wgpu::DeviceType::Cpu => AdapterKind::Cpu,
+        wgpu::DeviceType::Other => AdapterKind::Other,
+    }
+}
+
+fn transparent_alpha(modes: &[wgpu::CompositeAlphaMode]) -> Option<wgpu::CompositeAlphaMode> {
+    [
+        wgpu::CompositeAlphaMode::PreMultiplied,
+        wgpu::CompositeAlphaMode::PostMultiplied,
+    ]
+    .into_iter()
+    .find(|mode| modes.contains(mode))
+}
+
 impl Renderer {
-    async fn new(window: Arc<Window>) -> Result<Self, Box<dyn Error>> {
+    async fn new(
+        window: Arc<Window>,
+        choice: GpuChoice,
+        mark: &mut dyn FnMut(&str),
+    ) -> Result<Self, Box<dyn Error>> {
         let mut errors = Vec::new();
+        let mut adapters_seen = Vec::new();
         for backend in [
             wgpu::Backends::DX12,
             wgpu::Backends::VULKAN,
             wgpu::Backends::GL,
         ] {
             let instance = instance_for(backend);
+            mark("gpu-instance");
             let surface = match instance.create_surface(window.clone()) {
                 Ok(surface) => surface,
                 Err(error) => {
@@ -190,27 +235,46 @@ impl Renderer {
                     continue;
                 }
             };
-            let adapter = match instance
-                .request_adapter(&wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::LowPower,
-                    compatible_surface: Some(&surface),
-                    force_fallback_adapter: false,
-                })
-                .await
-            {
-                Ok(adapter) => adapter,
-                Err(error) => {
-                    errors.push(format!("adapter {backend:?}: {error}"));
-                    continue;
-                }
+            mark("gpu-surface");
+            // Explicit, logged adapter policy (see adapter_policy.rs).
+            let mut adapters = instance.enumerate_adapters(backend);
+            let mut candidates = Vec::with_capacity(adapters.len());
+            for (index, adapter) in adapters.iter().enumerate() {
+                let info = adapter.get_info();
+                let surface_supported = adapter.is_surface_supported(&surface);
+                let alpha = if surface_supported {
+                    transparent_alpha(&surface.get_capabilities(adapter).alpha_modes)
+                } else {
+                    None
+                };
+                candidates.push(Candidate {
+                    kind: adapter_kind(info.device_type),
+                    surface_supported,
+                    transparent_alpha: alpha.is_some(),
+                });
+                adapters_seen.push(format!(
+                    "{backend:?}[{index}] {} ({:?}, driver {} {}) surface={surface_supported} \
+                     transparent={}",
+                    info.name,
+                    info.device_type,
+                    info.driver,
+                    info.driver_info,
+                    alpha.is_some()
+                ));
+            }
+            let Some(index) = adapter_policy::choose(&candidates, choice.preference) else {
+                errors.push(format!(
+                    "{backend:?}: no adapter with a supported transparent surface \
+                     ({} enumerated)",
+                    candidates.len()
+                ));
+                continue;
             };
+            let adapter = adapters.swap_remove(index);
+            drop(adapters); // release handles to adapters that were not chosen
+            mark("gpu-adapter");
             let caps = surface.get_capabilities(&adapter);
-            let Some(alpha_mode) = [
-                wgpu::CompositeAlphaMode::PreMultiplied,
-                wgpu::CompositeAlphaMode::PostMultiplied,
-            ]
-            .into_iter()
-            .find(|mode| caps.alpha_modes.contains(mode)) else {
+            let Some(alpha_mode) = transparent_alpha(&caps.alpha_modes) else {
                 errors.push(format!(
                     "opaque-only surface {backend:?} {:?}; refusing unsafe overlay",
                     caps.alpha_modes
@@ -229,11 +293,21 @@ impl Renderer {
                 errors.push(format!("no surface format: {backend:?}"));
                 continue;
             };
+            // MemoryUsage: 8 MiB device / 4 MiB host D3D12 suballocation blocks
+            // instead of gpu-allocator's 256 / 64 MiB defaults (Performance).
+            // The overlay allocates a few KiB; on integrated GPUs those heaps
+            // are system RAM.
+            let (memory_hints, memory_hints_name) = if choice.memory_hints_performance {
+                (wgpu::MemoryHints::Performance, "Performance")
+            } else {
+                (wgpu::MemoryHints::MemoryUsage, "MemoryUsage")
+            };
             let (device, queue) = match adapter
                 .request_device(&wgpu::DeviceDescriptor {
                     label: Some("Pixel Pals S4 wgpu device"),
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::downlevel_defaults(),
+                    memory_hints,
                     ..Default::default()
                 })
                 .await
@@ -244,6 +318,7 @@ impl Renderer {
                     continue;
                 }
             };
+            mark("gpu-device");
             let size = window.inner_size();
             let config = wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -256,7 +331,15 @@ impl Renderer {
                 view_formats: vec![],
             };
             surface.configure(&device, &config);
+            mark("gpu-surface-configured");
             let pipeline = create_pipeline(&device, format, alpha_mode);
+            let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("S4 pal geometry"),
+                size: (MAX_VERTICES * std::mem::size_of::<Vertex>()) as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            mark("gpu-pipeline");
             let info = adapter.get_info();
             return Ok(Self {
                 surface,
@@ -264,12 +347,31 @@ impl Renderer {
                 queue,
                 config,
                 pipeline,
+                vertex_buffer,
                 backend: format!("{:?}", info.backend),
                 adapter: info.name,
                 device_type: format!("{:?}", info.device_type),
+                memory_hints: memory_hints_name,
+                adapters_seen,
             });
         }
-        Err(format!("No safe transparent GPU backend: {}", errors.join(" | ")).into())
+        Err(format!(
+            "No safe transparent GPU backend: {} | adapters: {}",
+            errors.join(" | "),
+            adapters_seen.join("; ")
+        )
+        .into())
+    }
+
+    /// wgpu/gpu-allocator suballocation heap usage (D3D12; None elsewhere).
+    fn allocator_report(&self) -> Option<memory::GpuAllocator> {
+        self.device
+            .generate_allocator_report()
+            .map(|report| memory::GpuAllocator {
+                allocated_bytes: report.total_allocated_bytes,
+                reserved_bytes: report.total_reserved_bytes,
+                block_sizes: report.blocks.iter().map(|block| block.size).collect(),
+            })
     }
 
     fn resize(&mut self, size: PhysicalSize<u32>) {
@@ -299,13 +401,9 @@ impl Renderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
         let vertices = sprite_vertices(state, scale, self.config.width, self.config.height);
-        let buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("S4 pal geometry"),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        debug_assert!(vertices.len() <= MAX_VERTICES);
+        let bytes: &[u8] = bytemuck::cast_slice(&vertices);
+        self.queue.write_buffer(&self.vertex_buffer, 0, bytes);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -328,7 +426,7 @@ impl Renderer {
                 occlusion_query_set: None,
             });
             pass.set_pipeline(&self.pipeline);
-            pass.set_vertex_buffer(0, buffer.slice(..));
+            pass.set_vertex_buffer(0, self.vertex_buffer.slice(..bytes.len() as u64));
             pass.draw(0..vertices.len() as u32, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
@@ -537,6 +635,107 @@ fn hide_on_failure(handle: HWND, log: &mut RunLog, message: &str) {
     let _ = apply_empty_region(handle);
 }
 
+/// PROCESS_MEMORY_COUNTERS_EX2 (Windows 10 1809+), declared locally so the
+/// private working set (Task Manager "Memory" column) is available.
+#[repr(C)]
+#[derive(Default)]
+#[allow(dead_code)] // FFI layout: every field must exist even if unread
+struct ProcessMemoryCountersEx2 {
+    cb: u32,
+    page_fault_count: u32,
+    peak_working_set_size: usize,
+    working_set_size: usize,
+    quota_peak_paged_pool_usage: usize,
+    quota_paged_pool_usage: usize,
+    quota_peak_non_paged_pool_usage: usize,
+    quota_non_paged_pool_usage: usize,
+    pagefile_usage: usize,
+    peak_pagefile_usage: usize,
+    private_usage: usize,
+    private_working_set_size: usize,
+    shared_commit_usage: u64,
+}
+
+/// Current process memory counters; zeros if the OS refuses both layouts.
+fn process_counters() -> memory::Counters {
+    // SAFETY: pseudo-handle for this process; out-structs are plain data with
+    // `cb` set to their size, as K32GetProcessMemoryInfo requires.
+    unsafe {
+        let process = GetCurrentProcess();
+        let mut ex2 = ProcessMemoryCountersEx2 {
+            cb: std::mem::size_of::<ProcessMemoryCountersEx2>() as u32,
+            ..Default::default()
+        };
+        let cb = ex2.cb;
+        let pointer = std::ptr::addr_of_mut!(ex2).cast::<PROCESS_MEMORY_COUNTERS>();
+        if K32GetProcessMemoryInfo(process, pointer, cb) != 0 {
+            return memory::Counters {
+                private_bytes: ex2.private_usage as u64,
+                working_set: ex2.working_set_size as u64,
+                private_working_set: Some(ex2.private_working_set_size as u64),
+                peak_working_set: ex2.peak_working_set_size as u64,
+            };
+        }
+        let mut ex: PROCESS_MEMORY_COUNTERS_EX = std::mem::zeroed();
+        ex.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX>() as u32;
+        let cb = ex.cb;
+        let pointer = std::ptr::addr_of_mut!(ex).cast::<PROCESS_MEMORY_COUNTERS>();
+        if K32GetProcessMemoryInfo(process, pointer, cb) != 0 {
+            return memory::Counters {
+                private_bytes: ex.PrivateUsage as u64,
+                working_set: ex.WorkingSetSize as u64,
+                private_working_set: None,
+                peak_working_set: ex.PeakWorkingSetSize as u64,
+            };
+        }
+        memory::Counters::default()
+    }
+}
+
+/// Shared, bounded memory profile with a stage clock.
+struct MemoryTrace {
+    profile: Profile,
+    started: Instant,
+}
+
+impl MemoryTrace {
+    fn new() -> Self {
+        let mut trace = Self {
+            profile: Profile::new(),
+            started: Instant::now(),
+        };
+        trace.mark("process-start");
+        trace
+    }
+
+    fn mark(&mut self, stage: &str) {
+        let elapsed = self.started.elapsed().as_millis() as u64;
+        self.profile.record(stage, elapsed, process_counters());
+    }
+
+    fn allocator(&mut self, stage: &str, renderer: &Renderer) {
+        if let Some(report) = renderer.allocator_report() {
+            self.profile.record_allocator(stage, report);
+        }
+    }
+}
+
+/// Set when the event-loop closure (which owns the wgpu device) is dropped,
+/// so the final memory sample can state whether GPU objects were released.
+struct ReleaseFlag(Rc<Cell<bool>>);
+
+impl Drop for ReleaseFlag {
+    fn drop(&mut self) {
+        self.0.set(true);
+    }
+}
+
+fn append_log(path: &std::path::Path, line: &str) {
+    if let Ok(mut file) = fs::OpenOptions::new().append(true).open(path) {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
 fn rect_from(rect: RECT) -> Rect {
     Rect::new(
         rect.left,
@@ -704,6 +903,7 @@ fn save_state(store: &mut Store, state: &DemoState, log: &mut RunLog) {
 }
 
 fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
+    let trace = Rc::new(RefCell::new(MemoryTrace::new()));
     // Load and validate portable state BEFORE any window exists: corrupt
     // settings fail closed (exit 1) and are never overwritten.
     let mut store = Store::beside_executable()?;
@@ -728,6 +928,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
 
     opt_in_per_monitor_dpi(log);
     let event_loop = EventLoop::new()?;
+    trace.borrow_mut().mark("event-loop");
     let monitor = choose_monitor(&event_loop, options.monitor_index)?;
     let monitor_scale = geometry::sanitize_scale(monitor.scale_factor());
     let (monitor_bounds, work_area) = monitor_rects(monitor.hmonitor()).unwrap_or_else(|| {
@@ -769,6 +970,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
             .build(&event_loop)?,
     );
     let handle = hwnd(&window)?;
+    trace.borrow_mut().mark("window");
     // SAFETY: adjusts only our window; no global hooks/registry/machine services.
     unsafe {
         let existing = GetWindowLongPtrW(handle, GWL_EXSTYLE);
@@ -791,7 +993,13 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     // Input region is EMPTY from creation until a frame has been presented.
     apply_empty_region(handle)?;
 
-    let mut renderer = match pollster::block_on(Renderer::new(window.clone())) {
+    let choice = GpuChoice {
+        preference: options.gpu_preference,
+        memory_hints_performance: options.memory_hints_performance,
+    };
+    let mut mark = |stage: &str| trace.borrow_mut().mark(stage);
+    let renderer = pollster::block_on(Renderer::new(window.clone(), choice, &mut mark));
+    let mut renderer = match renderer {
         Ok(renderer) => renderer,
         Err(error) => {
             hide_on_failure(handle, log, &error.to_string());
@@ -806,6 +1014,28 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
         renderer.config.alpha_mode,
         renderer.config.format
     ));
+    for adapter in &renderer.adapters_seen {
+        log.line(format!("adapter candidate: {adapter}"));
+    }
+    log.line(format!(
+        "adapter policy={:?} (explicit; see adapter_policy.rs) memory_hints={}",
+        options.gpu_preference, renderer.memory_hints
+    ));
+    {
+        let mut t = trace.borrow_mut();
+        t.profile.set("backend", renderer.backend.clone());
+        t.profile.set("adapter", renderer.adapter.clone());
+        t.profile.set("device_type", renderer.device_type.clone());
+        t.profile.set("memory_hints", renderer.memory_hints);
+        t.profile
+            .set("gpu_preference", format!("{:?}", options.gpu_preference));
+        t.profile
+            .set("adapters_seen", renderer.adapters_seen.clone());
+        t.profile.set(
+            "surface",
+            format!("{}x{}", renderer.config.width, renderer.config.height),
+        );
+    }
 
     // F5: bounded first-frame handshake. Hidden + empty region until a frame
     // is presented; then the Pal region is installed and (unless a fullscreen
@@ -837,6 +1067,10 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                 "first frame presented after {attempts} attempt(s); input region active; \
                  shown={shown}"
             ));
+            let mut t = trace.borrow_mut();
+            t.mark("first-frame");
+            t.allocator("first-frame", &renderer);
+            log.line(t.profile.summary_line());
             (attempts, shown)
         }
         Startup::FailedClosed { attempts, reason } => {
@@ -861,6 +1095,18 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     };
     let mut input_active = true;
     let mut skips = SkipTracker::default();
+    let qa_walk = options.qa_walk;
+    if qa_walk {
+        state.animate = true;
+        log.line("QA walk loop enabled for this smoke run");
+    }
+    let memory_report = store
+        .writable
+        .then(|| store.data_path().join(MEMORY_REPORT));
+    let run_log_path = store.writable.then(|| store.data_path().join(RUN_LOG));
+    let released = Rc::new(Cell::new(false));
+    let release_flag = ReleaseFlag(released.clone());
+    let trace_in_loop = trace.clone();
     if !visible {
         log.line("fullscreen/presentation detected at launch: starting hidden");
     }
@@ -873,7 +1119,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     let exit_code = Rc::new(Cell::new(EXIT_OK));
     let exit_code_in_loop = exit_code.clone();
     let mut pointer = PhysicalPosition::new(-1i32, -1i32);
-    let mut next_fullscreen_check = Instant::now() + FULLSCREEN_POLL_VISIBLE;
+    let mut next_fullscreen_check = Instant::now() + schedule::fullscreen_poll_interval(visible);
     let mut next_tick = Instant::now();
     let mut last_step = Instant::now();
     let mut log = std::mem::replace(log, RunLog::stderr_only());
@@ -882,9 +1128,17 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
     let mut exiting = false;
 
     event_loop.run(move |event, target| {
+        // Owned by this closure: dropped (with the wgpu device) when the
+        // event loop ends, which the final memory sample reports.
+        let _owned = &release_flag;
         if exiting {
             return;
         }
+        let record_exit = |renderer: &Renderer| {
+            let mut t = trace_in_loop.borrow_mut();
+            t.mark("exit");
+            t.allocator("exit", renderer);
+        };
         // Fail closed: hide, empty the input region, record exit code, stop.
         let fatal = |log: &mut RunLog, message: &str| {
             hide_on_failure(handle, log, message);
@@ -894,6 +1148,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
         match event {
             Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => {
+                    record_exit(&renderer);
                     save_state(&mut store, &state, &mut log);
                     frame_stats.save(&store, &renderer, &mut log);
                     exiting = true;
@@ -914,6 +1169,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                     }
                     if button == MouseButton::Right {
                         log.line("PAL_EXIT right-click");
+                        record_exit(&renderer);
                         save_state(&mut store, &state, &mut log);
                         frame_stats.save(&store, &renderer, &mut log);
                         exiting = true;
@@ -1000,6 +1256,7 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                 let now = Instant::now();
                 if smoke_deadline.is_some_and(|deadline| now >= deadline) {
                     smoke_deadline = None;
+                    record_exit(&renderer);
                     if smoke_click {
                         state.record_click();
                     }
@@ -1030,8 +1287,9 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                     return;
                 }
                 if now >= next_fullscreen_check {
-                    let want_visible =
-                        !fullscreen::should_hide(shell_state(), foreground_facts(handle).as_ref());
+                    let reason =
+                        fullscreen::hide_reason(shell_state(), foreground_facts(handle).as_ref());
+                    let want_visible = reason.is_none();
                     if want_visible && !visible {
                         // Re-show only after a fresh frame has been presented.
                         let result = startup::reveal(&mut LivePort {
@@ -1060,20 +1318,18 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                     } else if !want_visible && visible {
                         show(handle, false);
                         visible = false;
-                        log.line("fullscreen policy: overlay hidden");
+                        // Explicit policy (not z-order): the overlay is a
+                        // topmost window and would otherwise stay above a
+                        // non-topmost fullscreen browser or game window.
+                        log.line(format!("fullscreen policy: overlay hidden, reason={reason:?}"));
                     }
-                    next_fullscreen_check = now
-                        + if visible {
-                            FULLSCREEN_POLL_VISIBLE
-                        } else {
-                            FULLSCREEN_POLL_HIDDEN
-                        };
+                    next_fullscreen_check = now + schedule::fullscreen_poll_interval(visible);
                 }
-                if visible && state.animate {
+                if schedule::animation_active(visible, state.animate) {
                     if now >= next_tick {
                         let elapsed = now.duration_since(last_step);
                         last_step = now;
-                        next_tick = now + ANIMATION_TICK;
+                        next_tick = now + schedule::ANIMATION_TICK;
                         if state.step(elapsed.as_millis() as u64) {
                             if let Err(error) = apply_pal_region(handle, &state, scale) {
                                 exiting = true;
@@ -1083,24 +1339,44 @@ fn run(options: &Options, log: &mut RunLog) -> Result<i32, Box<dyn Error>> {
                             window.request_redraw();
                         }
                         if !state.animate {
-                            save_state(&mut store, &state, &mut log);
+                            if qa_walk {
+                                // QA soak: restart the deterministic walk.
+                                state.click();
+                            } else {
+                                save_state(&mut store, &state, &mut log);
+                            }
                         }
                     }
                 } else {
                     // Idle suspension: no timers besides the fullscreen probe.
                     last_step = now;
                 }
-                let mut wake = next_fullscreen_check;
-                if visible && state.animate {
-                    wake = wake.min(next_tick);
-                }
-                if let Some(deadline) = smoke_deadline {
-                    wake = wake.min(deadline);
-                }
+                let tick = schedule::animation_active(visible, state.animate).then_some(next_tick);
+                let wake = schedule::next_wake(next_fullscreen_check, tick, smoke_deadline);
                 target.set_control_flow(ControlFlow::WaitUntil(wake));
             }
             _ => {}
         }
     })?;
+    // The closure (and with it the wgpu device, surface and window) has been
+    // dropped by now; the final sample shows what the process retains.
+    let mut t = trace.borrow_mut();
+    t.mark("after-event-loop");
+    t.profile
+        .set("gpu_released_before_final_sample", released.get());
+    let summary = t.profile.summary_line();
+    if let Some(path) = &run_log_path {
+        append_log(path, &summary);
+    }
+    if let Some(path) = &memory_report {
+        match serde_json::to_vec_pretty(&t.profile) {
+            Ok(bytes) => {
+                if let Err(error) = fs::write(path, bytes) {
+                    eprintln!("Unable to save {MEMORY_REPORT}: {error}");
+                }
+            }
+            Err(error) => eprintln!("Unable to encode {MEMORY_REPORT}: {error}"),
+        }
+    }
     Ok(exit_code.get())
 }

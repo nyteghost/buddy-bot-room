@@ -1,7 +1,7 @@
 //! Command-line options. Unknown arguments are rejected (exit code 2) rather
 //! than ignored, so a mistyped QA flag can never silently run a different test.
 
-use crate::startup::FaultPlan;
+use crate::{adapter_policy::GpuPreference, startup::FaultPlan};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Options {
@@ -20,11 +20,19 @@ pub struct Options {
     /// with `never`) to report Timeout/Lost/Outdated/fatal, to exercise the
     /// fail-closed startup handshake on a real Windows desktop.
     pub fault_first_frame: Option<FaultPlan>,
+    /// Adapter ordering (default low-power = integrated GPU first).
+    pub gpu_preference: GpuPreference,
+    /// QA A/B: use wgpu `MemoryHints::Performance` (256/64 MiB D3D12
+    /// suballocation blocks) instead of the default `MemoryUsage` (8/4 MiB).
+    pub memory_hints_performance: bool,
+    /// QA soak: start walking and restart at the boundary (smoke runs only).
+    pub qa_walk: bool,
 }
 
 pub const USAGE: &str = "PixelPals.exe [--monitor-index=N] [--self-test] \
 [--smoke-test-ms=N [--smoke-click]] \
-[--qa-fault-first-frame=timeout|lost|outdated|fatal[:COUNT|:never]]";
+[--qa-fault-first-frame=timeout|lost|outdated|fatal[:COUNT|:never]] \
+[--gpu-preference=low-power|high-performance] [--qa-memory-hints=memory|performance] [--qa-walk]";
 
 /// Upper bound for automation runs so a broken harness cannot leave an
 /// always-on-top window behind indefinitely.
@@ -50,14 +58,24 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Options, String>
                 return Err(format!("smoke duration must be 1..={MAX_SMOKE_MS} ms"));
             }
             options.smoke_ms = Some(ms);
+        } else if arg == "--qa-walk" {
+            options.qa_walk = true;
+        } else if let Some(value) = arg.strip_prefix("--gpu-preference=") {
+            options.gpu_preference = GpuPreference::parse(value)?;
+        } else if let Some(value) = arg.strip_prefix("--qa-memory-hints=") {
+            options.memory_hints_performance = match value {
+                "memory" => false,
+                "performance" => true,
+                other => return Err(format!("invalid memory hints {other:?}")),
+            };
         } else if let Some(value) = arg.strip_prefix("--qa-fault-first-frame=") {
             options.fault_first_frame = Some(FaultPlan::parse(value)?);
         } else {
             return Err(format!("unknown argument {arg:?}; usage: {USAGE}"));
         }
     }
-    if options.smoke_click && options.smoke_ms.is_none() {
-        return Err("--smoke-click requires --smoke-test-ms".to_owned());
+    if (options.smoke_click || options.qa_walk) && options.smoke_ms.is_none() {
+        return Err("--smoke-click/--qa-walk require --smoke-test-ms".to_owned());
     }
     if options.self_test && (options.smoke_ms.is_some() || options.fault_first_frame.is_some()) {
         return Err("--self-test cannot be combined with overlay options".to_owned());
@@ -101,6 +119,25 @@ mod tests {
         assert!(parse(args(&["--self-test", "--smoke-test-ms=5"])).is_err());
         assert!(parse(args(&["--qa-fault-first-frame=boom"])).is_err());
         assert!(parse(args(&["--self-test", "--qa-fault-first-frame=lost:1"])).is_err());
+    }
+
+    #[test]
+    fn parses_gpu_memory_and_walk_options() {
+        let options = parse(args(&[
+            "--smoke-test-ms=100",
+            "--qa-walk",
+            "--gpu-preference=high-performance",
+            "--qa-memory-hints=performance",
+        ]))
+        .unwrap();
+        assert!(options.qa_walk && options.memory_hints_performance);
+        assert_eq!(options.gpu_preference, GpuPreference::HighPerformance);
+        let defaults = parse(args(&[])).unwrap();
+        assert_eq!(defaults.gpu_preference, GpuPreference::LowPower);
+        assert!(!defaults.memory_hints_performance);
+        assert!(parse(args(&["--qa-walk"])).is_err());
+        assert!(parse(args(&["--qa-memory-hints=lots"])).is_err());
+        assert!(parse(args(&["--gpu-preference=fast"])).is_err());
     }
 
     #[test]

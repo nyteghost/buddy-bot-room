@@ -89,6 +89,23 @@ function Invoke-PalsWatched([string[]]$Arguments, [int]$TimeoutMs = 120000) {
   }
 }
 
+function Read-Json([string]$Name) {
+  $path = Join-Path $data $Name
+  if (Test-Path -LiteralPath $path) { return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json }
+  return $null
+}
+
+function Get-Stage($Memory, [string]$Stage) {
+  if (-not $Memory) { return $null }
+  return @($Memory.samples | Where-Object stage -eq $Stage)[0]
+}
+
+function Get-AllocatorReserved($Memory, [string]$Stage) {
+  if (-not $Memory) { return $null }
+  foreach ($entry in @($Memory.gpu_allocator)) { if ($entry[0] -eq $Stage) { return [int64]$entry[1].reserved_bytes } }
+  return $null
+}
+
 function Read-Smoke {
   $smoke = Join-Path $data 's4-smoke.json'
   if (Test-Path -LiteralPath $smoke) { return Get-Content -LiteralPath $smoke -Raw | ConvertFrom-Json }
@@ -155,8 +172,10 @@ try {
   $nonOs = @($imports | Where-Object { $_ -match '^(vcruntime|msvcp|ucrtbase|api-ms-win-crt|dxcompiler|dxil|WebView2Loader)' })
   Assert-True ($imports.Count -gt 0 -and $nonOs.Count -eq 0) 'no-redistributable-imports' `
     ("static imports outside Windows itself: " + $(if ($nonOs.Count) { $nonOs -join ',' } else { 'none' }) + " (d3d12/dxgi/dcomp/d3dcompiler_47 are loaded at runtime from Windows)")
+  $qaDir = Join-Path $folder 'QA'
   $unexpected = Get-ChildItem -LiteralPath $folder -Recurse -File | Where-Object {
-    $_.Name -notin @('PixelPals.exe', 'README.txt', 'QA-WINDOWS.md', 'PERFORMANCE.md', 'BUILD-INFO.txt') -and
+    -not ($_.DirectoryName -eq $folder -and $_.Name -in @('PixelPals.exe', 'README.txt', 'QA-WINDOWS.md', 'PERFORMANCE.md', 'BUILD-INFO.txt')) -and
+    -not ($_.DirectoryName -eq $qaDir -and $_.Name -in @('test-portable.ps1', 'profile-memory.ps1')) -and
     -not ($_.DirectoryName -eq $data)
   }
   Assert-True (@($unexpected).Count -eq 0) 'package-contents' ("unexpected files: " + (@($unexpected | ForEach-Object Name) -join ','))
@@ -227,6 +246,60 @@ try {
     $report = Read-Smoke
     Assert-True ($r.ExitCode -eq 0 -and $report.startup_attempts -ge 1 -and $r.WindowSeen -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
       'normal-launch-never-visible-without-pal-region' "exit=$($r.ExitCode) attempts=$($report.startup_attempts) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)"
+
+    # 6b. Memory attribution, A/B suballocation sizes, idle cost, lifecycle --
+    #     Values below come from the CI runner (WARP software adapter): they
+    #     are behaviour/regression evidence, NOT hardware budgets.
+    Write-Settings 20
+    $memoryFile = Join-Path $data 's4-memory.json'
+    $ab = @{}
+    foreach ($hint in @('performance', 'memory')) {
+      Remove-Item -LiteralPath $memoryFile -ErrorAction SilentlyContinue
+      $code = Invoke-Pals @('--smoke-test-ms=3000', "--qa-memory-hints=$hint")
+      $mem = Read-Json 's4-memory.json'
+      $first = Get-Stage $mem 'first-frame'
+      $ab[$hint] = [pscustomobject]@{
+        exit = $code; hints = $(if ($mem) { $mem.context.memory_hints } else { $null })
+        private_mib = $(if ($first) { [Math]::Round($first.counters.private_bytes / 1MB, 1) } else { $null })
+        private_ws_mib = $(if ($first -and $first.counters.private_working_set) { [Math]::Round($first.counters.private_working_set / 1MB, 1) } else { $null })
+        reserved_mib = $(if ($null -ne (Get-AllocatorReserved $mem 'first-frame')) { [Math]::Round((Get-AllocatorReserved $mem 'first-frame') / 1MB, 1) } else { $null })
+        stages = $(if ($mem) { (@($mem.samples | ForEach-Object { '{0}={1:N1}' -f $_.stage, ($_.counters.private_bytes / 1MB) }) -join ' ') } else { '' })
+        released = $(if ($mem) { $mem.context.gpu_released_before_final_sample } else { $null })
+      }
+      Add-Result "memory-stages-$hint" 'INFO' ("hints=$($ab[$hint].hints) private_bytes_MiB_by_stage: $($ab[$hint].stages) | allocator_reserved_MiB=$($ab[$hint].reserved_mib) private_ws_MiB=$($ab[$hint].private_ws_mib) gpu_released_before_final_sample=$($ab[$hint].released)")
+    }
+    Assert-True ($ab['memory'].exit -eq 0 -and $ab['performance'].exit -eq 0 -and $ab['memory'].hints -eq 'MemoryUsage' -and $ab['performance'].hints -eq 'Performance') `
+      'memory-report-written' 'both hint modes ran and wrote Data/s4-memory.json with per-stage samples'
+    Assert-True ($null -ne $ab['memory'].reserved_mib -and $null -ne $ab['performance'].reserved_mib -and $ab['memory'].reserved_mib -le $ab['performance'].reserved_mib) `
+      'memoryusage-hints-reserve-no-more-than-performance' ("allocator reserved MiB: MemoryUsage=$($ab['memory'].reserved_mib) Performance=$($ab['performance'].reserved_mib); first-frame private MiB: MemoryUsage=$($ab['memory'].private_mib) Performance=$($ab['performance'].private_mib)")
+    Assert-True ($ab['memory'].released -eq $true) 'gpu-objects-released-on-exit' "gpu_released_before_final_sample=$($ab['memory'].released)"
+
+    #     Idle: event-driven rendering must not run a frame loop (design: 2 frames).
+    $code = Invoke-Pals @('--smoke-test-ms=10000')
+    $report = Read-Smoke
+    Assert-True ($code -eq 0 -and $report -and $report.frames_presented -le 4) 'idle-10s-no-render-loop' "exit=$code frames_presented=$(if ($report) { $report.frames_presented } else { 'n/a' }) over 10 s idle (a render loop would present ~300+)"
+
+    #     Walking soak with an external profiler: resource trend, leak tripwire.
+    $summaryPath = Join-Path $env:TEMP "pals-soak-$PID.json"
+    & (Join-Path $PSScriptRoot 'profile-memory.ps1') -Exe $exe -Arguments @('--smoke-test-ms=30000', '--qa-walk') -Seconds 40 -IntervalMs 1000 -SummaryPath $summaryPath -CsvPath (Join-Path $env:TEMP "pals-soak-$PID.csv") | Out-Null
+    $soak = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+    $report = Read-Smoke
+    Add-Result 'walking-soak-30s' 'INFO' ("samples=$($soak.samples) private_bytes_MiB first/max/last=$($soak.private_bytes_mib.first)/$($soak.private_bytes_mib.max)/$($soak.private_bytes_mib.last) private_ws_MiB median=$(if ($soak.private_ws_mib) { $soak.private_ws_mib.median } else { 'n/a' }) cpu_pct_one_core median/max=$(if ($soak.cpu_pct_one_core) { "$($soak.cpu_pct_one_core.median)/$($soak.cpu_pct_one_core.max)" } else { 'n/a' }) gpu_dedicated_MiB=$(if ($soak.gpu_dedicated_mib) { $soak.gpu_dedicated_mib.max } else { 'n/a' }) frames=$(if ($report) { $report.frames_presented } else { 'n/a' })")
+    # Tripwire for an obvious per-frame leak (~900 frames): not a memory budget.
+    $growth = if ($soak.private_bytes_mib) { [double]$soak.private_bytes_mib.last - [double]$soak.private_bytes_mib.min } else { $null }
+    Assert-True ($soak.exit_code -eq 0 -and $null -ne $growth -and $growth -lt 64 -and $report -and $report.frames_presented -gt 100) 'walking-soak-leak-tripwire' "exit=$($soak.exit_code) private_bytes growth (last-min)=$growth MiB over ~$($report.frames_presented) walking frames"
+
+    #     20 launch/exit cycles: every run exits 0, state stays valid, no
+    #     orphaned processes or temp files.
+    Write-Settings 30
+    $failures = 0
+    for ($i = 1; $i -le 20; $i++) {
+      $code = Invoke-Pals @('--smoke-test-ms=400')
+      if ($code -ne 0) { $failures++ }
+    }
+    $orphans = @(Get-Process -Name 'PixelPals' -ErrorAction SilentlyContinue)
+    $temps = @(Get-ChildItem -LiteralPath $data -Force -File | Where-Object { $_.Name -like '.settings-*.tmp' -or $_.Name -like '.s4-write-check*' })
+    Assert-True ($failures -eq 0 -and (Get-Clicks) -eq 30 -and $orphans.Count -eq 0 -and $temps.Count -eq 0) 'twenty-launch-exit-cycles' "failed_runs=$failures pal_clicks=$(Get-Clicks) (expected 30) orphan_processes=$($orphans.Count) temp_files=$($temps.Count)"
 
     # 7. Corrupt settings fail closed and are not overwritten ---------------
     $good = [System.IO.File]::ReadAllBytes($settings)

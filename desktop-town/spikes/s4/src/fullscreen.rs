@@ -46,23 +46,42 @@ pub fn covers_monitor(window: Rect, monitor: Rect) -> bool {
         && window.bottom() >= monitor.bottom() - TOLERANCE
 }
 
-pub fn should_hide(shell: ShellState, foreground: Option<&Foreground>) -> bool {
-    if shell != ShellState::Normal {
-        return true;
+/// Why the overlay is hidden; logged so QA can attribute a disappearance to
+/// this explicit policy rather than to window stacking.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HideReason {
+    /// Shell reports an exclusive-mode Direct3D application.
+    ExclusiveD3d,
+    /// Windows presentation settings / presentation mode are active.
+    PresentationMode,
+    /// A caption-less foreground window covers the overlay's monitor
+    /// (browser fullscreen video, borderless-fullscreen game, slideshow).
+    CoversMonitor { class_name: String },
+}
+
+pub fn hide_reason(shell: ShellState, foreground: Option<&Foreground>) -> Option<HideReason> {
+    match shell {
+        ShellState::D3dFullscreen => return Some(HideReason::ExclusiveD3d),
+        ShellState::PresentationMode => return Some(HideReason::PresentationMode),
+        ShellState::Normal => {}
     }
-    let Some(front) = foreground else {
-        return false;
-    };
-    if !front.same_monitor_as_overlay {
-        return false;
-    }
-    if SHELL_CLASSES
-        .iter()
-        .any(|class| class.eq_ignore_ascii_case(&front.class_name))
+    let front = foreground?;
+    if !front.same_monitor_as_overlay
+        || SHELL_CLASSES
+            .iter()
+            .any(|class| class.eq_ignore_ascii_case(&front.class_name))
+        || front.has_caption
+        || !covers_monitor(front.rect, front.monitor)
     {
-        return false;
+        return None;
     }
-    !front.has_caption && covers_monitor(front.rect, front.monitor)
+    Some(HideReason::CoversMonitor {
+        class_name: front.class_name.clone(),
+    })
+}
+
+pub fn should_hide(shell: ShellState, foreground: Option<&Foreground>) -> bool {
+    hide_reason(shell, foreground).is_some()
 }
 
 #[cfg(test)]
@@ -128,6 +147,26 @@ mod tests {
     fn tolerance_is_two_pixels() {
         assert!(covers_monitor(Rect::new(2, 2, 1916, 1076), MONITOR));
         assert!(!covers_monitor(Rect::new(3, 0, 1917, 1080), MONITOR));
+    }
+
+    #[test]
+    fn reasons_identify_the_mechanism() {
+        let video = front(MONITOR, false, "Chrome_WidgetWin_1", true);
+        assert_eq!(
+            hide_reason(ShellState::Normal, Some(&video)),
+            Some(HideReason::CoversMonitor {
+                class_name: "Chrome_WidgetWin_1".into()
+            })
+        );
+        assert_eq!(
+            hide_reason(ShellState::D3dFullscreen, Some(&video)),
+            Some(HideReason::ExclusiveD3d)
+        );
+        assert_eq!(
+            hide_reason(ShellState::PresentationMode, None),
+            Some(HideReason::PresentationMode)
+        );
+        assert_eq!(hide_reason(ShellState::Normal, None), None);
     }
 
     #[test]
