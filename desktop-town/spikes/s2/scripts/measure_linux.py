@@ -41,6 +41,19 @@ def pss_kib(pid):
         return None
     return None
 
+def webkit_processes(pids):
+    """PIDs of WebKit helper processes, including the truncated /proc comm form."""
+    found = []
+    for pid in pids:
+        try:
+            process = (Path('/proc') / str(pid) / 'comm').read_text().strip()
+            cmdline = (Path('/proc') / str(pid) / 'cmdline').read_bytes().replace(b'\\0', b' ').decode('utf-8', 'replace')
+            if 'WebKit' in process or 'WebKit' in cmdline:
+                found.append(pid)
+        except OSError:
+            continue
+    return sorted(found)
+
 def gpu_sample():
     try:
         out = subprocess.check_output(['nvidia-smi', '--query-gpu=utilization.gpu,memory.used', '--format=csv,noheader,nounits'], text=True, stderr=subprocess.DEVNULL, timeout=3)
@@ -55,12 +68,19 @@ def measure(pid, seconds, interval, mode):
     last_cpu = {}
     samples = []
     exited = False
+    browser_seen = set()
+    browser_exited = set()
+    browser_last = set()
     while time.monotonic() - started < seconds:
         now = time.monotonic()
         tree = process_tree(pid)
         if pid not in tree:
             exited = True
             break
+        browser_now = set(webkit_processes(tree))
+        browser_exited.update(browser_last - browser_now)
+        browser_last = browser_now
+        browser_seen.update(browser_now)
         cpu = {p: v for p in tree if (v := cpu_jiffies(p)) is not None}
         pss = [v for p in tree if (v := pss_kib(p)) is not None]
         cpu_pct = None
@@ -68,12 +88,12 @@ def measure(pid, seconds, interval, mode):
             # Count only matching persistent processes, conservatively excluding new/exited children.
             ticks = sum(max(0, c - last_cpu[p]) for p, c in cpu.items() if p in last_cpu)
             cpu_pct = 100 * ticks / clk / (now - last_t)
-        samples.append({'seconds': round(now - started, 3), 'processes': len(tree), 'cpuOneCorePercent': cpu_pct, 'pssMiB': round(sum(pss) / 1024, 2) if pss else None, 'pssObservedProcesses': len(pss), 'gpuSystemWide': gpu_sample()})
+        samples.append({'seconds': round(now - started, 3), 'processes': len(tree), 'webkitHelperPids': sorted(browser_now), 'cpuOneCorePercent': cpu_pct, 'pssMiB': round(sum(pss) / 1024, 2) if pss else None, 'pssObservedProcesses': len(pss), 'gpuSystemWide': gpu_sample()})
         last_t, last_cpu = now, cpu
         time.sleep(min(interval, max(.01, seconds - (time.monotonic() - started))))
     cpus = [s['cpuOneCorePercent'] for s in samples if s['cpuOneCorePercent'] is not None]
     psss = [s['pssMiB'] for s in samples if s['pssMiB'] is not None]
-    return {'phase': mode, 'pid': pid, 'secondsRequested': seconds, 'secondsObserved': round(time.monotonic() - started, 2), 'processExitedDuringSample': exited, 'cpuMeanOneLogicalCorePercent': round(statistics.mean(cpus), 2) if cpus else None, 'cpuPeakOneLogicalCorePercent': round(max(cpus), 2) if cpus else None, 'pssPeakMiB': max(psss) if psss else None, 'pssMeanMiB': round(statistics.mean(psss), 2) if psss else None, 'missingPss': any(s['pssObservedProcesses'] < s['processes'] for s in samples), 'gpuScope': 'system-wide, not process-attributed', 'samples': samples}
+    return {'phase': mode, 'pid': pid, 'secondsRequested': seconds, 'secondsObserved': round(time.monotonic() - started, 2), 'processExitedDuringSample': exited, 'webkitHelperPidsObserved': sorted(browser_seen), 'webkitHelperPidsDisappeared': sorted(browser_exited), 'webKitHelperNeverObserved': not bool(browser_seen), 'cpuMeanOneLogicalCorePercent': round(statistics.mean(cpus), 2) if cpus else None, 'cpuPeakOneLogicalCorePercent': round(max(cpus), 2) if cpus else None, 'pssPeakMiB': max(psss) if psss else None, 'pssMeanMiB': round(statistics.mean(psss), 2) if psss else None, 'missingPss': any(s['pssObservedProcesses'] < s['processes'] for s in samples), 'gpuScope': 'system-wide, not process-attributed', 'samples': samples}
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)

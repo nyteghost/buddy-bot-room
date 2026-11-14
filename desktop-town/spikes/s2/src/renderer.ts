@@ -94,7 +94,9 @@ export class CanvasTownRenderer implements SceneRenderer {
     const items: Item[] = [
       ...scene.buildings.map(b => ({ kind: 'building' as const, building: b, depth: b.x + b.y, bounds: this.buildingBounds(b) })),
       ...scene.actors.map((a, i) => ({ kind: 'actor' as const, actor: a, depth: a.x + a.y, bounds: actorBounds[i] }))
-    ].sort((a, b) => a.depth - b.depth || (a.kind === 'building' ? -1 : 1));
+    ].sort((a, b) => a.depth - b.depth || (a.kind === b.kind
+      ? (a.kind === 'actor' && b.kind === 'actor' ? a.actor.id.localeCompare(b.actor.id) : 0)
+      : (a.kind === 'building' ? -1 : 1)));
     this.ctx.save();
     for (const r of damage) {
       // Align to physical pixels for predictable transparent edges on high-DPI monitors.

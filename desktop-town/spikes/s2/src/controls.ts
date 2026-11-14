@@ -20,3 +20,5 @@ apply.addEventListener('click', () => launch());
 idle.addEventListener('click', () => launch('idle', 60));
 walk.addEventListener('click', () => launch('walk', 60));
 soak.addEventListener('click', () => launch('walk', 1800));
+
+export {}; // Each source file is an isolated ES module.

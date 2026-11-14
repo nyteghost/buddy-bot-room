@@ -23,6 +23,10 @@ test('empty and invalid scenes, count bounds, clock clamp', () => {
   assert.equal(sceneIsSafe({...s,actors:[s.actors[0],s.actors[0]]}),false);
   assert.equal(sceneIsSafe({...s,actors:[{...s.actors[0],x:Infinity}]}),false);
 });
+test('absolute synthetic time stays deterministic after renderer suspension',()=>{
+  const a=new TownSimulation(4),b=new TownSimulation(4);a.seek(90123);b.seek(90123);
+  assert.deepEqual(a.snapshot(),b.snapshot());assert.throws(()=>a.seek(-1),RangeError);
+});
 test('interpolation stays in range and maintains actor identity', () => {
   const a=new TownSimulation().snapshot().actors[0], b={...a,x:a.x+2,y:a.y+4,stride:a.stride+10};
   assert.equal(interpolateActor(a,b,.5).x,a.x+1);

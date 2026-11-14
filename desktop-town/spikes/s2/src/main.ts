@@ -12,6 +12,8 @@ const params = new URLSearchParams(location.search);
 const requestedCount = Number(params.get('actors') ?? '1');
 if (!Number.isSafeInteger(requestedCount) || requestedCount < 0 || requestedCount > 128) throw new RangeError('actors must be 0..128');
 const sim = new TownSimulation(requestedCount), renderer = new CanvasTownRenderer(canvas), perf = new PerfMetrics();
+const simulationEpoch = performance.now();
+function currentScene() { sim.seek(Math.max(0, performance.now() - simulationEpoch)); return sim.snapshot(); }
 let rafRequests = 0;
 let idleRafRequests = 0;
 let benchmarkTimer: ReturnType<typeof setTimeout> | undefined;
@@ -20,7 +22,8 @@ const scheduler = new FrameScheduler(
   cb => { rafRequests++; return requestAnimationFrame(cb); },
   id => cancelAnimationFrame(id),
   (dt, t) => {
-    sim.step(dt); const start = performance.now();
+    // The synthetic world is an absolute-time source: renderer visibility does not own its clock.
+    sim.seek(Math.max(0, t - simulationEpoch)); const start = performance.now();
     const drawn = renderer.render(sim.snapshot());
     const cost = performance.now() - start;
     if (drawn) perf.record(t, cost);
@@ -28,7 +31,8 @@ const scheduler = new FrameScheduler(
   }
 );
 const gate = new VisibilityGate(scheduler);
-function resize(): void { if (disposed) return; renderer.resize(innerWidth, innerHeight, devicePixelRatio); renderer.render(sim.snapshot(), true); }
+gate.setVisible(!document.hidden);
+function resize(): void { if (disposed) return; renderer.resize(innerWidth, innerHeight, devicePixelRatio); renderer.render(currentScene(), true); }
 function syncStatus(): void {
   toggle!.textContent = gate.wantsWalking ? 'Pause Pal' : 'Walk Pal';
   status!.textContent = scheduler.running ? `Walking ${sim.count} Pals — adaptive 30/60 FPS` : gate.wantsWalking ? 'Hidden — drawing suspended, will resume' : 'Idle — zero scheduled animation frames';
@@ -42,6 +46,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) resize(); // restore after compositor/WebKit content loss
   syncStatus();
 });
+window.addEventListener('pageshow', event => { if (event.persisted && disposed) location.reload(); });
 window.addEventListener('pagehide', () => {
   disposed = true; gate.setWanted(false); if (benchmarkTimer !== undefined) clearTimeout(benchmarkTimer);
   renderer.dispose(); window.s2Perf = undefined;

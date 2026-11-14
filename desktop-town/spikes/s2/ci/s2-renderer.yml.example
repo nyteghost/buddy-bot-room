@@ -32,6 +32,8 @@ jobs:
         run: npm ci && npm run typecheck && npm test && npm run build
       - name: No-dependency deterministic tests
         run: npm run test:offline
+      - name: Python telemetry sampler regression
+        run: python3 -B scripts/test_measure_linux.py
       - name: Rust formatting, check, clippy, tests
         run: |
           cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check

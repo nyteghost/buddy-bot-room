@@ -1,6 +1,6 @@
 [package]
 name = "pixel-pals-desktop-s2"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "Isolated Pixel Pals Canvas 2D performance spike"
 

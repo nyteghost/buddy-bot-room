@@ -7,6 +7,13 @@ describe('deterministic synthetic simulation', () => {
   it('rejects excessive actors and invalid deltas', () => { expect(()=>new TownSimulation(129)).toThrow(); expect(()=>new TownSimulation(-1)).toThrow(); const s=new TownSimulation(); expect(()=>s.step(NaN)).toThrow(); expect(()=>s.step(-1)).toThrow(); });
   it('clamps animation delta after a long pause', () => { const a=new TownSimulation(), b=new TownSimulation(); a.step(999999); b.step(100); expect(a.snapshot()).toEqual(b.snapshot()); });
   it('interpolates world position and stride without changing actor identity', () => { const [a,b]=[new TownSimulation(1).snapshot().actors[0],new TownSimulation(1).snapshot().actors[0]]; const target={...b,x:b.x+2,y:b.y+4,stride:10}; expect(interpolateActor(a,target,.5).x).toBeCloseTo(a.x+1); expect(interpolateActor(a,target,.5).y).toBeCloseTo(a.y+2); expect(interpolateActor(a,target,3).x).toBe(target.x); expect(()=>interpolateActor(a,{...target,id:'other'},.5)).toThrow(); });
+  it('allows deterministic authoritative time seek without renderer stepping', () => {
+    const a=new TownSimulation(4), b=new TownSimulation(4);
+    a.seek(90234); b.seek(90234);
+    expect(a.snapshot()).toEqual(b.snapshot());
+    expect(()=>a.seek(-1)).toThrow();
+    expect(()=>a.seek(NaN)).toThrow();
+  });
   it('rejects invalid/duplicate/NaN scenes instead of drawing indefinitely', () => { const s=new TownSimulation().snapshot(); expect(sceneIsSafe({...s,actors:[s.actors[0],s.actors[0]]})).toBe(false); expect(sceneIsSafe({...s,actors:[{...s.actors[0],x:Infinity}]})).toBe(false); expect(sceneIsSafe({...s,tiles:[{x:NaN,y:0,kind:'grass'}]})).toBe(false); });
 });
 describe('dirty damage and scene invalidation', () => {
@@ -23,6 +30,16 @@ describe('idle-safe scheduler, visibility and metrics', () => {
   it('has no idle RAF and does not schedule duplicate loops', () => { const f=fake(),render=vi.fn(()=>1),s=new FrameScheduler(f.request,f.cancel,render);expect(f.q.size).toBe(0);s.start();s.start();expect(f.q.size).toBe(1);f.tick(0);f.tick(17);expect(render).toHaveBeenCalledTimes(1);s.stop();expect(f.q.size).toBe(0);f.tick(50);expect(render).toHaveBeenCalledTimes(1); });
   it('resumes visible content only when user still wants walking', () => { const f=fake(),s=new FrameScheduler(f.request,f.cancel,()=>1),gate=new VisibilityGate(s);gate.setWanted(true);expect(f.q.size).toBe(1);gate.setVisible(false);expect(f.q.size).toBe(0);gate.setVisible(true);expect(f.q.size).toBe(1);gate.setWanted(false);expect(f.q.size).toBe(0);gate.setVisible(false);gate.setVisible(true);expect(f.q.size).toBe(0); });
   it('drops to 30fps on expensive frames and stops cleanly', () => { const f=fake(),s=new FrameScheduler(f.request,f.cancel,()=>23);s.start();f.tick(0);for(let i=1;i<=6;i++)f.tick(i*50);expect(s.targetFps).toBe(30);s.stop();expect(f.q.size).toBe(0); });
+  it('recovers from 30 to 60fps after sustained cheap frames', () => {
+    const f=fake(); let cost=23; const s=new FrameScheduler(f.request,f.cancel,()=>cost);
+    s.start(); f.tick(0);
+    for(let i=1;i<=6;i++) f.tick(i*50);
+    expect(s.targetFps).toBe(30);
+    cost=1;
+    for(let i=1;i<=122;i++) f.tick(300+i*34);
+    expect(s.targetFps).toBe(60);
+    s.stop();
+  });
   it('clamps huge frame-time before updating authoritative simulation', () => { const f=fake(),times:number[]=[],s=new FrameScheduler(f.request,f.cancel,(dt)=>{times.push(dt);return 1;});s.start();f.tick(0);f.tick(4000);expect(times).toEqual([100]);s.stop(); });
   it('retains bounded metrics and returns a window p95',()=>{const p=new PerfMetrics();for(let i=0;i<5000;i++)p.record(i*33,2);expect(p.snapshot().frames).toBe(5000);expect(p.snapshot().p95FrameIntervalMs).toBe(33);expect(p.snapshot().fps).toBeCloseTo(1000/33,3);p.reset();expect(p.snapshot().frames).toBe(0);expect(percentile([1,2,3,4,5],.95)).toBe(5);});
 });

@@ -11,13 +11,13 @@ export function intersect(a: Rect, b: Rect): boolean { return a.x < b.x + b.w &&
 export function combine(a: Rect, b: Rect): Rect { const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y } }
 export function percentile(values: readonly number[], p: number): number { if (!values.length) return 0; const sorted = [...values].sort((a, b) => a - b); return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1))] }
 export function sceneIsSafe(scene: Scene): boolean {
-  if (!Number.isSafeInteger(scene.revision) || !Number.isSafeInteger(scene.staticRevision) || scene.actors.length > 128 || scene.tiles.length > 4096 || scene.buildings.length > 128) return false;
+  if (!scene || !Array.isArray(scene.actors) || !Array.isArray(scene.tiles) || !Array.isArray(scene.buildings) || !Number.isSafeInteger(scene.revision) || !Number.isSafeInteger(scene.staticRevision) || scene.actors.length > 128 || scene.tiles.length > 4096 || scene.buildings.length > 128) return false;
   const ids = new Set<string>();
   for (const a of scene.actors) {
-    if (!a.id || ids.has(a.id) || ![a.x, a.y, a.stride].every(Number.isFinite) || (a.facing !== 1 && a.facing !== -1) || !/^#[0-9a-fA-F]{6}$/.test(a.color)) return false;
+    if (!a.id || ids.has(a.id) || ![a.x, a.y, a.stride].every(v => Number.isFinite(v) && Math.abs(v) < 100000) || (a.facing !== 1 && a.facing !== -1) || !/^#[0-9a-fA-F]{6}$/.test(a.color)) return false;
     ids.add(a.id);
   }
-  for (const p of [...scene.tiles, ...scene.buildings]) if (![p.x, p.y].every(Number.isFinite)) return false;
+  for (const p of [...scene.tiles, ...scene.buildings]) if (![p.x, p.y].every(v => Number.isFinite(v) && Math.abs(v) < 100000)) return false;
   return true;
 }
 /** Damage-plan implementation is pure so both Canvas and future wgpu implementations can test it. */
@@ -51,7 +51,7 @@ export function interpolateActor(a: Actor, b: Actor, alpha: number): Actor {
 export class TownSimulation {
   private elapsed = 0; private revision = 0;
   readonly count: number;
-  private readonly tiles: readonly Tile[]; private readonly buildings: readonly Building[] = [{ x: 1.5, y: 0.3, kind: 'post' }, { x: 4.2, y: 0.4, kind: 'cafe' }];
+  private readonly tiles: readonly Tile[]; private readonly buildings: readonly Building[] = [{ x: 1.5, y: 3.6, kind: 'post' }, { x: 4.2, y: 0.4, kind: 'cafe' }];
   constructor(count = 1) {
     if (!Number.isSafeInteger(count) || count < 0 || count > 128) throw new RangeError('actor count must be 0..128');
     this.count = count;
@@ -60,6 +60,12 @@ export class TownSimulation {
   step(dtMs: number): void {
     if (!Number.isFinite(dtMs) || dtMs < 0) throw new RangeError('invalid frame delta');
     this.elapsed += Math.min(dtMs, 100) / 1000; this.revision++;
+  }
+  /** Absolute-time scene progression, independent of whether any renderer is running. */
+  seek(elapsedMs: number): void {
+    if (!Number.isFinite(elapsedMs) || elapsedMs < 0) throw new RangeError('invalid scene time');
+    const seconds = elapsedMs / 1000;
+    if (seconds !== this.elapsed) { this.elapsed = seconds; this.revision++; }
   }
   snapshot(): Scene {
     const actors: Actor[] = [];
@@ -94,7 +100,7 @@ export class FrameScheduler {
       this.last = t;
       const cost = this.render(Math.min(100, Math.max(0, dt)), t);
       if (cost > 20 || dt > 42) { this.slow++; this.fast = 0; }
-      else if (cost < 10 && dt < 24) { this.fast++; this.slow = 0; }
+      else if (cost < 10 && dt < (this.interval > 30 ? 40 : 24)) { this.fast++; this.slow = 0; }
       else { this.slow = 0; this.fast = 0; }
       if (this.slow >= 5) { this.interval = 1000 / 30; this.slow = 0; }
       if (this.fast >= 120) { this.interval = 1000 / 60; this.fast = 0; }
@@ -105,7 +111,8 @@ export class FrameScheduler {
 /** Visibility pauses rendering, but retains user intent so a resumed tab may redraw. */
 export class VisibilityGate {
   private wanted = false; private visible = true;
-  constructor(private readonly scheduler: Pick<FrameScheduler, 'start' | 'stop'>) {}
+  private readonly scheduler: Pick<FrameScheduler, 'start' | 'stop'>;
+  constructor(scheduler: Pick<FrameScheduler, 'start' | 'stop'>) { this.scheduler = scheduler; }
   setWanted(walk: boolean): void { this.wanted = walk; this.sync(); }
   setVisible(visible: boolean): void { this.visible = visible; this.sync(); }
   get wantsWalking(): boolean { return this.wanted }
@@ -114,17 +121,36 @@ export class VisibilityGate {
 export interface PerfSnapshot { frames: number; fps: number; p95FrameIntervalMs: number; p95DrawMs: number; maxDrawMs: number; idleRafRequests: number }
 /** Windowed p95 over last 4096 samples; bounded memory in 30-minute soak. */
 export class PerfMetrics {
-  private frameTimes: number[] = []; private drawTimes: number[] = [];
-  private first = 0; private last = 0; private lastRecorded: number | null = null; private draws = 0;
+  private static readonly capacity = 4096;
+  private readonly frameTimes = new Float64Array(4096);
+  private readonly drawTimes = new Float64Array(4096);
+  private intervals = 0; private draws = 0;
+  private first = 0; private last = 0; private lastRecorded: number | null = null;
   record(t: number, drawCost: number): void {
+    if (!Number.isFinite(t) || !Number.isFinite(drawCost) || drawCost < 0) return;
     if (!this.draws) this.first = t;
-    if (this.lastRecorded !== null) { this.frameTimes.push(t - this.lastRecorded); if (this.frameTimes.length > 4096) this.frameTimes.shift(); }
+    if (this.lastRecorded !== null) {
+      this.frameTimes[this.intervals % PerfMetrics.capacity] = Math.max(0, t - this.lastRecorded);
+      this.intervals++;
+    }
     this.lastRecorded = t; this.last = t;
-    this.drawTimes.push(drawCost); if (this.drawTimes.length > 4096) this.drawTimes.shift();
+    this.drawTimes[this.draws % PerfMetrics.capacity] = drawCost;
     this.draws++;
   }
   snapshot(idleRafRequests = 0): PerfSnapshot {
-    return { frames: this.draws, fps: this.draws > 1 && this.last > this.first ? (this.draws - 1) * 1000 / (this.last - this.first) : 0, p95FrameIntervalMs: percentile(this.frameTimes, .95), p95DrawMs: percentile(this.drawTimes, .95), maxDrawMs: Math.max(0, ...this.drawTimes), idleRafRequests };
+    const frameWindow = Array.from(this.frameTimes.subarray(0, Math.min(this.intervals, PerfMetrics.capacity)));
+    const drawWindow = Array.from(this.drawTimes.subarray(0, Math.min(this.draws, PerfMetrics.capacity)));
+    return {
+      frames: this.draws,
+      fps: this.draws > 1 && this.last > this.first ? (this.draws - 1) * 1000 / (this.last - this.first) : 0,
+      p95FrameIntervalMs: percentile(frameWindow, .95),
+      p95DrawMs: percentile(drawWindow, .95),
+      maxDrawMs: drawWindow.reduce((max, x) => Math.max(max, x), 0),
+      idleRafRequests
+    };
   }
-  reset(): void { this.frameTimes = []; this.drawTimes = []; this.draws = 0; this.first = this.last = 0; this.lastRecorded = null; }
+  reset(): void {
+    this.intervals = this.draws = 0;
+    this.first = this.last = 0; this.lastRecorded = null;
+  }
 }
