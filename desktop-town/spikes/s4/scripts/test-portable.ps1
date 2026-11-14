@@ -66,7 +66,8 @@ function Invoke-PalsWatched([string[]]$Arguments, [int]$TimeoutMs = 120000) {
   $found = $false; $everVisible = $false; $palRegion = $false; $unsafe = 0; $samples = 0
   while (-not $p.HasExited) {
     if ($watch.ElapsedMilliseconds -gt $TimeoutMs) { $p.Kill(); throw "PixelPals.exe $Arguments did not exit within $TimeoutMs ms" }
-    $hwnd = [S4Qa.Win32]::FindWindowW($null, $OverlayTitle)
+    # [NullString]::Value: PowerShell would otherwise pass "" (match no class).
+    $hwnd = [S4Qa.Win32]::FindWindowW([NullString]::Value, $OverlayTitle)
     if ($hwnd -ne [System.IntPtr]::Zero) {
       $found = $true; $samples++
       $rect = New-Object S4Qa.Win32+RECT
@@ -208,7 +209,8 @@ try {
       $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs", "--qa-fault-first-frame=$spec")
       $report = Read-Smoke
       $after = (Get-FileHash -LiteralPath $settings -Algorithm SHA256).Hash
-      Assert-True ($r.ExitCode -eq 4 -and -not $r.EverVisible -and -not $r.PalRegionSeen -and $report -and $report.result -eq 'FAIL_CLOSED_FIRST_FRAME' -and $before -eq $after) `
+      # WindowSeen proves the observer really watched the (hidden) HWND.
+      Assert-True ($r.ExitCode -eq 4 -and $r.WindowSeen -and -not $r.EverVisible -and -not $r.PalRegionSeen -and $report -and $report.result -eq 'FAIL_CLOSED_FIRST_FRAME' -and $before -eq $after) `
         "first-frame-$kind-fails-closed" ("exit=$($r.ExitCode) window_seen=$($r.WindowSeen) samples=$($r.Samples) ever_visible=$($r.EverVisible) pal_region=$($r.PalRegionSeen) attempts=$(if ($report) { $report.startup_attempts } else { 'n/a' }) settings_unchanged=$($before -eq $after)")
     }
     #    Transient skips recover: shown only after a real present, always with
@@ -217,13 +219,13 @@ try {
       Remove-Item -LiteralPath (Join-Path $data 's4-smoke.json') -ErrorAction SilentlyContinue
       $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs", "--qa-fault-first-frame=${kind}:3")
       $report = Read-Smoke
-      Assert-True ($r.ExitCode -eq 0 -and $report -and $report.result -eq 'PASS' -and $report.startup_attempts -eq 4 -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
+      Assert-True ($r.ExitCode -eq 0 -and $report -and $report.result -eq 'PASS' -and $report.startup_attempts -eq 4 -and $r.WindowSeen -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
         "first-frame-$kind-recovers" ("exit=$($r.ExitCode) attempts=$(if ($report) { $report.startup_attempts } else { 'n/a' }) frames=$(if ($report) { $report.frames_presented } else { 'n/a' }) ever_visible=$($r.EverVisible) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)")
     }
     #    Unfaulted launch observed externally obeys the same invariant.
     $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs")
     $report = Read-Smoke
-    Assert-True ($r.ExitCode -eq 0 -and $report.startup_attempts -ge 1 -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
+    Assert-True ($r.ExitCode -eq 0 -and $report.startup_attempts -ge 1 -and $r.WindowSeen -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
       'normal-launch-never-visible-without-pal-region' "exit=$($r.ExitCode) attempts=$($report.startup_attempts) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)"
 
     # 7. Corrupt settings fail closed and are not overwritten ---------------
