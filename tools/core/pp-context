@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Session bootstrap: where is the project right now?
+
+  pp-context [--base beta] [--relays 8] [--hours 48] [--max-prs 15] [--json]
+
+Prints (REST API only, read-only):
+  * base branch head SHA and its last 5 commits
+  * open PRs with head SHA and an independent CI rollup for that exact SHA
+  * the latest relay blocks from the coordination issue (CLAIMS, flagged as such)
+  * failed GitHub Actions runs in the last N hours
+  * this checkout's branch, HEAD and whether ownership.yml assigns it to an agent
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pplib  # noqa: E402
+from pplib import ToolError  # noqa: E402
+
+
+def collect(gh: pplib.GitHub, repo: str, base: str, n_relays: int, hours: int, max_prs: int) -> dict:
+    info = gh.get(f"/repos/{repo}")
+    commits = gh.get(f"/repos/{repo}/commits", {"sha": base, "per_page": 5})
+    prs = gh.paginate(f"/repos/{repo}/pulls", {"state": "open", "sort": "updated", "direction": "desc"},
+                      max_pages=1, per_page=max_prs)
+    pr_rows = []
+    for pr in prs[:max_prs]:
+        sha = pr["head"]["sha"]
+        ci = pplib.ci_for_sha(gh, repo, sha)
+        pr_rows.append({"number": pr["number"], "title": pr["title"], "draft": pr.get("draft", False),
+                        "branch": pr["head"]["ref"], "base": pr["base"]["ref"], "head_sha": sha,
+                        "updated_at": pr.get("updated_at", ""), "url": pr.get("html_url", ""),
+                        "ci": {"state": ci["state"], "summary": ci["summary"], "provenance": "independent"}})
+    since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    runs = gh.get(f"/repos/{repo}/actions/runs",
+                  {"status": "failure", "created": f">={since}", "per_page": 30}).get("workflow_runs", [])
+    failed = [{"name": r.get("name"), "branch": r.get("head_branch"), "sha": r.get("head_sha"),
+               "event": r.get("event"), "created_at": r.get("created_at"), "url": r.get("html_url")}
+              for r in runs]
+    relays = pplib.issue_relays(gh, repo, pplib.COORDINATION_ISSUE, limit=n_relays)
+
+    local = {"branch": pplib.current_branch() or "DETACHED", "head": pplib.git("rev-parse", "HEAD", check=False),
+             "dirty": pplib.worktree_dirty() if pplib.git("rev-parse", "HEAD", check=False) else None}
+    try:
+        guardlib = pplib.import_guardlib()
+        local["agent"] = guardlib.select_agent(guardlib.policy(), local["branch"])
+    except ToolError as exc:
+        local["agent"] = f"UNKNOWN ({exc})"
+    except Exception as exc:  # guardlib.GuardError: branch not mapped to exactly one agent
+        local["agent"] = f"UNASSIGNED ({exc})"
+
+    return {"schema": "pp-context/v1", "generated_at": pplib.now(), "repo": repo,
+            "default_branch": info.get("default_branch"), "base": base,
+            "base_commits": [{"sha": c["sha"], "date": c["commit"]["committer"]["date"],
+                              "message": c["commit"]["message"].splitlines()[0][:100]} for c in commits],
+            "open_prs": pr_rows, "failed_runs": failed, "failed_runs_since": since,
+            "relays": [{k: r.get(k) for k in ("created_at", "agent", "branch", "sha", "status", "pr",
+                                               "canonical", "problems", "url", "provenance")}
+                       for r in relays],
+            "local": local, "github_api_calls": gh.calls}
+
+
+def render(d: dict) -> str:
+    out = [f"# {d['repo']}  (default branch: {d['default_branch']})  generated {d['generated_at']}", ""]
+    head = d["base_commits"][0]["sha"] if d["base_commits"] else "?"
+    out.append(f"## {d['base']} head {head}")
+    out += [f"  {c['sha'][:10]} {c['date'][:10]} {c['message']}" for c in d["base_commits"]]
+    out += ["", f"## Open PRs ({len(d['open_prs'])})  CI = independent rollup for the exact head SHA"]
+    for p in d["open_prs"]:
+        out.append(f"  #{p['number']:<4} {'draft' if p['draft'] else 'ready':<5} {p['ci']['state']:<7} "
+                   f"{p['ci']['summary']:<10} {p['head_sha'][:10]} {p['branch']} -> {p['base']}")
+        out.append(f"        {p['title'][:90]}")
+    out += ["", f"## Latest relays in #{pplib.COORDINATION_ISSUE}  (CLAIMS - verify with verify-claim)"]
+    for r in d["relays"]:
+        flag = "canonical" if r["canonical"] else "NON-CANONICAL"
+        out.append(f"  {r['created_at'][:16]} {r['agent'] or '?':<34} {(r['sha'] or '-')[:10]:<10} {flag}")
+        out.append(f"        {r['branch'] or '-'} | {r['status'][:80]}")
+    out += ["", f"## Failed Actions runs since {d['failed_runs_since']}: {len(d['failed_runs'])}"]
+    out += [f"  {r['created_at'][:16]} {r['name']} [{r['branch']}] {str(r['sha'])[:10]} {r['url']}"
+            for r in d["failed_runs"][:15]]
+    loc = d["local"]
+    out += ["", "## This checkout",
+            f"  branch {loc['branch']} @ {str(loc['head'])[:12]}  dirty={loc['dirty']}",
+            f"  ownership.yml agent: {loc['agent']}", "",
+            f"({d['github_api_calls']} GitHub REST calls)"]
+    return "\n".join(out)
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(description="Pixel Pals session context (read-only)")
+    p.add_argument("--repo")
+    p.add_argument("--base", default="beta")
+    p.add_argument("--relays", type=int, default=8)
+    p.add_argument("--hours", type=int, default=48)
+    p.add_argument("--max-prs", type=int, default=15)
+    p.add_argument("--json", action="store_true")
+    args = p.parse_args(argv)
+    try:
+        d = collect(pplib.GitHub(), pplib.repo_slug(args.repo), args.base, args.relays, args.hours, args.max_prs)
+        pplib.write_json(pplib.OUT / "context.json", d)
+        print(json.dumps(d, indent=2) if args.json else render(d))
+        return 0
+    except (ToolError, OSError, ValueError, KeyError) as exc:
+        print(f"pp-context: error: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

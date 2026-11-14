@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""Independently verify a developer's claim: <agent> says <sha> on <branch> is ready.
+
+Usage:
+  verify-claim --branch B --sha S --agent A [--json] [--base beta]
+               [--test-results FILE] [--output FILE]
+  verify-claim --relay-comment ID [--json]      # take B/S/A from an Issue #37 relay
+
+Checks (all against GitHub/git, never against the claim text):
+  1. agent/branch assignment     ownership.yml via tools/guard/scope-check
+  2. commit exists               GET /repos/:r/commits/:sha
+  3. commit is on the branch     GET /repos/:r/compare/:sha...:branch
+  4. CI for the exact SHA        check runs + commit statuses for :sha
+  5. file ownership              files changed base...sha via tools/guard/scope-check
+  6. claimed test evidence       optional pp-test-results/v1 file (stays CLAIMED)
+
+Output: pp-findings/v1 (tool = "verify-claim") with an additive "checks" array
+and "verdict". Exit 0 = every check independently VERIFIED; 1 = any check
+FAILED or UNVERIFIED; 2 = tool error. Policy comes from THIS checkout's
+ownership.yml (run it from a trusted branch), never from the claimed commit.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import subprocess
+import sys
+import tempfile
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import pplib  # noqa: E402
+from pplib import ToolError, finding  # noqa: E402
+
+TOOL = "verify-claim"
+# This workflow runs on the coordination comment itself, never on the claimed SHA;
+# excluding it keeps a relay check from counting itself as CI evidence.
+IGNORED_CHECKS = ("verify-relay",)
+
+
+def check(name: str, status: str, evidence: str, source: str = "independent") -> dict:
+    assert status in ("verified", "failed", "unverified")
+    return {"check": name, "status": status, "evidence": evidence, "provenance": source}
+
+
+def run_scope_check(branch: str, agent: str, files: list[str]) -> dict:
+    script = pplib.guard_script("scope-check")
+    if script is None:
+        raise ToolError("tools/guard/scope-check not present in this checkout")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = pathlib.Path(tmp) / "scope.json"
+        cmd = [sys.executable, "-B", str(script), "--branch", branch, "--agent", agent,
+               "--output", str(out)]
+        for f in files:
+            cmd += ["--file", f]
+        p = subprocess.run(cmd, cwd=pplib.ROOT, text=True, capture_output=True, timeout=120)
+        if not out.exists():
+            raise ToolError(f"scope-check produced no output: {p.stderr.strip()[:300]}")
+        doc = pplib.load_findings(out)
+        doc["exit_code"] = p.returncode
+        return doc
+
+
+def verify(gh: pplib.GitHub, repo: str, branch: str, sha: str, agent: str,
+           base: str, test_results: pathlib.Path | None) -> dict:
+    checks: list[dict] = []
+    findings: list[dict] = []
+
+    # 0. input shape (claim text is untrusted)
+    if not pplib.SHA40.fullmatch(sha):
+        raise ToolError("--sha must be a full 40-character lowercase hex SHA")
+    if not pplib.VALID_AGENT.fullmatch(agent):
+        raise ToolError("--agent is not a valid agent id")
+    if not pplib.VALID_BRANCH.fullmatch(branch) or ".." in branch.split("/"):
+        raise ToolError("--branch is not a valid branch name")
+
+    # 1. assignment: ChatGPT-owned guardlib decides branch -> agent (same code as scope-check)
+    guardlib = pplib.import_guardlib()
+    try:
+        guardlib.select_agent(guardlib.policy(), branch, agent)
+        checks.append(check("assignment", "verified", f"ownership.yml assigns {branch} to {agent}"))
+        assigned = True
+    except guardlib.GuardError as exc:
+        checks.append(check("assignment", "failed", str(exc)))
+        findings.append(finding("agent-not-assigned", "blocker", str(exc)))
+        assigned = False
+
+    # 2. commit exists
+    try:
+        commit = gh.get(f"/repos/{repo}/commits/{sha}")
+        checks.append(check("commit-exists", "verified",
+                            f"{sha[:12]} by {commit.get('commit', {}).get('author', {}).get('name', '?')}: "
+                            f"{commit.get('commit', {}).get('message', '').splitlines()[0][:80] if commit.get('commit') else ''}"))
+    except ToolError as exc:
+        checks.append(check("commit-exists", "failed", f"GitHub cannot find {sha}: {str(exc)[:160]}"))
+        findings.append(finding("commit-missing", "blocker", f"claimed commit {sha} not found in {repo}"))
+        return finish(branch, sha, agent, checks, findings, None)
+
+    # 3. on branch; is it the head?
+    branch_head = ""
+    try:
+        cmp_ = gh.get(f"/repos/{repo}/compare/{sha}...{urlsafe(branch)}")
+        status = cmp_.get("status")
+        ahead = cmp_.get("ahead_by", 0)
+        commits = cmp_.get("commits") or []
+        branch_head = commits[-1]["sha"] if commits else sha
+        if status == "identical":
+            checks.append(check("on-branch", "verified", f"{sha[:12]} is the current head of {branch}"))
+        elif status == "ahead":
+            checks.append(check("on-branch", "verified",
+                                f"{sha[:12]} is on {branch}; branch has {ahead} newer commit(s) (head {branch_head[:12]})"))
+            findings.append(finding("claim-not-head", "info",
+                                    f"{branch} moved {ahead} commit(s) past the claimed SHA; claim may be stale"))
+        else:
+            checks.append(check("on-branch", "failed", f"compare status {status!r}: {sha[:12]} is not on {branch}"))
+            findings.append(finding("commit-not-on-branch", "blocker",
+                                    f"{sha} is not an ancestor of {branch} (status {status})"))
+    except ToolError as exc:
+        checks.append(check("on-branch", "failed", f"branch {branch} unavailable: {str(exc)[:160]}"))
+        findings.append(finding("branch-missing", "blocker", f"cannot compare {sha} with {branch}"))
+
+    # 4. CI on the exact SHA
+    ci = pplib.ci_for_sha(gh, repo, sha, ignore=IGNORED_CHECKS)
+    state = ci["state"]
+    if state == "pass":
+        checks.append(check("ci-exact-sha", "verified", f"{ci['summary']} on {sha[:12]}"))
+    elif state == "fail":
+        bad = [c["name"] for c in ci["checks"] if c["conclusion"] not in ("success", "neutral", "skipped")]
+        checks.append(check("ci-exact-sha", "failed", f"{ci['summary']}; failing/other-SHA: {bad[:6]}"))
+        findings.append(finding("ci-failed", "blocker", f"CI not green on {sha}: {', '.join(bad[:6])}"))
+    elif state == "pending":
+        checks.append(check("ci-exact-sha", "unverified", f"{ci['summary']}; some checks still running"))
+        findings.append(finding("ci-pending", "medium", f"CI still running on {sha}; re-run verify-claim later"))
+    else:
+        checks.append(check("ci-exact-sha", "unverified", f"no check runs or statuses exist for {sha}"))
+        findings.append(finding("ci-missing", "high", f"no CI evidence exists for exact SHA {sha}"))
+
+    # 5. ownership of every file the branch changes relative to its base
+    if assigned:
+        try:
+            diff = gh.get(f"/repos/{repo}/compare/{urlsafe(base)}...{sha}")
+            files: list[str] = []
+            for f in diff.get("files") or []:
+                files.append(f["filename"])
+                if f.get("previous_filename"):
+                    files.append(f["previous_filename"])
+            truncated = len(diff.get("files") or []) >= 300
+            scope = (run_scope_check(branch, agent, sorted(set(files))) if files
+                     else {"findings": []})
+            bad = [f for f in scope["findings"] if f["rule"] != "tool-error"]
+            errs = [f for f in scope["findings"] if f["rule"] == "tool-error"]
+            if errs:
+                checks.append(check("file-ownership", "unverified", errs[0]["message"]))
+                findings.append(finding("scope-unverified", "high", errs[0]["message"]))
+            elif bad:
+                checks.append(check("file-ownership", "failed",
+                                    f"{len(bad)} of {len(set(files))} changed path(s) outside {agent}'s scope"))
+                for f in bad[:50]:
+                    findings.append(finding(f["rule"], f["severity"], f["message"], f["file"]))
+            elif truncated:
+                checks.append(check("file-ownership", "unverified",
+                                    "compare API returned 300+ files; list may be truncated"))
+                findings.append(finding("scope-truncated", "high", "too many files to verify via compare API"))
+            else:
+                checks.append(check("file-ownership", "verified",
+                                    f"all {len(set(files))} path(s) changed since {base} are within {agent}'s scope"))
+        except ToolError as exc:
+            checks.append(check("file-ownership", "unverified", str(exc)[:200]))
+            findings.append(finding("scope-unverified", "high", f"could not list changed files: {str(exc)[:160]}"))
+    else:
+        checks.append(check("file-ownership", "unverified", "skipped: agent is not assigned to this branch"))
+
+    # 6. developer-supplied test evidence: checked for consistency, still CLAIMED
+    if test_results:
+        tr = pplib.load_test_results(test_results)
+        failed = [r["name"] for r in tr["results"] if r["status"] == "fail"]
+        if tr.get("sha") != sha:
+            checks.append(check("claimed-tests", "failed",
+                                f"test results are for {str(tr.get('sha'))[:12]}, not {sha[:12]}", "claimed"))
+            findings.append(finding("test-results-sha-mismatch", "high",
+                                    "submitted pp-test-results/v1 does not match the claimed SHA"))
+        elif tr.get("dirty"):
+            checks.append(check("claimed-tests", "unverified",
+                                "tests ran on a working tree with uncommitted changes", "claimed"))
+            findings.append(finding("test-results-dirty-tree", "medium",
+                                    "self-reported tests ran with uncommitted changes"))
+        elif failed:
+            checks.append(check("claimed-tests", "failed", f"self-reported failures: {failed[:6]}", "claimed"))
+            findings.append(finding("claimed-test-failure", "high", f"self-reported failing tests: {failed[:6]}"))
+        else:
+            counts = {s: sum(r["status"] == s for r in tr["results"]) for s in pplib.TEST_STATUSES}
+            checks.append(check("claimed-tests", "unverified",
+                                f"self-reported {counts}; consistent with SHA but not re-executed", "claimed"))
+
+    return finish(branch, sha, agent, checks, findings, ci, branch_head)
+
+
+def urlsafe(ref: str) -> str:
+    import urllib.parse
+    return urllib.parse.quote(ref, safe="")
+
+
+def finish(branch, sha, agent, checks, findings, ci, branch_head="") -> dict:
+    independent = [c for c in checks if c["provenance"] == "independent"]
+    if any(c["status"] == "failed" for c in checks):
+        verdict = "FAILED"
+    elif all(c["status"] == "verified" for c in independent) and independent:
+        verdict = "VERIFIED"
+    else:
+        verdict = "UNVERIFIED"
+    return pplib.findings_doc(TOOL, branch, sha, findings, agent=agent, verdict=verdict,
+                              branch_head=branch_head, checks=checks,
+                              ci=ci and {k: ci[k] for k in ("state", "summary", "checks")})
+
+
+def render(doc: dict) -> str:
+    lines = [f"verify-claim: {doc['verdict']}  agent={doc.get('agent')} branch={doc['branch']} sha={doc['sha'][:12]}"]
+    mark = {"verified": "OK  ", "failed": "FAIL", "unverified": "??  "}
+    for c in doc.get("checks", []):
+        tag = "" if c["provenance"] == "independent" else " [claimed]"
+        lines.append(f"  {mark[c['status']]} {c['check']:<16} {c['evidence']}{tag}")
+    for f in doc["findings"][:12]:
+        where = f" [{f['file']}]" if f.get("file") else ""
+        lines.append(f"  - {f['severity']}: {f['rule']}{where}: {f['message'][:140]}")
+    if len(doc["findings"]) > 12:
+        lines.append(f"  ... {len(doc['findings']) - 12} more finding(s) in the JSON output")
+    return "\n".join(lines)
+
+
+def main(argv=None) -> int:
+    p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    p.add_argument("--branch")
+    p.add_argument("--sha")
+    p.add_argument("--agent")
+    p.add_argument("--relay-comment", type=int, help="Issue comment id holding a relay block")
+    p.add_argument("--base", default="beta", help="Base branch the work targets (default beta)")
+    p.add_argument("--repo")
+    p.add_argument("--test-results", type=pathlib.Path)
+    p.add_argument("--json", action="store_true", help="Print pp-findings/v1 JSON")
+    p.add_argument("--output", type=pathlib.Path,
+                   help="Also write JSON here (default tools/out/verify-claim-findings.json)")
+    args = p.parse_args(argv)
+    try:
+        repo = pplib.repo_slug(args.repo)
+        gh = pplib.GitHub()
+        branch, sha, agent = args.branch, args.sha, args.agent
+        if args.relay_comment:
+            body = gh.get(f"/repos/{repo}/issues/comments/{args.relay_comment}").get("body", "")
+            relay = pplib.parse_relay(body)
+            if not relay:
+                raise ToolError(f"comment {args.relay_comment} has no pixel-pals-relay:v1 block")
+            if not relay["canonical"]:
+                doc = pplib.findings_doc(TOOL, relay["branch"], relay["sha"], [
+                    finding("non-canonical-relay", "high", "; ".join(relay["problems"]))],
+                    agent=relay["agent"], verdict="UNVERIFIED", checks=[])
+                emit(doc, args)
+                return 1
+            branch, sha, agent = branch or relay["branch"], sha or relay["sha"], agent or relay["agent"]
+        if not (branch and sha and agent):
+            raise ToolError("need --branch, --sha and --agent (or --relay-comment)")
+        doc = verify(gh, repo, branch, sha.lower(), agent, args.base, args.test_results)
+        doc["repo"] = repo
+        doc["github_api_calls"] = gh.calls
+        emit(doc, args)
+        return 0 if doc["verdict"] == "VERIFIED" else 1
+    except (ToolError, OSError, ValueError, json.JSONDecodeError) as exc:
+        return pplib.die(TOOL, exc, args.json)
+
+
+def emit(doc: dict, args) -> None:
+    pplib.write_json(args.output or pplib.OUT / "verify-claim-findings.json", doc)
+    print(json.dumps(doc, indent=2) if args.json else render(doc))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
