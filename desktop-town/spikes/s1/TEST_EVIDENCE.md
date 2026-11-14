@@ -40,53 +40,59 @@ byte-for-byte by SHA-256 (run 43612413371), then reviewed:
 | `Cargo.lock` | `ace166be6286199904d60ed1666ac8073d280baedbd7408f51dd98f52b07fc54` | 74 crates.io + 1 local | all checksummed; no git/path deps; gtk-rs 0.22/gtk4 0.11, gtk4-layer-shell 0.8.1, glib-unix 0.22.8, standard proc-macro/toml/futures crates; MSRV 1.92 |
 | `qa/wlr-clicker/Cargo.lock` | `75ba217ebb544093626288b1728276ff17c9e547428f022310eb2895f6a78858` | 24 crates.io + 1 local | QA-only; Smithay wayland-client 0.31 / wayland-protocols-wlr 0.3 |
 
-## Results on the committed sources — run [43613334371](https://github.com/nyteghost/buddy-bot-room/actions/runs/43613334371)
+## Results on the PR head sources — run [43615517387](https://github.com/nyteghost/buddy-bot-room/actions/runs/43615517387)
 
-Tested commit `70a0243009a639befdac56034b0ccb83c2aa7913` (S1 tree
-`3131310abf50c6cbaee17ba063af1eaa848062cd`) via probe `2a5d63be`
+Tested commit `7e4fa2200f8ebb22c7b7ab27b0f29fa1b2173f96` (S1 tree
+`5ab3c8f032ce50f9917e2b4f7eac6a02beedd9e6`) via probe `128fe805`
 (= that commit + the workflow file). **Conclusion: success, every step.**
-
-- Both lockfiles used as committed (`--locked`/`--frozen`), SHA-256 as above.
-- `cargo audit --deny warnings`: **0 advisories** (Cargo.lock 75 entries,
-  clicker 25 entries).
-- fmt / check / clippy `-D warnings` / test / build: PASS.
-- GTK runtime: sway 6/6, weston 6/6; X11 fallback PASS.
-- wlroots acceptance: identical PASS matrix to the table below (100 %
-  scenario with 20/20 lifecycle; 125 %, 150 %, dual mixed-DPI + hotplug).
-- `makepkg`: PASS (`0.1.0.r1.g2a5d63beeda7-1`); namcap: license E (no repo
-  LICENSE), informational W only (`bash`/`python3` script interpreters, ld.so).
-
-The commit after `70a0243` changes only this file.
-
-## Earlier run — [43611656042](https://github.com/nyteghost/buddy-bot-room/actions/runs/43611656042) (probe `f09930a9`, same S1 sources before lock commit; lock generated in-run)
+The commit after `7e4fa22` changes only this file.
 
 | Check | Result |
 | --- | --- |
+| Lockfiles | used as committed (`--locked` / `--frozen`); SHA-256 as above |
+| `cargo audit --deny warnings` | **0 advisories** (75 + 25 lock entries) |
 | `cargo fmt --all -- --check` | PASS |
 | `cargo check --locked --all-targets` | PASS |
 | `cargo clippy --locked --all-targets -- -D warnings` | PASS (0 warnings) |
-| `cargo test --locked` | PASS — 16 unit (geometry, CLI) + 3 CLI process tests; GTK runtime SKIP outside session |
+| `cargo test --locked` | PASS — 16 unit (geometry, CLI) + 3 CLI process tests; GTK runtime SKIP outside a session |
 | QA clicker fmt / clippy `-D warnings` / build | PASS |
 | `bash -n`, `py_compile` | PASS |
-| GTK runtime tests, headless **sway** (layer-shell) | PASS 6/6 (overlay ready+allocated+timeout, bounded default, town-only, SIGTERM, unknown connector → exit 2, 5 lifecycle cycles) |
-| GTK runtime tests, headless **weston** (no wlr-layer-shell) | PASS 6/6 (`--require-overlay` → exit 2, otherwise town-only window) |
-| X11 (Xvfb) fallback | PASS (`--require-overlay` → exit 2 "Not a native Wayland GDK display"; default → town-only window, no overlay) |
-| `makepkg --cleanbuild` (from checkout, runs `cargo test --frozen`) | PASS; package lists only `/usr/bin/pixel-pals-s1-kwin-overlay`, `/usr/share/pixel-pals-s1/qa/*`, `/usr/share/doc/…` |
-| `namcap` | 1 E (no license file — repo has no LICENSE); dependency W fixed after this run (`graphene`, `libgcc`, `bash`) |
+| GTK runtime tests, headless **sway** (layer-shell) | PASS 6/6 — ready+allocated+timeout, bounded default mode, town-only, SIGTERM clean exit, unknown connector → exit 2, 5 lifecycle cycles |
+| GTK runtime tests, headless **weston** (no wlr-layer-shell) | PASS 6/6 — `--require-overlay` → exit 2; otherwise town-only window, never an overlay |
+| X11 (Xvfb) fallback | PASS — `--require-overlay` → exit 2 "Not a native Wayland GDK display"; default → town-only window |
+| `makepkg --cleanbuild` (runs `cargo test --frozen`) | PASS (`0.1.0.r1.g128fe805d111-1`); installs only `/usr/bin/pixel-pals-s1-kwin-overlay`, `/usr/share/pixel-pals-s1/qa/*`, `/usr/share/doc/pixel-pals-s1-overlay-dev/*` |
+| `namcap` | 1 E: no license file (repo has no LICENSE); W only for script interpreters / ld.so |
 
-### wlroots acceptance (`qa/wlroots_acceptance.py`, virtual pointer)
+### wlroots acceptance (`qa/wlroots_acceptance.py`, virtual pointer, 6 scenarios)
 
-| Gate | 1 output 100 % | 1 output 125 % | 1 output 150 % | 2 outputs 100 % + 150 % |
+Underlay placement per output verified from the sway tree in every scenario.
+
+| Gate | 1× 100 % | 1× 125 % | 1× 150 % | 2× 100 %+150 % (run 1 / 2 / 3) |
 | --- | --- | --- | --- | --- |
-| G0 layer surface mapped per output | PASS | PASS | PASS | PASS (2/2) |
-| G1 empty-region clicks reach underlay | **100/100**, 0 Pal, 0 spurious | 100/100 | 100/100 | 100/100 (50 per output) |
-| G2 Pal clicks | **30/30**, 0 underlay | 30/30 | 30/30 | 30/30 |
-| G7 rim probe r−4 → Pal / r+4 → underlay | 8/8 · 8/8 | 8/8 · 8/8 | 8/8 · 8/8 | 16/16 · 16/16 |
-| G4 transparency (grim diff outside Pal+marker) | 0 px changed | 0 px | 0 px | 0 px |
-| G2b moving Pal (100 px/s) tracked hits; vacated spot → underlay | 20/20; yes | 20/20; yes | 20/20; yes | 20/20; yes |
-| G3 lifecycle cycles; no residual region; screen identical after | **20/20**; yes; yes | 3/3 | 3/3 | 3/3 |
-| G5 fullscreen window focused (top / bottom layer) | click → fullscreen window both (INFO) | same | same | same |
-| G6 output unplug → `S1_HOTPLUG_EXIT`, exit 0, no residual | — | — | — | PASS |
+| G0 layer surface mapped per output | PASS | PASS | PASS | PASS ×3 (2/2 outputs) |
+| G1 empty-region clicks → underlay | **100/100**, 0 Pal, 0 spurious | 100/100 | 100/100 | 100/100 ×3 (50 per output) |
+| G2 Pal clicks → overlay | **30/30**, 0 underlay | 30/30 | 30/30 | 30/30 ×3 |
+| G7 rim r−4 → Pal · r+4 → underlay | 8/8 · 8/8 | 8/8 · 8/8 | 8/8 · 8/8 | 16/16 · 16/16 ×3 |
+| G4 grim diff outside Pal + marker | 0 px | 0 px | 0 px | 0 px ×3 |
+| G2b moving Pal @100 px/s tracked hits; vacated spot → underlay | 20/20; yes | 20/20; yes | 20/20; yes | 20/20; yes ×3 |
+| G3 lifecycle; no residual region; screen identical after | **20/20**; yes; yes | 3/3 | 3/3 | 3/3 ×3 |
+| G5 focused fullscreen window, top & bottom layer | click → fullscreen window (INFO) | same | same | same |
+| G6 output unplug → `S1_HOTPLUG_EXIT`, exit 0, no residual | — | — | — | PASS ×3 |
+
+## Run history (nothing omitted)
+
+| Run | Commit tested | Result | Notes |
+| --- | --- | --- | --- |
+| 43610024843 → 43611013664 | probe WIP | FAIL | compile fixes found in CI: `set_input_region` takes `Option` in gtk4-rs 0.11; `unix_signal_add_local` moved to `glib-unix`; `glib-unix` 0.22.8 needs default features; Arch sway file caps must be stripped in containers; no session bus |
+| [43611656042](https://github.com/nyteghost/buddy-bot-room/actions/runs/43611656042) | probe `f09930a9` | PASS | first fully green run; lock generated in-run |
+| [43612413371](https://github.com/nyteghost/buddy-bot-room/actions/runs/43612413371) | probe `3016e782` | PASS | lockfiles printed to log; reconstructed byte-for-byte |
+| [43613334371](https://github.com/nyteghost/buddy-bot-room/actions/runs/43613334371) | `70a0243` | PASS | committed lockfiles; first `cargo audit` (0 advisories) |
+| [43614124894](https://github.com/nyteghost/buddy-bot-room/actions/runs/43614124894) | `05ad0ec` (docs-only change vs `70a0243`) | **FAIL** | dual-output scenario only: 50/100 empty clicks counted, **0 spurious**, Pal clicks correct. Harness race: both underlay windows could land on one output. Fixed in `68bf59d` (move by pid + verify) |
+| [43614888996](https://github.com/nyteghost/buddy-bot-room/actions/runs/43614888996) | `68bf59d` | **FAIL** | harness error: sway rejects no-op `move` on single-output runs; the three dual-output runs all PASS. Fixed in `7e4fa22` |
+| [43615517387](https://github.com/nyteghost/buddy-bot-room/actions/runs/43615517387) | `7e4fa22` | PASS | evidence table above |
+
+No overlay source code changed between `70a0243` and `7e4fa22`; only the QA
+harness, CI definition and docs.
 
 ## Still UNVERIFIED (owner hardware, `qa/DEVICE-QA-CHECKLIST.md`)
 
