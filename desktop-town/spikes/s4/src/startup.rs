@@ -542,7 +542,7 @@ mod tests {
     #[test]
     fn reveal_shows_only_after_a_fresh_present() {
         for (outcome, expect_reconfigure) in [(Timeout, false), (Lost, true), (Outdated, true)] {
-            let mut port = FakePort::new(&[outcome.clone()]);
+            let mut port = FakePort::new(std::slice::from_ref(&outcome));
             assert_eq!(reveal(&mut port), Reveal::StayHidden, "{outcome:?}");
             assert!(!port.calls.contains(&Call::Show));
             assert_eq!(port.calls.contains(&Call::Reconfigure), expect_reconfigure);
