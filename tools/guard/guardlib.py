@@ -59,7 +59,13 @@ def matches(path: str, pattern: str) -> bool:
     # A trailing /** must not inadvertently match sibling paths.
     if pattern.endswith("/**"):
         return path.startswith(pattern[:-3] + "/")
-    return fnmatch.fnmatchcase(path, pattern)
+    parts, patterns = path.split("/"), pattern.split("/")
+    # fnmatchcase('*') also matches '/' in Python. Match by segment to keep
+    # .github/workflows/pp-*.yml from authorizing nested/other paths.
+    return len(parts) == len(patterns) and all(
+        fnmatch.fnmatchcase(segment, glob)
+        for segment, glob in zip(parts, patterns)
+    )
 
 def select_agent(data: dict, branch: str, specified: str | None = None) -> str:
     if not VALID_BRANCH.fullmatch(branch) or ".." in branch.split("/"):
