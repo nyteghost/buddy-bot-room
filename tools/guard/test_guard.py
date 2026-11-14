@@ -32,6 +32,7 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(matches("tools/guarded/check", "tools/guard/**"))
         self.assertTrue(matches(".github/workflows/pp-relay-check.yml", ".github/workflows/pp-*.yml"))
         self.assertFalse(matches(".github/workflows/ci.yml", ".github/workflows/pp-*.yml"))
+        self.assertFalse(matches(".github/workflows/pp-trick/evil.yml", ".github/workflows/pp-*.yml"))
 
     def test_scope_denies_wrong_branch_and_escape(self):
         with self.assertRaises(GuardError):
