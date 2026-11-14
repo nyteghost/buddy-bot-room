@@ -64,6 +64,7 @@ function Invoke-PalsWatched([string[]]$Arguments, [int]$TimeoutMs = 120000) {
   $null = $p.Handle
   $watch = [System.Diagnostics.Stopwatch]::StartNew()
   $found = $false; $everVisible = $false; $palRegion = $false; $unsafe = 0; $samples = 0
+  $firstVisibleMs = $null; $firstPalMs = $null; $unsafeLog = [System.Collections.Generic.List[string]]::new()
   while (-not $p.HasExited) {
     if ($watch.ElapsedMilliseconds -gt $TimeoutMs) { $p.Kill(); throw "PixelPals.exe $Arguments did not exit within $TimeoutMs ms" }
     # [NullString]::Value: PowerShell would otherwise pass "" (match no class).
@@ -73,11 +74,17 @@ function Invoke-PalsWatched([string[]]$Arguments, [int]$TimeoutMs = 120000) {
       $rect = New-Object S4Qa.Win32+RECT
       $type = [S4Qa.Win32]::GetWindowRgnBox($hwnd, [ref]$rect)
       $visible = [S4Qa.Win32]::IsWindowVisible($hwnd)
-      if ($type -ge 2) { $palRegion = $true }
+      if ($type -ge 2) { $palRegion = $true; if ($null -eq $firstPalMs) { $firstPalMs = $watch.ElapsedMilliseconds } }
       if ($visible) {
         $everVisible = $true
+        if ($null -eq $firstVisibleMs) { $firstVisibleMs = $watch.ElapsedMilliseconds }
         # A visible overlay must always carry the Pal-shaped region.
-        if ($type -lt 2) { $unsafe++ }
+        if ($type -lt 2) {
+          $unsafe++
+          # Re-read both after the fact: distinguishes a torn read from a real state.
+          $again = [S4Qa.Win32]::GetWindowRgnBox($hwnd, [ref]$rect)
+          if ($unsafeLog.Count -lt 10) { $unsafeLog.Add("t=$($watch.ElapsedMilliseconds)ms type=$type visible=$visible recheck_type=$again recheck_visible=$([S4Qa.Win32]::IsWindowVisible($hwnd)) exited=$($p.HasExited)") }
+        }
       }
     }
     Start-Sleep -Milliseconds 5
@@ -86,6 +93,8 @@ function Invoke-PalsWatched([string[]]$Arguments, [int]$TimeoutMs = 120000) {
   return [pscustomobject]@{
     ExitCode = $p.ExitCode; WindowSeen = $found; EverVisible = $everVisible
     PalRegionSeen = $palRegion; VisibleWithoutPalRegion = $unsafe; Samples = $samples
+    FirstVisibleMs = $firstVisibleMs; FirstPalRegionMs = $firstPalMs; ExitMs = $watch.ElapsedMilliseconds
+    UnsafeDetail = ($unsafeLog -join ' | ')
   }
 }
 
@@ -234,18 +243,20 @@ try {
     }
     #    Transient skips recover: shown only after a real present, always with
     #    the Pal region, never visible with an empty/full-window region.
-    foreach ($kind in @('timeout', 'lost', 'outdated')) {
+    foreach ($kind in @('timeout', 'lost', 'outdated', 'timeout', 'lost', 'outdated', 'timeout', 'lost', 'outdated')) {
       Remove-Item -LiteralPath (Join-Path $data 's4-smoke.json') -ErrorAction SilentlyContinue
       $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs", "--qa-fault-first-frame=${kind}:3")
       $report = Read-Smoke
       Assert-True ($r.ExitCode -eq 0 -and $report -and $report.result -eq 'PASS' -and $report.startup_attempts -eq 4 -and $r.WindowSeen -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
-        "first-frame-$kind-recovers" ("exit=$($r.ExitCode) attempts=$(if ($report) { $report.startup_attempts } else { 'n/a' }) frames=$(if ($report) { $report.frames_presented } else { 'n/a' }) ever_visible=$($r.EverVisible) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)")
+        "first-frame-$kind-recovers" ("exit=$($r.ExitCode) attempts=$(if ($report) { $report.startup_attempts } else { 'n/a' }) frames=$(if ($report) { $report.frames_presented } else { 'n/a' }) ever_visible=$($r.EverVisible) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples) first_pal_ms=$($r.FirstPalRegionMs) first_visible_ms=$($r.FirstVisibleMs) exit_ms=$($r.ExitMs) unsafe=[$($r.UnsafeDetail)]")
     }
-    #    Unfaulted launch observed externally obeys the same invariant.
+    #    Unfaulted launch observed externally obeys the same invariant (x3).
+    foreach ($rep in 1..3) {
     $r = Invoke-PalsWatched @("--smoke-test-ms=$SmokeMs")
     $report = Read-Smoke
     Assert-True ($r.ExitCode -eq 0 -and $report.startup_attempts -ge 1 -and $r.WindowSeen -and $r.EverVisible -and $r.VisibleWithoutPalRegion -eq 0) `
-      'normal-launch-never-visible-without-pal-region' "exit=$($r.ExitCode) attempts=$($report.startup_attempts) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples)"
+      "normal-launch-never-visible-without-pal-region-$rep" "exit=$($r.ExitCode) attempts=$($report.startup_attempts) visible_without_pal_region=$($r.VisibleWithoutPalRegion) samples=$($r.Samples) first_pal_ms=$($r.FirstPalRegionMs) first_visible_ms=$($r.FirstVisibleMs) exit_ms=$($r.ExitMs) unsafe=[$($r.UnsafeDetail)]"
+    }
 
     # 6b. Memory attribution, A/B suballocation sizes, idle cost, lifecycle --
     #     Values below come from the CI runner (WARP software adapter): they
