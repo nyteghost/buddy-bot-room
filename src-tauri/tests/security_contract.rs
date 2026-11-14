@@ -96,7 +96,13 @@ fn legacy_updater_is_disabled_and_installer_does_not_fetch_code() {
             "installer must not update source: {forbidden}"
         );
     }
-    for forbidden in ["git fetch", "git pull", "git merge", "git reset", "git checkout"] {
+    for forbidden in [
+        "git fetch",
+        "git pull",
+        "git merge",
+        "git reset",
+        "git checkout",
+    ] {
         assert!(
             !old_updater.contains(forbidden),
             "legacy updater must not mutate repository: {forbidden}"
